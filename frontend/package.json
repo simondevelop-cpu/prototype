@@ -1,0 +1,16 @@
+{
+  "name": "canadian-insights-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "jest"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "axios": "^1.4.0",
+    "@chakra-ui/react": "^2.6.0"
+  }
+}
