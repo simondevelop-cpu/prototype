@@ -57,6 +57,16 @@ npm run test:ui
 - Introduce authentication and per-user data isolation.
 - Add French translations to satisfy the bilingual requirement in the PRD.
 
+## Resolving merge conflicts with this update
+
+If you run into merge conflicts while integrating **Add Express backend and connect UI to live data (#3)**, use the following decision tree:
+
+1. Prefer **Accept incoming change** when the conflict is between legacy static prototype code and the new Express-backed implementation. The incoming block contains the backend-enabled logic and should generally replace the older stub.
+2. Choose **Accept both changes** only when the conflicting snippets configure complementary behaviour (e.g., environment variables or documentation notes). After accepting both, edit the result to remove duplicate headings or commands.
+3. Fall back to **Accept current change** when you have local modifications that intentionally diverge from the full-stack implementation and you plan to re-apply the backend wiring manually.
+
+After resolving each conflict, delete the conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`), run `npm start` to verify the server boots, and rerun the Playwright smoke test (`npm run test:ui`) to confirm the UI still operates end to end.
+
 ## License
 
 Proprietary – internal prototype for discovery and user feedback.
