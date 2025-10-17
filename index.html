@@ -370,17 +370,17 @@
     </footer>
 
     <dialog id="upload-dialog">
-      <form class="upload-modal" data-form="upload">
+      <form method="dialog" class="upload-modal">
         <h2>Upload bank statements</h2>
         <p>Drag and drop up to 6 CSV or PDF statements at a time.</p>
         <label class="dropzone">
-          <input type="file" name="statements" accept=".csv,application/csv,text/csv,application/vnd.ms-excel" multiple required />
+          <input type="file" multiple />
           <span>Drop files here or browse</span>
         </label>
         <p class="tiny">We use bank-level encryption and never store your credentials.</p>
         <menu class="dialog-actions">
-          <button type="button" data-action="cancel" class="secondary">Cancel</button>
-          <button type="submit" data-action="confirm">Continue</button>
+          <button value="cancel" class="secondary">Cancel</button>
+          <button value="confirm">Continue</button>
         </menu>
       </form>
     </dialog>
