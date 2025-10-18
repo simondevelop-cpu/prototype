@@ -690,45 +690,17 @@ transactions.forEach((tx) => {
 });
 
 const monthlySequence = Array.from(monthlyMap.values()).sort((a, b) => a.date - b.date);
-const monthIndexByKey = new Map(monthlySequence.map((month, index) => [month.key, index]));
 const timeframeMonths = { '3m': 3, '6m': 6, '12m': 12 };
-const timeframeLabels = {
-  '3m': 'Last 3 months',
-  '6m': 'Last 6 months',
-  '12m': 'Last 12 months',
-  custom: 'Custom range',
-};
-
-function getDefaultCustomRange() {
-  if (!monthlySequence.length) {
-    return { start: null, end: null };
-  }
-  const endIndex = monthlySequence.length - 1;
-  const startIndex = Math.max(0, endIndex - 2);
-  return {
-    start: monthlySequence[startIndex].key,
-    end: monthlySequence[endIndex].key,
-  };
-}
 
 const dashboardState = {
   timeframe: '3m',
   type: 'income',
   monthKey: monthlySequence.length ? monthlySequence[monthlySequence.length - 1].key : null,
-  customRange: getDefaultCustomRange(),
 };
 
 const cashflowChartContainer = document.querySelector('[data-chart="cashflow"]');
-const cashflowAxisContainer = document.querySelector('[data-chart-axis]');
 const cashflowCategoriesList = document.querySelector('[data-list="cashflow-categories"]');
-const timeframeDropdown = document.querySelector('[data-timeframe]');
-const cashflowTimeframeToggle = document.querySelector('[data-timeframe-toggle]');
-const cashflowTimeframeMenu = document.querySelector('[data-timeframe-menu]');
-const cashflowTimeframeLabel = document.querySelector('[data-timeframe-label]');
-const cashflowTimeframeOptions = Array.from(document.querySelectorAll('[data-timeframe-option]'));
-const customRangeContainer = document.querySelector('[data-custom-range]');
-const customStartSelect = document.querySelector('[data-custom-start]');
-const customEndSelect = document.querySelector('[data-custom-end]');
+const cashflowTimeframeSelect = document.querySelector('[data-filter="cashflow-timeframe"]');
 const dashboardTransactionsTable = document.querySelector('[data-table="dashboard-transactions"]');
 const dashboardSummaryLabel = document.querySelector('[data-dashboard-summary]');
 
@@ -745,279 +717,6 @@ if (uploadButton) {
   uploadButton.addEventListener('click', () => {
     uploadDialog.showModal();
   });
-}
-
-uploadDialog.addEventListener('close', () => {
-  if (uploadDialog.returnValue === 'confirm') {
-    showToast('Upload started. We will notify you when categorisation finishes.');
-  }
-});
-
-function showToast(message) {
-  toast.textContent = message;
-  toast.dataset.state = 'visible';
-  setTimeout(() => {
-    toast.dataset.state = 'hidden';
-  }, 2800);
-}
-
-function unlockModule(button) {
-  const module = button.closest('.module');
-  module.classList.remove('locked');
-  const overlay = module.querySelector('.lock-overlay');
-  if (overlay) {
-    overlay.remove();
-  }
-  showToast('Sample data unlocked. Upload your statements to make it yours.');
-}
-
-document.querySelectorAll('.unlock-button').forEach((button) => {
-  button.addEventListener('click', () => {
-    unlockModule(button);
-    const demo = button.dataset.demo;
-    if (demo === 'cashflow') {
-      renderDashboard();
-    }
-    if (demo === 'budget') {
-      populateBudget('monthly');
-    }
-    if (demo === 'savings') {
-      populateSavings('last-month');
-    }
-  });
-});
-
-function setTimeframeMenuState(isOpen) {
-  if (!cashflowTimeframeMenu || !cashflowTimeframeToggle) return;
-  cashflowTimeframeMenu.hidden = !isOpen;
-  cashflowTimeframeToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-  if (isOpen) {
-    const activeOption = cashflowTimeframeOptions.find(
-      (option) => option.dataset.timeframeOption === dashboardState.timeframe,
-    );
-    const target = activeOption || cashflowTimeframeOptions[0];
-    if (target) {
-      target.focus();
-    }
-  }
-}
-
-function closeTimeframeMenu(options = {}) {
-  if (!cashflowTimeframeMenu || cashflowTimeframeMenu.hidden) return;
-  setTimeframeMenuState(false);
-  if (options.focusToggle && cashflowTimeframeToggle) {
-    cashflowTimeframeToggle.focus();
-  }
-}
-
-function toggleTimeframeMenu() {
-  if (!cashflowTimeframeMenu) return;
-  setTimeframeMenuState(cashflowTimeframeMenu.hidden);
-}
-
-if (cashflowTimeframeToggle) {
-  cashflowTimeframeToggle.addEventListener('click', () => {
-    toggleTimeframeMenu();
-  });
-}
-
-document.addEventListener('click', (event) => {
-  if (!timeframeDropdown || !cashflowTimeframeMenu || cashflowTimeframeMenu.hidden) return;
-  if (!timeframeDropdown.contains(event.target)) {
-    closeTimeframeMenu();
-  }
-});
-
-if (cashflowTimeframeMenu) {
-  cashflowTimeframeMenu.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') {
-      event.stopPropagation();
-      closeTimeframeMenu({ focusToggle: true });
-    }
-  });
-}
-
-function handleTimeframeSelection(value) {
-  if (!value) return;
-  if (dashboardState.timeframe !== value) {
-    dashboardState.timeframe = value;
-    if (value !== 'custom') {
-      dashboardState.customRange = getDefaultCustomRange();
-    }
-  }
-  renderDashboard();
-  closeTimeframeMenu({ focusToggle: true });
-}
-
-cashflowTimeframeOptions.forEach((option) => {
-  option.addEventListener('click', () => {
-    handleTimeframeSelection(option.dataset.timeframeOption);
-  });
-});
-
-function updateTimeframeDisplay() {
-  if (cashflowTimeframeLabel) {
-    let label = timeframeLabels[dashboardState.timeframe] || timeframeLabels['3m'];
-    if (dashboardState.timeframe === 'custom') {
-      const { start, end } = dashboardState.customRange;
-      if (start && end && monthlyMap.has(start) && monthlyMap.has(end)) {
-        const startLabel = monthlyMap.get(start).label;
-        const endLabel = monthlyMap.get(end).label;
-        label = `Custom range (${startLabel} – ${endLabel})`;
-      }
-    }
-    cashflowTimeframeLabel.textContent = label;
-  }
-  cashflowTimeframeOptions.forEach((option) => {
-    const isActive = option.dataset.timeframeOption === dashboardState.timeframe;
-    option.classList.toggle('active', isActive);
-    option.setAttribute('aria-selected', isActive ? 'true' : 'false');
-  });
-}
-
-if (customStartSelect && customEndSelect) {
-  populateCustomRangeOptions();
-  customStartSelect.addEventListener('change', () => handleCustomRangeChange('start'));
-  customEndSelect.addEventListener('change', () => handleCustomRangeChange('end'));
-}
-
-if (cashflowChartContainer) {
-  cashflowChartContainer.addEventListener('click', (event) => {
-    const bar = event.target.closest('[data-month][data-type]');
-    if (!bar) return;
-    dashboardState.monthKey = bar.dataset.month;
-    dashboardState.type = bar.dataset.type;
-    renderDashboard();
-  });
-}
-
-function populateCustomRangeOptions() {
-  if (!customStartSelect || !customEndSelect) return;
-  const options = monthlySequence
-    .map((month) => `<option value="${month.key}">${month.longLabel}</option>`)
-    .join('');
-  customStartSelect.innerHTML = options;
-  customEndSelect.innerHTML = options;
-}
-
-function handleCustomRangeChange(changedField) {
-  if (!customStartSelect || !customEndSelect || !monthlySequence.length) {
-    return;
-  }
-
-  let startValue = customStartSelect.value;
-  let endValue = customEndSelect.value;
-
-  if (!monthIndexByKey.has(startValue) || !monthIndexByKey.has(endValue)) {
-    normalizeCustomRange();
-    startValue = dashboardState.customRange.start;
-    endValue = dashboardState.customRange.end;
-  }
-
-  let startIndex = monthIndexByKey.get(startValue);
-  let endIndex = monthIndexByKey.get(endValue);
-
-  if (startIndex > endIndex) {
-    if (changedField === 'start') {
-      endIndex = startIndex;
-      customEndSelect.value = monthlySequence[endIndex].key;
-    } else {
-      startIndex = endIndex;
-      customStartSelect.value = monthlySequence[startIndex].key;
-    }
-  }
-
-  const maxSpan = 11;
-  if (endIndex - startIndex > maxSpan) {
-    if (changedField === 'start') {
-      endIndex = Math.min(startIndex + maxSpan, monthlySequence.length - 1);
-      customEndSelect.value = monthlySequence[endIndex].key;
-    } else {
-      startIndex = Math.max(endIndex - maxSpan, 0);
-      customStartSelect.value = monthlySequence[startIndex].key;
-    }
-  }
-
-  dashboardState.customRange.start = monthlySequence[startIndex].key;
-  dashboardState.customRange.end = monthlySequence[endIndex].key;
-
-  renderDashboard();
-}
-
-function getCustomRangeMonths() {
-  const { start, end } = dashboardState.customRange;
-  if (!start || !end) {
-    return [];
-  }
-  const startIndex = monthIndexByKey.get(start);
-  const endIndex = monthIndexByKey.get(end);
-  if (startIndex === undefined || endIndex === undefined || startIndex > endIndex) {
-    return [];
-  }
-  const span = endIndex - startIndex + 1;
-  if (span < 1 || span > 12) {
-    return [];
-  }
-  return monthlySequence.slice(startIndex, endIndex + 1);
-}
-
-function getMonthsForTimeframe(timeframe) {
-  if (timeframe === 'custom') {
-    return getCustomRangeMonths();
-  }
-  const count = timeframeMonths[timeframe] || 3;
-  return monthlySequence.slice(-count);
-}
-
-function ensureDashboardMonth() {
-  let months = getMonthsForTimeframe(dashboardState.timeframe);
-  if (!months.length && dashboardState.timeframe === 'custom') {
-    dashboardState.customRange = getDefaultCustomRange();
-    if (customStartSelect && customEndSelect) {
-      customStartSelect.value = dashboardState.customRange.start || '';
-      customEndSelect.value = dashboardState.customRange.end || '';
-    }
-    months = getCustomRangeMonths();
-  }
-  if (!months.length) {
-    dashboardState.monthKey = null;
-    return;
-  }
-  if (!months.some((month) => month.key === dashboardState.monthKey)) {
-    dashboardState.monthKey = months[months.length - 1].key;
-  }
-}
-
-function normalizeCustomRange() {
-  if (!monthlySequence.length) {
-    dashboardState.customRange = { start: null, end: null };
-    return;
-  }
-
-  let { start, end } = dashboardState.customRange;
-
-  if (!start || !monthIndexByKey.has(start)) {
-    start = getDefaultCustomRange().start;
-  }
-  if (!end || !monthIndexByKey.has(end)) {
-    end = getDefaultCustomRange().end;
-  }
-
-  let startIndex = monthIndexByKey.get(start);
-  let endIndex = monthIndexByKey.get(end);
-
-  if (startIndex > endIndex) {
-    [startIndex, endIndex] = [endIndex, startIndex];
-  }
-
-  if (endIndex - startIndex + 1 > 12) {
-    endIndex = Math.min(startIndex + 11, monthlySequence.length - 1);
-  }
-
-  dashboardState.customRange = {
-    start: monthlySequence[startIndex].key,
-    end: monthlySequence[endIndex].key,
-  };
 }
 
 function updateCustomRangeControls() {
@@ -1052,43 +751,76 @@ function calculateNiceMax(value) {
   return niceNormalized * magnitude;
 }
 
+function unlockModule(button) {
+  const module = button.closest('.module');
+  module.classList.remove('locked');
+  const overlay = module.querySelector('.lock-overlay');
+  if (overlay) {
+    overlay.remove();
+  }
+  showToast('Sample data unlocked. Upload your statements to make it yours.');
+}
+
+document.querySelectorAll('.unlock-button').forEach((button) => {
+  button.addEventListener('click', () => {
+    unlockModule(button);
+    const demo = button.dataset.demo;
+    if (demo === 'cashflow') {
+      renderDashboard();
+    }
+    if (demo === 'budget') {
+      populateBudget('monthly');
+    }
+    if (demo === 'savings') {
+      populateSavings('last-month');
+    }
+  });
+});
+
+if (cashflowTimeframeSelect) {
+  cashflowTimeframeSelect.addEventListener('change', () => {
+    dashboardState.timeframe = cashflowTimeframeSelect.value;
+    ensureDashboardMonth();
+    renderDashboard();
+  });
+}
+
+if (cashflowChartContainer) {
+  cashflowChartContainer.addEventListener('click', (event) => {
+    const bar = event.target.closest('[data-month][data-type]');
+    if (!bar) return;
+    dashboardState.monthKey = bar.dataset.month;
+    dashboardState.type = bar.dataset.type;
+    renderDashboard();
+  });
+}
+
+function getMonthsForTimeframe(timeframe) {
+  const count = timeframeMonths[timeframe] || 3;
+  return monthlySequence.slice(-count);
+}
+
+function ensureDashboardMonth() {
+  const months = getMonthsForTimeframe(dashboardState.timeframe);
+  if (!months.length) {
+    dashboardState.monthKey = null;
+    return;
+  }
+  if (!months.some((month) => month.key === dashboardState.monthKey)) {
+    dashboardState.monthKey = months[months.length - 1].key;
+  }
+}
+
 function buildCashflowChart() {
   if (!cashflowChartContainer) return;
   const months = getMonthsForTimeframe(dashboardState.timeframe);
   const maxValue = months.reduce((max, month) => Math.max(max, month.income.total, month.expense.total), 0);
-  const axisMax = calculateNiceMax(maxValue);
-  if (cashflowAxisContainer) {
-    cashflowAxisContainer.innerHTML = '';
-  }
   cashflowChartContainer.innerHTML = '';
 
-  if (!months.length || !maxValue) {
-    if (cashflowAxisContainer) {
-      const tick = document.createElement('div');
-      tick.className = 'chart-y-tick';
-      const label = document.createElement('span');
-      label.textContent = currency(0);
-      tick.appendChild(label);
-      cashflowAxisContainer.appendChild(tick);
-    }
+  if (!months.length) {
     cashflowChartContainer.innerHTML = '<p class="empty-state">No cash flow data yet.</p>';
     return;
   }
-
-  if (cashflowAxisContainer) {
-    const tickCount = 4;
-    for (let index = tickCount; index >= 0; index -= 1) {
-      const tickValue = (axisMax / tickCount) * index;
-      const tick = document.createElement('div');
-      tick.className = 'chart-y-tick';
-      const label = document.createElement('span');
-      label.textContent = currency(tickValue);
-      tick.appendChild(label);
-      cashflowAxisContainer.appendChild(tick);
-    }
-  }
-
-  const chartHeight = 220;
 
   months.forEach((month) => {
     const group = document.createElement('div');
@@ -1109,20 +841,16 @@ function buildCashflowChart() {
         button.classList.add('active');
       }
 
-      const track = document.createElement('span');
-      track.className = 'chart-bar-track';
-
       const fill = document.createElement('span');
       fill.className = 'chart-bar-fill';
-      const height = bucket.total ? Math.max(6, (bucket.total / axisMax) * chartHeight) : 0;
+      const height = maxValue ? Math.max(20, (bucket.total / maxValue) * 140) : 20;
       fill.style.height = `${height}px`;
       fill.dataset.type = type;
-      track.appendChild(fill);
-      button.appendChild(track);
+      button.appendChild(fill);
 
       const value = document.createElement('span');
       value.className = 'chart-value';
-      value.textContent = currency(Math.abs(bucket.signedTotal));
+      value.textContent = currency(bucket.signedTotal);
       button.appendChild(value);
 
       group.appendChild(button);
@@ -1210,12 +938,10 @@ function updateDashboardSummary() {
 }
 
 function renderDashboard() {
-  if (dashboardState.timeframe === 'custom') {
-    normalizeCustomRange();
-  }
   ensureDashboardMonth();
-  updateTimeframeDisplay();
-  updateCustomRangeControls();
+  if (cashflowTimeframeSelect) {
+    cashflowTimeframeSelect.value = dashboardState.timeframe;
+  }
   buildCashflowChart();
   buildCashflowBreakdown();
   renderDashboardTransactions();
