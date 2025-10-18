@@ -233,6 +233,90 @@ main {
   flex-wrap: wrap;
 }
 
+.filter-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  min-width: 180px;
+}
+
+.filter-label {
+  font-weight: 600;
+}
+
+.timeframe-dropdown {
+  position: relative;
+}
+
+.timeframe-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.timeframe-toggle:hover,
+.timeframe-toggle:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(65, 120, 255, 0.12);
+  outline: none;
+}
+
+.timeframe-toggle svg {
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
+}
+
+.timeframe-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.15);
+  padding: 0.35rem;
+  z-index: 10;
+}
+
+.timeframe-menu button {
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.timeframe-menu button:hover,
+.timeframe-menu button:focus-visible {
+  background: var(--surface-muted);
+  outline: none;
+}
+
+.timeframe-menu button.active {
+  background: rgba(65, 120, 255, 0.1);
+  color: var(--primary-dark);
+  font-weight: 600;
+}
+
 .filter-row label {
   display: flex;
   flex-direction: column;
@@ -256,36 +340,14 @@ main {
   gap: 1.5rem;
 }
 
-.module-header p {
-  margin: 0;
-}
-
-.module-section {
-  display: grid;
-  gap: 1rem;
-}
-
-.module-section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-.module-section-header h3 {
-  margin: 0;
-  font-size: 1.05rem;
-}
-
-.custom-range {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-end;
-  flex-wrap: wrap;
+.module[data-module='dashboard-transactions'] .module-content {
+  display: block;
 }
 
 @media (min-width: 900px) {
-  .custom-range {
-    align-items: center;
+  .module[data-module='cashflow'] .module-content {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: stretch;
   }
 }
 
@@ -325,68 +387,14 @@ main {
   background: var(--danger);
 }
 
-.chart-body {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 1.5rem;
-  align-items: end;
-}
-
-.chart-y-axis {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  height: 220px;
-  padding: 0 1rem 2.5rem 0;
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-.chart-y-axis::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 2.5rem;
-  right: 0;
-  width: 1px;
-  background: var(--border);
-}
-
-.chart-y-tick {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  height: 1px;
-  position: relative;
-}
-
-.chart-y-tick span {
-  position: relative;
-  top: -8px;
-  padding-right: 0.5rem;
-  background: var(--surface-muted);
-}
-
 .chart-bars {
-  position: relative;
   display: flex;
   align-items: flex-end;
   gap: 1.5rem;
   flex: 1;
-  min-height: 220px;
+  min-height: 180px;
   overflow-x: auto;
-  padding: 0 1.5rem 2.5rem;
-}
-
-.chart-bars::after {
-  content: '';
-  position: absolute;
-  left: 1.5rem;
-  right: 1.5rem;
-  bottom: 2.5rem;
-  height: 1px;
-  background: var(--border);
+  padding-bottom: 0.5rem;
 }
 
 .chart-bar-group {
@@ -440,8 +448,6 @@ main {
 .chart-bar-group small {
   color: var(--muted);
   font-weight: 600;
-  display: block;
-  margin-top: 0.75rem;
 }
 
 @media (max-width: 720px) {

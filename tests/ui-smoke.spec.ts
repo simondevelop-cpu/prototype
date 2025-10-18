@@ -10,11 +10,6 @@ test.describe('Canadian Insights full-stack smoke test', () => {
     await expect(chartGroups).toHaveCount(3);
     await page.locator('[data-filter="cashflow-timeframe"]').selectOption('6m');
     await expect(chartGroups).toHaveCount(6);
-    await page.locator('[data-filter="cashflow-timeframe"]').selectOption('custom');
-    await expect(page.locator('[data-custom-range]')).toBeVisible();
-    const endValue = await page.locator('[data-custom-end]').inputValue();
-    await page.locator('[data-custom-start]').selectOption(endValue);
-    await expect(chartGroups).toHaveCount(1);
     const expenseBar = page.locator('[data-chart="cashflow"] [data-type="expense"]').first();
     await expenseBar.click();
     await expect(page.locator('[data-list="cashflow-categories"] .breakdown-item')).not.toHaveCount(0);

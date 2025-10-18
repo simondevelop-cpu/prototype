@@ -55,19 +55,8 @@
                   <option value="3m">Last 3 months</option>
                   <option value="6m">Last 6 months</option>
                   <option value="12m">Last 12 months</option>
-                  <option value="custom">Custom</option>
                 </select>
               </label>
-              <div class="custom-range" data-custom-range hidden>
-                <label>
-                  From
-                  <select data-custom-start></select>
-                </label>
-                <label>
-                  To
-                  <select data-custom-end></select>
-                </label>
-              </div>
             </div>
           </header>
           <div class="module-content">
@@ -76,11 +65,9 @@
                 <span data-type="income">Income</span>
                 <span data-type="expense">Expenses</span>
               </div>
-              <div class="chart-body">
-                <div class="chart-y-axis" data-chart-axis></div>
-                <div class="chart-bars" data-chart="cashflow"></div>
-              </div>
+              <div class="chart-bars" data-chart="cashflow"></div>
             </div>
+            <div class="category-breakdown" data-list="cashflow-categories"></div>
           </div>
           <div class="lock-overlay">
             <p class="lock-copy">See how your real cash flow looks once you upload your data.</p>
@@ -91,20 +78,12 @@
 
         <article class="module" data-module="dashboard-transactions">
           <header class="module-header">
-            <h2>Transactions</h2>
-            <p class="feedback-note" data-dashboard-summary>Income for Jun 2025</p>
+            <div>
+              <h2>Transactions</h2>
+              <p class="feedback-note" data-dashboard-summary>Income for Jun 2025</p>
+            </div>
           </header>
           <div class="module-content">
-            <section class="module-section">
-              <div class="module-section-header">
-                <h3>Categorisation</h3>
-              </div>
-              <div class="category-breakdown" data-list="cashflow-categories"></div>
-            </section>
-            <section class="module-section">
-              <div class="module-section-header">
-                <h3>Transactions</h3>
-              </div>
             <table class="transactions-table compact">
               <thead>
                 <tr>
@@ -116,7 +95,6 @@
               </thead>
               <tbody data-table="dashboard-transactions"></tbody>
             </table>
-            </section>
           </div>
         </article>
       </section>
