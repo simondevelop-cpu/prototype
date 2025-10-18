@@ -719,18 +719,36 @@ if (uploadButton) {
   });
 }
 
-uploadDialog.addEventListener('close', () => {
-  if (uploadDialog.returnValue === 'confirm') {
-    showToast('Upload started. We will notify you when categorisation finishes.');
+function updateCustomRangeControls() {
+  if (!customRangeContainer || !customStartSelect || !customEndSelect) return;
+  const isCustom = dashboardState.timeframe === 'custom';
+  customRangeContainer.hidden = !isCustom;
+  const hasMonths = monthlySequence.length > 0;
+  customStartSelect.disabled = !hasMonths || !isCustom;
+  customEndSelect.disabled = !hasMonths || !isCustom;
+  if (!hasMonths) {
+    return;
   }
-});
+  customStartSelect.value = dashboardState.customRange.start || '';
+  customEndSelect.value = dashboardState.customRange.end || '';
+}
 
-function showToast(message) {
-  toast.textContent = message;
-  toast.dataset.state = 'visible';
-  setTimeout(() => {
-    toast.dataset.state = 'hidden';
-  }, 2800);
+function calculateNiceMax(value) {
+  if (!value) return 0;
+  const exponent = Math.floor(Math.log10(value));
+  const magnitude = 10 ** exponent;
+  const normalized = value / magnitude;
+  let niceNormalized;
+  if (normalized <= 1) {
+    niceNormalized = 1;
+  } else if (normalized <= 2) {
+    niceNormalized = 2;
+  } else if (normalized <= 5) {
+    niceNormalized = 5;
+  } else {
+    niceNormalized = 10;
+  }
+  return niceNormalized * magnitude;
 }
 
 function unlockModule(button) {
