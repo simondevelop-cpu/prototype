@@ -22,16 +22,18 @@
         </div>
       </div>
       <nav class="primary-nav">
-        <button class="tab-button active" data-tab="cashflow">Cash flow &amp; budget</button>
-        <button class="tab-button" data-tab="categorise">Categorise transactions</button>
-        <button class="tab-button" data-tab="insights">Insight modules</button>
-        <button class="tab-button" data-tab="settings">Account settings</button>
+        <button class="tab-button active" data-tab-target="dashboard">Dashboard</button>
+        <button class="tab-button" data-tab-target="saving">Saving</button>
+        <button class="tab-button" data-tab-target="transactions">Transactions</button>
+        <button class="tab-button" data-tab-target="insights">Insights</button>
       </nav>
-      <button class="cta-button">Upload statements</button>
+      <button class="avatar-button" data-tab-target="settings" aria-label="Account settings">
+        <span data-user-initial>T</span>
+      </button>
     </header>
 
     <main>
-      <section id="cashflow" class="tab-panel active">
+      <section id="dashboard" class="tab-panel active">
         <div class="panel-header">
           <h1>Understand your cash flow in seconds</h1>
           <p class="lead">
@@ -40,46 +42,95 @@
           </p>
         </div>
 
-        <div class="module-grid">
-          <article class="module locked" data-module="cashflow-chart">
-            <header class="module-header">
-              <div>
-                <h2>Cash flow overview</h2>
-                <p>Track income, expenses and other flows across every account.</p>
-              </div>
-              <div class="filter-row">
+        <article class="module locked" data-module="cashflow">
+          <header class="module-header">
+            <div>
+              <h2>Monthly cash flow</h2>
+              <p>Compare income and expenses across any time period.</p>
+            </div>
+            <div class="filter-row">
+              <label>
+                Timeframe
+                <select data-filter="cashflow-timeframe">
+                  <option value="3m">Last 3 months</option>
+                  <option value="6m">Last 6 months</option>
+                  <option value="12m">Last 12 months</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </label>
+              <div class="custom-range" data-custom-range hidden>
                 <label>
-                  Timeframe
-                  <select data-filter="cashflow-timeframe">
-                    <option value="3m">Last 3 months</option>
-                    <option value="6m">Last 6 months</option>
-                    <option value="12m">Last 12 months</option>
-                  </select>
+                  From
+                  <select data-custom-start></select>
                 </label>
                 <label>
-                  Flow type
-                  <select data-filter="cashflow-type">
-                    <option value="all">All</option>
-                    <option value="income">Income</option>
-                    <option value="expense">Expense</option>
-                    <option value="other">Other</option>
-                  </select>
+                  To
+                  <select data-custom-end></select>
                 </label>
               </div>
-            </header>
-            <div class="module-content">
-              <div class="chart" aria-hidden="true">
+            </div>
+          </header>
+          <div class="module-content">
+            <div class="chart" aria-hidden="true">
+              <div class="chart-legend">
+                <span data-type="income">Income</span>
+                <span data-type="expense">Expenses</span>
+              </div>
+              <div class="chart-body">
+                <div class="chart-y-axis" data-chart-axis></div>
                 <div class="chart-bars" data-chart="cashflow"></div>
               </div>
-              <div class="category-breakdown" data-list="cashflow-categories"></div>
             </div>
-            <div class="lock-overlay">
-              <p class="lock-copy">See how your real cash flow looks once you upload your data.</p>
-              <button class="unlock-button" data-demo="cashflow">Explore sample data</button>
-              <p class="coming-soon">Secure bank linking arriving soon.</p>
-            </div>
-          </article>
+          </div>
+          <div class="lock-overlay">
+            <p class="lock-copy">See how your real cash flow looks once you upload your data.</p>
+            <button class="unlock-button" data-demo="cashflow">Explore sample data</button>
+            <p class="coming-soon">Secure bank linking arriving soon.</p>
+          </div>
+        </article>
 
+        <article class="module" data-module="dashboard-transactions">
+          <header class="module-header">
+            <h2>Transactions</h2>
+            <p class="feedback-note" data-dashboard-summary>Income for Jun 2025</p>
+          </header>
+          <div class="module-content">
+            <section class="module-section">
+              <div class="module-section-header">
+                <h3>Categorisation</h3>
+              </div>
+              <div class="category-breakdown" data-list="cashflow-categories"></div>
+            </section>
+            <section class="module-section">
+              <div class="module-section-header">
+                <h3>Transactions</h3>
+              </div>
+            <table class="transactions-table compact">
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th>Date</th>
+                  <th>Category</th>
+                  <th class="numeric">Amount</th>
+                </tr>
+              </thead>
+              <tbody data-table="dashboard-transactions"></tbody>
+            </table>
+            </section>
+          </div>
+        </article>
+      </section>
+
+      <section id="saving" class="tab-panel">
+        <div class="panel-header">
+          <h1>Keep your savings momentum on track</h1>
+          <p class="lead">
+            Preview automated budgets and saving goals that adapt as we learn about your spending
+            patterns.
+          </p>
+        </div>
+
+        <div class="module-grid">
           <article class="module locked" data-module="budget">
             <header class="module-header">
               <div>
@@ -139,13 +190,17 @@
         </div>
       </section>
 
-      <section id="categorise" class="tab-panel">
+      <section id="transactions" class="tab-panel">
         <div class="panel-header">
           <h1>Clean, categorise and control your transactions</h1>
           <p class="lead">
             Upload CSVs from any Canadian bank, personalise categories and keep recurring
             bills tidy with smart rules.
           </p>
+        </div>
+
+        <div class="panel-actions">
+          <button class="cta-button" data-trigger="upload">Upload transactions</button>
         </div>
 
         <div class="transactions-toolbar">
