@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test:ui": "playwright test"
+    "test:ui": "playwright test",
+    "vercel-build": "node -e \"console.log('No build step required for API-only deployment')\""
   },
   "dependencies": {
     "cors": "^2.8.5",
