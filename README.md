@@ -19,13 +19,17 @@ The prototype is functional and ready for stakeholder walkthroughs, but it remai
 
 ## Getting started
 
-No build step is required. Open `index.html` in any modern browser (Chrome, Edge, Firefox or Safari) and the prototype will load immediately.
+The prototype assets are still static, but the ingestion and insight APIs now run from a managed PostgreSQL database. To explore the end-to-end flow locally you can either open the static HTML (no API calls) or run the Node.js server with a database URL.
 
 ```bash
-# From the repository root
+# Static walkthrough (no API calls)
 open index.html     # macOS
 xdg-open index.html # Linux
 start index.html    # Windows
+
+# Interactive API walkthrough
+npm install
+DATABASE_URL="postgres://user:password@host:5432/db" npm start
 ```
 
 ## Design & interaction notes
@@ -42,6 +46,58 @@ start index.html    # Windows
 - Extend the insights module lists with additional rules from the specification.
 - Hook the feedback form into the chosen support tooling (e.g., email or CRM) and persist responses.
 - Add French language copy to satisfy the bilingual requirement noted in the specification.
+
+## Managed database configuration
+
+The prototype now uses a hosted PostgreSQL instance for long-lived storage. We provisioned a [Supabase](https://supabase.com/) project in the **Canada (Central)** region (`ca-central-1`, Montréal) so data residency remains in Canada. The application server manages schema creation and migrations on boot, so no external migration tool is required.
+
+### 1. Provision the database
+
+1. Create a new Supabase project and select the **Canada (Central)** region.
+2. Once the project is ready, open **Project Settings → Database → Connection string** and copy the `Direct Connection` URL (format: `postgres://USER:PASSWORD@HOST:5432/postgres?sslmode=require`).
+3. (Optional) Run the following snippet in the Supabase SQL editor if you want to pre-create the tables manually—otherwise the server will create them on first run:
+
+```sql
+CREATE TABLE IF NOT EXISTS transactions (
+  id SERIAL PRIMARY KEY,
+  description TEXT NOT NULL,
+  merchant TEXT NOT NULL,
+  date DATE NOT NULL,
+  cashflow TEXT NOT NULL,
+  account TEXT NOT NULL,
+  category TEXT NOT NULL,
+  label TEXT DEFAULT '',
+  amount NUMERIC NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT transactions_unique UNIQUE (date, amount, merchant, cashflow)
+);
+
+CREATE TABLE IF NOT EXISTS insight_feedback (
+  id SERIAL PRIMARY KEY,
+  insight_type TEXT NOT NULL,
+  insight_title TEXT NOT NULL,
+  response TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### 2. Configure environment variables
+
+Add the following environment variables locally (e.g., `.env.local`) and in Vercel (`Project Settings → Environment Variables`) for **Development**, **Preview**, and **Production**:
+
+| Name | Description |
+| --- | --- |
+| `DATABASE_URL` | Supabase PostgreSQL connection string (`postgres://…`). |
+| `DATABASE_SSL` | Optional. Leave unset to enforce SSL (recommended for Supabase). Set to `false` only for trusted local Postgres instances. |
+
+Vercel will expose these variables to `server.js`. After updating the variables, redeploy the project so the new configuration is applied.
+
+### 3. Deployment notes
+
+- The repository includes a `vercel.json` file that disables automatic Next.js detection and maps `/api/*` routes to the Express
+  server defined in `server.js`. This avoids the `No Next.js version detected` build failure reported by Vercel and keeps the
+  static prototype assets (`index.html`, `app.js`, `styles.css`, `logo.svg`) served by Vercel’s static hosting.
+- The Express app now exports its instance so Vercel’s Node runtime can mount it while local development continues to use `npm start`.
 
 ## License
 
