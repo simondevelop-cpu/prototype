@@ -16,6 +16,7 @@ export default defineConfig({
     env: {
       ...process.env,
       PORT: '4173',
+      DISABLE_DB: '1',
     },
   },
 });
