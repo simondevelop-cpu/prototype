@@ -1,5 +1,6 @@
 {
   "framework": null,
+  "buildCommand": "npm run vercel-build",
   "functions": {
     "api/server.js": {
       "includeFiles": [
