@@ -8,15 +8,8 @@ test.describe('Canadian Insights full-stack smoke test', () => {
     await page.locator('[data-module="cashflow"] [data-demo="cashflow"]').click();
     const chartGroups = page.locator('[data-chart="cashflow"] .chart-bar-group');
     await expect(chartGroups).toHaveCount(3);
-    await page.locator('[data-timeframe-toggle]').click();
-    await page.locator('[data-timeframe-option="6m"]').click();
+    await page.locator('[data-filter="cashflow-timeframe"]').selectOption('6m');
     await expect(chartGroups).toHaveCount(6);
-    await page.locator('[data-timeframe-toggle]').click();
-    await page.locator('[data-timeframe-option="custom"]').click();
-    await expect(page.locator('[data-custom-range]')).toBeVisible();
-    const endValue = await page.locator('[data-custom-end]').inputValue();
-    await page.locator('[data-custom-start]').selectOption(endValue);
-    await expect(chartGroups).toHaveCount(1);
     const expenseBar = page.locator('[data-chart="cashflow"] [data-type="expense"]').first();
     await expenseBar.click();
     await expect(page.locator('[data-list="cashflow-categories"] .breakdown-item')).not.toHaveCount(0);

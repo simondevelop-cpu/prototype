@@ -49,39 +49,14 @@
               <p>Compare income and expenses across any time period.</p>
             </div>
             <div class="filter-row">
-              <div class="filter-control">
-                <span class="filter-label">Timeframe</span>
-                <div class="timeframe-dropdown" data-timeframe>
-                  <button
-                    type="button"
-                    class="timeframe-toggle"
-                    data-timeframe-toggle
-                    aria-haspopup="listbox"
-                    aria-expanded="false"
-                  >
-                    <span data-timeframe-label>Last 3 months</span>
-                    <svg viewBox="0 0 16 16" aria-hidden="true">
-                      <path d="M4.47 6.47a.75.75 0 0 1 1.06 0L8 8.94l2.47-2.47a.75.75 0 1 1 1.06 1.06l-3 3a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 0 1 0-1.06Z" />
-                    </svg>
-                  </button>
-                  <div class="timeframe-menu" data-timeframe-menu role="listbox" hidden>
-                    <button type="button" role="option" data-timeframe-option="3m">Last 3 months</button>
-                    <button type="button" role="option" data-timeframe-option="6m">Last 6 months</button>
-                    <button type="button" role="option" data-timeframe-option="12m">Last 12 months</button>
-                    <button type="button" role="option" data-timeframe-option="custom">Custom</button>
-                  </div>
-                </div>
-              </div>
-              <div class="custom-range" data-custom-range hidden>
-                <label>
-                  From
-                  <select data-custom-start></select>
-                </label>
-                <label>
-                  To
-                  <select data-custom-end></select>
-                </label>
-              </div>
+              <label>
+                Timeframe
+                <select data-filter="cashflow-timeframe">
+                  <option value="3m">Last 3 months</option>
+                  <option value="6m">Last 6 months</option>
+                  <option value="12m">Last 12 months</option>
+                </select>
+              </label>
             </div>
           </header>
           <div class="module-content">
@@ -90,11 +65,9 @@
                 <span data-type="income">Income</span>
                 <span data-type="expense">Expenses</span>
               </div>
-              <div class="chart-body">
-                <div class="chart-y-axis" data-chart-axis></div>
-                <div class="chart-bars" data-chart="cashflow"></div>
-              </div>
+              <div class="chart-bars" data-chart="cashflow"></div>
             </div>
+            <div class="category-breakdown" data-list="cashflow-categories"></div>
           </div>
           <div class="lock-overlay">
             <p class="lock-copy">See how your real cash flow looks once you upload your data.</p>
@@ -105,20 +78,12 @@
 
         <article class="module" data-module="dashboard-transactions">
           <header class="module-header">
-            <h2>Transactions</h2>
-            <p class="feedback-note" data-dashboard-summary>Income for Jun 2025</p>
+            <div>
+              <h2>Transactions</h2>
+              <p class="feedback-note" data-dashboard-summary>Income for Jun 2025</p>
+            </div>
           </header>
           <div class="module-content">
-            <section class="module-section">
-              <div class="module-section-header">
-                <h3>Categorisation</h3>
-              </div>
-              <div class="category-breakdown" data-list="cashflow-categories"></div>
-            </section>
-            <section class="module-section">
-              <div class="module-section-header">
-                <h3>Transactions</h3>
-              </div>
             <table class="transactions-table compact">
               <thead>
                 <tr>
@@ -130,7 +95,6 @@
               </thead>
               <tbody data-table="dashboard-transactions"></tbody>
             </table>
-            </section>
           </div>
         </article>
       </section>
