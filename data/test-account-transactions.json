@@ -1,0 +1,562 @@
+[
+  {
+    "id": 1,
+    "description": "Metro - groceries",
+    "date": "2025-06-12",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Groceries",
+    "label": "Household",
+    "amount": -112.45
+  },
+  {
+    "id": 2,
+    "description": "Rent payment",
+    "date": "2025-06-01",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Housing",
+    "label": "Essential",
+    "amount": -2100
+  },
+  {
+    "id": 3,
+    "description": "Salary - ACME Corp",
+    "date": "2025-06-01",
+    "cashflow": "income",
+    "account": "cash",
+    "category": "Employment income",
+    "label": "Primary income",
+    "amount": 3150
+  },
+  {
+    "id": 4,
+    "description": "EQ Bank - transfer",
+    "date": "2025-06-05",
+    "cashflow": "other",
+    "account": "cash",
+    "category": "Transfers",
+    "label": "Savings",
+    "amount": -400
+  },
+  {
+    "id": 5,
+    "description": "Spotify subscription",
+    "date": "2025-06-15",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Subscriptions",
+    "label": "Music",
+    "amount": -14.99
+  },
+  {
+    "id": 6,
+    "description": "Hydro-Québec",
+    "date": "2025-06-08",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Utilities",
+    "label": "Household",
+    "amount": -132.1
+  },
+  {
+    "id": 7,
+    "description": "Uber trip",
+    "date": "2025-06-18",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Transportation",
+    "label": "City travel",
+    "amount": -24.6
+  },
+  {
+    "id": 8,
+    "description": "CRA Tax Refund",
+    "date": "2025-05-15",
+    "cashflow": "other",
+    "account": "cash",
+    "category": "Tax refunds",
+    "label": "Windfall",
+    "amount": 360
+  },
+  {
+    "id": 9,
+    "description": "Amazon.ca order",
+    "date": "2025-06-04",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Shopping",
+    "label": "Home",
+    "amount": -89.23
+  },
+  {
+    "id": 10,
+    "description": "Telus Mobility",
+    "date": "2025-06-09",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Mobile phone",
+    "label": "Household",
+    "amount": -76.5
+  },
+  {
+    "id": 11,
+    "description": "Salary - ACME Corp",
+    "date": "2025-05-01",
+    "cashflow": "income",
+    "account": "cash",
+    "category": "Employment income",
+    "label": "Primary income",
+    "amount": 3125
+  },
+  {
+    "id": 12,
+    "description": "Rent payment",
+    "date": "2025-05-01",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Housing",
+    "label": "Essential",
+    "amount": -2100
+  },
+  {
+    "id": 13,
+    "description": "Provigo - groceries",
+    "date": "2025-05-14",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Groceries",
+    "label": "Household",
+    "amount": -126.32
+  },
+  {
+    "id": 14,
+    "description": "EQ Bank - transfer",
+    "date": "2025-05-06",
+    "cashflow": "other",
+    "account": "cash",
+    "category": "Transfers",
+    "label": "Savings",
+    "amount": -400
+  },
+  {
+    "id": 15,
+    "description": "Indigo Books",
+    "date": "2025-05-20",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Shopping",
+    "label": "Leisure",
+    "amount": -48.2
+  },
+  {
+    "id": 16,
+    "description": "Salary - ACME Corp",
+    "date": "2025-04-01",
+    "cashflow": "income",
+    "account": "cash",
+    "category": "Employment income",
+    "label": "Primary income",
+    "amount": 3125
+  },
+  {
+    "id": 17,
+    "description": "Rent payment",
+    "date": "2025-04-01",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Housing",
+    "label": "Essential",
+    "amount": -2100
+  },
+  {
+    "id": 18,
+    "description": "Costco Wholesale",
+    "date": "2025-04-10",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Groceries",
+    "label": "Household",
+    "amount": -183.4
+  },
+  {
+    "id": 19,
+    "description": "STM transit pass",
+    "date": "2025-04-02",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Transportation",
+    "label": "City travel",
+    "amount": -94.5
+  },
+  {
+    "id": 20,
+    "description": "La Banquise dinner",
+    "date": "2025-04-18",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Dining out",
+    "label": "Treat",
+    "amount": -42.75
+  },
+  {
+    "id": 21,
+    "description": "Salary - ACME Corp",
+    "date": "2025-03-01",
+    "cashflow": "income",
+    "account": "cash",
+    "category": "Employment income",
+    "label": "Primary income",
+    "amount": 3100
+  },
+  {
+    "id": 22,
+    "description": "Rent payment",
+    "date": "2025-03-01",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Housing",
+    "label": "Essential",
+    "amount": -2050
+  },
+  {
+    "id": 23,
+    "description": "IGA - groceries",
+    "date": "2025-03-12",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Groceries",
+    "label": "Household",
+    "amount": -135.66
+  },
+  {
+    "id": 24,
+    "description": "Hydro-Québec",
+    "date": "2025-03-07",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Utilities",
+    "label": "Household",
+    "amount": -128.4
+  },
+  {
+    "id": 25,
+    "description": "Salary - ACME Corp",
+    "date": "2025-02-01",
+    "cashflow": "income",
+    "account": "cash",
+    "category": "Employment income",
+    "label": "Primary income",
+    "amount": 3090
+  },
+  {
+    "id": 26,
+    "description": "Rent payment",
+    "date": "2025-02-01",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Housing",
+    "label": "Essential",
+    "amount": -2050
+  },
+  {
+    "id": 27,
+    "description": "Shell fuel",
+    "date": "2025-02-16",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Transportation",
+    "label": "Commuting",
+    "amount": -64.9
+  },
+  {
+    "id": 28,
+    "description": "Tim Hortons",
+    "date": "2025-02-09",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Dining out",
+    "label": "Coffee",
+    "amount": -22.45
+  },
+  {
+    "id": 29,
+    "description": "Salary - ACME Corp",
+    "date": "2025-01-01",
+    "cashflow": "income",
+    "account": "cash",
+    "category": "Employment income",
+    "label": "Primary income",
+    "amount": 3080
+  },
+  {
+    "id": 30,
+    "description": "Rent payment",
+    "date": "2025-01-01",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Housing",
+    "label": "Essential",
+    "amount": -2050
+  },
+  {
+    "id": 31,
+    "description": "Provigo - groceries",
+    "date": "2025-01-14",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Groceries",
+    "label": "Household",
+    "amount": -140.12
+  },
+  {
+    "id": 32,
+    "description": "Bell internet",
+    "date": "2025-01-05",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Utilities",
+    "label": "Home",
+    "amount": -89.95
+  },
+  {
+    "id": 33,
+    "description": "Salary - ACME Corp",
+    "date": "2024-12-01",
+    "cashflow": "income",
+    "account": "cash",
+    "category": "Employment income",
+    "label": "Primary income",
+    "amount": 3050
+  },
+  {
+    "id": 34,
+    "description": "Rent payment",
+    "date": "2024-12-01",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Housing",
+    "label": "Essential",
+    "amount": -2000
+  },
+  {
+    "id": 35,
+    "description": "Christmas Market",
+    "date": "2024-12-12",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Entertainment",
+    "label": "Seasonal",
+    "amount": -120
+  },
+  {
+    "id": 36,
+    "description": "SAQ purchase",
+    "date": "2024-12-18",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Dining out",
+    "label": "Gifts",
+    "amount": -75.5
+  },
+  {
+    "id": 37,
+    "description": "Salary - ACME Corp",
+    "date": "2024-11-01",
+    "cashflow": "income",
+    "account": "cash",
+    "category": "Employment income",
+    "label": "Primary income",
+    "amount": 3050
+  },
+  {
+    "id": 38,
+    "description": "Rent payment",
+    "date": "2024-11-01",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Housing",
+    "label": "Essential",
+    "amount": -2000
+  },
+  {
+    "id": 39,
+    "description": "Metro - groceries",
+    "date": "2024-11-13",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Groceries",
+    "label": "Household",
+    "amount": -115.4
+  },
+  {
+    "id": 40,
+    "description": "Netflix subscription",
+    "date": "2024-11-15",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Subscriptions",
+    "label": "Entertainment",
+    "amount": -19.99
+  },
+  {
+    "id": 41,
+    "description": "Salary - ACME Corp",
+    "date": "2024-10-01",
+    "cashflow": "income",
+    "account": "cash",
+    "category": "Employment income",
+    "label": "Primary income",
+    "amount": 3025
+  },
+  {
+    "id": 42,
+    "description": "Rent payment",
+    "date": "2024-10-01",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Housing",
+    "label": "Essential",
+    "amount": -1980
+  },
+  {
+    "id": 43,
+    "description": "Uber trip",
+    "date": "2024-10-18",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Transportation",
+    "label": "City travel",
+    "amount": -24.75
+  },
+  {
+    "id": 44,
+    "description": "Pharmaprix",
+    "date": "2024-10-09",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Shopping",
+    "label": "Wellness",
+    "amount": -54.3
+  },
+  {
+    "id": 45,
+    "description": "Salary - ACME Corp",
+    "date": "2024-09-01",
+    "cashflow": "income",
+    "account": "cash",
+    "category": "Employment income",
+    "label": "Primary income",
+    "amount": 3025
+  },
+  {
+    "id": 46,
+    "description": "Rent payment",
+    "date": "2024-09-01",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Housing",
+    "label": "Essential",
+    "amount": -1980
+  },
+  {
+    "id": 47,
+    "description": "Loblaws - groceries",
+    "date": "2024-09-11",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Groceries",
+    "label": "Household",
+    "amount": -132.6
+  },
+  {
+    "id": 48,
+    "description": "BIXI membership",
+    "date": "2024-09-03",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Transportation",
+    "label": "Commuting",
+    "amount": -36.5
+  },
+  {
+    "id": 49,
+    "description": "Salary - ACME Corp",
+    "date": "2024-08-01",
+    "cashflow": "income",
+    "account": "cash",
+    "category": "Employment income",
+    "label": "Primary income",
+    "amount": 3000
+  },
+  {
+    "id": 50,
+    "description": "Rent payment",
+    "date": "2024-08-01",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Housing",
+    "label": "Essential",
+    "amount": -1980
+  },
+  {
+    "id": 51,
+    "description": "Air Canada - travel",
+    "date": "2024-08-19",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Travel",
+    "label": "Vacation",
+    "amount": -450
+  },
+  {
+    "id": 52,
+    "description": "Starbucks",
+    "date": "2024-08-08",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Dining out",
+    "label": "Coffee",
+    "amount": -18.75
+  },
+  {
+    "id": 53,
+    "description": "Salary - ACME Corp",
+    "date": "2024-07-01",
+    "cashflow": "income",
+    "account": "cash",
+    "category": "Employment income",
+    "label": "Primary income",
+    "amount": 2980
+  },
+  {
+    "id": 54,
+    "description": "Rent payment",
+    "date": "2024-07-01",
+    "cashflow": "expense",
+    "account": "cash",
+    "category": "Housing",
+    "label": "Essential",
+    "amount": -1950
+  },
+  {
+    "id": 55,
+    "description": "Metro - groceries",
+    "date": "2024-07-09",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Groceries",
+    "label": "Household",
+    "amount": -118.9
+  },
+  {
+    "id": 56,
+    "description": "Cinéma Montréal",
+    "date": "2024-07-21",
+    "cashflow": "expense",
+    "account": "credit",
+    "category": "Entertainment",
+    "label": "Leisure",
+    "amount": -32.4
+  }
+]

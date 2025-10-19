@@ -4,6 +4,16 @@ test.describe('Canadian Insights full-stack smoke test', () => {
   test('core flows remain functional with the redesigned navigation', async ({ page }) => {
     await page.goto('/');
 
+    // Sign in with the demo account before interacting with dashboards
+    await page.getByRole('button', { name: 'Account settings' }).click();
+    await page.locator('[data-input="login-email"]').fill('test@gmail.com');
+    await page.locator('[data-input="login-password"]').fill('password');
+    await page.locator('[data-form="login"] button[type="submit"]').click();
+    await page.getByRole('button', { name: 'Dashboard' }).click();
+    await expect(page.locator('[data-table="dashboard-transactions"] tr')).not.toHaveCount(0, {
+      timeout: 10000,
+    });
+
     // Dashboard cash flow interactions
     await page.locator('[data-module="cashflow"] [data-demo="cashflow"]').click();
     const chartGroups = page.locator('[data-chart="cashflow"] .chart-bar-group');
