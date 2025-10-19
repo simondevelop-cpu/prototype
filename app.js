@@ -105,6 +105,7 @@ function clearSession() {
   budgetCache.clear();
   savingsCache.clear();
   insightsData = { subscriptions: [], fraud: [], benchmarks: [] };
+  relockModules();
   rebuildTransactionState([]);
   updateAvatarInitial();
   setLoginStatus('Sign in with the test account to load demo data.', 'info');
@@ -193,6 +194,7 @@ async function loadAllData() {
   try {
     await loadTransactionsData();
     await Promise.all([populateBudget('monthly'), populateSavings('last-month'), loadInsightsData()]);
+    unlockAuthenticatedModules();
     setLoginStatus('Sample data loaded for the test account.', 'info');
     showToast('Test account data is ready.');
   } catch (error) {
@@ -306,14 +308,21 @@ function calculateNiceMax(value) {
   return niceNormalized * magnitude;
 }
 
-function unlockModule(button) {
-  const module = button.closest('.module');
+function unlockModule(target, options = {}) {
+  const { silent = false } = options;
+  if (!target) return;
+  const module =
+    target.classList && target.classList.contains('module') ? target : target.closest('.module');
+  if (!module) return;
   module.classList.remove('locked');
   const overlay = module.querySelector('.lock-overlay');
   if (overlay) {
-    overlay.remove();
+    overlay.hidden = true;
+    overlay.setAttribute('aria-hidden', 'true');
   }
-  showToast('Sample data unlocked. Upload your statements to make it yours.');
+  if (!silent) {
+    showToast('Sample data unlocked. Upload your statements to make it yours.');
+  }
 }
 
 document.querySelectorAll('.unlock-button').forEach((button) => {
@@ -331,6 +340,23 @@ document.querySelectorAll('.unlock-button').forEach((button) => {
     }
   });
 });
+
+function unlockAuthenticatedModules() {
+  document.querySelectorAll('[data-module].locked').forEach((module) => {
+    unlockModule(module, { silent: true });
+  });
+}
+
+function relockModules() {
+  document.querySelectorAll('[data-module] .lock-overlay').forEach((overlay) => {
+    overlay.hidden = false;
+    overlay.removeAttribute('aria-hidden');
+    const module = overlay.closest('.module');
+    if (module) {
+      module.classList.add('locked');
+    }
+  });
+}
 
 if (cashflowTimeframeSelect) {
   cashflowTimeframeSelect.addEventListener('change', () => {

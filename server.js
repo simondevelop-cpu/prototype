@@ -24,7 +24,7 @@ try {
   console.warn('Failed to load sample transactions from file', error.message);
   sampleTransactions = [];
 }
-const disableDb = process.env.DISABLE_DB === '1';
+let disableDb = process.env.DISABLE_DB === '1';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -99,6 +99,9 @@ function ensureMemoryUser(email, password) {
 }
 
 async function ensureDbUser(email, password) {
+  if (disableDb || !pool) {
+    return null;
+  }
   const existing = await pool.query('SELECT id, password FROM users WHERE email = $1', [email]);
   if (!existing.rows.length) {
     const inserted = await pool.query(
@@ -300,17 +303,49 @@ async function seedSampleData() {
   }
 }
 
-const readiness = disableDb
-  ? Promise.resolve()
-  : (async () => {
-      try {
-        await ensureSchema();
-        await seedSampleData();
-      } catch (error) {
-        console.error('Database initialisation failed', error);
-        throw error;
-      }
-    })();
+function isDatabaseConnectionError(error) {
+  if (!error) return false;
+  if (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET') {
+    return true;
+  }
+  if (error.name === 'AggregateError' && Array.isArray(error.errors)) {
+    return error.errors.some((inner) => isDatabaseConnectionError(inner));
+  }
+  if (error.cause) {
+    return isDatabaseConnectionError(error.cause);
+  }
+  return false;
+}
+
+async function fallbackToMemory(error) {
+  if (disableDb) {
+    return;
+  }
+  console.warn('Falling back to in-memory data store.', error ? error.message : '');
+  disableDb = true;
+  if (pool) {
+    try {
+      await pool.end();
+    } catch (endError) {
+      console.error('Failed to close database pool during fallback', endError);
+    }
+    pool = null;
+  }
+  console.info('Continuing with in-memory data only.');
+}
+
+const readiness = (async () => {
+  if (disableDb) {
+    return;
+  }
+  try {
+    await ensureSchema();
+    await seedSampleData();
+  } catch (error) {
+    console.error('Database initialisation failed', error);
+    await fallbackToMemory(error);
+  }
+})();
 
 app.use(async (req, res, next) => {
   try {
@@ -773,6 +808,16 @@ app.post('/api/login', async (req, res) => {
     const token = createSession(session);
     res.json({ token, user: { email: session.email } });
   } catch (error) {
+    if (!disableDb && isDatabaseConnectionError(error)) {
+      await fallbackToMemory(error);
+      const memoryUser = ensureMemoryUser(email, password);
+      if (!memoryUser) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      const token = createSession({ email: memoryUser.email });
+      return res.json({ token, user: { email: memoryUser.email } });
+    }
+
     console.error('Failed to authenticate user', error);
     res.status(500).json({ error: 'Failed to authenticate user' });
   }
