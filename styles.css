@@ -874,6 +874,103 @@ main {
   gap: 1rem;
 }
 
+.onboarding-dialog {
+  border: none;
+  padding: 0;
+  max-width: min(520px, 90vw);
+}
+
+.onboarding-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.onboarding-modal {
+  background: var(--surface);
+  border-radius: var(--radius-xl);
+  padding: 2.5rem 2.25rem;
+  box-shadow: var(--shadow-lg);
+  display: grid;
+  gap: 1.5rem;
+  position: relative;
+}
+
+.dialog-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.onboarding-panels {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.onboarding-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.onboarding-panel[hidden] {
+  display: none;
+}
+
+.onboarding-panel label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.onboarding-panel input {
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.onboarding-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.onboarding-actions button {
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--primary);
+  color: white;
+  font-weight: 600;
+}
+
+.onboarding-actions .secondary {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+[data-onboarding-status],
+[data-onboarding-register-status] {
+  min-height: 1.25rem;
+}
+
+[data-onboarding-status][data-state='error'],
+[data-onboarding-register-status][data-state='error'] {
+  color: var(--danger);
+}
+
+[data-onboarding-status][data-state='info'],
+[data-onboarding-register-status][data-state='info'] {
+  color: var(--muted);
+}
+
 .dropzone {
   border: 2px dashed var(--border);
   border-radius: var(--radius-md);

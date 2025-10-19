@@ -86,11 +86,22 @@ function getMemoryTransactions(email) {
   return inMemoryTransactions.filter((tx) => tx.user === email);
 }
 
-function ensureMemoryUser(email, password) {
+function createMemoryUser(email, password) {
+  if (memoryUsers.has(email)) {
+    return null;
+  }
+  memoryUsers.set(email, { password });
+  return { email };
+}
+
+function ensureMemoryUser(email, password, options = {}) {
+  const { allowCreate = false } = options;
   const existing = memoryUsers.get(email);
   if (!existing) {
-    memoryUsers.set(email, { password });
-    return { email };
+    if (!allowCreate) {
+      return null;
+    }
+    return createMemoryUser(email, password);
   }
   if (existing.password !== password) {
     return null;
@@ -98,23 +109,27 @@ function ensureMemoryUser(email, password) {
   return { email };
 }
 
-async function ensureDbUser(email, password) {
+async function findDbUser(email) {
   if (disableDb || !pool) {
     return null;
   }
   const existing = await pool.query('SELECT id, password FROM users WHERE email = $1', [email]);
   if (!existing.rows.length) {
-    const inserted = await pool.query(
-      'INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id',
-      [email, password]
-    );
-    return { id: inserted.rows[0].id, password };
-  }
-  const row = existing.rows[0];
-  if (row.password !== password) {
     return null;
   }
+  const row = existing.rows[0];
   return { id: row.id, password: row.password };
+}
+
+async function createDbUser(email, password) {
+  if (disableDb || !pool) {
+    return null;
+  }
+  const inserted = await pool.query(
+    'INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id',
+    [email, password]
+  );
+  return { id: inserted.rows[0].id, password };
 }
 
 function createSession(userContext) {
@@ -283,7 +298,10 @@ async function seedSampleData() {
     return;
   }
 
-  const dbUser = await ensureDbUser(TEST_ACCOUNT_EMAIL, TEST_ACCOUNT_PASSWORD);
+  let dbUser = await findDbUser(TEST_ACCOUNT_EMAIL);
+  if (!dbUser) {
+    dbUser = await createDbUser(TEST_ACCOUNT_EMAIL, TEST_ACCOUNT_PASSWORD);
+  }
   if (!dbUser) {
     throw new Error('Unable to create test account for seeding');
   }
@@ -783,6 +801,44 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+app.post('/api/register', async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  try {
+    if (disableDb) {
+      if (memoryUsers.has(email)) {
+        return res.status(409).json({ error: 'An account with that email already exists.' });
+      }
+      createMemoryUser(email, password);
+      return res.status(201).json({ user: { email } });
+    }
+
+    try {
+      await createDbUser(email, password);
+      return res.status(201).json({ user: { email } });
+    } catch (error) {
+      if (error && error.code === '23505') {
+        return res.status(409).json({ error: 'An account with that email already exists.' });
+      }
+      if (isDatabaseConnectionError(error)) {
+        await fallbackToMemory(error);
+        if (memoryUsers.has(email)) {
+          return res.status(409).json({ error: 'An account with that email already exists.' });
+        }
+        createMemoryUser(email, password);
+        return res.status(201).json({ user: { email } });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('Failed to register user', error);
+    res.status(500).json({ error: 'Failed to create account' });
+  }
+});
+
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) {
@@ -798,8 +854,8 @@ app.post('/api/login', async (req, res) => {
       }
       session = { email: memoryUser.email };
     } else {
-      const dbUser = await ensureDbUser(email, password);
-      if (!dbUser) {
+      const dbUser = await findDbUser(email);
+      if (!dbUser || dbUser.password !== password) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
       session = { email, userId: dbUser.id };
@@ -810,7 +866,7 @@ app.post('/api/login', async (req, res) => {
   } catch (error) {
     if (!disableDb && isDatabaseConnectionError(error)) {
       await fallbackToMemory(error);
-      const memoryUser = ensureMemoryUser(email, password);
+      const memoryUser = ensureMemoryUser(email, password, { allowCreate: true });
       if (!memoryUser) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }

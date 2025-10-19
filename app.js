@@ -24,7 +24,7 @@ function updateAvatarInitial() {
   if (state.user && state.user.email) {
     avatarInitial.textContent = state.user.email[0].toUpperCase();
   } else {
-    avatarInitial.textContent = 'Login';
+    avatarInitial.textContent = 'Log in';
   }
 }
 
@@ -38,6 +38,84 @@ const loginStatus = document.querySelector('[data-login-status]');
 const loginEmailInput = document.querySelector('[data-input="login-email"]');
 const loginPasswordInput = document.querySelector('[data-input="login-password"]');
 const logoutButton = document.querySelector('[data-action="logout"]');
+
+const onboardingDialog = document.getElementById('onboarding-dialog');
+const onboardingSteps = onboardingDialog
+  ? Array.from(onboardingDialog.querySelectorAll('[data-onboarding-step]'))
+  : [];
+const onboardingStatus = onboardingDialog
+  ? onboardingDialog.querySelector('[data-onboarding-status]')
+  : null;
+const onboardingRegisterStatus = onboardingDialog
+  ? onboardingDialog.querySelector('[data-onboarding-register-status]')
+  : null;
+const onboardingLoginForm = onboardingDialog
+  ? onboardingDialog.querySelector('[data-form="onboarding-login"]')
+  : null;
+const onboardingRegisterForm = onboardingDialog
+  ? onboardingDialog.querySelector('[data-form="onboarding-register"]')
+  : null;
+const onboardingLoginEmailInput = onboardingDialog
+  ? onboardingDialog.querySelector('[data-onboarding-field="login-email"]')
+  : null;
+const onboardingLoginPasswordInput = onboardingDialog
+  ? onboardingDialog.querySelector('[data-onboarding-field="login-password"]')
+  : null;
+const onboardingRegisterEmailInput = onboardingDialog
+  ? onboardingDialog.querySelector('[data-onboarding-field="register-email"]')
+  : null;
+const onboardingRegisterPasswordInput = onboardingDialog
+  ? onboardingDialog.querySelector('[data-onboarding-field="register-password"]')
+  : null;
+const onboardingRegisterConfirmInput = onboardingDialog
+  ? onboardingDialog.querySelector('[data-onboarding-field="register-confirm"]')
+  : null;
+
+function setStatusMessage(element, message, tone = 'info') {
+  if (!element) return;
+  element.textContent = message;
+  element.dataset.state = tone;
+}
+
+function clearStatusMessage(element) {
+  if (!element) return;
+  element.textContent = '';
+  delete element.dataset.state;
+}
+
+let toastTimeoutId = null;
+
+function hideToast() {
+  if (!toast) return;
+  toast.dataset.state = 'hidden';
+  if (typeof toast.close === 'function') {
+    try {
+      toast.close();
+    } catch (error) {
+      console.warn('Failed to close toast dialog', error);
+    }
+  }
+}
+
+function showToast(message, options = {}) {
+  if (!toast) return;
+  const { duration = 3200 } = options;
+  toast.textContent = message;
+  toast.dataset.state = 'visible';
+  if (typeof toast.show === 'function') {
+    try {
+      toast.show();
+    } catch (error) {
+      if (error && error.message && !/already open/i.test(error.message)) {
+        console.warn('Unable to display toast', error);
+      }
+    }
+  }
+  window.clearTimeout(toastTimeoutId);
+  toastTimeoutId = window.setTimeout(() => {
+    hideToast();
+  }, duration);
+}
 
 const monthFormatter = new Intl.DateTimeFormat('en-CA', { month: 'short' });
 const longMonthFormatter = new Intl.DateTimeFormat('en-CA', { month: 'short', year: 'numeric' });
@@ -137,10 +215,20 @@ async function fetchJsonWithAuth(url, options = {}) {
 }
 
 function setLoginStatus(message, tone = 'info') {
-  if (loginStatus) {
-    loginStatus.textContent = message;
-    loginStatus.dataset.state = tone;
+  setStatusMessage(loginStatus, message, tone);
+}
+
+async function registerAccount(email, password) {
+  const response = await fetch('/api/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to create account');
   }
+  return response.json();
 }
 
 async function signIn(email, password) {
@@ -167,6 +255,62 @@ async function signOut() {
   setLoginStatus('Signed out.', 'info');
 }
 
+async function startSessionFromCredentials(email, password, options = {}) {
+  const { silentLoad = false } = options;
+  const result = await signIn(email, password);
+  state.token = result.token;
+  state.user = result.user;
+  budgetCache.clear();
+  savingsCache.clear();
+  insightsData = { subscriptions: [], fraud: [], benchmarks: [] };
+  sessionStorage.setItem('authToken', state.token);
+  sessionStorage.setItem('userEmail', state.user.email);
+  updateAvatarInitial();
+  await loadAllData({ silent: silentLoad });
+  return result;
+}
+
+let activeOnboardingStep = 'intro';
+
+function showOnboardingStep(step) {
+  if (!onboardingDialog) return;
+  activeOnboardingStep = step;
+  onboardingSteps.forEach((panel) => {
+    const isActive = panel.dataset.onboardingStep === step;
+    panel.hidden = !isActive;
+  });
+}
+
+function resetOnboardingForms() {
+  clearStatusMessage(onboardingStatus);
+  clearStatusMessage(onboardingRegisterStatus);
+  if (onboardingLoginForm) {
+    onboardingLoginForm.reset();
+  }
+  if (onboardingRegisterForm) {
+    onboardingRegisterForm.reset();
+  }
+  if (onboardingLoginEmailInput) {
+    onboardingLoginEmailInput.value = onboardingLoginEmailInput.dataset.defaultValue || 'test@gmail.com';
+  }
+  if (onboardingLoginPasswordInput) {
+    onboardingLoginPasswordInput.value = onboardingLoginPasswordInput.dataset.defaultValue || 'password';
+  }
+}
+
+function openOnboarding(step = 'intro') {
+  if (!onboardingDialog) return;
+  resetOnboardingForms();
+  showOnboardingStep(step);
+  onboardingDialog.showModal();
+}
+
+function closeOnboarding() {
+  if (!onboardingDialog || !onboardingDialog.open) return;
+  onboardingDialog.close();
+  activeOnboardingStep = 'intro';
+}
+
 async function loadTransactionsData() {
   const data = await fetchJsonWithAuth('/api/transactions');
   rebuildTransactionState(data.transactions || []);
@@ -189,17 +333,23 @@ async function loadInsightsData(cohort = 'all') {
   renderInsightList('[data-list="benchmarks"]', insights.benchmarks);
 }
 
-async function loadAllData() {
+async function loadAllData(options = {}) {
+  const { silent = false } = options;
   if (!state.token) return;
   try {
     await loadTransactionsData();
     await Promise.all([populateBudget('monthly'), populateSavings('last-month'), loadInsightsData()]);
     unlockAuthenticatedModules();
-    setLoginStatus('Sample data loaded for the test account.', 'info');
-    showToast('Test account data is ready.');
+    if (!silent) {
+      setLoginStatus('Your dashboard is ready.', 'info');
+      showToast('Account data loaded successfully.');
+    }
   } catch (error) {
     console.error('Failed to load account data', error);
-    setLoginStatus('Unable to load account data. Please try again.', 'error');
+    if (!silent) {
+      setLoginStatus('Unable to load account data. Please try again.', 'error');
+      showToast('We could not refresh your data. Please try again.');
+    }
   }
 }
 
@@ -210,7 +360,7 @@ function restoreSession() {
     state.token = storedToken;
     state.user = { email: storedEmail };
     updateAvatarInitial();
-    void loadAllData().catch(() => {
+    void loadAllData({ silent: true }).catch(() => {
       clearSession();
     });
   }
@@ -227,17 +377,9 @@ async function handleLogin(event) {
   }
 
   try {
-    const result = await signIn(email, password);
-    state.token = result.token;
-    state.user = result.user;
-    budgetCache.clear();
-    savingsCache.clear();
-    insightsData = { subscriptions: [], fraud: [], benchmarks: [] };
-    sessionStorage.setItem('authToken', state.token);
-    sessionStorage.setItem('userEmail', state.user.email);
-    updateAvatarInitial();
+    setLoginStatus('Signing you in…', 'info');
+    await startSessionFromCredentials(email, password);
     setLoginStatus('Signed in successfully.', 'info');
-    await loadAllData();
   } catch (error) {
     console.error('Login failed', error);
     setLoginStatus(error.message || 'Failed to sign in.', 'error');
@@ -267,7 +409,16 @@ function switchTab(targetId) {
 }
 
 tabButtons.forEach((tab) => {
-  tab.addEventListener('click', () => switchTab(tab.dataset.tabTarget));
+  tab.addEventListener('click', (event) => {
+    const targetId = tab.dataset.tabTarget;
+    if (!targetId) return;
+    if (tab.classList.contains('avatar-button') && !state.user) {
+      event.preventDefault();
+      openOnboarding('intro');
+      return;
+    }
+    switchTab(targetId);
+  });
 });
 
 if (uploadButton) {
@@ -320,24 +471,52 @@ function unlockModule(target, options = {}) {
     overlay.hidden = true;
     overlay.setAttribute('aria-hidden', 'true');
   }
-  if (!silent) {
-    showToast('Sample data unlocked. Upload your statements to make it yours.');
-  }
 }
 
-document.querySelectorAll('.unlock-button').forEach((button) => {
-  button.addEventListener('click', () => {
-    unlockModule(button);
-    const demo = button.dataset.demo;
-    if (demo === 'cashflow') {
-      renderDashboard();
-    }
-    if (demo === 'budget') {
-      void populateBudget('monthly');
-    }
-    if (demo === 'savings') {
-      void populateSavings('last-month');
-    }
+document.querySelectorAll('[data-action="open-onboarding"]').forEach((button) => {
+  button.addEventListener('click', (event) => {
+    event.preventDefault();
+    const targetStep = button.dataset.onboardingTarget || 'intro';
+    openOnboarding(targetStep);
+  });
+});
+
+if (toast) {
+  toast.addEventListener('click', () => {
+    window.clearTimeout(toastTimeoutId);
+    hideToast();
+  });
+}
+
+if (onboardingDialog) {
+  onboardingDialog.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    closeOnboarding();
+  });
+
+  onboardingSteps.forEach((panel) => {
+    panel
+      .querySelectorAll('[data-onboarding-next]')
+      .forEach((nextButton) =>
+        nextButton.addEventListener('click', () => {
+          showOnboardingStep(nextButton.dataset.onboardingNext);
+        })
+      );
+    panel
+      .querySelectorAll('[data-onboarding-back]')
+      .forEach((backButton) =>
+        backButton.addEventListener('click', () => {
+          const target = backButton.dataset.onboardingBack || 'intro';
+          showOnboardingStep(target);
+        })
+      );
+  });
+}
+
+document.querySelectorAll('[data-action="close-onboarding"]').forEach((button) => {
+  button.addEventListener('click', (event) => {
+    event.preventDefault();
+    closeOnboarding();
   });
 });
 
@@ -895,6 +1074,66 @@ if (feedbackForm) {
     event.preventDefault();
     feedbackForm.reset();
     showToast('Thank you for the feedback—our team will review it within 24 hours.');
+  });
+}
+
+if (onboardingLoginForm) {
+  onboardingLoginForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!onboardingLoginEmailInput || !onboardingLoginPasswordInput) {
+      return;
+    }
+    const email = onboardingLoginEmailInput.value.trim();
+    const password = onboardingLoginPasswordInput.value;
+    if (!email || !password) {
+      setStatusMessage(onboardingStatus, 'Enter an email and password to continue.', 'error');
+      return;
+    }
+    setStatusMessage(onboardingStatus, 'Signing you in…', 'info');
+    setLoginStatus('Signing you in…', 'info');
+    try {
+      await startSessionFromCredentials(email, password);
+      setStatusMessage(onboardingStatus, 'Signed in! Loading your dashboards…', 'info');
+      closeOnboarding();
+    } catch (error) {
+      console.error('Onboarding login failed', error);
+      setStatusMessage(onboardingStatus, error.message || 'Failed to sign in.', 'error');
+    }
+  });
+}
+
+if (onboardingRegisterForm) {
+  onboardingRegisterForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (
+      !onboardingRegisterEmailInput ||
+      !onboardingRegisterPasswordInput ||
+      !onboardingRegisterConfirmInput
+    ) {
+      return;
+    }
+    const email = onboardingRegisterEmailInput.value.trim();
+    const password = onboardingRegisterPasswordInput.value;
+    const confirm = onboardingRegisterConfirmInput.value;
+    if (!email || !password) {
+      setStatusMessage(onboardingRegisterStatus, 'Enter an email and password to continue.', 'error');
+      return;
+    }
+    if (password !== confirm) {
+      setStatusMessage(onboardingRegisterStatus, 'Passwords must match.', 'error');
+      return;
+    }
+    setStatusMessage(onboardingRegisterStatus, 'Creating your account…', 'info');
+    try {
+      await registerAccount(email, password);
+      setStatusMessage(onboardingRegisterStatus, 'Account created! Signing you in…', 'info');
+      setLoginStatus('Signing you in…', 'info');
+      await startSessionFromCredentials(email, password);
+      closeOnboarding();
+    } catch (error) {
+      console.error('Account creation failed', error);
+      setStatusMessage(onboardingRegisterStatus, error.message || 'Failed to create account.', 'error');
+    }
   });
 }
 

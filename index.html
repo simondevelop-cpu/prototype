@@ -69,8 +69,10 @@
             </div>
           </div>
           <div class="lock-overlay">
-            <p class="lock-copy">See how your real cash flow looks once you upload your data.</p>
-            <button class="unlock-button" data-demo="cashflow">Explore sample data</button>
+            <p class="lock-copy">Log in to unlock cash flow charts powered by your transactions.</p>
+            <button class="unlock-button" data-action="open-onboarding" data-onboarding-target="intro">
+              Log in
+            </button>
             <p class="coming-soon">Secure bank linking arriving soon.</p>
           </div>
         </article>
@@ -140,8 +142,10 @@
               <div class="budget-categories" data-list="budget"></div>
             </div>
             <div class="lock-overlay">
-              <p class="lock-copy">Let us crunch your last 3 months to set realistic targets.</p>
-              <button class="unlock-button" data-demo="budget">Preview budget insights</button>
+              <p class="lock-copy">Log in so we can crunch your last 3 months to set realistic targets.</p>
+              <button class="unlock-button" data-action="open-onboarding" data-onboarding-target="intro">
+                Log in
+              </button>
             </div>
           </article>
 
@@ -167,8 +171,10 @@
               <div class="savings-goals" data-list="savings"></div>
             </div>
             <div class="lock-overlay">
-              <p class="lock-copy">Track RRSP, TFSA or custom goals and keep them on autopilot.</p>
-              <button class="unlock-button" data-demo="savings">View sample goals</button>
+              <p class="lock-copy">Sign in to track RRSP, TFSA or custom goals and keep them on autopilot.</p>
+              <button class="unlock-button" data-action="open-onboarding" data-onboarding-target="intro">
+                Log in
+              </button>
             </div>
           </article>
         </div>
@@ -440,6 +446,105 @@
           <button value="confirm">Continue</button>
         </menu>
       </form>
+    </dialog>
+
+    <dialog id="onboarding-dialog" class="onboarding-dialog">
+      <div class="onboarding-modal">
+        <button
+          type="button"
+          class="dialog-close"
+          data-action="close-onboarding"
+          aria-label="Close onboarding"
+        >
+          ×
+        </button>
+        <div class="onboarding-panels">
+          <section class="onboarding-panel" data-onboarding-step="intro">
+            <h2>Unlock personalised insights</h2>
+            <p>
+              Sign in with our demo account or create your own profile to load dashboards with real
+              transaction data.
+            </p>
+            <div class="onboarding-actions">
+              <button type="button" data-onboarding-next="login">Use the demo login</button>
+              <button type="button" class="secondary" data-onboarding-next="register">
+                Create an account
+              </button>
+            </div>
+            <p class="feedback-note">Demo credentials: test@gmail.com / password</p>
+          </section>
+
+          <form class="onboarding-panel" data-onboarding-step="login" data-form="onboarding-login" hidden>
+            <h2>Sign in to continue</h2>
+            <p class="feedback-note">Access the demo account or your own credentials.</p>
+            <label>
+              Email address
+              <input
+                type="email"
+                data-onboarding-field="login-email"
+                data-default-value="test@gmail.com"
+                required
+              />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                data-onboarding-field="login-password"
+                data-default-value="password"
+                required
+              />
+            </label>
+            <p class="feedback-note" data-onboarding-status></p>
+            <div class="onboarding-actions">
+              <button type="button" class="secondary" data-onboarding-back="intro">Back</button>
+              <button type="submit">Log in</button>
+            </div>
+          </form>
+
+          <form
+            class="onboarding-panel"
+            data-onboarding-step="register"
+            data-form="onboarding-register"
+            hidden
+          >
+            <h2>Create your account</h2>
+            <p class="feedback-note">Upload statements later to personalise every insight.</p>
+            <label>
+              Email address
+              <input
+                type="email"
+                data-onboarding-field="register-email"
+                placeholder="you@example.com"
+                required
+              />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                data-onboarding-field="register-password"
+                minlength="6"
+                required
+              />
+            </label>
+            <label>
+              Confirm password
+              <input
+                type="password"
+                data-onboarding-field="register-confirm"
+                minlength="6"
+                required
+              />
+            </label>
+            <p class="feedback-note" data-onboarding-register-status></p>
+            <div class="onboarding-actions">
+              <button type="button" class="secondary" data-onboarding-back="intro">Back</button>
+              <button type="submit">Create account</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </dialog>
 
     <dialog id="toast" class="toast" data-state="hidden"></dialog>
