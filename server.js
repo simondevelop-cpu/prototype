@@ -808,31 +808,25 @@ app.post('/api/register', async (req, res) => {
   }
 
   try {
-    if (disableDb) {
-      if (memoryUsers.has(email)) {
-        return res.status(409).json({ error: 'An account with that email already exists.' });
-      }
-      createMemoryUser(email, password);
-      return res.status(201).json({ user: { email } });
-    }
-
-    try {
-      await createDbUser(email, password);
-      return res.status(201).json({ user: { email } });
-    } catch (error) {
-      if (error && error.code === '23505') {
-        return res.status(409).json({ error: 'An account with that email already exists.' });
-      }
-      if (isDatabaseConnectionError(error)) {
-        await fallbackToMemory(error);
-        if (memoryUsers.has(email)) {
+    if (!disableDb) {
+      try {
+        await createDbUser(email, password);
+        return res.status(201).json({ user: { email } });
+      } catch (error) {
+        if (error && error.code === '23505') {
           return res.status(409).json({ error: 'An account with that email already exists.' });
         }
-        createMemoryUser(email, password);
-        return res.status(201).json({ user: { email } });
+
+        await fallbackToMemory(error);
       }
-      throw error;
     }
+
+    if (memoryUsers.has(email)) {
+      return res.status(409).json({ error: 'An account with that email already exists.' });
+    }
+
+    createMemoryUser(email, password);
+    return res.status(201).json({ user: { email } });
   } catch (error) {
     console.error('Failed to register user', error);
     res.status(500).json({ error: 'Failed to create account' });
@@ -845,35 +839,43 @@ app.post('/api/login', async (req, res) => {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
+  const startMemorySession = (allowCreate = false) => {
+    const memoryUser = ensureMemoryUser(email, password, { allowCreate });
+    if (!memoryUser) {
+      return null;
+    }
+    const token = createSession({ email: memoryUser.email });
+    return { token, user: { email: memoryUser.email } };
+  };
+
   try {
-    let session = null;
-    if (disableDb) {
-      const memoryUser = ensureMemoryUser(email, password);
-      if (!memoryUser) {
-        return res.status(401).json({ error: 'Invalid credentials' });
+    let memoryAllowCreate = false;
+    if (!disableDb) {
+      try {
+        const dbUser = await findDbUser(email);
+        if (!dbUser || dbUser.password !== password) {
+          if (email === TEST_ACCOUNT_EMAIL && password === TEST_ACCOUNT_PASSWORD) {
+            await fallbackToMemory(new Error('Demo credentials not available in database.'));
+            memoryAllowCreate = true;
+          } else {
+            return res.status(401).json({ error: 'Invalid credentials' });
+          }
+        }
+
+        const token = createSession({ email, userId: dbUser.id });
+        return res.json({ token, user: { email } });
+      } catch (error) {
+        await fallbackToMemory(error);
+        memoryAllowCreate = email === TEST_ACCOUNT_EMAIL;
       }
-      session = { email: memoryUser.email };
-    } else {
-      const dbUser = await findDbUser(email);
-      if (!dbUser || dbUser.password !== password) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-      session = { email, userId: dbUser.id };
     }
 
-    const token = createSession(session);
-    res.json({ token, user: { email: session.email } });
+    const memorySession = startMemorySession(memoryAllowCreate);
+    if (!memorySession) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    return res.json(memorySession);
   } catch (error) {
-    if (!disableDb && isDatabaseConnectionError(error)) {
-      await fallbackToMemory(error);
-      const memoryUser = ensureMemoryUser(email, password, { allowCreate: true });
-      if (!memoryUser) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-      const token = createSession({ email: memoryUser.email });
-      return res.json({ token, user: { email: memoryUser.email } });
-    }
-
     console.error('Failed to authenticate user', error);
     res.status(500).json({ error: 'Failed to authenticate user' });
   }
