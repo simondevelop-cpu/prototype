@@ -699,11 +699,15 @@ const dashboardState = {
 };
 
 const cashflowChartContainer = document.querySelector('[data-chart="cashflow"]');
+const cashflowChartCanvas = cashflowChartContainer?.querySelector('canvas') || null;
+const cashflowChartEmptyState = cashflowChartContainer?.querySelector('[data-chart-empty]') || null;
 const cashflowCategoriesList = document.querySelector('[data-list="cashflow-categories"]');
 const cashflowTimeframeSelect = document.querySelector('[data-filter="cashflow-timeframe"]');
 const dashboardTransactionsTable = document.querySelector('[data-table="dashboard-transactions"]');
 const dashboardSummaryLabel = document.querySelector('[data-dashboard-summary]');
 const categorisationSummaryLabel = document.querySelector('[data-categorisation-summary]');
+
+let cashflowChartInstance = null;
 
 function switchTab(targetId) {
   tabButtons.forEach((tab) => tab.classList.toggle('active', tab.dataset.tabTarget === targetId));
@@ -786,16 +790,6 @@ if (cashflowTimeframeSelect) {
   });
 }
 
-if (cashflowChartContainer) {
-  cashflowChartContainer.addEventListener('click', (event) => {
-    const bar = event.target.closest('[data-month][data-type]');
-    if (!bar) return;
-    dashboardState.monthKey = bar.dataset.month;
-    dashboardState.type = bar.dataset.type;
-    renderDashboard();
-  });
-}
-
 function getMonthsForTimeframe(timeframe) {
   const count = timeframeMonths[timeframe] || 3;
   return monthlySequence.slice(-count);
@@ -813,57 +807,137 @@ function ensureDashboardMonth() {
 }
 
 function buildCashflowChart() {
-  if (!cashflowChartContainer) return;
-  const months = getMonthsForTimeframe(dashboardState.timeframe);
-  const maxValue = months.reduce((max, month) => Math.max(max, month.income.total, month.expense.total), 0);
-  cashflowChartContainer.innerHTML = '';
-
-  if (!months.length) {
-    cashflowChartContainer.innerHTML = '<p class="empty-state">No cash flow data yet.</p>';
+  if (!cashflowChartContainer || !cashflowChartCanvas || typeof Chart === 'undefined') {
     return;
   }
 
-  months.forEach((month) => {
-    const group = document.createElement('div');
-    group.className = 'chart-bar-group';
+  const months = getMonthsForTimeframe(dashboardState.timeframe);
 
-    ['income', 'expense'].forEach((type) => {
-      const bucket = month[type];
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'chart-bar';
-      button.dataset.month = month.key;
-      button.dataset.type = type;
-      button.setAttribute(
-        'aria-label',
-        `${type === 'income' ? 'Income' : 'Expenses'} for ${month.longLabel}`,
-      );
-      if (dashboardState.monthKey === month.key && dashboardState.type === type) {
-        button.classList.add('active');
-      }
+  if (!months.length) {
+    if (cashflowChartInstance) {
+      cashflowChartInstance.destroy();
+      cashflowChartInstance = null;
+    }
+    cashflowChartCanvas.hidden = true;
+    if (cashflowChartEmptyState) {
+      cashflowChartEmptyState.hidden = false;
+    }
+    return;
+  }
 
-      const fill = document.createElement('span');
-      fill.className = 'chart-bar-fill';
-      const height = maxValue ? Math.max(24, (bucket.total / maxValue) * 180) : 24;
-      fill.style.height = `${height}px`;
-      fill.dataset.type = type;
-      button.appendChild(fill);
+  cashflowChartCanvas.hidden = false;
+  if (cashflowChartEmptyState) {
+    cashflowChartEmptyState.hidden = true;
+  }
 
-      const value = document.createElement('span');
-      value.className = 'chart-value';
-      value.textContent = currency(bucket.total);
-      value.dataset.type = type;
-      button.appendChild(value);
+  const labels = months.map((month) => month.key);
+  const incomeValues = months.map((month) => month.income.total);
+  const expenseValues = months.map((month) => month.expense.total);
+  const activeMonth = dashboardState.monthKey;
+  const suggestedMax = calculateNiceMax(
+    Math.max(...incomeValues, ...expenseValues, 0),
+  );
 
-      group.appendChild(button);
-    });
+  const incomeColors = months.map((month) =>
+    month.key === activeMonth && dashboardState.type === 'income' ? '#15803d' : '#22c55e',
+  );
+  const expenseColors = months.map((month) =>
+    month.key === activeMonth && dashboardState.type === 'expense' ? '#b91c1c' : '#ef4444',
+  );
 
-    const caption = document.createElement('small');
-    caption.textContent = month.label;
-    group.appendChild(caption);
+  const formatCurrency = (value) =>
+    value.toLocaleString('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 });
 
-    cashflowChartContainer.appendChild(group);
-  });
+  const chartConfig = {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Income',
+          data: incomeValues,
+          backgroundColor: incomeColors,
+          borderWidth: 0,
+          borderSkipped: false,
+          borderRadius: 6,
+          categoryPercentage: 0.55,
+          barPercentage: 0.85,
+          order: 1,
+        },
+        {
+          label: 'Expenses',
+          data: expenseValues,
+          backgroundColor: expenseColors,
+          borderWidth: 0,
+          borderSkipped: false,
+          borderRadius: 6,
+          categoryPercentage: 0.55,
+          barPercentage: 0.85,
+          order: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'nearest', intersect: true },
+      layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.parsed.y)}`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            font: { size: 14, weight: '600' },
+            padding: 10,
+          },
+        },
+        y: {
+          beginAtZero: true,
+          suggestedMax: suggestedMax || undefined,
+          grace: '5%',
+          ticks: {
+            callback: (value) => value.toLocaleString('en-CA'),
+            font: { size: 14, weight: '600' },
+            maxTicksLimit: 6,
+            padding: 8,
+          },
+          grid: {
+            color: '#e5e7eb',
+            borderDash: [4, 4],
+          },
+        },
+      },
+      onClick: (_event, elements) => {
+        if (!elements.length) return;
+        const { index, datasetIndex } = elements[0];
+        const monthKey = labels[index];
+        const type = datasetIndex === 0 ? 'income' : 'expense';
+        dashboardState.monthKey = monthKey;
+        dashboardState.type = type;
+        renderDashboard();
+      },
+    },
+  };
+
+  if (cashflowChartInstance) {
+    cashflowChartInstance.data.labels = labels;
+    cashflowChartInstance.data.datasets[0].data = incomeValues;
+    cashflowChartInstance.data.datasets[1].data = expenseValues;
+    cashflowChartInstance.data.datasets[0].backgroundColor = incomeColors;
+    cashflowChartInstance.data.datasets[1].backgroundColor = expenseColors;
+    cashflowChartInstance.options.scales.y.suggestedMax = suggestedMax || undefined;
+    cashflowChartInstance.update();
+    return;
+  }
+
+  cashflowChartInstance = new Chart(cashflowChartCanvas.getContext('2d'), chartConfig);
 }
 
 function buildCashflowBreakdown() {
@@ -958,6 +1032,19 @@ function renderDashboard() {
   buildCashflowBreakdown();
   renderDashboardTransactions();
   updateDashboardSummary();
+}
+
+if (typeof window !== 'undefined') {
+  window.__app__ = window.__app__ || {};
+  window.__app__.getCashflowLabels = () => cashflowChartInstance?.data?.labels ?? [];
+  window.__app__.selectCashflowPoint = (monthKey, type = 'income') => {
+    if (!monthlyMap.has(monthKey)) return false;
+    if (!['income', 'expense'].includes(type)) return false;
+    dashboardState.monthKey = monthKey;
+    dashboardState.type = type;
+    renderDashboard();
+    return true;
+  };
 }
 
 function populateBudget(period) {

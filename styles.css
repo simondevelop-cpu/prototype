@@ -360,27 +360,50 @@ main {
   padding: 1.75rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 
+.chart-bars {
+  position: relative;
+  height: 360px;
+}
+
+.chart-bars canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.chart-bars [data-chart-empty] {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--surface);
+}
+
 .chart-legend {
   display: flex;
+  gap: 1rem;
   justify-content: center;
-  gap: 1.5rem;
+  align-items: center;
   flex-wrap: wrap;
-  font-size: 0.9rem;
-  color: var(--muted);
-  padding-top: 1rem;
-  border-top: 1px solid var(--surface-muted);
+  margin-top: 0.5rem;
+  font-weight: 600;
 }
 
 .chart-legend span {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  font-weight: 500;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.9rem;
+  background: #f3f4f6;
   color: var(--secondary);
 }
 
@@ -389,93 +412,25 @@ main {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: var(--income);
+  background: currentColor;
+}
+
+.chart-legend span[data-type='income'] {
+  color: #15803d;
+  background: #dcfce7;
+}
+
+.chart-legend span[data-type='income']::before {
+  background: #22c55e;
+}
+
+.chart-legend span[data-type='expense'] {
+  color: #b91c1c;
+  background: #fee2e2;
 }
 
 .chart-legend span[data-type='expense']::before {
-  background: var(--expense);
-}
-
-.chart-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 2rem;
-  flex: 1;
-  min-height: 220px;
-  overflow-x: auto;
-  padding: 1.5rem 1rem 0;
-  position: relative;
-  border-radius: var(--radius-md);
-  background-image: repeating-linear-gradient(
-    to top,
-    rgba(15, 23, 42, 0.06) 0,
-    rgba(15, 23, 42, 0.06) 1px,
-    transparent 1px,
-    transparent 48px
-  );
-  background-origin: content-box;
-}
-
-.chart-bar-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  flex: 0 0 80px;
-}
-
-.chart-bar {
-  border: none;
-  background: none;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.chart-bar-fill {
-  width: 44px;
-  border-radius: var(--radius-sm);
-  background: var(--income);
-  display: block;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-}
-
-.chart-bar-fill[data-type='expense'] {
-  background: var(--expense);
-}
-
-.chart-bar:hover .chart-bar-fill,
-.chart-bar.active .chart-bar-fill {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
-}
-
-.chart-value {
-  order: -1;
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: var(--secondary);
-  background: rgba(255, 255, 255, 0.9);
-  padding: 0.25rem 0.5rem;
-  border-radius: var(--radius-sm);
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
-}
-
-.chart-value[data-type='income'] {
-  color: var(--income);
-}
-
-.chart-value[data-type='expense'] {
-  color: var(--expense);
-}
-
-.chart-bar-group small {
-  color: var(--muted);
-  font-weight: 600;
+  background: #ef4444;
 }
 
 .categorisation-card {
@@ -514,16 +469,6 @@ main {
 
 .categorisation-card .empty-state {
   text-align: left;
-}
-
-@media (max-width: 720px) {
-  .chart-bars {
-    gap: 1rem;
-  }
-
-  .chart-bar-fill {
-    width: 32px;
-  }
 }
 
 @media (max-width: 640px) {
