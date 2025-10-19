@@ -849,32 +849,40 @@ app.post('/api/login', async (req, res) => {
   };
 
   try {
-    let memoryAllowCreate = false;
+    let shouldUseMemory = disableDb;
+    let memoryAllowCreate = email === TEST_ACCOUNT_EMAIL && password === TEST_ACCOUNT_PASSWORD;
+
     if (!disableDb) {
       try {
         const dbUser = await findDbUser(email);
-        if (!dbUser || dbUser.password !== password) {
-          if (email === TEST_ACCOUNT_EMAIL && password === TEST_ACCOUNT_PASSWORD) {
+
+        if (!dbUser) {
+          if (memoryAllowCreate) {
             await fallbackToMemory(new Error('Demo credentials not available in database.'));
-            memoryAllowCreate = true;
+            shouldUseMemory = true;
           } else {
             return res.status(401).json({ error: 'Invalid credentials' });
           }
+        } else if (dbUser.password !== password) {
+          return res.status(401).json({ error: 'Invalid credentials' });
+        } else {
+          const token = createSession({ email, userId: dbUser.id });
+          return res.json({ token, user: { email } });
         }
-
-        const token = createSession({ email, userId: dbUser.id });
-        return res.json({ token, user: { email } });
       } catch (error) {
         await fallbackToMemory(error);
-        memoryAllowCreate = email === TEST_ACCOUNT_EMAIL;
+        shouldUseMemory = true;
       }
     }
 
-    const memorySession = startMemorySession(memoryAllowCreate);
-    if (!memorySession) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    if (shouldUseMemory) {
+      const memorySession = startMemorySession(memoryAllowCreate);
+      if (memorySession) {
+        return res.json(memorySession);
+      }
     }
-    return res.json(memorySession);
+
+    return res.status(401).json({ error: 'Invalid credentials' });
   } catch (error) {
     console.error('Failed to authenticate user', error);
     res.status(500).json({ error: 'Failed to authenticate user' });
