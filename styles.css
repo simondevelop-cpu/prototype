@@ -834,6 +834,24 @@ main {
   font-weight: 600;
 }
 
+.settings-card .form-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+[data-login-status] {
+  min-height: 1.25rem;
+}
+
+[data-login-status][data-state='error'] {
+  color: var(--danger);
+}
+
+[data-login-status][data-state='info'] {
+  color: var(--muted);
+}
+
 .settings-card.trust ul {
   padding-left: 1.25rem;
   color: var(--muted);

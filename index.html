@@ -303,6 +303,24 @@
         </div>
 
         <div class="settings-grid">
+          <form class="settings-card" data-form="login">
+            <h2>Account access</h2>
+            <p class="feedback-note">Use the demo account to explore personalised dashboards.</p>
+            <label>
+              Email address
+              <input type="email" data-input="login-email" value="test@gmail.com" required />
+            </label>
+            <label>
+              Password
+              <input type="password" data-input="login-password" value="password" required />
+            </label>
+            <div class="form-actions">
+              <button type="submit">Sign in</button>
+              <button type="button" class="secondary" data-action="logout">Sign out</button>
+            </div>
+            <p class="feedback-note" data-login-status></p>
+          </form>
+
           <form class="settings-card">
             <h2>App settings</h2>
             <label>

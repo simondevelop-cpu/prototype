@@ -5,650 +5,39 @@ const uploadDialog = document.getElementById('upload-dialog');
 const toast = document.getElementById('toast');
 const avatarInitial = document.querySelector('[data-user-initial]');
 
-const username = 'Taylor';
-avatarInitial.textContent = username ? username[0].toUpperCase() : 'Login';
+const state = {
+  token: null,
+  user: null,
+};
+
+let transactions = [];
+let transactionLabels = [];
+let transactionCategories = [];
+let monthlyMap = new Map();
+let monthlySequence = [];
+
+const budgetCache = new Map();
+const savingsCache = new Map();
+let insightsData = { subscriptions: [], fraud: [], benchmarks: [] };
+
+function updateAvatarInitial() {
+  if (state.user && state.user.email) {
+    avatarInitial.textContent = state.user.email[0].toUpperCase();
+  } else {
+    avatarInitial.textContent = 'Login';
+  }
+}
+
+updateAvatarInitial();
 
 const currency = (value) =>
   new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(value);
 
-const budgets = {
-  monthly: {
-    months: ['April 2025', 'May 2025', 'June 2025'],
-    summary: {
-      budget: 5000,
-      spent: 4520,
-      saved: 480,
-    },
-    categories: [
-      { name: 'Housing', target: 2100, spent: 2100 },
-      { name: 'Groceries', target: 800, spent: 760 },
-      { name: 'Transportation', target: 500, spent: 430 },
-      { name: 'Dining out', target: 350, spent: 390 },
-      { name: 'Subscriptions', target: 180, spent: 165 },
-      { name: 'Wellness', target: 200, spent: 140 },
-    ],
-  },
-  quarterly: {
-    months: ['Q2 2025', 'Q3 2025'],
-    summary: {
-      budget: 15000,
-      spent: 13860,
-      saved: 1140,
-    },
-    categories: [
-      { name: 'Housing', target: 6300, spent: 6300 },
-      { name: 'Groceries', target: 2400, spent: 2260 },
-      { name: 'Transportation', target: 1500, spent: 1320 },
-      { name: 'Dining out', target: 1200, spent: 1125 },
-      { name: 'Subscriptions', target: 540, spent: 495 },
-      { name: 'Travel', target: 1500, spent: 1530 },
-    ],
-  },
-};
-
-const savings = {
-  'last-month': {
-    summary: {
-      last: 480,
-      cumulative: 5200,
-      label: 'Last month',
-    },
-    goals: [
-      { name: 'RRSP 2025', target: 6500, contributed: 4800, priority: 'High' },
-      { name: 'Emergency fund', target: 10000, contributed: 7200, priority: 'Medium' },
-      { name: 'Travel 2025', target: 3000, contributed: 1800, priority: 'Low' },
-    ],
-  },
-  'since-start': {
-    summary: {
-      last: 5200,
-      cumulative: 5200,
-      label: 'Since joining',
-    },
-    goals: [
-      { name: 'RRSP 2025', target: 6500, contributed: 4800, priority: 'High' },
-      { name: 'Emergency fund', target: 10000, contributed: 7200, priority: 'Medium' },
-      { name: 'Travel 2025', target: 3000, contributed: 1800, priority: 'Low' },
-    ],
-  },
-  'year-to-date': {
-    summary: {
-      last: 2650,
-      cumulative: 2650,
-      label: 'Year to date',
-    },
-    goals: [
-      { name: 'RRSP 2025', target: 6500, contributed: 3200, priority: 'High' },
-      { name: 'Emergency fund', target: 10000, contributed: 7400, priority: 'Medium' },
-      { name: 'Travel 2025', target: 3000, contributed: 1450, priority: 'Low' },
-    ],
-  },
-};
-
-const transactions = [
-  {
-    id: 1,
-    description: 'Metro - groceries',
-    date: '2025-06-12',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -112.45,
-  },
-  {
-    id: 2,
-    description: 'Rent payment',
-    date: '2025-06-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2100,
-  },
-  {
-    id: 3,
-    description: 'Salary - ACME Corp',
-    date: '2025-06-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3150,
-  },
-  {
-    id: 4,
-    description: 'EQ Bank - transfer',
-    date: '2025-06-05',
-    cashflow: 'other',
-    account: 'cash',
-    category: 'Transfers',
-    label: 'Savings',
-    amount: -400,
-  },
-  {
-    id: 5,
-    description: 'Spotify subscription',
-    date: '2025-06-15',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Subscriptions',
-    label: 'Music',
-    amount: -14.99,
-  },
-  {
-    id: 6,
-    description: 'Hydro-Québec',
-    date: '2025-06-08',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Utilities',
-    label: 'Household',
-    amount: -132.1,
-  },
-  {
-    id: 7,
-    description: 'Uber trip',
-    date: '2025-06-18',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Transportation',
-    label: 'City travel',
-    amount: -24.6,
-  },
-  {
-    id: 8,
-    description: 'CRA Tax Refund',
-    date: '2025-05-15',
-    cashflow: 'other',
-    account: 'cash',
-    category: 'Tax refunds',
-    label: 'Windfall',
-    amount: 360,
-  },
-  {
-    id: 9,
-    description: 'Amazon.ca order',
-    date: '2025-06-04',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Shopping',
-    label: 'Home',
-    amount: -89.23,
-  },
-  {
-    id: 10,
-    description: 'Telus Mobility',
-    date: '2025-06-09',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Mobile phone',
-    label: 'Household',
-    amount: -76.5,
-  },
-  {
-    id: 11,
-    description: 'Salary - ACME Corp',
-    date: '2025-05-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3125,
-  },
-  {
-    id: 12,
-    description: 'Rent payment',
-    date: '2025-05-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2100,
-  },
-  {
-    id: 13,
-    description: 'Provigo - groceries',
-    date: '2025-05-14',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -126.32,
-  },
-  {
-    id: 14,
-    description: 'EQ Bank - transfer',
-    date: '2025-05-06',
-    cashflow: 'other',
-    account: 'cash',
-    category: 'Transfers',
-    label: 'Savings',
-    amount: -400,
-  },
-  {
-    id: 15,
-    description: 'Indigo Books',
-    date: '2025-05-20',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Shopping',
-    label: 'Leisure',
-    amount: -48.2,
-  },
-  {
-    id: 16,
-    description: 'Salary - ACME Corp',
-    date: '2025-04-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3125,
-  },
-  {
-    id: 17,
-    description: 'Rent payment',
-    date: '2025-04-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2100,
-  },
-  {
-    id: 18,
-    description: 'Costco Wholesale',
-    date: '2025-04-10',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -183.4,
-  },
-  {
-    id: 19,
-    description: 'STM transit pass',
-    date: '2025-04-02',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Transportation',
-    label: 'City travel',
-    amount: -94.5,
-  },
-  {
-    id: 20,
-    description: 'La Banquise dinner',
-    date: '2025-04-18',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Dining out',
-    label: 'Treat',
-    amount: -42.75,
-  },
-  {
-    id: 21,
-    description: 'Salary - ACME Corp',
-    date: '2025-03-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3100,
-  },
-  {
-    id: 22,
-    description: 'Rent payment',
-    date: '2025-03-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2050,
-  },
-  {
-    id: 23,
-    description: 'IGA - groceries',
-    date: '2025-03-12',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -135.66,
-  },
-  {
-    id: 24,
-    description: 'Hydro-Québec',
-    date: '2025-03-07',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Utilities',
-    label: 'Household',
-    amount: -128.4,
-  },
-  {
-    id: 25,
-    description: 'Salary - ACME Corp',
-    date: '2025-02-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3090,
-  },
-  {
-    id: 26,
-    description: 'Rent payment',
-    date: '2025-02-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2050,
-  },
-  {
-    id: 27,
-    description: 'Shell fuel',
-    date: '2025-02-16',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Transportation',
-    label: 'Commuting',
-    amount: -64.9,
-  },
-  {
-    id: 28,
-    description: 'Tim Hortons',
-    date: '2025-02-09',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Dining out',
-    label: 'Coffee',
-    amount: -22.45,
-  },
-  {
-    id: 29,
-    description: 'Salary - ACME Corp',
-    date: '2025-01-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3080,
-  },
-  {
-    id: 30,
-    description: 'Rent payment',
-    date: '2025-01-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2050,
-  },
-  {
-    id: 31,
-    description: 'Provigo - groceries',
-    date: '2025-01-14',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -140.12,
-  },
-  {
-    id: 32,
-    description: 'Bell internet',
-    date: '2025-01-05',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Utilities',
-    label: 'Home',
-    amount: -89.95,
-  },
-  {
-    id: 33,
-    description: 'Salary - ACME Corp',
-    date: '2024-12-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3050,
-  },
-  {
-    id: 34,
-    description: 'Rent payment',
-    date: '2024-12-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2000,
-  },
-  {
-    id: 35,
-    description: 'Christmas Market',
-    date: '2024-12-12',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Entertainment',
-    label: 'Seasonal',
-    amount: -120,
-  },
-  {
-    id: 36,
-    description: 'SAQ purchase',
-    date: '2024-12-18',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Dining out',
-    label: 'Gifts',
-    amount: -75.5,
-  },
-  {
-    id: 37,
-    description: 'Salary - ACME Corp',
-    date: '2024-11-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3050,
-  },
-  {
-    id: 38,
-    description: 'Rent payment',
-    date: '2024-11-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2000,
-  },
-  {
-    id: 39,
-    description: 'Metro - groceries',
-    date: '2024-11-13',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -115.4,
-  },
-  {
-    id: 40,
-    description: 'Netflix subscription',
-    date: '2024-11-15',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Subscriptions',
-    label: 'Entertainment',
-    amount: -19.99,
-  },
-  {
-    id: 41,
-    description: 'Salary - ACME Corp',
-    date: '2024-10-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3025,
-  },
-  {
-    id: 42,
-    description: 'Rent payment',
-    date: '2024-10-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -1980,
-  },
-  {
-    id: 43,
-    description: 'Uber trip',
-    date: '2024-10-18',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Transportation',
-    label: 'City travel',
-    amount: -24.75,
-  },
-  {
-    id: 44,
-    description: 'Pharmaprix',
-    date: '2024-10-09',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Shopping',
-    label: 'Wellness',
-    amount: -54.3,
-  },
-  {
-    id: 45,
-    description: 'Salary - ACME Corp',
-    date: '2024-09-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3025,
-  },
-  {
-    id: 46,
-    description: 'Rent payment',
-    date: '2024-09-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -1980,
-  },
-  {
-    id: 47,
-    description: 'Loblaws - groceries',
-    date: '2024-09-11',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -132.6,
-  },
-  {
-    id: 48,
-    description: 'BIXI membership',
-    date: '2024-09-03',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Transportation',
-    label: 'Commuting',
-    amount: -36.5,
-  },
-  {
-    id: 49,
-    description: 'Salary - ACME Corp',
-    date: '2024-08-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3000,
-  },
-  {
-    id: 50,
-    description: 'Rent payment',
-    date: '2024-08-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -1980,
-  },
-  {
-    id: 51,
-    description: 'Air Canada - travel',
-    date: '2024-08-19',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Travel',
-    label: 'Vacation',
-    amount: -450,
-  },
-  {
-    id: 52,
-    description: 'Starbucks',
-    date: '2024-08-08',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Dining out',
-    label: 'Coffee',
-    amount: -18.75,
-  },
-  {
-    id: 53,
-    description: 'Salary - ACME Corp',
-    date: '2024-07-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 2980,
-  },
-  {
-    id: 54,
-    description: 'Rent payment',
-    date: '2024-07-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -1950,
-  },
-  {
-    id: 55,
-    description: 'Metro - groceries',
-    date: '2024-07-09',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -118.9,
-  },
-  {
-    id: 56,
-    description: 'Cinéma Montréal',
-    date: '2024-07-21',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Entertainment',
-    label: 'Leisure',
-    amount: -32.4,
-  },
-];
-const transactionLabels = [...new Set(transactions.map((t) => t.label))];
-const transactionCategories = [...new Set(transactions.map((t) => t.category))];
+const loginForm = document.querySelector('[data-form="login"]');
+const loginStatus = document.querySelector('[data-login-status]');
+const loginEmailInput = document.querySelector('[data-input="login-email"]');
+const loginPasswordInput = document.querySelector('[data-input="login-password"]');
+const logoutButton = document.querySelector('[data-action="logout"]');
 
 const monthFormatter = new Intl.DateTimeFormat('en-CA', { month: 'short' });
 const longMonthFormatter = new Intl.DateTimeFormat('en-CA', { month: 'short', year: 'numeric' });
@@ -662,40 +51,205 @@ const createFlowBucket = () => ({
 
 const getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
-const monthlyMap = new Map();
+const timeframeMonths = { '3m': 3, '6m': 6, '12m': 12 };
 
-transactions.forEach((tx) => {
-  const date = new Date(tx.date);
-  const key = getMonthKey(date);
-  if (!monthlyMap.has(key)) {
-    monthlyMap.set(key, {
-      key,
-      date,
-      label: monthFormatter.format(date),
-      longLabel: longMonthFormatter.format(date),
-      income: createFlowBucket(),
-      expense: createFlowBucket(),
-      other: createFlowBucket(),
+function rebuildTransactionState(data = []) {
+  transactions = data.slice();
+  transactionLabels = [...new Set(transactions.map((t) => t.label).filter(Boolean))].sort();
+  transactionCategories = [...new Set(transactions.map((t) => t.category).filter(Boolean))].sort();
+
+  monthlyMap = new Map();
+  transactions.forEach((tx) => {
+    const date = new Date(tx.date);
+    if (Number.isNaN(date.getTime())) return;
+    const key = getMonthKey(date);
+    if (!monthlyMap.has(key)) {
+      monthlyMap.set(key, {
+        key,
+        date,
+        label: monthFormatter.format(date),
+        longLabel: longMonthFormatter.format(date),
+        income: createFlowBucket(),
+        expense: createFlowBucket(),
+        other: createFlowBucket(),
+      });
+    }
+
+    const monthEntry = monthlyMap.get(key);
+    const bucket =
+      tx.cashflow === 'income'
+        ? monthEntry.income
+        : tx.cashflow === 'expense'
+        ? monthEntry.expense
+        : monthEntry.other;
+    const magnitude = Math.abs(Number(tx.amount));
+    bucket.total += magnitude;
+    bucket.signedTotal += Number(tx.amount);
+    bucket.transactions.push(tx.id);
+    if (tx.category) {
+      bucket.categories.set(tx.category, (bucket.categories.get(tx.category) || 0) + magnitude);
+    }
+  });
+
+  monthlySequence = Array.from(monthlyMap.values()).sort((a, b) => a.date - b.date);
+  dashboardState.monthKey = monthlySequence.length
+    ? monthlySequence[monthlySequence.length - 1].key
+    : null;
+}
+
+function clearSession() {
+  state.token = null;
+  state.user = null;
+  sessionStorage.removeItem('authToken');
+  sessionStorage.removeItem('userEmail');
+  budgetCache.clear();
+  savingsCache.clear();
+  insightsData = { subscriptions: [], fraud: [], benchmarks: [] };
+  rebuildTransactionState([]);
+  updateAvatarInitial();
+  setLoginStatus('Sign in with the test account to load demo data.', 'info');
+  populateFilterOptions();
+  renderTransactions();
+  renderDashboard();
+  renderInsightList('[data-list="subscriptions"]', []);
+  renderInsightList('[data-list="fraud"]', []);
+  renderInsightList('[data-list="benchmarks"]', []);
+}
+
+async function fetchWithAuth(url, options = {}) {
+  if (!state.token) {
+    throw new Error('Not authenticated');
+  }
+  const headers = new Headers(options.headers || {});
+  headers.set('Authorization', `Bearer ${state.token}`);
+  const config = { ...options, headers };
+  return fetch(url, config);
+}
+
+async function fetchJsonWithAuth(url, options = {}) {
+  const response = await fetchWithAuth(url, options);
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
+function setLoginStatus(message, tone = 'info') {
+  if (loginStatus) {
+    loginStatus.textContent = message;
+    loginStatus.dataset.state = tone;
+  }
+}
+
+async function signIn(email, password) {
+  const response = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Invalid credentials');
+  }
+  return response.json();
+}
+
+async function signOut() {
+  if (!state.token) return;
+  try {
+    await fetchWithAuth('/api/logout', { method: 'POST' });
+  } catch (error) {
+    console.warn('Failed to revoke session', error);
+  }
+  clearSession();
+  setLoginStatus('Signed out.', 'info');
+}
+
+async function loadTransactionsData() {
+  const data = await fetchJsonWithAuth('/api/transactions');
+  rebuildTransactionState(data.transactions || []);
+  if (Array.isArray(data.categories) && data.categories.length) {
+    transactionCategories = data.categories;
+  }
+  if (Array.isArray(data.labels) && data.labels.length) {
+    transactionLabels = data.labels;
+  }
+  populateFilterOptions();
+  renderTransactions();
+  renderDashboard();
+}
+
+async function loadInsightsData(cohort = 'all') {
+  const insights = await fetchJsonWithAuth(`/api/insights?cohort=${encodeURIComponent(cohort)}`);
+  insightsData = insights;
+  renderInsightList('[data-list="subscriptions"]', insights.subscriptions);
+  renderInsightList('[data-list="fraud"]', insights.fraud);
+  renderInsightList('[data-list="benchmarks"]', insights.benchmarks);
+}
+
+async function loadAllData() {
+  if (!state.token) return;
+  try {
+    await loadTransactionsData();
+    await Promise.all([populateBudget('monthly'), populateSavings('last-month'), loadInsightsData()]);
+    setLoginStatus('Sample data loaded for the test account.', 'info');
+    showToast('Test account data is ready.');
+  } catch (error) {
+    console.error('Failed to load account data', error);
+    setLoginStatus('Unable to load account data. Please try again.', 'error');
+  }
+}
+
+function restoreSession() {
+  const storedToken = sessionStorage.getItem('authToken');
+  const storedEmail = sessionStorage.getItem('userEmail');
+  if (storedToken && storedEmail) {
+    state.token = storedToken;
+    state.user = { email: storedEmail };
+    updateAvatarInitial();
+    void loadAllData().catch(() => {
+      clearSession();
     });
   }
+}
 
-  const monthEntry = monthlyMap.get(key);
-  const bucket =
-    tx.cashflow === 'income' ? monthEntry.income : tx.cashflow === 'expense' ? monthEntry.expense : monthEntry.other;
-  const magnitude = Math.abs(tx.amount);
-  bucket.total += magnitude;
-  bucket.signedTotal += tx.amount;
-  bucket.transactions.push(tx.id);
-  bucket.categories.set(tx.category, (bucket.categories.get(tx.category) || 0) + magnitude);
-});
+async function handleLogin(event) {
+  event.preventDefault();
+  if (!loginEmailInput || !loginPasswordInput) return;
+  const email = loginEmailInput.value.trim();
+  const password = loginPasswordInput.value;
+  if (!email || !password) {
+    setLoginStatus('Please provide an email and password.', 'error');
+    return;
+  }
 
-const monthlySequence = Array.from(monthlyMap.values()).sort((a, b) => a.date - b.date);
-const timeframeMonths = { '3m': 3, '6m': 6, '12m': 12 };
+  try {
+    const result = await signIn(email, password);
+    state.token = result.token;
+    state.user = result.user;
+    budgetCache.clear();
+    savingsCache.clear();
+    insightsData = { subscriptions: [], fraud: [], benchmarks: [] };
+    sessionStorage.setItem('authToken', state.token);
+    sessionStorage.setItem('userEmail', state.user.email);
+    updateAvatarInitial();
+    setLoginStatus('Signed in successfully.', 'info');
+    await loadAllData();
+  } catch (error) {
+    console.error('Login failed', error);
+    setLoginStatus(error.message || 'Failed to sign in.', 'error');
+  }
+}
+
+function handleLogoutClick() {
+  signOut();
+}
 
 const dashboardState = {
   timeframe: '3m',
   type: 'income',
-  monthKey: monthlySequence.length ? monthlySequence[monthlySequence.length - 1].key : null,
+  monthKey: null,
 };
 
 const cashflowChartContainer = document.querySelector('[data-chart="cashflow"]');
@@ -770,10 +324,10 @@ document.querySelectorAll('.unlock-button').forEach((button) => {
       renderDashboard();
     }
     if (demo === 'budget') {
-      populateBudget('monthly');
+      void populateBudget('monthly');
     }
     if (demo === 'savings') {
-      populateSavings('last-month');
+      void populateSavings('last-month');
     }
   });
 });
@@ -960,88 +514,131 @@ function renderDashboard() {
   updateDashboardSummary();
 }
 
-function populateBudget(period) {
+async function populateBudget(period) {
   const summaryContainer = document.querySelector('[data-summary="budget"]');
   const list = document.querySelector('[data-list="budget"]');
   const monthSelect = document.querySelector('[data-filter="budget-month"]');
-  const dataset = budgets[period];
+  if (!summaryContainer || !list || !monthSelect) return;
 
-  monthSelect.innerHTML = dataset.months
-    .map((month, index) => `<option value="${index}">${month}</option>`)
-    .join('');
+  if (!state.token) {
+    monthSelect.innerHTML = '<option>Sign in to load budget insights</option>';
+    summaryContainer.innerHTML =
+      '<p class="feedback-note">Sign in to calculate budgets from your real spending.</p>';
+    list.innerHTML = '';
+    return;
+  }
 
-  summaryContainer.innerHTML = `
-    <div class="breakdown-item">
-      <div>
-        <strong>Budget</strong>
-        <p class="feedback-note">Auto-set from your last 3 months</p>
-      </div>
-      <span>${currency(dataset.summary.budget)}</span>
-    </div>
-    <div class="breakdown-item">
-      <div>
-        <strong>Spent this ${period === 'monthly' ? 'month' : 'period'}</strong>
-      </div>
-      <span>${currency(dataset.summary.spent)}</span>
-    </div>
-    <div class="breakdown-item">
-      <div>
-        <strong>Savings</strong>
-      </div>
-      <span>${currency(dataset.summary.saved)}</span>
-    </div>
-  `;
+  try {
+    if (!budgetCache.has(period)) {
+      const data = await fetchJsonWithAuth(`/api/budget?period=${encodeURIComponent(period)}`);
+      budgetCache.set(period, data);
+    }
+    const dataset = budgetCache.get(period);
+    const months = dataset.months || [];
+    monthSelect.innerHTML = months
+      .map((month, index) => `<option value="${index}">${month}</option>`)
+      .join('');
 
-  list.innerHTML = '';
-  dataset.categories
-    .slice()
-    .sort((a, b) => b.target - a.target)
-    .forEach((category) => {
-      const pct = Math.min(100, (category.spent / category.target) * 100);
+    const heading = period === 'monthly' ? 'month' : 'period';
+    summaryContainer.innerHTML = `
+      <div class="breakdown-item">
+        <div>
+          <strong>Budget</strong>
+          <p class="feedback-note">Auto-set from your last three months</p>
+        </div>
+        <span>${currency(dataset.summary.budget)}</span>
+      </div>
+      <div class="breakdown-item">
+        <div>
+          <strong>Spent this ${heading}</strong>
+        </div>
+        <span>${currency(dataset.summary.spent)}</span>
+      </div>
+      <div class="breakdown-item">
+        <div>
+          <strong>Savings</strong>
+        </div>
+        <span>${currency(dataset.summary.saved)}</span>
+      </div>
+    `;
+
+    list.innerHTML = '';
+    (dataset.categories || [])
+      .slice()
+      .sort((a, b) => b.spent - a.spent)
+      .forEach((category) => {
+        const pct = category.target ? Math.min(100, (category.spent / category.target) * 100) : 0;
+        const row = document.createElement('div');
+        row.className = 'budget-item';
+        row.innerHTML = `
+          <div>
+            <strong>${category.name}</strong>
+            <div class="feedback-note">${currency(category.spent)} of ${currency(category.target)}</div>
+            <div class="progress"><span style="width:${pct}%"></span></div>
+          </div>
+          <span>${Math.round(pct)}%</span>
+        `;
+        list.appendChild(row);
+      });
+  } catch (error) {
+    console.error('Failed to load budget', error);
+    monthSelect.innerHTML = '<option>Error loading data</option>';
+    summaryContainer.innerHTML =
+      '<p class="feedback-note">Unable to load budget insights right now.</p>';
+    list.innerHTML = '';
+  }
+}
+
+async function populateSavings(view) {
+  const summaryContainer = document.querySelector('[data-summary="savings"]');
+  const list = document.querySelector('[data-list="savings"]');
+  if (!summaryContainer || !list) return;
+
+  if (!state.token) {
+    summaryContainer.innerHTML =
+      '<p class="feedback-note">Sign in to track your personalised savings progress.</p>';
+    list.innerHTML = '';
+    return;
+  }
+
+  try {
+    if (!savingsCache.has(view)) {
+      const data = await fetchJsonWithAuth(`/api/savings?range=${encodeURIComponent(view)}`);
+      savingsCache.set(view, data);
+    }
+    const dataset = savingsCache.get(view);
+
+    summaryContainer.innerHTML = `
+      <div class="breakdown-item">
+        <div>
+          <strong>${dataset.summary.label}</strong>
+          <p class="feedback-note">Saved ${currency(dataset.summary.last)} this period</p>
+        </div>
+        <span>${currency(dataset.summary.cumulative)}</span>
+      </div>
+    `;
+
+    list.innerHTML = '';
+    (dataset.goals || []).forEach((goal) => {
+      const pct = goal.target ? Math.min(100, (goal.contributed / goal.target) * 100) : 0;
       const row = document.createElement('div');
-      row.className = 'budget-item';
+      row.className = 'savings-item';
       row.innerHTML = `
         <div>
-          <strong>${category.name}</strong>
-          <div class="feedback-note">${currency(category.spent)} of ${currency(category.target)}</div>
+          <strong>${goal.name}</strong>
+          <div class="feedback-note">${goal.priority || 'Goal'} priority</div>
           <div class="progress"><span style="width:${pct}%"></span></div>
         </div>
         <span>${Math.round(pct)}%</span>
       `;
       list.appendChild(row);
     });
-}
-
-function populateSavings(view) {
-  const summaryContainer = document.querySelector('[data-summary="savings"]');
-  const list = document.querySelector('[data-list="savings"]');
-  const dataset = savings[view];
-
-  summaryContainer.innerHTML = `
-    <div class="breakdown-item">
-      <div>
-        <strong>${dataset.summary.label}</strong>
-        <p class="feedback-note">Saved ${currency(dataset.summary.last)} this period</p>
-      </div>
-      <span>${currency(dataset.summary.cumulative)}</span>
-    </div>
-  `;
-
-  list.innerHTML = '';
-  dataset.goals.forEach((goal) => {
-    const pct = Math.min(100, (goal.contributed / goal.target) * 100);
-    const row = document.createElement('div');
-    row.className = 'savings-item';
-    row.innerHTML = `
-      <div>
-        <strong>${goal.name}</strong>
-        <div class="feedback-note">${goal.priority} priority</div>
-        <div class="progress"><span style="width:${pct}%"></span></div>
-      </div>
-      <span>${Math.round(pct)}%</span>
-    `;
-    list.appendChild(row);
-  });
+  } catch (error) {
+    console.error('Failed to load savings', error);
+    summaryContainer.innerHTML =
+      '<p class="feedback-note">Unable to load savings insights right now.</p>';
+    list.innerHTML = '';
+  }
 }
 
 const budgetPeriodSelect = document.querySelector('[data-filter="budget-period"]');
@@ -1049,7 +646,7 @@ const budgetMonthSelect = document.querySelector('[data-filter="budget-month"]')
 
 if (budgetPeriodSelect) {
   budgetPeriodSelect.addEventListener('change', () => {
-    populateBudget(budgetPeriodSelect.value);
+    void populateBudget(budgetPeriodSelect.value);
   });
 }
 
@@ -1063,7 +660,7 @@ const savingsPeriodSelect = document.querySelector('[data-filter="savings-period
 
 if (savingsPeriodSelect) {
   savingsPeriodSelect.addEventListener('change', () => {
-    populateSavings(savingsPeriodSelect.value);
+    void populateSavings(savingsPeriodSelect.value);
   });
 }
 
@@ -1077,22 +674,37 @@ const filterCategory = document.querySelector('[data-filter="tx-category"]');
 const filterLabel = document.querySelector('[data-filter="tx-label"]');
 
 function populateFilterOptions() {
-  transactionCategories.forEach((category) => {
-    const option = document.createElement('option');
-    option.value = category;
-    option.textContent = category;
-    filterCategory.appendChild(option);
-  });
+  if (filterCategory) {
+    const selected = filterCategory.value;
+    filterCategory.innerHTML = '<option value="all">All categories</option>';
+    transactionCategories.forEach((category) => {
+      const option = document.createElement('option');
+      option.value = category;
+      option.textContent = category;
+      filterCategory.appendChild(option);
+    });
+    if (transactionCategories.includes(selected)) {
+      filterCategory.value = selected;
+    }
+  }
 
-  transactionLabels.forEach((label) => {
-    const option = document.createElement('option');
-    option.value = label;
-    option.textContent = label;
-    filterLabel.appendChild(option);
-  });
+  if (filterLabel) {
+    const selected = filterLabel.value;
+    filterLabel.innerHTML = '<option value="all">All labels</option>';
+    transactionLabels.forEach((label) => {
+      const option = document.createElement('option');
+      option.value = label;
+      option.textContent = label;
+      filterLabel.appendChild(option);
+    });
+    if (transactionLabels.includes(selected)) {
+      filterLabel.value = selected;
+    }
+  }
 }
 
 function renderTransactions() {
+  if (!transactionTableBody) return;
   const term = searchInput.value.toLowerCase();
   const flow = filterCashflow.value;
   const account = filterAccount.value;
@@ -1116,20 +728,29 @@ function renderTransactions() {
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
   transactionTableBody.innerHTML = '';
-  filtered.forEach((tx) => {
+  if (!filtered.length) {
     const row = document.createElement('tr');
-    row.innerHTML = `
-      <td><input type="checkbox" data-tx="${tx.id}" /></td>
-      <td>${tx.description}</td>
-      <td>${new Date(tx.date).toLocaleDateString('en-CA')}</td>
-      <td>${tx.cashflow}</td>
-      <td>${tx.account}</td>
-      <td>${tx.category}</td>
-      <td>${tx.label}</td>
-      <td class="numeric">${currency(tx.amount)}</td>
-    `;
+    const message = state.token
+      ? 'No transactions match your filters.'
+      : 'Sign in to view and manage your transactions.';
+    row.innerHTML = `<td colspan="8" class="empty-state">${message}</td>`;
     transactionTableBody.appendChild(row);
-  });
+  } else {
+    filtered.forEach((tx) => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><input type="checkbox" data-tx="${tx.id}" /></td>
+        <td>${tx.description}</td>
+        <td>${new Date(tx.date).toLocaleDateString('en-CA')}</td>
+        <td>${tx.cashflow}</td>
+        <td>${tx.account}</td>
+        <td>${tx.category}</td>
+        <td>${tx.label}</td>
+        <td class="numeric">${currency(tx.amount)}</td>
+      `;
+      transactionTableBody.appendChild(row);
+    });
+  }
 
   bindTransactionSelection();
   updateTransactionSummary();
@@ -1157,70 +778,11 @@ function updateTransactionSummary() {
   transactionSummaryTotal.textContent = currency(total);
 }
 
-[searchInput, filterCashflow, filterAccount, filterCategory, filterLabel].forEach((control) => {
-  control.addEventListener('input', renderTransactions);
-});
-
-const subscriptionInsights = [
-  {
-    title: 'Netflix increased to $22.99 (+15%)',
-    body: 'The premium plan went up versus your 3-month average. Consider downgrading or sharing a plan.',
-  },
-  {
-    title: 'Duplicate: Crave and Disney+',
-    body: 'You spend $42/mo across two streaming platforms. Could you keep just one this month?',
-  },
-  {
-    title: 'Spotify hasn’t been used in 45 days',
-    body: 'Based on low activity, consider pausing Spotify and switching to Apple Music’s free trial.',
-  },
-];
-
-const fraudInsights = [
-  {
-    title: 'Possible duplicate ride with Uber',
-    body: 'Two similar charges ($24.60) on June 18. If one was cancelled, request a refund.',
-  },
-  {
-    title: 'Hydro-Québec preauth not released',
-    body: 'A $200 pre-authorisation from May 28 is still pending after 7 days. Check your account status.',
-  },
-  {
-    title: 'Bank fee spike at RBC',
-    body: 'Monthly fee jumped from $4.00 to $7.50. Explore no-fee accounts like Simplii or EQ Bank.',
-  },
-];
-
-const benchmarkCopy = {
-  all: [
-    {
-      title: 'Transportation spend +12% vs. Canadian households',
-      body: 'You spend $310/mo on transportation compared to the Canadian average of $276. Consider a commuter pass or rideshare credits.',
-    },
-    {
-      title: 'Groceries -8% vs. Canadian households',
-      body: 'At $480/mo, you are trending below the $520 national average while keeping healthy staples.',
-    },
-  ],
-  students: [
-    {
-      title: 'Dining out higher than student peers',
-      body: 'You spend $185/mo compared to the student average of $120. Try our $15 meal prep ideas.',
-    },
-  ],
-  'young-professionals': [
-    {
-      title: 'Subscription stack looks lean',
-      body: 'Most professionals your age pay for 5–6 services. You pay for 3—great job staying focused.',
-    },
-  ],
-  households: [
-    {
-      title: 'Family groceries 5% lower than similar households',
-      body: 'Smart use of Costco and PC Optimum points keeps you below average by $40/mo.',
-    },
-  ],
-};
+[searchInput, filterCashflow, filterAccount, filterCategory, filterLabel]
+  .filter(Boolean)
+  .forEach((control) => {
+    control.addEventListener('input', renderTransactions);
+  });
 
 const insightFeedback = {
   useful: 0,
@@ -1230,7 +792,20 @@ const insightFeedback = {
 
 function renderInsightList(containerSelector, items) {
   const container = document.querySelector(containerSelector);
+  if (!container) return;
   container.innerHTML = '';
+  if (!items || !items.length) {
+    const empty = document.createElement('li');
+    empty.className = 'insight-item';
+    empty.innerHTML = `
+      <div>
+        <p class="feedback-note">No insights yet. Sign in and upload transactions to unlock recommendations.</p>
+      </div>
+    `;
+    container.appendChild(empty);
+    return;
+  }
+
   items.forEach((item) => {
     const li = document.createElement('li');
     li.className = 'insight-item';
@@ -1276,7 +851,14 @@ const benchmarkSelect = document.querySelector('[data-filter="benchmark-cohort"]
 
 if (benchmarkSelect) {
   benchmarkSelect.addEventListener('change', () => {
-    renderInsightList('[data-list="benchmarks"]', benchmarkCopy[benchmarkSelect.value]);
+    if (!state.token) {
+      renderInsightList('[data-list="benchmarks"]', []);
+      return;
+    }
+    void loadInsightsData(benchmarkSelect.value).catch((error) => {
+      console.error('Failed to update benchmark insights', error);
+      setLoginStatus('Unable to refresh insights right now.', 'error');
+    });
   });
 }
 
@@ -1290,13 +872,25 @@ if (feedbackForm) {
   });
 }
 
+if (loginForm) {
+  loginForm.addEventListener('submit', handleLogin);
+}
+
+if (logoutButton) {
+  logoutButton.addEventListener('click', handleLogoutClick);
+}
+
 function init() {
+  setLoginStatus('Sign in with the test account to load demo data.', 'info');
   renderDashboard();
   populateFilterOptions();
   renderTransactions();
-  renderInsightList('[data-list="subscriptions"]', subscriptionInsights);
-  renderInsightList('[data-list="fraud"]', fraudInsights);
-  renderInsightList('[data-list="benchmarks"]', benchmarkCopy.all);
+  renderInsightList('[data-list="subscriptions"]', insightsData.subscriptions);
+  renderInsightList('[data-list="fraud"]', insightsData.fraud);
+  renderInsightList('[data-list="benchmarks"]', insightsData.benchmarks);
+  void populateBudget('monthly');
+  void populateSavings('last-month');
+  restoreSession();
 }
 
 init();
