@@ -9,6 +9,8 @@
   --accent: #3dd598;
   --warning: #f59e0b;
   --danger: #ef4444;
+  --income: #22c55e;
+  --expense: #ef4444;
   --text: #1f2937;
   --muted: #6b7280;
   --border: #d5dbe5;
@@ -341,7 +343,8 @@ main {
 }
 
 .module[data-module='dashboard-transactions'] .module-content {
-  display: block;
+  display: grid;
+  gap: 1.75rem;
 }
 
 @media (min-width: 900px) {
@@ -352,20 +355,25 @@ main {
 }
 
 .chart {
-  background: var(--surface-muted);
-  border-radius: var(--radius-md);
-  padding: 1.5rem;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
 .chart-legend {
   display: flex;
-  gap: 1rem;
+  justify-content: center;
+  gap: 1.5rem;
   flex-wrap: wrap;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: var(--muted);
+  padding-top: 1rem;
+  border-top: 1px solid var(--surface-muted);
 }
 
 .chart-legend span {
@@ -373,6 +381,7 @@ main {
   align-items: center;
   gap: 0.4rem;
   font-weight: 500;
+  color: var(--secondary);
 }
 
 .chart-legend span::before {
@@ -380,29 +389,39 @@ main {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: var(--primary);
+  background: var(--income);
 }
 
 .chart-legend span[data-type='expense']::before {
-  background: var(--danger);
+  background: var(--expense);
 }
 
 .chart-bars {
   display: flex;
   align-items: flex-end;
-  gap: 1.5rem;
+  gap: 2rem;
   flex: 1;
-  min-height: 180px;
+  min-height: 220px;
   overflow-x: auto;
-  padding-bottom: 0.5rem;
+  padding: 1.5rem 1rem 0;
+  position: relative;
+  border-radius: var(--radius-md);
+  background-image: repeating-linear-gradient(
+    to top,
+    rgba(15, 23, 42, 0.06) 0,
+    rgba(15, 23, 42, 0.06) 1px,
+    transparent 1px,
+    transparent 48px
+  );
+  background-origin: content-box;
 }
 
 .chart-bar-group {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.65rem;
-  flex: 0 0 72px;
+  gap: 0.75rem;
+  flex: 0 0 80px;
 }
 
 .chart-bar {
@@ -418,15 +437,15 @@ main {
 }
 
 .chart-bar-fill {
-  width: 36px;
+  width: 44px;
   border-radius: var(--radius-sm);
-  background: var(--primary);
+  background: var(--income);
   display: block;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .chart-bar-fill[data-type='expense'] {
-  background: var(--danger);
+  background: var(--expense);
 }
 
 .chart-bar:hover .chart-bar-fill,
@@ -436,18 +455,65 @@ main {
 }
 
 .chart-value {
+  order: -1;
   font-weight: 600;
+  font-size: 0.85rem;
   color: var(--secondary);
-  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
 }
 
-.chart-bar.active .chart-value {
-  color: var(--primary-dark);
+.chart-value[data-type='income'] {
+  color: var(--income);
+}
+
+.chart-value[data-type='expense'] {
+  color: var(--expense);
 }
 
 .chart-bar-group small {
   color: var(--muted);
   font-weight: 600;
+}
+
+.categorisation-card {
+  background: var(--surface-muted);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  display: grid;
+  gap: 1.25rem;
+}
+
+.categorisation-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.categorisation-card .summary-label {
+  margin: 0;
+  color: var(--muted);
+  text-align: right;
+}
+
+.transactions-list-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.5rem 0 1rem;
+}
+
+.transactions-list-header h2 {
+  margin: 0;
+}
+
+.categorisation-card .empty-state {
+  text-align: left;
 }
 
 @media (max-width: 720px) {
@@ -456,7 +522,25 @@ main {
   }
 
   .chart-bar-fill {
-    width: 28px;
+    width: 32px;
+  }
+}
+
+@media (max-width: 640px) {
+  .categorisation-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .categorisation-card .summary-label {
+    text-align: left;
+  }
+
+  .transactions-list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    margin: 1.25rem 0 0.75rem;
   }
 }
 
@@ -492,6 +576,22 @@ main {
   height: 100%;
   border-radius: inherit;
   background: var(--primary);
+}
+
+.progress span[data-type='income'] {
+  background: var(--income);
+}
+
+.progress span[data-type='expense'] {
+  background: var(--expense);
+}
+
+.breakdown-item[data-type='income'] span:last-child {
+  color: var(--income);
+}
+
+.breakdown-item[data-type='expense'] span:last-child {
+  color: var(--expense);
 }
 
 .lock-overlay {
