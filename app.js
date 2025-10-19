@@ -703,6 +703,7 @@ const cashflowCategoriesList = document.querySelector('[data-list="cashflow-cate
 const cashflowTimeframeSelect = document.querySelector('[data-filter="cashflow-timeframe"]');
 const dashboardTransactionsTable = document.querySelector('[data-table="dashboard-transactions"]');
 const dashboardSummaryLabel = document.querySelector('[data-dashboard-summary]');
+const categorisationSummaryLabel = document.querySelector('[data-categorisation-summary]');
 
 function switchTab(targetId) {
   tabButtons.forEach((tab) => tab.classList.toggle('active', tab.dataset.tabTarget === targetId));
@@ -843,14 +844,15 @@ function buildCashflowChart() {
 
       const fill = document.createElement('span');
       fill.className = 'chart-bar-fill';
-      const height = maxValue ? Math.max(20, (bucket.total / maxValue) * 140) : 20;
+      const height = maxValue ? Math.max(24, (bucket.total / maxValue) * 180) : 24;
       fill.style.height = `${height}px`;
       fill.dataset.type = type;
       button.appendChild(fill);
 
       const value = document.createElement('span');
       value.className = 'chart-value';
-      value.textContent = currency(bucket.signedTotal);
+      value.textContent = currency(bucket.total);
+      value.dataset.type = type;
       button.appendChild(value);
 
       group.appendChild(button);
@@ -886,10 +888,12 @@ function buildCashflowBreakdown() {
   categoryEntries.forEach((item) => {
     const row = document.createElement('div');
     row.className = 'breakdown-item';
+    row.dataset.type = dashboardState.type;
+    const width = Math.min(100, (item.value / maxCategory) * 100);
     row.innerHTML = `
       <div>
         <strong>${item.name}</strong>
-        <div class="progress"><span style="width:${Math.min(100, (item.value / maxCategory) * 100)}%"></span></div>
+        <div class="progress"><span data-type="${dashboardState.type}" style="width:${width}%"></span></div>
       </div>
       <span>${currency(dashboardState.type === 'expense' ? -item.value : item.value)}</span>
     `;
@@ -927,14 +931,22 @@ function renderDashboardTransactions() {
 }
 
 function updateDashboardSummary() {
-  if (!dashboardSummaryLabel) return;
   const month = dashboardState.monthKey ? monthlyMap.get(dashboardState.monthKey) : null;
-  if (!month) {
-    dashboardSummaryLabel.textContent = 'Select a bar to explore transactions.';
-    return;
-  }
   const label = dashboardState.type === 'income' ? 'Income' : 'Expenses';
-  dashboardSummaryLabel.textContent = `${label} for ${month.longLabel}`;
+  const transactionsMessage = month
+    ? `${label} for ${month.longLabel}`
+    : 'Select a bar to explore transactions.';
+  const categorisationMessage = month
+    ? `${label} categories for ${month.longLabel}`
+    : 'Select a bar to see category detail.';
+
+  if (dashboardSummaryLabel) {
+    dashboardSummaryLabel.textContent = transactionsMessage;
+  }
+
+  if (categorisationSummaryLabel) {
+    categorisationSummaryLabel.textContent = categorisationMessage;
+  }
 }
 
 function renderDashboard() {

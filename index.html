@@ -61,13 +61,12 @@
           </header>
           <div class="module-content">
             <div class="chart" aria-hidden="true">
+              <div class="chart-bars" data-chart="cashflow"></div>
               <div class="chart-legend">
                 <span data-type="income">Income</span>
                 <span data-type="expense">Expenses</span>
               </div>
-              <div class="chart-bars" data-chart="cashflow"></div>
             </div>
-            <div class="category-breakdown" data-list="cashflow-categories"></div>
           </div>
           <div class="lock-overlay">
             <p class="lock-copy">See how your real cash flow looks once you upload your data.</p>
@@ -77,13 +76,20 @@
         </article>
 
         <article class="module" data-module="dashboard-transactions">
-          <header class="module-header">
-            <div>
+          <div class="module-content">
+            <section class="categorisation-card">
+              <div class="categorisation-card-header">
+                <h3>Categorisation</h3>
+                <p class="summary-label" data-categorisation-summary>
+                  Select a bar to see category detail.
+                </p>
+              </div>
+              <div class="category-breakdown" data-list="cashflow-categories"></div>
+            </section>
+            <div class="transactions-list-header">
               <h2>Transactions</h2>
               <p class="feedback-note" data-dashboard-summary>Income for Jun 2025</p>
             </div>
-          </header>
-          <div class="module-content">
             <table class="transactions-table compact">
               <thead>
                 <tr>
