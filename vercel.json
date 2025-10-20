@@ -3,12 +3,7 @@
   "buildCommand": "npm run vercel-build",
   "functions": {
     "api/server.js": {
-      "includeFiles": [
-        "index.html",
-        "app.js",
-        "styles.css",
-        "logo.svg"
-      ]
+      "includeFiles": "{index.html,app.js,styles.css,logo.svg}"
     }
   },
   "routes": [
