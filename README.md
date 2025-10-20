@@ -23,9 +23,9 @@ The prototype assets are still static, but the ingestion and insight APIs now ru
 
 ```bash
 # Static walkthrough (no API calls)
-open index.html     # macOS
-xdg-open index.html # Linux
-start index.html    # Windows
+open static/index.html     # macOS
+xdg-open static/index.html # Linux
+start static/index.html    # Windows
 
 # Interactive API walkthrough
 npm install
@@ -117,7 +117,8 @@ Share these credentials with anyone rehearsing the product demo so that all pres
 
 - The repository includes a `vercel.json` file that disables automatic Next.js detection and maps `/api/*` routes to the Express
   server defined in `server.js`. This avoids the `No Next.js version detected` build failure reported by Vercel and keeps the
-  static prototype assets (`index.html`, `app.js`, `styles.css`, `logo.svg`) served by Vercel’s static hosting.
+  static prototype assets (`static/index.html`, `static/app.js`, `static/styles.css`, `static/logo.svg`) served by Vercel’s
+  static hosting.
 - The Express app now exports its instance so Vercel’s Node runtime can mount it while local development continues to use `npm start`.
 
 ## License
