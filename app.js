@@ -82,9 +82,9 @@ function updateAvatar() {
   if (!avatarInitial || !avatarButton) return;
   const user = state.auth.user;
   if (user) {
-    const initial = user.name ? user.name.trim().charAt(0).toUpperCase() : 'U';
-    avatarInitial.textContent = initial;
-    avatarButton.setAttribute('aria-label', `Account settings for ${user.name}`);
+    const name = user.name?.trim() || user.email || 'your account';
+    avatarInitial.textContent = `Signed in as ${name}`;
+    avatarButton.setAttribute('aria-label', `Account settings for ${name}`);
   } else {
     avatarInitial.textContent = 'Sign in';
     avatarButton.setAttribute('aria-label', 'Sign in');

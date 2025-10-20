@@ -577,7 +577,10 @@ function resolveUserId(req) {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7).trim();
     if (token) {
-      return token;
+      const payload = decodeToken(token);
+      if (payload?.sub) {
+        return payload.sub;
+      }
     }
   }
   const headerUser = req.headers['x-user-id'];
