@@ -5,11 +5,111 @@ const { parse } = require('csv-parse');
 const dayjs = require('dayjs');
 const cors = require('cors');
 const { Pool } = require('pg');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const __dirnameResolved = __dirname;
 const disableDb = process.env.DISABLE_DB === '1';
+const JWT_SECRET = process.env.JWT_SECRET || 'canadian-insights-demo-secret';
+const SESSION_TTL_SECONDS = Number(process.env.JWT_TTL_SECONDS || 60 * 60 * 2);
+const demoEmail = process.env.DEMO_EMAIL || 'demo@canadianinsights.ca';
+const demoPassword = process.env.DEMO_PASSWORD || 'northstar-demo';
+
+const demoUser = {
+  id: 'demo-user',
+  name: 'Taylor Nguyen',
+  email: demoEmail,
+};
+
+const users = [
+  {
+    ...demoUser,
+    passwordHash: hashPassword(demoPassword),
+  },
+];
+
+const usersById = new Map(users.map((user) => [user.id, user]));
+
+function publicUser(user) {
+  return { id: user.id, name: user.name, email: user.email };
+}
+
+function hashPassword(value) {
+  return crypto.createHash('sha256').update(value).digest('hex');
+}
+
+function createToken(user) {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(
+    JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS })
+  ).toString('base64url');
+  const signature = crypto
+    .createHmac('sha256', JWT_SECRET)
+    .update(`${header}.${payload}`)
+    .digest('base64url');
+  return `${header}.${payload}.${signature}`;
+}
+
+async function verifyPassword(user, password) {
+  if (!password) return false;
+  try {
+    return hashPassword(password) === user.passwordHash;
+  } catch (error) {
+    console.warn('Password verification failed', error);
+    return false;
+  }
+}
+
+function decodeToken(token) {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  const [headerPart, payloadPart, signaturePart] = parts;
+  try {
+    const expectedSignature = crypto
+      .createHmac('sha256', JWT_SECRET)
+      .update(`${headerPart}.${payloadPart}`)
+      .digest('base64url');
+    if (signaturePart.length !== expectedSignature.length) {
+      return null;
+    }
+    const providedBuffer = Buffer.from(signaturePart);
+    const expectedBuffer = Buffer.from(expectedSignature);
+    if (!crypto.timingSafeEqual(providedBuffer, expectedBuffer)) {
+      return null;
+    }
+    const payloadJson = Buffer.from(payloadPart, 'base64url').toString('utf8');
+    const payload = JSON.parse(payloadJson);
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    return payload;
+  } catch (error) {
+    console.warn('Token verification failed', error);
+    return null;
+  }
+}
+
+function authenticate(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthenticated' });
+  }
+
+  try {
+    const payload = decodeToken(token);
+    const user = payload?.sub ? usersById.get(payload.sub) : null;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthenticated' });
+    }
+    req.user = publicUser(user);
+    next();
+  } catch (error) {
+    console.warn('Failed to verify token', error);
+    return res.status(401).json({ error: 'Unauthenticated' });
+  }
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -22,6 +122,46 @@ const upload = multer({
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirnameResolved));
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const user = users.find((entry) => entry.email.toLowerCase() === email.toLowerCase());
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const valid = await verifyPassword(user, password);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = createToken(user);
+    res.json({ token, user: publicUser(user) });
+  } catch (error) {
+    console.error('Login failed', error);
+    res.status(500).json({ error: 'Unable to sign in' });
+  }
+});
+
+app.post('/api/auth/demo', (req, res) => {
+  try {
+    const user = users[0];
+    const token = createToken(user);
+    res.json({ token, user: publicUser(user) });
+  } catch (error) {
+    console.error('Demo login failed', error);
+    res.status(500).json({ error: 'Unable to start demo session' });
+  }
+});
+
+app.get('/api/auth/me', authenticate, (req, res) => {
+  res.json({ user: req.user });
+});
 
 let pool = null;
 if (disableDb) {
@@ -894,7 +1034,7 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-app.get('/api/transactions', async (req, res) => {
+app.get('/api/transactions', authenticate, async (req, res) => {
   try {
     const { search = '', cashflow = 'all', account = 'all', category = 'all', label = 'all', limit = 500 } = req.query;
     const userId = getDefaultUserId();
@@ -1006,7 +1146,7 @@ app.get('/api/transactions', async (req, res) => {
   }
 });
 
-app.get('/api/summary', async (req, res) => {
+app.get('/api/summary', authenticate, async (req, res) => {
   try {
     const window = req.query.window || '3m';
     const monthCount = Number.parseInt(window, 10) || 3;
@@ -1051,7 +1191,7 @@ app.get('/api/summary', async (req, res) => {
         .sort((a, b) => b.value - a.value)
         .slice(0, 12);
 
-      return res.json({ ...chart, categories });
+      return res.json({ ...chart, categories, monthKeys: labels });
     }
 
     const userId = getDefaultUserId();
@@ -1096,14 +1236,14 @@ app.get('/api/summary', async (req, res) => {
       value: Number(row.total),
     }));
 
-    res.json({ ...chart, categories });
+    res.json({ ...chart, categories, monthKeys: labels });
   } catch (error) {
     console.error('Failed to load summary', error);
     res.status(500).json({ error: 'Failed to load summary' });
   }
 });
 
-app.get('/api/budget', async (req, res) => {
+app.get('/api/budget', authenticate, async (req, res) => {
   try {
     const period = req.query.period === 'quarterly' ? 'quarterly' : 'monthly';
     const months = period === 'quarterly' ? 3 : 1;
@@ -1268,7 +1408,7 @@ app.get('/api/budget', async (req, res) => {
   }
 });
 
-app.get('/api/savings', async (req, res) => {
+app.get('/api/savings', authenticate, async (req, res) => {
   try {
     const rangeParam = req.query.range || 'last-month';
     const { start, end } = savingsRange(rangeParam);
@@ -1423,7 +1563,7 @@ app.get('/api/savings', async (req, res) => {
   }
 });
 
-app.get('/api/insights', async (req, res) => {
+app.get('/api/insights', authenticate, async (req, res) => {
   try {
     const cohort = req.query.cohort || 'all';
     const insights = await generateInsights(cohort, req.userId);
@@ -1434,7 +1574,7 @@ app.get('/api/insights', async (req, res) => {
   }
 });
 
-app.post('/api/insights/:type/feedback', async (req, res) => {
+app.post('/api/insights/:type/feedback', authenticate, async (req, res) => {
   try {
     const { type } = req.params;
     const { title = '', response = '' } = req.body || {};
@@ -1459,7 +1599,7 @@ app.post('/api/insights/:type/feedback', async (req, res) => {
   }
 });
 
-app.post('/api/upload', upload.array('statements', 6), async (req, res) => {
+app.post('/api/upload', authenticate, upload.array('statements', 6), async (req, res) => {
   if (!req.files || !req.files.length) {
     return res.status(400).json({ error: 'No files uploaded' });
   }
@@ -1476,7 +1616,7 @@ app.post('/api/upload', upload.array('statements', 6), async (req, res) => {
   res.json({ summary });
 });
 
-app.post('/api/feedback', async (req, res) => {
+app.post('/api/feedback', authenticate, async (req, res) => {
   try {
     const payload = req.body || {};
     if (disableDb) {
