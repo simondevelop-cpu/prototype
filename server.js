@@ -38,6 +38,40 @@ if (disableDb) {
   });
 }
 
+const DEMO_USER_EMAIL = 'demo@example.com';
+const DEMO_USER_DISPLAY_NAME = 'Demo User';
+const DEMO_USER_PASSWORD_HASH = 'demo-password-hash';
+
+let defaultUserId = null;
+const defaultAccountIds = new Map();
+
+function getDefaultUserId() {
+  if (defaultUserId === null) {
+    throw new Error('Default user context has not been initialised');
+  }
+  return defaultUserId;
+}
+
+function setDefaultUserContext(userId, accounts = []) {
+  defaultUserId = userId;
+  defaultAccountIds.clear();
+  accounts.forEach(({ name, id }) => {
+    if (name && id) {
+      const key = name.toString().trim().toLowerCase();
+      if (key) {
+        defaultAccountIds.set(key, id);
+      }
+    }
+  });
+}
+
+function getAccountIdForName(name) {
+  if (!name) return null;
+  const key = name.toString().trim().toLowerCase();
+  if (!key) return null;
+  return defaultAccountIds.get(key) || null;
+}
+
 function toCurrency(value) {
   return Number.parseFloat(value || 0);
 }
@@ -187,6 +221,25 @@ function setInMemoryTransaction(userId, transaction) {
 async function ensureSchema() {
   if (disableDb) return;
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS accounts (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS transactions (
       id SERIAL PRIMARY KEY,
       description TEXT NOT NULL,
@@ -197,8 +250,20 @@ async function ensureSchema() {
       category TEXT NOT NULL,
       label TEXT DEFAULT '',
       amount NUMERIC NOT NULL,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE transactions
+    ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
+  `);
+
+  await pool.query(`
+    ALTER TABLE transactions
+    ADD COLUMN IF NOT EXISTS account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL
   `);
 
   await pool.query(`
@@ -248,11 +313,54 @@ async function ensureSchema() {
       END IF;
     END $$;
   `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'transactions_unique'
+      ) THEN
+        ALTER TABLE transactions
+        ADD CONSTRAINT transactions_unique UNIQUE (user_id, date, amount, merchant, cashflow);
+      END IF;
+    END $$;
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS transactions_user_id_date_idx
+    ON transactions (user_id, date)
+  `);
 }
 
 async function insertTransaction(transaction, userId) {
   if (disableDb) {
     return setInMemoryTransaction(userId, transaction) ? 1 : 0;
+  }
+  const merchant = transaction.merchant || normaliseMerchant(transaction.description);
+  const userId = transaction.user_id ?? (defaultUserId !== null ? defaultUserId : null);
+  if (!userId) {
+    throw new Error('Transactions require a user_id when the database is enabled');
+  }
+  let accountId =
+    transaction.account_id !== undefined && transaction.account_id !== null
+      ? transaction.account_id
+      : getAccountIdForName(transaction.account);
+  const accountKey = (transaction.account || '').toString().trim().toLowerCase();
+  if (userId && accountKey && accountId == null) {
+    const accountResult = await pool.query(
+      `INSERT INTO accounts (user_id, name)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, name) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id, name`,
+      [userId, accountKey]
+    );
+    accountId = accountResult.rows[0]?.id || null;
+    if (accountResult.rows[0]) {
+      const keyFromDb = accountResult.rows[0].name.toString().trim().toLowerCase();
+      if (keyFromDb) {
+        defaultAccountIds.set(keyFromDb, accountResult.rows[0].id);
+      }
+    }
   }
   const result = await pool.query(
     `INSERT INTO transactions
@@ -262,13 +370,15 @@ async function insertTransaction(transaction, userId) {
     [
       userId,
       transaction.description,
-      transaction.merchant,
+      merchant,
       transaction.date,
       transaction.cashflow,
       transaction.account,
       transaction.category,
       transaction.label,
       transaction.amount,
+      userId,
+      accountId,
     ]
   );
   return result.rowCount;
@@ -491,6 +601,7 @@ function buildTransaction(record) {
 async function ingestFile(buffer, userId) {
   const records = await parseCSV(buffer);
   let inserted = 0;
+  const userId = disableDb ? null : getDefaultUserId();
   for (const record of records) {
     const transaction = buildTransaction(record);
     if (!transaction) continue;
@@ -672,6 +783,7 @@ async function generateInsights(cohort = 'all', userId = DEFAULT_USER_ID) {
     return buildInsightsFromTransactions(getInMemoryTransactions(userId), cohort);
   }
 
+  const userId = getDefaultUserId();
   const expensesResult = await pool.query(
     `SELECT id, description, merchant, date, amount, category
      FROM transactions
@@ -785,9 +897,10 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/transactions', async (req, res) => {
   try {
     const { search = '', cashflow = 'all', account = 'all', category = 'all', label = 'all', limit = 500 } = req.query;
-    const filters = [];
-    const values = [];
-    let index = 1;
+    const userId = getDefaultUserId();
+    const filters = [`user_id = $1`];
+    const values = [userId];
+    let index = 2;
 
     if (disableDb) {
       const term = search.toLowerCase();
@@ -941,6 +1054,7 @@ app.get('/api/summary', async (req, res) => {
       return res.json({ ...chart, categories });
     }
 
+    const userId = getDefaultUserId();
     const summaryResult = await pool.query(
       `SELECT TO_CHAR(date, 'YYYY-MM') AS month, cashflow, SUM(amount) AS total
        FROM transactions
@@ -1073,6 +1187,7 @@ app.get('/api/budget', async (req, res) => {
       });
     }
 
+    const userId = getDefaultUserId();
     const expenseRow = await pool.query(
       `SELECT COALESCE(ABS(SUM(amount)), 0) AS spent
        FROM transactions
@@ -1110,6 +1225,7 @@ app.get('/api/budget', async (req, res) => {
         req.userId,
         baselineRange.start.format('YYYY-MM-DD'),
         baselineRange.end.format('YYYY-MM-DD'),
+        userId,
       ]
     );
 
@@ -1221,6 +1337,7 @@ app.get('/api/savings', async (req, res) => {
       });
     }
 
+    const userId = getDefaultUserId();
     const totalsResult = await pool.query(
       `SELECT
         SUM(CASE WHEN cashflow = 'income' THEN amount ELSE 0 END) AS income,
