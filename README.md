@@ -92,6 +92,27 @@ Add the following environment variables locally (e.g., `.env.local`) and in Verc
 
 Vercel will expose these variables to `server.js`. After updating the variables, redeploy the project so the new configuration is applied.
 
+## Refreshing demo data
+
+Before a stakeholder walkthrough, you can reset the demo account’s data back to the curated baseline. The repository includes a helper script that truncates the `transactions` and `insight_feedback` tables and reloads the canonical CSV found in `scripts/demo-transactions.csv`.
+
+```bash
+# Supabase connection string must be provided
+DATABASE_URL="postgres://user:password@host:5432/db" npm run refresh-demo-data
+
+# Optionally point to a different CSV
+DATABASE_URL="postgres://user:password@host:5432/db" npm run refresh-demo-data -- ./path/to/custom.csv
+```
+
+The script honours the `DATABASE_SSL` flag (defaults to SSL on) in case you are targeting a local PostgreSQL instance without TLS.
+
+### Demo account credentials
+
+Share these credentials with anyone rehearsing the product demo so that all presenters use the same dataset:
+
+- **Email:** `demo@canadianinsights.ca`
+- **Password:** `DemoUser!2024`
+
 ### 3. Deployment notes
 
 - The repository includes a `vercel.json` file that disables automatic Next.js detection and maps `/api/*` routes to the Express

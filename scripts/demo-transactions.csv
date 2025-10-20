@@ -1,0 +1,13 @@
+description,date,cashflow,account,category,label,amount
+Metro - groceries,2025-06-12,expense,credit,Groceries,Household,-112.45
+Rent payment,2025-06-01,expense,cash,Housing,Essential,-2100
+Salary - ACME Corp,2025-06-01,income,cash,Employment income,Primary income,3150
+EQ Bank - transfer,2025-06-05,other,cash,Transfers,Savings,-400
+Spotify subscription,2025-06-15,expense,credit,Subscriptions,Music,-14.99
+Hydro-Québec,2025-06-08,expense,cash,Utilities,Household,-132.10
+Uber trip,2025-06-18,expense,credit,Transportation,City travel,-24.60
+CRA Tax Refund,2025-05-15,other,cash,Tax refunds,Windfall,360
+Amazon.ca order,2025-06-04,expense,credit,Shopping,Home,-89.23
+Telus Mobility,2025-06-09,expense,credit,Mobile phone,Household,-76.50
+Jean Coutu pharmacy,2025-06-11,expense,credit,Health,Personal care,-45.80
+STM Opus reload,2025-06-03,expense,cash,Transportation,Transit,-90
