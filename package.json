@@ -6,7 +6,8 @@
     "start": "node server.js",
     "dev": "node server.js",
     "test:ui": "playwright test",
-    "vercel-build": "node -e \"console.log('No build step required for API-only deployment')\""
+    "vercel-build": "node -e \"console.log('No build step required for API-only deployment')\"",
+    "refresh-demo-data": "node scripts/refresh-demo.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
