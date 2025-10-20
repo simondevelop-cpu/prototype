@@ -139,12 +139,50 @@ function normaliseMerchant(description) {
   return description.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-const inMemoryTransactions = sampleTransactions.map((tx, index) => ({
-  ...tx,
-  id: tx.id || index + 1,
-  merchant: normaliseMerchant(tx.description),
-}));
-let nextInMemoryId = inMemoryTransactions.reduce((max, tx) => Math.max(max, tx.id), 0) + 1;
+const DEFAULT_USER_ID = 'demo-user';
+
+function createInMemoryState(transactions = []) {
+  const normalised = transactions.map((tx, index) => ({
+    ...tx,
+    id: tx.id || index + 1,
+    merchant: normaliseMerchant(tx.description),
+    user_id: tx.user_id || DEFAULT_USER_ID,
+  }));
+  const nextId =
+    normalised.reduce((max, tx) => Math.max(max, tx.id || 0), 0) + 1;
+  return { transactions: normalised, nextId };
+}
+
+const inMemoryStore = new Map();
+inMemoryStore.set(DEFAULT_USER_ID, createInMemoryState(sampleTransactions));
+
+function getInMemoryState(userId) {
+  if (!inMemoryStore.has(userId)) {
+    inMemoryStore.set(userId, createInMemoryState([]));
+  }
+  return inMemoryStore.get(userId);
+}
+
+function getInMemoryTransactions(userId) {
+  return getInMemoryState(userId).transactions;
+}
+
+function setInMemoryTransaction(userId, transaction) {
+  const state = getInMemoryState(userId);
+  const exists = state.transactions.some(
+    (item) =>
+      item.date === transaction.date &&
+      item.amount === transaction.amount &&
+      item.merchant === transaction.merchant &&
+      item.cashflow === transaction.cashflow
+  );
+  if (exists) {
+    return false;
+  }
+  const id = state.nextId++;
+  state.transactions.push({ ...transaction, id, user_id: userId });
+  return true;
+}
 
 async function ensureSchema() {
   if (disableDb) return;
@@ -174,37 +212,55 @@ async function ensureSchema() {
   `);
 
   await pool.query(`
+    ALTER TABLE transactions
+    ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT '${DEFAULT_USER_ID}';
+  `);
+
+  await pool.query(`
+    ALTER TABLE transactions
+    ALTER COLUMN user_id DROP DEFAULT;
+  `);
+
+  await pool.query(`
     DO $$
     BEGIN
-      ALTER TABLE transactions
-      ADD CONSTRAINT transactions_unique UNIQUE (date, amount, merchant, cashflow);
-    EXCEPTION
-      WHEN duplicate_object THEN NULL;
+      IF EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'transactions_unique'
+      ) THEN
+        ALTER TABLE transactions DROP CONSTRAINT transactions_unique;
+      END IF;
+    END $$;
+  `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'transactions_user_unique'
+      ) THEN
+        ALTER TABLE transactions
+        ADD CONSTRAINT transactions_user_unique
+        UNIQUE (user_id, date, amount, merchant, cashflow);
+      END IF;
     END $$;
   `);
 }
 
-async function insertTransaction(transaction) {
+async function insertTransaction(transaction, userId) {
   if (disableDb) {
-    const exists = inMemoryTransactions.some(
-      (item) =>
-        item.date === transaction.date &&
-        item.amount === transaction.amount &&
-        item.merchant === transaction.merchant &&
-        item.cashflow === transaction.cashflow
-    );
-    if (exists) {
-      return 0;
-    }
-    inMemoryTransactions.push({ ...transaction, id: nextInMemoryId++ });
-    return 1;
+    return setInMemoryTransaction(userId, transaction) ? 1 : 0;
   }
   const result = await pool.query(
     `INSERT INTO transactions
-      (description, merchant, date, cashflow, account, category, label, amount)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     ON CONFLICT (date, amount, merchant, cashflow) DO NOTHING`,
+      (user_id, description, merchant, date, cashflow, account, category, label, amount)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     ON CONFLICT (user_id, date, amount, merchant, cashflow) DO NOTHING`,
     [
+      userId,
       transaction.description,
       transaction.merchant,
       transaction.date,
@@ -222,7 +278,10 @@ async function seedSampleData() {
   if (disableDb) {
     return;
   }
-  const existing = await pool.query('SELECT COUNT(*)::int AS count FROM transactions');
+  const existing = await pool.query(
+    'SELECT COUNT(*)::int AS count FROM transactions WHERE user_id = $1',
+    [DEFAULT_USER_ID]
+  );
   if ((existing.rows[0] && existing.rows[0].count) > 0) {
     return;
   }
@@ -231,11 +290,14 @@ async function seedSampleData() {
   for (const [index, tx] of sampleTransactions.entries()) {
     const baseDate = dayjs(tx.date);
     const date = baseDate.isValid() ? baseDate : today.subtract(index, 'day');
-    await insertTransaction({
-      ...tx,
-      date: date.format('YYYY-MM-DD'),
-      merchant: normaliseMerchant(tx.description),
-    });
+    await insertTransaction(
+      {
+        ...tx,
+        date: date.format('YYYY-MM-DD'),
+        merchant: normaliseMerchant(tx.description),
+      },
+      DEFAULT_USER_ID
+    );
   }
 }
 
@@ -258,6 +320,40 @@ app.use(async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+function resolveUserId(req) {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7).trim();
+    if (token) {
+      return token;
+    }
+  }
+  const headerUser = req.headers['x-user-id'];
+  if (headerUser) {
+    return Array.isArray(headerUser) ? headerUser[0] : headerUser;
+  }
+  return null;
+}
+
+function authenticateRequest(req, res, next) {
+  let userId = resolveUserId(req);
+  if (!userId) {
+    if (!disableDb && process.env.ALLOW_DEMO_USER !== '1') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    userId = process.env.DEFAULT_USER_ID || DEFAULT_USER_ID;
+  }
+  req.userId = userId;
+  next();
+}
+
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health') {
+    return next();
+  }
+  return authenticateRequest(req, res, next);
 });
 
 function parseCSV(buffer) {
@@ -392,13 +488,13 @@ function buildTransaction(record) {
   };
 }
 
-async function ingestFile(buffer) {
+async function ingestFile(buffer, userId) {
   const records = await parseCSV(buffer);
   let inserted = 0;
   for (const record of records) {
     const transaction = buildTransaction(record);
     if (!transaction) continue;
-    const changes = await insertTransaction(transaction);
+    const changes = await insertTransaction(transaction, userId);
     inserted += changes;
   }
   return inserted;
@@ -418,21 +514,25 @@ function ensureRangeMonths(monthCount) {
   return { start, end };
 }
 
-async function getLatestMonthRange(months = 1) {
+async function getLatestMonthRange(months = 1, userId = DEFAULT_USER_ID) {
   if (disableDb) {
-    if (!inMemoryTransactions.length) {
+    const transactions = getInMemoryTransactions(userId);
+    if (!transactions.length) {
       const end = dayjs().endOf('month');
       const start = end.subtract(months - 1, 'month').startOf('month');
       return { start, end };
     }
-    const latestDate = inMemoryTransactions
+    const latestDate = transactions
       .map((tx) => dayjs(tx.date))
-      .reduce((max, date) => (date.isAfter(max) ? date : max), dayjs(inMemoryTransactions[0].date));
+      .reduce((max, date) => (date.isAfter(max) ? date : max), dayjs(transactions[0].date));
     const end = latestDate.endOf('month');
     const start = end.subtract(months - 1, 'month').startOf('month');
     return { start, end };
   }
-  const latest = await pool.query('SELECT date FROM transactions ORDER BY date DESC LIMIT 1');
+  const latest = await pool.query(
+    'SELECT date FROM transactions WHERE user_id = $1 ORDER BY date DESC LIMIT 1',
+    [userId]
+  );
   const latestDate = latest.rows[0] ? latest.rows[0].date : null;
   const end = latestDate ? dayjs(latestDate).endOf('month') : dayjs().endOf('month');
   const start = end.subtract(months - 1, 'month').startOf('month');
@@ -567,15 +667,16 @@ function buildInsightsFromTransactions(transactions, cohort = 'all') {
   };
 }
 
-async function generateInsights(cohort = 'all') {
+async function generateInsights(cohort = 'all', userId = DEFAULT_USER_ID) {
   if (disableDb) {
-    return buildInsightsFromTransactions(inMemoryTransactions, cohort);
+    return buildInsightsFromTransactions(getInMemoryTransactions(userId), cohort);
   }
 
   const expensesResult = await pool.query(
     `SELECT id, description, merchant, date, amount, category
      FROM transactions
-     WHERE cashflow = 'expense'`
+     WHERE user_id = $1 AND cashflow = 'expense'`,
+    [userId]
   );
 
   const expenses = expensesResult.rows.map((row) => ({
@@ -583,30 +684,38 @@ async function generateInsights(cohort = 'all') {
     amount: Number(row.amount),
   }));
 
-  const duplicatesResult = await pool.query(`
-    SELECT t1.description, t1.date, ABS(t1.amount) AS amount
-    FROM transactions t1
-    JOIN transactions t2 ON t1.date = t2.date AND t1.amount = t2.amount AND t1.id != t2.id
-    WHERE t1.cashflow = 'expense'
-    GROUP BY t1.description, t1.date, t1.amount
-  `);
+  const duplicatesResult = await pool.query(
+    `SELECT t1.description, t1.date, ABS(t1.amount) AS amount
+     FROM transactions t1
+     JOIN transactions t2
+       ON t1.user_id = t2.user_id
+      AND t1.date = t2.date
+      AND t1.amount = t2.amount
+      AND t1.id != t2.id
+     WHERE t1.user_id = $1 AND t1.cashflow = 'expense'
+     GROUP BY t1.description, t1.date, t1.amount`,
+    [userId]
+  );
 
-  const feeRows = await pool.query(`
-      SELECT description, ABS(amount) AS amount, date
-      FROM transactions
-      WHERE lower(description) LIKE '%fee%' OR lower(category) LIKE '%fee%'
-      ORDER BY date DESC
-      LIMIT 3
-    `);
+  const feeRows = await pool.query(
+    `SELECT description, ABS(amount) AS amount, date
+     FROM transactions
+     WHERE user_id = $1
+       AND (lower(description) LIKE '%fee%' OR lower(category) LIKE '%fee%')
+     ORDER BY date DESC
+     LIMIT 3`,
+    [userId]
+  );
 
-  const categorySpendResult = await pool.query(`
-    SELECT category, ABS(SUM(amount)) AS total
-    FROM transactions
-    WHERE cashflow = 'expense'
-    GROUP BY category
-    ORDER BY total DESC
-    LIMIT 5
-  `);
+  const categorySpendResult = await pool.query(
+    `SELECT category, ABS(SUM(amount)) AS total
+     FROM transactions
+     WHERE user_id = $1 AND cashflow = 'expense'
+     GROUP BY category
+     ORDER BY total DESC
+     LIMIT 5`,
+    [userId]
+  );
 
   const insightsFromDb = buildInsightsFromTransactions(expenses, cohort);
 
@@ -683,7 +792,8 @@ app.get('/api/transactions', async (req, res) => {
     if (disableDb) {
       const term = search.toLowerCase();
       const limitValue = Number(limit) || 500;
-      const filtered = inMemoryTransactions
+      const userTransactions = getInMemoryTransactions(req.userId);
+      const filtered = userTransactions
         .filter((tx) => {
           const matchesSearch =
             !term ||
@@ -705,14 +815,18 @@ app.get('/api/transactions', async (req, res) => {
         }));
 
       const categories = Array.from(
-        new Set(inMemoryTransactions.map((tx) => tx.category).filter(Boolean))
+        new Set(userTransactions.map((tx) => tx.category).filter(Boolean))
       ).sort();
       const labels = Array.from(
-        new Set(inMemoryTransactions.map((tx) => tx.label).filter((value) => value && value.trim()))
+        new Set(userTransactions.map((tx) => tx.label).filter((value) => value && value.trim()))
       ).sort();
 
       return res.json({ transactions: filtered, categories, labels });
     }
+
+    filters.push(`user_id = $${index}`);
+    values.push(req.userId);
+    index += 1;
 
     if (search) {
       filters.push(`(description ILIKE $${index} OR category ILIKE $${index} OR label ILIKE $${index})`);
@@ -760,10 +874,12 @@ app.get('/api/transactions', async (req, res) => {
     }));
 
     const categoriesResult = await pool.query(
-      'SELECT DISTINCT category FROM transactions ORDER BY category ASC'
+      'SELECT DISTINCT category FROM transactions WHERE user_id = $1 ORDER BY category ASC',
+      [req.userId]
     );
     const labelsResult = await pool.query(
-      "SELECT DISTINCT label FROM transactions WHERE label <> '' ORDER BY label ASC"
+      "SELECT DISTINCT label FROM transactions WHERE user_id = $1 AND label <> '' ORDER BY label ASC",
+      [req.userId]
     );
 
     res.json({
@@ -785,6 +901,7 @@ app.get('/api/summary', async (req, res) => {
     const labels = monthLabels(start, monthCount);
 
     if (disableDb) {
+      const userTransactions = getInMemoryTransactions(req.userId);
       const chart = {
         months: labels.map((label) => dayjs(label).format('MMM YY')),
         income: Array(monthCount).fill(0),
@@ -794,7 +911,7 @@ app.get('/api/summary', async (req, res) => {
 
       const labelIndex = new Map(labels.map((label, idx) => [label, idx]));
 
-      inMemoryTransactions.forEach((tx) => {
+      userTransactions.forEach((tx) => {
         const date = dayjs(tx.date);
         if (!date.isBetween(start, end, 'day', '[]')) return;
         const key = date.format('YYYY-MM');
@@ -808,7 +925,7 @@ app.get('/api/summary', async (req, res) => {
 
       const latestMonth = labels[labels.length - 1];
       const categoriesMap = new Map();
-      inMemoryTransactions.forEach((tx) => {
+      userTransactions.forEach((tx) => {
         if (tx.cashflow !== 'expense') return;
         const key = dayjs(tx.date).format('YYYY-MM');
         if (key !== latestMonth) return;
@@ -827,9 +944,9 @@ app.get('/api/summary', async (req, res) => {
     const summaryResult = await pool.query(
       `SELECT TO_CHAR(date, 'YYYY-MM') AS month, cashflow, SUM(amount) AS total
        FROM transactions
-       WHERE date BETWEEN $1 AND $2
+       WHERE user_id = $1 AND date BETWEEN $2 AND $3
        GROUP BY month, cashflow`,
-      [start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD')]
+      [req.userId, start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD')]
     );
 
     const chart = {
@@ -853,11 +970,11 @@ app.get('/api/summary', async (req, res) => {
     const categoriesResult = await pool.query(
       `SELECT category, ABS(SUM(amount)) AS total
        FROM transactions
-       WHERE cashflow = 'expense' AND TO_CHAR(date, 'YYYY-MM') = $1
+       WHERE user_id = $1 AND cashflow = 'expense' AND TO_CHAR(date, 'YYYY-MM') = $2
        GROUP BY category
        ORDER BY total DESC
        LIMIT 12`,
-      [latestMonth]
+      [req.userId, latestMonth]
     );
 
     const categories = categoriesResult.rows.map((row) => ({
@@ -876,7 +993,7 @@ app.get('/api/budget', async (req, res) => {
   try {
     const period = req.query.period === 'quarterly' ? 'quarterly' : 'monthly';
     const months = period === 'quarterly' ? 3 : 1;
-    const { start, end } = await getLatestMonthRange(months);
+    const { start, end } = await getLatestMonthRange(months, req.userId);
     const monthLabelsDisplay = [];
 
     if (period === 'quarterly') {
@@ -889,7 +1006,8 @@ app.get('/api/budget', async (req, res) => {
     const endDate = end.format('YYYY-MM-DD');
 
     if (disableDb) {
-      const relevant = inMemoryTransactions.filter((tx) =>
+      const userTransactions = getInMemoryTransactions(req.userId);
+      const relevant = userTransactions.filter((tx) =>
         dayjs(tx.date).isBetween(startDate, endDate, 'day', '[]')
       );
 
@@ -905,8 +1023,8 @@ app.get('/api/budget', async (req, res) => {
       const saved = income + other - spent;
 
       const baselineMonths = period === 'quarterly' ? 6 : 3;
-      const baselineRange = await getLatestMonthRange(baselineMonths);
-      const baselineExpenses = inMemoryTransactions
+      const baselineRange = await getLatestMonthRange(baselineMonths, req.userId);
+      const baselineExpenses = getInMemoryTransactions(req.userId)
         .filter((tx) =>
           tx.cashflow === 'expense' &&
           dayjs(tx.date).isBetween(
@@ -958,22 +1076,22 @@ app.get('/api/budget', async (req, res) => {
     const expenseRow = await pool.query(
       `SELECT COALESCE(ABS(SUM(amount)), 0) AS spent
        FROM transactions
-       WHERE cashflow = 'expense' AND date BETWEEN $1 AND $2`,
-      [startDate, endDate]
+       WHERE user_id = $1 AND cashflow = 'expense' AND date BETWEEN $2 AND $3`,
+      [req.userId, startDate, endDate]
     );
 
     const incomeRow = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) AS income
        FROM transactions
-       WHERE cashflow = 'income' AND date BETWEEN $1 AND $2`,
-      [startDate, endDate]
+       WHERE user_id = $1 AND cashflow = 'income' AND date BETWEEN $2 AND $3`,
+      [req.userId, startDate, endDate]
     );
 
     const otherRow = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) AS other
        FROM transactions
-       WHERE cashflow = 'other' AND date BETWEEN $1 AND $2`,
-      [startDate, endDate]
+       WHERE user_id = $1 AND cashflow = 'other' AND date BETWEEN $2 AND $3`,
+      [req.userId, startDate, endDate]
     );
 
     const spent = Number(expenseRow.rows[0].spent) || 0;
@@ -982,13 +1100,14 @@ app.get('/api/budget', async (req, res) => {
     const saved = income + other - spent;
 
     const baselineMonths = period === 'quarterly' ? 6 : 3;
-    const baselineRange = await getLatestMonthRange(baselineMonths);
+    const baselineRange = await getLatestMonthRange(baselineMonths, req.userId);
     const baselineExpensesResult = await pool.query(
       `SELECT TO_CHAR(date, 'YYYY-MM') as month, ABS(SUM(amount)) AS total
        FROM transactions
-       WHERE cashflow = 'expense' AND date BETWEEN $1 AND $2
+       WHERE user_id = $1 AND cashflow = 'expense' AND date BETWEEN $2 AND $3
        GROUP BY month`,
       [
+        req.userId,
         baselineRange.start.format('YYYY-MM-DD'),
         baselineRange.end.format('YYYY-MM-DD'),
       ]
@@ -1002,11 +1121,11 @@ app.get('/api/budget', async (req, res) => {
     const categoriesResult = await pool.query(
       `SELECT category, ABS(SUM(amount)) AS spent
        FROM transactions
-       WHERE cashflow = 'expense' AND date BETWEEN $1 AND $2
+       WHERE user_id = $1 AND cashflow = 'expense' AND date BETWEEN $2 AND $3
        GROUP BY category
        ORDER BY spent DESC
        LIMIT 10`,
-      [startDate, endDate]
+      [req.userId, startDate, endDate]
     );
 
     const categories = categoriesResult.rows.map((row) => {
@@ -1041,7 +1160,8 @@ app.get('/api/savings', async (req, res) => {
     const endDate = end.format('YYYY-MM-DD');
 
     if (disableDb) {
-      const relevant = inMemoryTransactions.filter((tx) =>
+      const userTransactions = getInMemoryTransactions(req.userId);
+      const relevant = userTransactions.filter((tx) =>
         dayjs(tx.date).isBetween(startDate, endDate, 'day', '[]')
       );
 
@@ -1056,7 +1176,7 @@ app.get('/api/savings', async (req, res) => {
         .reduce((sum, tx) => sum + Number(tx.amount), 0);
       const last = income + other + expense;
 
-      const cumulative = inMemoryTransactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
+      const cumulative = userTransactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
 
       const savingsCategories = relevant
         .filter((tx) => Number(tx.amount) > 0)
@@ -1107,8 +1227,8 @@ app.get('/api/savings', async (req, res) => {
         SUM(CASE WHEN cashflow = 'other' THEN amount ELSE 0 END) AS other,
         SUM(CASE WHEN cashflow = 'expense' THEN amount ELSE 0 END) AS expense
        FROM transactions
-       WHERE date BETWEEN $1 AND $2`,
-      [startDate, endDate]
+       WHERE user_id = $1 AND date BETWEEN $2 AND $3`,
+      [req.userId, startDate, endDate]
     );
 
     const totalsRow = totalsResult.rows[0] || { income: 0, other: 0, expense: 0 };
@@ -1122,7 +1242,9 @@ app.get('/api/savings', async (req, res) => {
         SUM(CASE WHEN cashflow = 'income' THEN amount ELSE 0 END) AS income,
         SUM(CASE WHEN cashflow = 'other' THEN amount ELSE 0 END) AS other,
         SUM(CASE WHEN cashflow = 'expense' THEN amount ELSE 0 END) AS expense
-       FROM transactions`
+       FROM transactions
+       WHERE user_id = $1`,
+      [req.userId]
     );
 
     const cumulativeRow = cumulativeResult.rows[0] || { income: 0, other: 0, expense: 0 };
@@ -1134,10 +1256,10 @@ app.get('/api/savings', async (req, res) => {
     const savingsCategoriesResult = await pool.query(
       `SELECT category, SUM(amount) AS total
        FROM transactions
-       WHERE amount > 0 AND date BETWEEN $1 AND $2
+       WHERE user_id = $1 AND amount > 0 AND date BETWEEN $2 AND $3
        GROUP BY category
        ORDER BY total DESC`,
-      [startDate, endDate]
+      [req.userId, startDate, endDate]
     );
 
     const savingsCategories = savingsCategoriesResult.rows.map((row) => ({
@@ -1187,7 +1309,7 @@ app.get('/api/savings', async (req, res) => {
 app.get('/api/insights', async (req, res) => {
   try {
     const cohort = req.query.cohort || 'all';
-    const insights = await generateInsights(cohort);
+    const insights = await generateInsights(cohort, req.userId);
     res.json(insights);
   } catch (error) {
     console.error('Failed to load insights', error);
@@ -1227,7 +1349,7 @@ app.post('/api/upload', upload.array('statements', 6), async (req, res) => {
   const summary = [];
   for (const file of req.files) {
     try {
-      const inserted = await ingestFile(file.buffer);
+      const inserted = await ingestFile(file.buffer, req.userId);
       summary.push({ file: file.originalname, inserted });
     } catch (error) {
       console.error(`Failed to ingest ${file.originalname}`, error);
