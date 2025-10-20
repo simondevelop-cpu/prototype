@@ -61,7 +61,10 @@
           </header>
           <div class="module-content">
             <div class="chart" aria-hidden="true">
-              <div class="chart-bars" data-chart="cashflow"></div>
+              <div class="chart-bars" data-chart="cashflow">
+                <canvas id="cashflow-canvas"></canvas>
+                <p class="empty-state" data-chart-empty hidden>No cash flow data yet.</p>
+              </div>
               <div class="chart-legend">
                 <span data-type="income">Income</span>
                 <span data-type="expense">Expenses</span>
@@ -426,6 +429,7 @@
 
     <dialog id="toast" class="toast" data-state="hidden"></dialog>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="app.js" type="module"></script>
   </body>
 </html>

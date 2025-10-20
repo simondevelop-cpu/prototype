@@ -6,12 +6,18 @@ test.describe('Canadian Insights full-stack smoke test', () => {
 
     // Dashboard cash flow interactions
     await page.locator('[data-module="cashflow"] [data-demo="cashflow"]').click();
-    const chartGroups = page.locator('[data-chart="cashflow"] .chart-bar-group');
-    await expect(chartGroups).toHaveCount(3);
+    await expect
+      .poll(async () => page.evaluate(() => window.__app__?.getCashflowLabels().length ?? 0))
+      .toBe(3);
     await page.locator('[data-filter="cashflow-timeframe"]').selectOption('6m');
-    await expect(chartGroups).toHaveCount(6);
-    const expenseBar = page.locator('[data-chart="cashflow"] [data-type="expense"]').first();
-    await expenseBar.click();
+    await expect
+      .poll(async () => page.evaluate(() => window.__app__?.getCashflowLabels().length ?? 0))
+      .toBe(6);
+    await page.evaluate(() => {
+      const labels = window.__app__?.getCashflowLabels() ?? [];
+      if (!labels.length) return false;
+      return window.__app__?.selectCashflowPoint(labels[0], 'expense');
+    });
     await expect(page.locator('[data-list="cashflow-categories"] .breakdown-item')).not.toHaveCount(0);
     await expect(page.locator('[data-table="dashboard-transactions"] tr')).not.toHaveCount(0);
     await expect(page.locator('[data-dashboard-summary]')).toContainText('Expenses');
