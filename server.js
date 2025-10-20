@@ -9,7 +9,7 @@ const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const __dirnameResolved = __dirname;
+const staticRoot = path.join(__dirname, 'static');
 const disableDb = process.env.DISABLE_DB === '1';
 const JWT_SECRET = process.env.JWT_SECRET || 'canadian-insights-demo-secret';
 const SESSION_TTL_SECONDS = Number(process.env.JWT_TTL_SECONDS || 60 * 60 * 2);
@@ -217,7 +217,7 @@ function statementsUpload(req, res, next) {
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirnameResolved));
+app.use(express.static(staticRoot));
 
 app.post('/api/auth/login', async (req, res) => {
   try {
@@ -1734,7 +1734,7 @@ app.post('/api/feedback', authenticate, async (req, res) => {
 });
 
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirnameResolved, 'index.html'));
+  res.sendFile(path.join(staticRoot, 'index.html'));
 });
 
 if (require.main === module) {
