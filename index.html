@@ -27,8 +27,8 @@
         <button class="tab-button" data-tab-target="transactions">Transactions</button>
         <button class="tab-button" data-tab-target="insights">Insights</button>
       </nav>
-      <button class="avatar-button" data-tab-target="settings" aria-label="Account settings">
-        <span data-user-initial>T</span>
+      <button class="avatar-button" data-tab-target="settings" aria-label="Sign in">
+        <span data-user-initial>Sign in</span>
       </button>
     </header>
 
@@ -325,6 +325,7 @@
             </label>
             <button type="button" class="secondary">Personalise categories</button>
             <button type="button" class="secondary">Recheck categorisation</button>
+            <button type="button" class="secondary danger" data-action="logout">Sign out</button>
           </form>
 
           <form class="settings-card">
@@ -407,6 +408,34 @@
     <footer class="app-footer">
       <p>© 2025 Canadian Insights. Privacy-first personal finance for Canadians.</p>
     </footer>
+
+    <dialog id="auth-dialog" class="auth-dialog">
+      <form class="auth-modal" data-form="login">
+        <h2>Sign in to Canadian Insights</h2>
+        <p class="lead">Use your credentials or jump into the seeded demo account.</p>
+        <label>
+          Email address
+          <input type="email" name="email" placeholder="demo@canadianinsights.ca" autocomplete="username" required />
+        </label>
+        <label>
+          Password
+          <input
+            type="password"
+            name="password"
+            placeholder="northstar-demo"
+            autocomplete="current-password"
+            required
+          />
+        </label>
+        <p class="form-error" data-auth-error role="alert" aria-live="polite"></p>
+        <p class="tiny">Sessions last two hours. Demo access skips the form for quick previews.</p>
+        <menu class="dialog-actions column">
+          <button type="submit">Sign in</button>
+          <button type="button" class="secondary" data-action="demo-login">Demo login</button>
+          <button type="button" class="secondary" data-action="close-login">Cancel</button>
+        </menu>
+      </form>
+    </dialog>
 
     <dialog id="upload-dialog">
       <form method="dialog" class="upload-modal">

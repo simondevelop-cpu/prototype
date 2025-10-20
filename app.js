@@ -3,700 +3,46 @@ const panels = document.querySelectorAll('.tab-panel');
 const uploadButton = document.querySelector('[data-trigger="upload"]');
 const uploadDialog = document.getElementById('upload-dialog');
 const toast = document.getElementById('toast');
+const avatarButton = document.querySelector('.avatar-button');
 const avatarInitial = document.querySelector('[data-user-initial]');
 
-const username = 'Taylor';
-avatarInitial.textContent = username ? username[0].toUpperCase() : 'Login';
+const authDialog = document.getElementById('auth-dialog');
+const loginForm = document.querySelector('[data-form="login"]');
+const demoLoginButton = document.querySelector('[data-action="demo-login"]');
+const closeLoginButton = document.querySelector('[data-action="close-login"]');
+const authError = document.querySelector('[data-auth-error]');
+const logoutButton = document.querySelector('[data-action="logout"]');
 
+const AUTH_TOKEN_KEY = 'ci.session.token';
+const AUTH_USER_KEY = 'ci.session.user';
 const currency = (value) =>
-  new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(value);
-
-const budgets = {
-  monthly: {
-    months: ['April 2025', 'May 2025', 'June 2025'],
-    summary: {
-      budget: 5000,
-      spent: 4520,
-      saved: 480,
-    },
-    categories: [
-      { name: 'Housing', target: 2100, spent: 2100 },
-      { name: 'Groceries', target: 800, spent: 760 },
-      { name: 'Transportation', target: 500, spent: 430 },
-      { name: 'Dining out', target: 350, spent: 390 },
-      { name: 'Subscriptions', target: 180, spent: 165 },
-      { name: 'Wellness', target: 200, spent: 140 },
-    ],
-  },
-  quarterly: {
-    months: ['Q2 2025', 'Q3 2025'],
-    summary: {
-      budget: 15000,
-      spent: 13860,
-      saved: 1140,
-    },
-    categories: [
-      { name: 'Housing', target: 6300, spent: 6300 },
-      { name: 'Groceries', target: 2400, spent: 2260 },
-      { name: 'Transportation', target: 1500, spent: 1320 },
-      { name: 'Dining out', target: 1200, spent: 1125 },
-      { name: 'Subscriptions', target: 540, spent: 495 },
-      { name: 'Travel', target: 1500, spent: 1530 },
-    ],
-  },
-};
-
-const savings = {
-  'last-month': {
-    summary: {
-      last: 480,
-      cumulative: 5200,
-      label: 'Last month',
-    },
-    goals: [
-      { name: 'RRSP 2025', target: 6500, contributed: 4800, priority: 'High' },
-      { name: 'Emergency fund', target: 10000, contributed: 7200, priority: 'Medium' },
-      { name: 'Travel 2025', target: 3000, contributed: 1800, priority: 'Low' },
-    ],
-  },
-  'since-start': {
-    summary: {
-      last: 5200,
-      cumulative: 5200,
-      label: 'Since joining',
-    },
-    goals: [
-      { name: 'RRSP 2025', target: 6500, contributed: 4800, priority: 'High' },
-      { name: 'Emergency fund', target: 10000, contributed: 7200, priority: 'Medium' },
-      { name: 'Travel 2025', target: 3000, contributed: 1800, priority: 'Low' },
-    ],
-  },
-  'year-to-date': {
-    summary: {
-      last: 2650,
-      cumulative: 2650,
-      label: 'Year to date',
-    },
-    goals: [
-      { name: 'RRSP 2025', target: 6500, contributed: 3200, priority: 'High' },
-      { name: 'Emergency fund', target: 10000, contributed: 7400, priority: 'Medium' },
-      { name: 'Travel 2025', target: 3000, contributed: 1450, priority: 'Low' },
-    ],
-  },
-};
-
-const transactions = [
-  {
-    id: 1,
-    description: 'Metro - groceries',
-    date: '2025-06-12',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -112.45,
-  },
-  {
-    id: 2,
-    description: 'Rent payment',
-    date: '2025-06-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2100,
-  },
-  {
-    id: 3,
-    description: 'Salary - ACME Corp',
-    date: '2025-06-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3150,
-  },
-  {
-    id: 4,
-    description: 'EQ Bank - transfer',
-    date: '2025-06-05',
-    cashflow: 'other',
-    account: 'cash',
-    category: 'Transfers',
-    label: 'Savings',
-    amount: -400,
-  },
-  {
-    id: 5,
-    description: 'Spotify subscription',
-    date: '2025-06-15',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Subscriptions',
-    label: 'Music',
-    amount: -14.99,
-  },
-  {
-    id: 6,
-    description: 'Hydro-Québec',
-    date: '2025-06-08',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Utilities',
-    label: 'Household',
-    amount: -132.1,
-  },
-  {
-    id: 7,
-    description: 'Uber trip',
-    date: '2025-06-18',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Transportation',
-    label: 'City travel',
-    amount: -24.6,
-  },
-  {
-    id: 8,
-    description: 'CRA Tax Refund',
-    date: '2025-05-15',
-    cashflow: 'other',
-    account: 'cash',
-    category: 'Tax refunds',
-    label: 'Windfall',
-    amount: 360,
-  },
-  {
-    id: 9,
-    description: 'Amazon.ca order',
-    date: '2025-06-04',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Shopping',
-    label: 'Home',
-    amount: -89.23,
-  },
-  {
-    id: 10,
-    description: 'Telus Mobility',
-    date: '2025-06-09',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Mobile phone',
-    label: 'Household',
-    amount: -76.5,
-  },
-  {
-    id: 11,
-    description: 'Salary - ACME Corp',
-    date: '2025-05-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3125,
-  },
-  {
-    id: 12,
-    description: 'Rent payment',
-    date: '2025-05-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2100,
-  },
-  {
-    id: 13,
-    description: 'Provigo - groceries',
-    date: '2025-05-14',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -126.32,
-  },
-  {
-    id: 14,
-    description: 'EQ Bank - transfer',
-    date: '2025-05-06',
-    cashflow: 'other',
-    account: 'cash',
-    category: 'Transfers',
-    label: 'Savings',
-    amount: -400,
-  },
-  {
-    id: 15,
-    description: 'Indigo Books',
-    date: '2025-05-20',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Shopping',
-    label: 'Leisure',
-    amount: -48.2,
-  },
-  {
-    id: 16,
-    description: 'Salary - ACME Corp',
-    date: '2025-04-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3125,
-  },
-  {
-    id: 17,
-    description: 'Rent payment',
-    date: '2025-04-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2100,
-  },
-  {
-    id: 18,
-    description: 'Costco Wholesale',
-    date: '2025-04-10',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -183.4,
-  },
-  {
-    id: 19,
-    description: 'STM transit pass',
-    date: '2025-04-02',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Transportation',
-    label: 'City travel',
-    amount: -94.5,
-  },
-  {
-    id: 20,
-    description: 'La Banquise dinner',
-    date: '2025-04-18',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Dining out',
-    label: 'Treat',
-    amount: -42.75,
-  },
-  {
-    id: 21,
-    description: 'Salary - ACME Corp',
-    date: '2025-03-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3100,
-  },
-  {
-    id: 22,
-    description: 'Rent payment',
-    date: '2025-03-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2050,
-  },
-  {
-    id: 23,
-    description: 'IGA - groceries',
-    date: '2025-03-12',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -135.66,
-  },
-  {
-    id: 24,
-    description: 'Hydro-Québec',
-    date: '2025-03-07',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Utilities',
-    label: 'Household',
-    amount: -128.4,
-  },
-  {
-    id: 25,
-    description: 'Salary - ACME Corp',
-    date: '2025-02-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3090,
-  },
-  {
-    id: 26,
-    description: 'Rent payment',
-    date: '2025-02-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2050,
-  },
-  {
-    id: 27,
-    description: 'Shell fuel',
-    date: '2025-02-16',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Transportation',
-    label: 'Commuting',
-    amount: -64.9,
-  },
-  {
-    id: 28,
-    description: 'Tim Hortons',
-    date: '2025-02-09',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Dining out',
-    label: 'Coffee',
-    amount: -22.45,
-  },
-  {
-    id: 29,
-    description: 'Salary - ACME Corp',
-    date: '2025-01-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3080,
-  },
-  {
-    id: 30,
-    description: 'Rent payment',
-    date: '2025-01-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2050,
-  },
-  {
-    id: 31,
-    description: 'Provigo - groceries',
-    date: '2025-01-14',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -140.12,
-  },
-  {
-    id: 32,
-    description: 'Bell internet',
-    date: '2025-01-05',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Utilities',
-    label: 'Home',
-    amount: -89.95,
-  },
-  {
-    id: 33,
-    description: 'Salary - ACME Corp',
-    date: '2024-12-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3050,
-  },
-  {
-    id: 34,
-    description: 'Rent payment',
-    date: '2024-12-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2000,
-  },
-  {
-    id: 35,
-    description: 'Christmas Market',
-    date: '2024-12-12',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Entertainment',
-    label: 'Seasonal',
-    amount: -120,
-  },
-  {
-    id: 36,
-    description: 'SAQ purchase',
-    date: '2024-12-18',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Dining out',
-    label: 'Gifts',
-    amount: -75.5,
-  },
-  {
-    id: 37,
-    description: 'Salary - ACME Corp',
-    date: '2024-11-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3050,
-  },
-  {
-    id: 38,
-    description: 'Rent payment',
-    date: '2024-11-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2000,
-  },
-  {
-    id: 39,
-    description: 'Metro - groceries',
-    date: '2024-11-13',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -115.4,
-  },
-  {
-    id: 40,
-    description: 'Netflix subscription',
-    date: '2024-11-15',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Subscriptions',
-    label: 'Entertainment',
-    amount: -19.99,
-  },
-  {
-    id: 41,
-    description: 'Salary - ACME Corp',
-    date: '2024-10-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3025,
-  },
-  {
-    id: 42,
-    description: 'Rent payment',
-    date: '2024-10-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -1980,
-  },
-  {
-    id: 43,
-    description: 'Uber trip',
-    date: '2024-10-18',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Transportation',
-    label: 'City travel',
-    amount: -24.75,
-  },
-  {
-    id: 44,
-    description: 'Pharmaprix',
-    date: '2024-10-09',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Shopping',
-    label: 'Wellness',
-    amount: -54.3,
-  },
-  {
-    id: 45,
-    description: 'Salary - ACME Corp',
-    date: '2024-09-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3025,
-  },
-  {
-    id: 46,
-    description: 'Rent payment',
-    date: '2024-09-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -1980,
-  },
-  {
-    id: 47,
-    description: 'Loblaws - groceries',
-    date: '2024-09-11',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -132.6,
-  },
-  {
-    id: 48,
-    description: 'BIXI membership',
-    date: '2024-09-03',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Transportation',
-    label: 'Commuting',
-    amount: -36.5,
-  },
-  {
-    id: 49,
-    description: 'Salary - ACME Corp',
-    date: '2024-08-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3000,
-  },
-  {
-    id: 50,
-    description: 'Rent payment',
-    date: '2024-08-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -1980,
-  },
-  {
-    id: 51,
-    description: 'Air Canada - travel',
-    date: '2024-08-19',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Travel',
-    label: 'Vacation',
-    amount: -450,
-  },
-  {
-    id: 52,
-    description: 'Starbucks',
-    date: '2024-08-08',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Dining out',
-    label: 'Coffee',
-    amount: -18.75,
-  },
-  {
-    id: 53,
-    description: 'Salary - ACME Corp',
-    date: '2024-07-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 2980,
-  },
-  {
-    id: 54,
-    description: 'Rent payment',
-    date: '2024-07-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -1950,
-  },
-  {
-    id: 55,
-    description: 'Metro - groceries',
-    date: '2024-07-09',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -118.9,
-  },
-  {
-    id: 56,
-    description: 'Cinéma Montréal',
-    date: '2024-07-21',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Entertainment',
-    label: 'Leisure',
-    amount: -32.4,
-  },
-];
-const transactionLabels = [...new Set(transactions.map((t) => t.label))];
-const transactionCategories = [...new Set(transactions.map((t) => t.category))];
+  new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(Number(value) || 0);
 
 const monthFormatter = new Intl.DateTimeFormat('en-CA', { month: 'short' });
-const longMonthFormatter = new Intl.DateTimeFormat('en-CA', { month: 'short', year: 'numeric' });
+const longMonthFormatter = new Intl.DateTimeFormat('en-CA', { month: 'long', year: 'numeric' });
 
-const createFlowBucket = () => ({
-  total: 0,
-  signedTotal: 0,
-  categories: new Map(),
-  transactions: [],
-});
-
-const getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-const monthlyMap = new Map();
-
-transactions.forEach((tx) => {
-  const date = new Date(tx.date);
-  const key = getMonthKey(date);
-  if (!monthlyMap.has(key)) {
-    monthlyMap.set(key, {
-      key,
-      date,
-      label: monthFormatter.format(date),
-      longLabel: longMonthFormatter.format(date),
-      income: createFlowBucket(),
-      expense: createFlowBucket(),
-      other: createFlowBucket(),
-    });
-  }
-
-  const monthEntry = monthlyMap.get(key);
-  const bucket =
-    tx.cashflow === 'income' ? monthEntry.income : tx.cashflow === 'expense' ? monthEntry.expense : monthEntry.other;
-  const magnitude = Math.abs(tx.amount);
-  bucket.total += magnitude;
-  bucket.signedTotal += tx.amount;
-  bucket.transactions.push(tx.id);
-  bucket.categories.set(tx.category, (bucket.categories.get(tx.category) || 0) + magnitude);
-});
-
-const monthlySequence = Array.from(monthlyMap.values()).sort((a, b) => a.date - b.date);
 const timeframeMonths = { '3m': 3, '6m': 6, '12m': 12 };
 
-const dashboardState = {
-  timeframe: '3m',
-  type: 'income',
-  monthKey: monthlySequence.length ? monthlySequence[monthlySequence.length - 1].key : null,
+const state = {
+  auth: { token: null, user: null },
+  dashboard: {
+    timeframe: '3m',
+    type: 'income',
+    monthKey: null,
+    customRange: { start: '', end: '' },
+  },
+  summary: null,
+  transactions: [],
+  transactionMeta: { categories: [], labels: [] },
+  insights: { subscriptions: [], fraud: [], benchmarks: [], cohort: 'all' },
+  budgetCache: new Map(),
+  savingsCache: new Map(),
 };
+
+let monthlySequence = [];
+let transactionIndex = new Map();
+let toastTimeout = null;
+const insightFeedbackTally = { useful: 0, maybe: 0, 'not-useful': 0 };
 
 const cashflowChartContainer = document.querySelector('[data-chart="cashflow"]');
 const cashflowCategoriesList = document.querySelector('[data-list="cashflow-categories"]');
@@ -704,25 +50,203 @@ const cashflowTimeframeSelect = document.querySelector('[data-filter="cashflow-t
 const dashboardTransactionsTable = document.querySelector('[data-table="dashboard-transactions"]');
 const dashboardSummaryLabel = document.querySelector('[data-dashboard-summary]');
 const categorisationSummaryLabel = document.querySelector('[data-categorisation-summary]');
+const customRangeContainer = document.querySelector('[data-custom-range]');
+const customStartSelect = document.querySelector('[data-custom-start]');
+const customEndSelect = document.querySelector('[data-custom-end]');
 
-function switchTab(targetId) {
-  tabButtons.forEach((tab) => tab.classList.toggle('active', tab.dataset.tabTarget === targetId));
-  panels.forEach((panel) => panel.classList.toggle('active', panel.id === targetId));
+const transactionTableBody = document.querySelector('[data-table="transactions"]');
+const transactionSummaryCount = document.querySelector('[data-summary="count"]');
+const transactionSummaryTotal = document.querySelector('[data-summary="total"]');
+const searchInput = document.querySelector('[data-input="search"]');
+const filterCashflow = document.querySelector('[data-filter="tx-cashflow"]');
+const filterAccount = document.querySelector('[data-filter="tx-account"]');
+const filterCategory = document.querySelector('[data-filter="tx-category"]');
+const filterLabel = document.querySelector('[data-filter="tx-label"]');
+const benchmarkSelect = document.querySelector('[data-filter="benchmark-cohort"]');
+const feedbackForm = document.querySelector('[data-form="feedback"]');
+
+function showToast(message, tone = 'info') {
+  if (!toast) return;
+  toast.textContent = message;
+  toast.dataset.state = 'visible';
+  toast.dataset.tone = tone;
+  if (toastTimeout) {
+    window.clearTimeout(toastTimeout);
+  }
+  toastTimeout = window.setTimeout(() => {
+    toast.dataset.state = 'hidden';
+  }, 3200);
 }
 
-tabButtons.forEach((tab) => {
-  tab.addEventListener('click', () => switchTab(tab.dataset.tabTarget));
-});
+function updateAvatar() {
+  if (!avatarInitial || !avatarButton) return;
+  const user = state.auth.user;
+  if (user) {
+    const initial = user.name ? user.name.trim().charAt(0).toUpperCase() : 'U';
+    avatarInitial.textContent = initial;
+    avatarButton.setAttribute('aria-label', `Account settings for ${user.name}`);
+  } else {
+    avatarInitial.textContent = 'Sign in';
+    avatarButton.setAttribute('aria-label', 'Sign in');
+  }
+}
 
-if (uploadButton) {
-  uploadButton.addEventListener('click', () => {
-    uploadDialog.showModal();
-  });
+function persistSession() {
+  if (state.auth.token && state.auth.user) {
+    localStorage.setItem(AUTH_TOKEN_KEY, state.auth.token);
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(state.auth.user));
+  }
+}
+
+function clearPersistedSession() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
+}
+
+function clearDataState() {
+  state.summary = null;
+  state.transactions = [];
+  state.transactionMeta = { categories: [], labels: [] };
+  state.insights = { subscriptions: [], fraud: [], benchmarks: [], cohort: 'all' };
+  state.budgetCache.clear();
+  state.savingsCache.clear();
+  state.dashboard.monthKey = null;
+  monthlySequence = [];
+  transactionIndex = new Map();
+}
+
+function renderSignedOutState() {
+  renderDashboard();
+  renderTransactions();
+  renderInsightList('[data-list="subscriptions"]', []);
+  renderInsightList('[data-list="fraud"]', []);
+  renderInsightList('[data-list="benchmarks"]', []);
+  const summaryContainer = document.querySelector('[data-summary="budget"]');
+  const budgetList = document.querySelector('[data-list="budget"]');
+  const savingsSummary = document.querySelector('[data-summary="savings"]');
+  const savingsList = document.querySelector('[data-list="savings"]');
+  if (summaryContainer) summaryContainer.innerHTML = '';
+  if (budgetList) budgetList.innerHTML = '';
+  if (savingsSummary) savingsSummary.innerHTML = '';
+  if (savingsList) savingsList.innerHTML = '';
+  if (filterCategory) {
+    while (filterCategory.options.length > 1) {
+      filterCategory.remove(1);
+    }
+  }
+  if (filterLabel) {
+    while (filterLabel.options.length > 1) {
+      filterLabel.remove(1);
+    }
+  }
+}
+
+function clearSession({ silent = false } = {}) {
+  state.auth = { token: null, user: null };
+  clearPersistedSession();
+  updateAvatar();
+  clearDataState();
+  renderSignedOutState();
+  if (!silent) {
+    showToast('Signed out.');
+  }
+}
+
+function setSession(token, user, { silent = false, skipData = false } = {}) {
+  state.auth = { token, user };
+  persistSession();
+  updateAvatar();
+  if (!silent) {
+    const firstName = user?.name?.split(' ')?.[0] || 'there';
+    showToast(`Welcome back, ${firstName}!`);
+  }
+  if (!skipData) {
+    loadAllData();
+  }
+}
+
+function openAuthDialog() {
+  if (authDialog && !authDialog.open) {
+    authDialog.showModal();
+  }
+}
+
+function closeAuthDialog() {
+  if (authDialog?.open) {
+    authDialog.close();
+  }
+  if (authError) authError.textContent = '';
+  loginForm?.reset();
+}
+
+function handleUnauthorized() {
+  const wasAuthenticated = Boolean(state.auth.token);
+  clearSession({ silent: true });
+  if (wasAuthenticated) {
+    showToast('Session expired. Please sign in again.', 'danger');
+  }
+  openAuthDialog();
+}
+
+async function apiFetch(path, options = {}) {
+  const { skipAuthHandling, ...rest } = options;
+  const opts = { ...rest };
+  const headers = new Headers(opts.headers || {});
+  if (opts.body && !(opts.body instanceof FormData) && typeof opts.body === 'object') {
+    headers.set('Content-Type', 'application/json');
+    opts.body = JSON.stringify(opts.body);
+  }
+  if (!(opts.body instanceof FormData)) {
+    headers.set('Accept', 'application/json');
+  }
+  if (state.auth.token) {
+    headers.set('Authorization', `Bearer ${state.auth.token}`);
+  }
+  opts.headers = headers;
+
+  const response = await fetch(path, opts);
+  if ((response.status === 401 || response.status === 403) && !skipAuthHandling) {
+    handleUnauthorized();
+    throw new Error('unauthorised');
+  }
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Request failed');
+  }
+  if (response.status === 204) {
+    return null;
+  }
+  return response.json();
+}
+
+function createFlowBucket(total = 0) {
+  return {
+    total,
+    transactions: [],
+    categories: new Map(),
+  };
+}
+
+function getMonthsForTimeframe(timeframe) {
+  const count = timeframeMonths[timeframe] || 3;
+  if (!monthlySequence.length) return [];
+  return monthlySequence.slice(-count);
+}
+
+function ensureDashboardMonth() {
+  const months = getMonthsForTimeframe(state.dashboard.timeframe);
+  if (!months.length) {
+    state.dashboard.monthKey = null;
+    return;
+  }
+  if (!months.some((month) => month.key === state.dashboard.monthKey)) {
+    state.dashboard.monthKey = months[months.length - 1].key;
+  }
 }
 
 function updateCustomRangeControls() {
   if (!customRangeContainer || !customStartSelect || !customEndSelect) return;
-  const isCustom = dashboardState.timeframe === 'custom';
+  const isCustom = state.dashboard.timeframe === 'custom';
   customRangeContainer.hidden = !isCustom;
   const hasMonths = monthlySequence.length > 0;
   customStartSelect.disabled = !hasMonths || !isCustom;
@@ -730,8 +254,8 @@ function updateCustomRangeControls() {
   if (!hasMonths) {
     return;
   }
-  customStartSelect.value = dashboardState.customRange.start || '';
-  customEndSelect.value = dashboardState.customRange.end || '';
+  customStartSelect.value = state.dashboard.customRange.start || '';
+  customEndSelect.value = state.dashboard.customRange.end || '';
 }
 
 function calculateNiceMax(value) {
@@ -752,93 +276,36 @@ function calculateNiceMax(value) {
   return niceNormalized * magnitude;
 }
 
-function unlockModule(button) {
-  const module = button.closest('.module');
-  module.classList.remove('locked');
-  const overlay = module.querySelector('.lock-overlay');
-  if (overlay) {
-    overlay.remove();
-  }
-  showToast('Sample data unlocked. Upload your statements to make it yours.');
-}
-
-document.querySelectorAll('.unlock-button').forEach((button) => {
-  button.addEventListener('click', () => {
-    unlockModule(button);
-    const demo = button.dataset.demo;
-    if (demo === 'cashflow') {
-      renderDashboard();
-    }
-    if (demo === 'budget') {
-      populateBudget('monthly');
-    }
-    if (demo === 'savings') {
-      populateSavings('last-month');
-    }
-  });
-});
-
-if (cashflowTimeframeSelect) {
-  cashflowTimeframeSelect.addEventListener('change', () => {
-    dashboardState.timeframe = cashflowTimeframeSelect.value;
-    ensureDashboardMonth();
-    renderDashboard();
-  });
-}
-
-if (cashflowChartContainer) {
-  cashflowChartContainer.addEventListener('click', (event) => {
-    const bar = event.target.closest('[data-month][data-type]');
-    if (!bar) return;
-    dashboardState.monthKey = bar.dataset.month;
-    dashboardState.type = bar.dataset.type;
-    renderDashboard();
-  });
-}
-
-function getMonthsForTimeframe(timeframe) {
-  const count = timeframeMonths[timeframe] || 3;
-  return monthlySequence.slice(-count);
-}
-
-function ensureDashboardMonth() {
-  const months = getMonthsForTimeframe(dashboardState.timeframe);
-  if (!months.length) {
-    dashboardState.monthKey = null;
-    return;
-  }
-  if (!months.some((month) => month.key === dashboardState.monthKey)) {
-    dashboardState.monthKey = months[months.length - 1].key;
-  }
-}
-
 function buildCashflowChart() {
   if (!cashflowChartContainer) return;
-  const months = getMonthsForTimeframe(dashboardState.timeframe);
-  const maxValue = months.reduce((max, month) => Math.max(max, month.income.total, month.expense.total), 0);
+  const months = getMonthsForTimeframe(state.dashboard.timeframe);
   cashflowChartContainer.innerHTML = '';
-
   if (!months.length) {
-    cashflowChartContainer.innerHTML = '<p class="empty-state">No cash flow data yet.</p>';
+    const empty = document.createElement('p');
+    empty.className = 'empty-state';
+    empty.textContent = state.auth.token
+      ? 'No cash flow data available yet.'
+      : 'Sign in to explore your cash flow.';
+    cashflowChartContainer.appendChild(empty);
     return;
   }
+
+  const maxValue = calculateNiceMax(
+    months.reduce((max, month) => Math.max(max, month.income.total, month.expense.total, month.other.total), 0)
+  );
 
   months.forEach((month) => {
     const group = document.createElement('div');
     group.className = 'chart-bar-group';
-
-    ['income', 'expense'].forEach((type) => {
+    ['income', 'expense', 'other'].forEach((type) => {
       const bucket = month[type];
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = 'chart-bar';
       button.dataset.month = month.key;
       button.dataset.type = type;
-      button.setAttribute(
-        'aria-label',
-        `${type === 'income' ? 'Income' : 'Expenses'} for ${month.longLabel}`,
-      );
-      if (dashboardState.monthKey === month.key && dashboardState.type === type) {
+      button.className = 'chart-bar';
+      button.setAttribute('aria-label', `${type === 'income' ? 'Income' : 'Expenses'} for ${month.longLabel}`);
+      if (state.dashboard.monthKey === month.key && state.dashboard.type === type) {
         button.classList.add('active');
       }
 
@@ -859,7 +326,7 @@ function buildCashflowChart() {
     });
 
     const caption = document.createElement('small');
-    caption.textContent = month.label;
+    caption.textContent = monthFormatter.format(month.date);
     group.appendChild(caption);
 
     cashflowChartContainer.appendChild(group);
@@ -869,13 +336,15 @@ function buildCashflowChart() {
 function buildCashflowBreakdown() {
   if (!cashflowCategoriesList) return;
   cashflowCategoriesList.innerHTML = '';
-  const month = dashboardState.monthKey ? monthlyMap.get(dashboardState.monthKey) : null;
-  const bucket = month ? month[dashboardState.type] : null;
+  const monthEntry = monthlySequence.find((month) => month.key === state.dashboard.monthKey);
+  const bucket = monthEntry ? monthEntry[state.dashboard.type] : null;
 
   if (!bucket || bucket.categories.size === 0) {
     const empty = document.createElement('p');
     empty.className = 'empty-state';
-    empty.textContent = 'Select a bar to see category detail.';
+    empty.textContent = state.auth.token
+      ? 'Select a bar to see category detail.'
+      : 'Sign in to view category insights.';
     cashflowCategoriesList.appendChild(empty);
     return;
   }
@@ -883,19 +352,19 @@ function buildCashflowBreakdown() {
   const categoryEntries = Array.from(bucket.categories.entries())
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
-  const maxCategory = categoryEntries[0].value || 1;
+  const maxCategory = categoryEntries[0]?.value || 1;
 
   categoryEntries.forEach((item) => {
     const row = document.createElement('div');
     row.className = 'breakdown-item';
-    row.dataset.type = dashboardState.type;
+    row.dataset.type = state.dashboard.type;
     const width = Math.min(100, (item.value / maxCategory) * 100);
     row.innerHTML = `
       <div>
         <strong>${item.name}</strong>
-        <div class="progress"><span data-type="${dashboardState.type}" style="width:${width}%"></span></div>
+        <div class="progress"><span data-type="${state.dashboard.type}" style="width:${width}%"></span></div>
       </div>
-      <span>${currency(dashboardState.type === 'expense' ? -item.value : item.value)}</span>
+      <span>${currency(state.dashboard.type === 'expense' ? -item.value : item.value)}</span>
     `;
     cashflowCategoriesList.appendChild(row);
   });
@@ -904,21 +373,22 @@ function buildCashflowBreakdown() {
 function renderDashboardTransactions() {
   if (!dashboardTransactionsTable) return;
   dashboardTransactionsTable.innerHTML = '';
-  const monthKey = dashboardState.monthKey;
-  if (!monthKey) return;
-
-  const filtered = transactions
-    .filter((tx) => getMonthKey(new Date(tx.date)) === monthKey && tx.cashflow === dashboardState.type)
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
-
-  if (!filtered.length) {
+  const monthEntry = monthlySequence.find((month) => month.key === state.dashboard.monthKey);
+  const bucket = monthEntry ? monthEntry[state.dashboard.type] : null;
+  if (!bucket || !bucket.transactions.length) {
     const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="4" class="empty-state">No transactions for this selection.</td>';
+    row.innerHTML = '<td colspan="4" class="empty-state">' +
+      (state.auth.token ? 'No transactions for this selection.' : 'Sign in to view transactions.') +
+      '</td>';
     dashboardTransactionsTable.appendChild(row);
     return;
   }
 
-  filtered.forEach((tx) => {
+  const sorted = bucket.transactions
+    .slice()
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  sorted.forEach((tx) => {
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>${tx.description}</td>
@@ -931,14 +401,18 @@ function renderDashboardTransactions() {
 }
 
 function updateDashboardSummary() {
-  const month = dashboardState.monthKey ? monthlyMap.get(dashboardState.monthKey) : null;
-  const label = dashboardState.type === 'income' ? 'Income' : 'Expenses';
-  const transactionsMessage = month
-    ? `${label} for ${month.longLabel}`
-    : 'Select a bar to explore transactions.';
-  const categorisationMessage = month
-    ? `${label} categories for ${month.longLabel}`
-    : 'Select a bar to see category detail.';
+  const monthEntry = monthlySequence.find((month) => month.key === state.dashboard.monthKey);
+  const label = state.dashboard.type === 'income' ? 'Income' : 'Expenses';
+  const transactionsMessage = monthEntry
+    ? `${label} for ${monthEntry.longLabel}`
+    : state.auth.token
+    ? 'Select a bar to explore transactions.'
+    : 'Sign in to explore transactions.';
+  const categorisationMessage = monthEntry
+    ? `${label} categories for ${monthEntry.longLabel}`
+    : state.auth.token
+    ? 'Select a bar to see category detail.'
+    : 'Sign in to see category detail.';
 
   if (dashboardSummaryLabel) {
     dashboardSummaryLabel.textContent = transactionsMessage;
@@ -951,8 +425,9 @@ function updateDashboardSummary() {
 
 function renderDashboard() {
   ensureDashboardMonth();
+  updateCustomRangeControls();
   if (cashflowTimeframeSelect) {
-    cashflowTimeframeSelect.value = dashboardState.timeframe;
+    cashflowTimeframeSelect.value = state.dashboard.timeframe;
   }
   buildCashflowChart();
   buildCashflowBreakdown();
@@ -960,131 +435,25 @@ function renderDashboard() {
   updateDashboardSummary();
 }
 
-function populateBudget(period) {
-  const summaryContainer = document.querySelector('[data-summary="budget"]');
-  const list = document.querySelector('[data-list="budget"]');
-  const monthSelect = document.querySelector('[data-filter="budget-month"]');
-  const dataset = budgets[period];
-
-  monthSelect.innerHTML = dataset.months
-    .map((month, index) => `<option value="${index}">${month}</option>`)
-    .join('');
-
-  summaryContainer.innerHTML = `
-    <div class="breakdown-item">
-      <div>
-        <strong>Budget</strong>
-        <p class="feedback-note">Auto-set from your last 3 months</p>
-      </div>
-      <span>${currency(dataset.summary.budget)}</span>
-    </div>
-    <div class="breakdown-item">
-      <div>
-        <strong>Spent this ${period === 'monthly' ? 'month' : 'period'}</strong>
-      </div>
-      <span>${currency(dataset.summary.spent)}</span>
-    </div>
-    <div class="breakdown-item">
-      <div>
-        <strong>Savings</strong>
-      </div>
-      <span>${currency(dataset.summary.saved)}</span>
-    </div>
-  `;
-
-  list.innerHTML = '';
-  dataset.categories
-    .slice()
-    .sort((a, b) => b.target - a.target)
-    .forEach((category) => {
-      const pct = Math.min(100, (category.spent / category.target) * 100);
-      const row = document.createElement('div');
-      row.className = 'budget-item';
-      row.innerHTML = `
-        <div>
-          <strong>${category.name}</strong>
-          <div class="feedback-note">${currency(category.spent)} of ${currency(category.target)}</div>
-          <div class="progress"><span style="width:${pct}%"></span></div>
-        </div>
-        <span>${Math.round(pct)}%</span>
-      `;
-      list.appendChild(row);
-    });
-}
-
-function populateSavings(view) {
-  const summaryContainer = document.querySelector('[data-summary="savings"]');
-  const list = document.querySelector('[data-list="savings"]');
-  const dataset = savings[view];
-
-  summaryContainer.innerHTML = `
-    <div class="breakdown-item">
-      <div>
-        <strong>${dataset.summary.label}</strong>
-        <p class="feedback-note">Saved ${currency(dataset.summary.last)} this period</p>
-      </div>
-      <span>${currency(dataset.summary.cumulative)}</span>
-    </div>
-  `;
-
-  list.innerHTML = '';
-  dataset.goals.forEach((goal) => {
-    const pct = Math.min(100, (goal.contributed / goal.target) * 100);
-    const row = document.createElement('div');
-    row.className = 'savings-item';
-    row.innerHTML = `
-      <div>
-        <strong>${goal.name}</strong>
-        <div class="feedback-note">${goal.priority} priority</div>
-        <div class="progress"><span style="width:${pct}%"></span></div>
-      </div>
-      <span>${Math.round(pct)}%</span>
-    `;
-    list.appendChild(row);
-  });
-}
-
-const budgetPeriodSelect = document.querySelector('[data-filter="budget-period"]');
-const budgetMonthSelect = document.querySelector('[data-filter="budget-month"]');
-
-if (budgetPeriodSelect) {
-  budgetPeriodSelect.addEventListener('change', () => {
-    populateBudget(budgetPeriodSelect.value);
-  });
-}
-
-if (budgetMonthSelect) {
-  budgetMonthSelect.addEventListener('change', () => {
-    showToast(`Viewing ${budgetMonthSelect.selectedOptions[0].text} sample budget.`);
-  });
-}
-
-const savingsPeriodSelect = document.querySelector('[data-filter="savings-period"]');
-
-if (savingsPeriodSelect) {
-  savingsPeriodSelect.addEventListener('change', () => {
-    populateSavings(savingsPeriodSelect.value);
-  });
-}
-
-const transactionTableBody = document.querySelector('[data-table="transactions"]');
-const transactionSummaryCount = document.querySelector('[data-summary="count"]');
-const transactionSummaryTotal = document.querySelector('[data-summary="total"]');
-const searchInput = document.querySelector('[data-input="search"]');
-const filterCashflow = document.querySelector('[data-filter="tx-cashflow"]');
-const filterAccount = document.querySelector('[data-filter="tx-account"]');
-const filterCategory = document.querySelector('[data-filter="tx-category"]');
-const filterLabel = document.querySelector('[data-filter="tx-label"]');
-
 function populateFilterOptions() {
-  transactionCategories.forEach((category) => {
+  if (!filterCategory || !filterLabel) return;
+  while (filterCategory.options.length > 1) {
+    filterCategory.remove(1);
+  }
+  while (filterLabel.options.length > 1) {
+    filterLabel.remove(1);
+  }
+
+  state.transactionMeta.categories.forEach((category) => {
+    if (!category) return;
     const option = document.createElement('option');
     option.value = category;
     option.textContent = category;
     filterCategory.appendChild(option);
   });
 
-  transactionLabels.forEach((label) => {
+  state.transactionMeta.labels.forEach((label) => {
+    if (!label) return;
     const option = document.createElement('option');
     option.value = label;
     option.textContent = label;
@@ -1092,30 +461,78 @@ function populateFilterOptions() {
   });
 }
 
-function renderTransactions() {
-  const term = searchInput.value.toLowerCase();
-  const flow = filterCashflow.value;
-  const account = filterAccount.value;
-  const category = filterCategory.value;
-  const label = filterLabel.value;
+function bindTransactionSelection() {
+  if (!transactionTableBody) return;
+  const checkboxes = transactionTableBody.querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach((checkbox) => {
+    checkbox.addEventListener('change', updateTransactionSummary);
+  });
+}
 
-  const filtered = transactions
+function updateTransactionSummary() {
+  if (!transactionSummaryCount || !transactionSummaryTotal) return;
+  const checkboxes = transactionTableBody
+    ? transactionTableBody.querySelectorAll('input[type="checkbox"]')
+    : [];
+  let count = 0;
+  let total = 0;
+  checkboxes.forEach((checkbox) => {
+    if (checkbox.checked) {
+      count += 1;
+      const tx = transactionIndex.get(checkbox.dataset.tx);
+      if (tx) {
+        total += Number(tx.amount) || 0;
+      }
+    }
+  });
+  transactionSummaryCount.textContent = count;
+  transactionSummaryTotal.textContent = currency(total);
+}
+
+function renderTransactions() {
+  if (!transactionTableBody) return;
+  transactionTableBody.innerHTML = '';
+  if (!state.auth.token) {
+    const row = document.createElement('tr');
+    row.innerHTML = '<td colspan="8" class="empty-state">Sign in to view transactions.</td>';
+    transactionTableBody.appendChild(row);
+    updateTransactionSummary();
+    return;
+  }
+
+  const term = searchInput?.value.trim().toLowerCase() || '';
+  const flow = filterCashflow?.value || 'all';
+  const account = filterAccount?.value || 'all';
+  const categoryFilter = filterCategory?.value || 'all';
+  const labelFilter = filterLabel?.value || 'all';
+
+  const filtered = state.transactions
     .filter((tx) => {
+      const description = (tx.description || '').toLowerCase();
+      const category = (tx.category || '').toLowerCase();
+      const label = (tx.label || '').toLowerCase();
       const matchesSearch =
         !term ||
-        tx.description.toLowerCase().includes(term) ||
-        tx.category.toLowerCase().includes(term) ||
-        tx.label.toLowerCase().includes(term) ||
-        `${Math.abs(tx.amount)}`.includes(term);
+        description.includes(term) ||
+        category.includes(term) ||
+        label.includes(term) ||
+        `${Math.abs(Number(tx.amount) || 0)}`.includes(term);
       const matchesFlow = flow === 'all' || tx.cashflow === flow;
       const matchesAccount = account === 'all' || tx.account === account;
-      const matchesCategory = category === 'all' || tx.category === category;
-      const matchesLabel = label === 'all' || tx.label === label;
+      const matchesCategory = categoryFilter === 'all' || tx.category === categoryFilter;
+      const matchesLabel = labelFilter === 'all' || tx.label === labelFilter;
       return matchesSearch && matchesFlow && matchesAccount && matchesCategory && matchesLabel;
     })
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  transactionTableBody.innerHTML = '';
+  if (!filtered.length) {
+    const row = document.createElement('tr');
+    row.innerHTML = '<td colspan="8" class="empty-state">No transactions match your filters.</td>';
+    transactionTableBody.appendChild(row);
+    updateTransactionSummary();
+    return;
+  }
+
   filtered.forEach((tx) => {
     const row = document.createElement('tr');
     row.innerHTML = `
@@ -1135,105 +552,33 @@ function renderTransactions() {
   updateTransactionSummary();
 }
 
-function bindTransactionSelection() {
-  const checkboxes = transactionTableBody.querySelectorAll('input[type="checkbox"]');
-  checkboxes.forEach((checkbox) => {
-    checkbox.addEventListener('change', updateTransactionSummary);
-  });
-}
-
-function updateTransactionSummary() {
-  const checkboxes = transactionTableBody.querySelectorAll('input[type="checkbox"]');
-  let count = 0;
-  let total = 0;
-  checkboxes.forEach((checkbox) => {
-    if (checkbox.checked) {
-      count += 1;
-      const tx = transactions.find((item) => item.id === Number(checkbox.dataset.tx));
-      total += tx.amount;
-    }
-  });
-  transactionSummaryCount.textContent = count;
-  transactionSummaryTotal.textContent = currency(total);
-}
-
-[searchInput, filterCashflow, filterAccount, filterCategory, filterLabel].forEach((control) => {
-  control.addEventListener('input', renderTransactions);
-});
-
-const subscriptionInsights = [
-  {
-    title: 'Netflix increased to $22.99 (+15%)',
-    body: 'The premium plan went up versus your 3-month average. Consider downgrading or sharing a plan.',
-  },
-  {
-    title: 'Duplicate: Crave and Disney+',
-    body: 'You spend $42/mo across two streaming platforms. Could you keep just one this month?',
-  },
-  {
-    title: 'Spotify hasn’t been used in 45 days',
-    body: 'Based on low activity, consider pausing Spotify and switching to Apple Music’s free trial.',
-  },
-];
-
-const fraudInsights = [
-  {
-    title: 'Possible duplicate ride with Uber',
-    body: 'Two similar charges ($24.60) on June 18. If one was cancelled, request a refund.',
-  },
-  {
-    title: 'Hydro-Québec preauth not released',
-    body: 'A $200 pre-authorisation from May 28 is still pending after 7 days. Check your account status.',
-  },
-  {
-    title: 'Bank fee spike at RBC',
-    body: 'Monthly fee jumped from $4.00 to $7.50. Explore no-fee accounts like Simplii or EQ Bank.',
-  },
-];
-
-const benchmarkCopy = {
-  all: [
-    {
-      title: 'Transportation spend +12% vs. Canadian households',
-      body: 'You spend $310/mo on transportation compared to the Canadian average of $276. Consider a commuter pass or rideshare credits.',
-    },
-    {
-      title: 'Groceries -8% vs. Canadian households',
-      body: 'At $480/mo, you are trending below the $520 national average while keeping healthy staples.',
-    },
-  ],
-  students: [
-    {
-      title: 'Dining out higher than student peers',
-      body: 'You spend $185/mo compared to the student average of $120. Try our $15 meal prep ideas.',
-    },
-  ],
-  'young-professionals': [
-    {
-      title: 'Subscription stack looks lean',
-      body: 'Most professionals your age pay for 5–6 services. You pay for 3—great job staying focused.',
-    },
-  ],
-  households: [
-    {
-      title: 'Family groceries 5% lower than similar households',
-      body: 'Smart use of Costco and PC Optimum points keeps you below average by $40/mo.',
-    },
-  ],
-};
-
-const insightFeedback = {
-  useful: 0,
-  maybe: 0,
-  'not-useful': 0,
-};
-
-function renderInsightList(containerSelector, items) {
-  const container = document.querySelector(containerSelector);
+function renderInsightList(selector, items) {
+  const container = document.querySelector(selector);
+  if (!container) return;
   container.innerHTML = '';
+  const type = container.dataset.list;
+
+  if (!state.auth.token) {
+    const li = document.createElement('li');
+    li.className = 'insight-item';
+    li.innerHTML = '<p class="feedback-note">Sign in to generate personalised insights.</p>';
+    container.appendChild(li);
+    return;
+  }
+
+  if (!items || !items.length) {
+    const li = document.createElement('li');
+    li.className = 'insight-item';
+    li.innerHTML = '<p class="feedback-note">No insights available yet. Upload more data to generate recommendations.</p>';
+    container.appendChild(li);
+    return;
+  }
+
   items.forEach((item) => {
     const li = document.createElement('li');
     li.className = 'insight-item';
+    li.dataset.title = item.title;
+    li.dataset.type = type || '';
     li.innerHTML = `
       <div>
         <strong>${item.title}</strong>
@@ -1253,50 +598,495 @@ function renderInsightList(containerSelector, items) {
 function handleInsightFeedback(event) {
   const button = event.target.closest('button[data-response]');
   if (!button) return;
+  if (!state.auth.token) {
+    openAuthDialog();
+    showToast('Sign in to share insight feedback.');
+    return;
+  }
 
   const response = button.dataset.response;
-  insightFeedback[response] += 1;
+  const item = button.closest('.insight-item');
+  const list = button.closest('.insight-list');
+  if (!item || !list) return;
+  const type = list.dataset.list || 'insights';
+  const title = item.dataset.title || item.querySelector('strong')?.textContent || '';
+  const feedbackNote = item.querySelector('[data-feedback]');
+
+  insightFeedbackTally[response] += 1;
   const message =
     response === 'useful'
       ? 'Thanks! We will prioritise more insights like this.'
       : response === 'maybe'
       ? 'Got it. We will resurface this if it becomes more relevant.'
       : 'Thanks for the feedback—insights like this will show up less often.';
+  if (feedbackNote) {
+    feedbackNote.textContent = message;
+  }
 
-  const feedbackNote = button.closest('.insight-item').querySelector('[data-feedback]');
-  feedbackNote.textContent = message;
-  showToast(`Feedback captured. ${insightFeedback.useful} insights marked useful today.`);
+  apiFetch(`/api/insights/${encodeURIComponent(type)}/feedback`, {
+    method: 'POST',
+    body: { response, title },
+  }).catch((error) => {
+    console.error('Failed to record insight feedback', error);
+  });
+
+  showToast(`Feedback captured. ${insightFeedbackTally.useful} insights marked useful today.`);
 }
 
-document.querySelectorAll('.insight-list').forEach((list) => {
-  list.addEventListener('click', handleInsightFeedback);
-});
+async function loginWithCredentials(email, password) {
+  const trimmedEmail = email?.trim();
+  const trimmedPassword = password?.trim();
+  if (!trimmedEmail || !trimmedPassword) {
+    throw new Error('Missing credentials');
+  }
+  const result = await apiFetch('/api/auth/login', {
+    method: 'POST',
+    body: { email: trimmedEmail, password: trimmedPassword },
+    skipAuthHandling: true,
+  });
+  return result;
+}
 
-const benchmarkSelect = document.querySelector('[data-filter="benchmark-cohort"]');
+async function startDemoSession() {
+  const result = await apiFetch('/api/auth/demo', { method: 'POST', skipAuthHandling: true });
+  return result;
+}
 
-if (benchmarkSelect) {
-  benchmarkSelect.addEventListener('change', () => {
-    renderInsightList('[data-list="benchmarks"]', benchmarkCopy[benchmarkSelect.value]);
+async function loadSummary(timeframe = state.dashboard.timeframe) {
+  if (!state.auth.token) return;
+  try {
+    const data = await apiFetch(`/api/summary?window=${encodeURIComponent(timeframe)}`);
+    state.summary = data;
+    state.dashboard.timeframe = timeframe;
+    if (data.monthKeys && data.monthKeys.length) {
+      if (!data.monthKeys.includes(state.dashboard.monthKey)) {
+        state.dashboard.monthKey = data.monthKeys[data.monthKeys.length - 1];
+      }
+    } else {
+      state.dashboard.monthKey = null;
+    }
+    rebuildMonthlySequence();
+  } catch (error) {
+    console.error('Failed to load summary', error);
+    showToast('Unable to load cash flow summary.', 'danger');
+  }
+}
+
+async function loadTransactions() {
+  if (!state.auth.token) return;
+  try {
+    const data = await apiFetch('/api/transactions?limit=500');
+    const items = data.transactions || [];
+    state.transactions = items.map((tx) => ({
+      ...tx,
+      amount: Number(tx.amount),
+      label: tx.label || '',
+      category: tx.category || '',
+      monthKey: tx.date ? tx.date.slice(0, 7) : '',
+    }));
+    state.transactionMeta.categories = data.categories || [];
+    state.transactionMeta.labels = data.labels || [];
+    transactionIndex = new Map(state.transactions.map((tx) => [String(tx.id), tx]));
+    populateFilterOptions();
+    renderTransactions();
+    rebuildMonthlySequence();
+  } catch (error) {
+    console.error('Failed to load transactions', error);
+    showToast('Unable to load transactions.', 'danger');
+  }
+}
+
+async function loadInsights(cohort = state.insights.cohort) {
+  if (!state.auth.token) return;
+  try {
+    const data = await apiFetch(`/api/insights?cohort=${encodeURIComponent(cohort)}`);
+    state.insights = { ...data, cohort };
+    renderInsightList('[data-list="subscriptions"]', data.subscriptions || []);
+    renderInsightList('[data-list="fraud"]', data.fraud || []);
+    renderInsightList('[data-list="benchmarks"]', data.benchmarks || []);
+  } catch (error) {
+    console.error('Failed to load insights', error);
+    showToast('Unable to load insights.', 'danger');
+  }
+}
+
+async function ensureBudget(period) {
+  if (state.budgetCache.has(period)) {
+    return state.budgetCache.get(period);
+  }
+  const data = await apiFetch(`/api/budget?period=${encodeURIComponent(period)}`);
+  state.budgetCache.set(period, data);
+  return data;
+}
+
+async function populateBudget(period) {
+  const summaryContainer = document.querySelector('[data-summary="budget"]');
+  const list = document.querySelector('[data-list="budget"]');
+  const monthSelect = document.querySelector('[data-filter="budget-month"]');
+  if (!summaryContainer || !list || !monthSelect) return;
+
+  if (!state.auth.token) {
+    summaryContainer.innerHTML = '<p class="empty-state">Sign in to view budget insights.</p>';
+    list.innerHTML = '';
+    return;
+  }
+
+  summaryContainer.innerHTML = '<p class="feedback-note">Loading budget…</p>';
+  list.innerHTML = '';
+  try {
+    const dataset = await ensureBudget(period);
+    monthSelect.innerHTML = dataset.months
+      .map((month, index) => `<option value="${index}">${month}</option>`)
+      .join('');
+    monthSelect.selectedIndex = 0;
+
+    summaryContainer.innerHTML = `
+      <div class="breakdown-item">
+        <div>
+          <strong>Budget</strong>
+          <p class="feedback-note">Auto-set from your recent trends</p>
+        </div>
+        <span>${currency(dataset.summary.budget)}</span>
+      </div>
+      <div class="breakdown-item">
+        <div>
+          <strong>Spent this ${period === 'monthly' ? 'month' : 'period'}</strong>
+        </div>
+        <span>${currency(dataset.summary.spent)}</span>
+      </div>
+      <div class="breakdown-item">
+        <div>
+          <strong>Savings</strong>
+        </div>
+        <span>${currency(dataset.summary.saved)}</span>
+      </div>
+    `;
+
+    list.innerHTML = '';
+    dataset.categories
+      .slice()
+      .sort((a, b) => b.spent - a.spent)
+      .forEach((category) => {
+        const pct = category.target ? Math.min(100, (category.spent / category.target) * 100) : 0;
+        const row = document.createElement('div');
+        row.className = 'budget-item';
+        row.innerHTML = `
+          <div>
+            <strong>${category.name}</strong>
+            <div class="feedback-note">${currency(category.spent)} of ${currency(category.target)}</div>
+            <div class="progress"><span style="width:${pct}%"></span></div>
+          </div>
+          <span>${Math.round(pct)}%</span>
+        `;
+        list.appendChild(row);
+      });
+  } catch (error) {
+    console.error('Failed to load budget', error);
+    summaryContainer.innerHTML = '<p class="empty-state">Unable to load budget right now.</p>';
+    showToast('Unable to load budget insights.', 'danger');
+  }
+}
+
+async function ensureSavings(range) {
+  if (state.savingsCache.has(range)) {
+    return state.savingsCache.get(range);
+  }
+  const data = await apiFetch(`/api/savings?range=${encodeURIComponent(range)}`);
+  state.savingsCache.set(range, data);
+  return data;
+}
+
+async function populateSavings(view) {
+  const summaryContainer = document.querySelector('[data-summary="savings"]');
+  const list = document.querySelector('[data-list="savings"]');
+  if (!summaryContainer || !list) return;
+
+  if (!state.auth.token) {
+    summaryContainer.innerHTML = '<p class="empty-state">Sign in to track your savings momentum.</p>';
+    list.innerHTML = '';
+    return;
+  }
+
+  summaryContainer.innerHTML = '<p class="feedback-note">Loading savings…</p>';
+  list.innerHTML = '';
+  try {
+    const dataset = await ensureSavings(view);
+    summaryContainer.innerHTML = `
+      <div class="breakdown-item">
+        <div>
+          <strong>${dataset.summary.label}</strong>
+          <p class="feedback-note">Saved ${currency(dataset.summary.last)} this period</p>
+        </div>
+        <span>${currency(dataset.summary.cumulative)}</span>
+      </div>
+    `;
+
+    list.innerHTML = '';
+    dataset.goals.forEach((goal) => {
+      const pct = goal.target ? Math.min(100, (goal.contributed / goal.target) * 100) : 0;
+      const row = document.createElement('div');
+      row.className = 'savings-item';
+      row.innerHTML = `
+        <div>
+          <strong>${goal.name}</strong>
+          <div class="feedback-note">${goal.priority} priority</div>
+          <div class="progress"><span style="width:${pct}%"></span></div>
+        </div>
+        <span>${Math.round(pct)}%</span>
+      `;
+      list.appendChild(row);
+    });
+  } catch (error) {
+    console.error('Failed to load savings', error);
+    summaryContainer.innerHTML = '<p class="empty-state">Unable to load savings insights.</p>';
+    showToast('Unable to load savings insights.', 'danger');
+  }
+}
+
+function rebuildMonthlySequence() {
+  monthlySequence = [];
+  if (!state.summary || !state.summary.monthKeys) {
+    renderDashboard();
+    return;
+  }
+
+  monthlySequence = state.summary.monthKeys.map((key, index) => {
+    const [year, month] = key.split('-').map(Number);
+    const date = new Date(year, (month || 1) - 1, 1);
+    return {
+      key,
+      date,
+      label: state.summary.months?.[index] || monthFormatter.format(date),
+      longLabel: longMonthFormatter.format(date),
+      income: createFlowBucket(Math.abs(state.summary.income?.[index] || 0)),
+      expense: createFlowBucket(Math.abs(state.summary.expense?.[index] || 0)),
+      other: createFlowBucket(Math.abs(state.summary.other?.[index] || 0)),
+    };
+  });
+
+  const sequenceMap = new Map(monthlySequence.map((entry) => [entry.key, entry]));
+  state.transactions.forEach((tx) => {
+    const entry = sequenceMap.get(tx.monthKey);
+    if (!entry) return;
+    const type = ['income', 'expense', 'other'].includes(tx.cashflow) ? tx.cashflow : 'other';
+    const bucket = entry[type];
+    bucket.transactions.push(tx);
+    const category = tx.category || 'Uncategorised';
+    const current = bucket.categories.get(category) || 0;
+    bucket.categories.set(category, current + Math.abs(Number(tx.amount) || 0));
+  });
+
+  renderDashboard();
+}
+
+async function loadAllData() {
+  if (!state.auth.token) return;
+  await Promise.all([loadSummary(state.dashboard.timeframe), loadTransactions()]);
+  loadInsights(state.insights.cohort);
+  ensureBudget('monthly').catch((error) => {
+    console.error('Preloading monthly budget failed', error);
+  });
+  ensureSavings('last-month').catch((error) => {
+    console.error('Preloading savings failed', error);
   });
 }
 
-const feedbackForm = document.querySelector('[data-form="feedback"]');
+function switchTab(targetId) {
+  tabButtons.forEach((tab) => tab.classList.toggle('active', tab.dataset.tabTarget === targetId));
+  panels.forEach((panel) => panel.classList.toggle('active', panel.id === targetId));
+}
 
-if (feedbackForm) {
-  feedbackForm.addEventListener('submit', (event) => {
-    event.preventDefault();
-    feedbackForm.reset();
-    showToast('Thank you for the feedback—our team will review it within 24 hours.');
+function unlockModule(button) {
+  if (!state.auth.token) {
+    openAuthDialog();
+    showToast('Sign in to explore the live demo data.');
+    return;
+  }
+  const module = button.closest('.module');
+  if (!module) return;
+  module.classList.remove('locked');
+  const overlay = module.querySelector('.lock-overlay');
+  if (overlay) {
+    overlay.remove();
+  }
+  showToast('Sample data unlocked. Upload your statements to make it yours.');
+  const demo = button.dataset.demo;
+  if (demo === 'cashflow') {
+    renderDashboard();
+  }
+  if (demo === 'budget') {
+    populateBudget('monthly');
+  }
+  if (demo === 'savings') {
+    populateSavings('last-month');
+  }
+}
+
+function handleFeedbackSubmit(event) {
+  event.preventDefault();
+  if (!state.auth.token) {
+    openAuthDialog();
+    showToast('Sign in to submit feedback.');
+    return;
+  }
+  const textarea = feedbackForm?.querySelector('textarea');
+  const message = textarea?.value?.trim() || 'Prototype feedback submitted.';
+  apiFetch('/api/feedback', {
+    method: 'POST',
+    body: { message },
+  })
+    .then(() => {
+      feedbackForm.reset();
+      showToast('Thank you for the feedback—our team will review it within 24 hours.');
+    })
+    .catch((error) => {
+      console.error('Failed to send feedback', error);
+      showToast('Unable to submit feedback right now.', 'danger');
+    });
+}
+
+function attachEventListeners() {
+  tabButtons.forEach((tab) => {
+    tab.addEventListener('click', (event) => {
+      const targetId = tab.dataset.tabTarget;
+      if (tab === avatarButton && !state.auth.token) {
+        event.preventDefault();
+        openAuthDialog();
+        return;
+      }
+      switchTab(targetId);
+    });
   });
+
+  if (uploadButton) {
+    uploadButton.addEventListener('click', () => {
+      if (!state.auth.token) {
+        openAuthDialog();
+        showToast('Sign in to upload transactions.');
+        return;
+      }
+      uploadDialog?.showModal();
+    });
+  }
+
+  document.querySelectorAll('.unlock-button').forEach((button) => {
+    button.addEventListener('click', () => unlockModule(button));
+  });
+
+  if (cashflowTimeframeSelect) {
+    cashflowTimeframeSelect.addEventListener('change', () => {
+      state.dashboard.timeframe = cashflowTimeframeSelect.value;
+      loadSummary(state.dashboard.timeframe);
+    });
+  }
+
+  if (cashflowChartContainer) {
+    cashflowChartContainer.addEventListener('click', (event) => {
+      const bar = event.target.closest('[data-month][data-type]');
+      if (!bar) return;
+      state.dashboard.monthKey = bar.dataset.month;
+      state.dashboard.type = bar.dataset.type;
+      renderDashboard();
+    });
+  }
+
+  [searchInput, filterCashflow, filterAccount, filterCategory, filterLabel].forEach((control) => {
+    control?.addEventListener('input', renderTransactions);
+  });
+
+  document.querySelectorAll('.insight-list').forEach((list) => {
+    list.addEventListener('click', handleInsightFeedback);
+  });
+
+  if (benchmarkSelect) {
+    benchmarkSelect.addEventListener('change', () => {
+      state.insights.cohort = benchmarkSelect.value;
+      loadInsights(state.insights.cohort);
+    });
+  }
+
+  if (feedbackForm) {
+    feedbackForm.addEventListener('submit', handleFeedbackSubmit);
+  }
+
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!loginForm) return;
+      const formData = new FormData(loginForm);
+      const email = formData.get('email');
+      const password = formData.get('password');
+      try {
+        if (authError) authError.textContent = '';
+        const result = await loginWithCredentials(email, password);
+        setSession(result.token, result.user);
+        closeAuthDialog();
+      } catch (error) {
+        console.error('Login failed', error);
+        if (authError) authError.textContent = 'Invalid email or password. Try the demo login if needed.';
+      }
+    });
+  }
+
+  if (demoLoginButton) {
+    demoLoginButton.addEventListener('click', async () => {
+      try {
+        demoLoginButton.disabled = true;
+        if (authError) authError.textContent = '';
+        const result = await startDemoSession();
+        setSession(result.token, result.user, { silent: false });
+        closeAuthDialog();
+      } catch (error) {
+        console.error('Demo login failed', error);
+        showToast('Unable to start the demo session.', 'danger');
+      } finally {
+        demoLoginButton.disabled = false;
+      }
+    });
+  }
+
+  if (closeLoginButton) {
+    closeLoginButton.addEventListener('click', () => {
+      closeAuthDialog();
+      if (!state.auth.token) {
+        renderSignedOutState();
+      }
+    });
+  }
+
+  if (logoutButton) {
+    logoutButton.addEventListener('click', () => {
+      clearSession();
+      openAuthDialog();
+    });
+  }
+}
+
+function restoreSession() {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  const userRaw = localStorage.getItem(AUTH_USER_KEY);
+  if (token && userRaw) {
+    try {
+      const user = JSON.parse(userRaw);
+      setSession(token, user, { silent: true, skipData: true });
+      loadAllData();
+      return true;
+    } catch (error) {
+      console.error('Failed to restore session', error);
+      clearSession({ silent: true });
+    }
+  }
+  return false;
 }
 
 function init() {
-  renderDashboard();
-  populateFilterOptions();
-  renderTransactions();
-  renderInsightList('[data-list="subscriptions"]', subscriptionInsights);
-  renderInsightList('[data-list="fraud"]', fraudInsights);
-  renderInsightList('[data-list="benchmarks"]', benchmarkCopy.all);
+  updateAvatar();
+  attachEventListeners();
+  const restored = restoreSession();
+  if (!restored) {
+    clearSession({ silent: true });
+    openAuthDialog();
+  }
 }
 
 init();
