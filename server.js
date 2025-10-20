@@ -38,6 +38,40 @@ if (disableDb) {
   });
 }
 
+const DEMO_USER_EMAIL = 'demo@example.com';
+const DEMO_USER_DISPLAY_NAME = 'Demo User';
+const DEMO_USER_PASSWORD_HASH = 'demo-password-hash';
+
+let defaultUserId = null;
+const defaultAccountIds = new Map();
+
+function getDefaultUserId() {
+  if (defaultUserId === null) {
+    throw new Error('Default user context has not been initialised');
+  }
+  return defaultUserId;
+}
+
+function setDefaultUserContext(userId, accounts = []) {
+  defaultUserId = userId;
+  defaultAccountIds.clear();
+  accounts.forEach(({ name, id }) => {
+    if (name && id) {
+      const key = name.toString().trim().toLowerCase();
+      if (key) {
+        defaultAccountIds.set(key, id);
+      }
+    }
+  });
+}
+
+function getAccountIdForName(name) {
+  if (!name) return null;
+  const key = name.toString().trim().toLowerCase();
+  if (!key) return null;
+  return defaultAccountIds.get(key) || null;
+}
+
 function toCurrency(value) {
   return Number.parseFloat(value || 0);
 }
@@ -143,11 +177,31 @@ const inMemoryTransactions = sampleTransactions.map((tx, index) => ({
   ...tx,
   id: tx.id || index + 1,
   merchant: normaliseMerchant(tx.description),
+  user_id: tx.user_id || 1,
 }));
 let nextInMemoryId = inMemoryTransactions.reduce((max, tx) => Math.max(max, tx.id), 0) + 1;
 
 async function ensureSchema() {
   if (disableDb) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS accounts (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS transactions (
       id SERIAL PRIMARY KEY,
@@ -159,8 +213,20 @@ async function ensureSchema() {
       category TEXT NOT NULL,
       label TEXT DEFAULT '',
       amount NUMERIC NOT NULL,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE transactions
+    ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
+  `);
+
+  await pool.query(`
+    ALTER TABLE transactions
+    ADD COLUMN IF NOT EXISTS account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL
   `);
 
   await pool.query(`
@@ -174,13 +240,36 @@ async function ensureSchema() {
   `);
 
   await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS accounts_user_name_idx
+    ON accounts (user_id, name)
+  `);
+
+  await pool.query(`
     DO $$
     BEGIN
-      ALTER TABLE transactions
-      ADD CONSTRAINT transactions_unique UNIQUE (date, amount, merchant, cashflow);
-    EXCEPTION
-      WHEN duplicate_object THEN NULL;
+      IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'transactions_unique'
+      ) THEN
+        ALTER TABLE transactions DROP CONSTRAINT transactions_unique;
+      END IF;
     END $$;
+  `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'transactions_unique'
+      ) THEN
+        ALTER TABLE transactions
+        ADD CONSTRAINT transactions_unique UNIQUE (user_id, date, amount, merchant, cashflow);
+      END IF;
+    END $$;
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS transactions_user_id_date_idx
+    ON transactions (user_id, date)
   `);
 }
 
@@ -196,23 +285,55 @@ async function insertTransaction(transaction) {
     if (exists) {
       return 0;
     }
-    inMemoryTransactions.push({ ...transaction, id: nextInMemoryId++ });
+    inMemoryTransactions.push({
+      ...transaction,
+      id: nextInMemoryId++,
+      user_id: transaction.user_id || 1,
+    });
     return 1;
+  }
+  const merchant = transaction.merchant || normaliseMerchant(transaction.description);
+  const userId = transaction.user_id ?? (defaultUserId !== null ? defaultUserId : null);
+  if (!userId) {
+    throw new Error('Transactions require a user_id when the database is enabled');
+  }
+  let accountId =
+    transaction.account_id !== undefined && transaction.account_id !== null
+      ? transaction.account_id
+      : getAccountIdForName(transaction.account);
+  const accountKey = (transaction.account || '').toString().trim().toLowerCase();
+  if (userId && accountKey && accountId == null) {
+    const accountResult = await pool.query(
+      `INSERT INTO accounts (user_id, name)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, name) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id, name`,
+      [userId, accountKey]
+    );
+    accountId = accountResult.rows[0]?.id || null;
+    if (accountResult.rows[0]) {
+      const keyFromDb = accountResult.rows[0].name.toString().trim().toLowerCase();
+      if (keyFromDb) {
+        defaultAccountIds.set(keyFromDb, accountResult.rows[0].id);
+      }
+    }
   }
   const result = await pool.query(
     `INSERT INTO transactions
-      (description, merchant, date, cashflow, account, category, label, amount)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     ON CONFLICT (date, amount, merchant, cashflow) DO NOTHING`,
+      (description, merchant, date, cashflow, account, category, label, amount, user_id, account_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (user_id, date, amount, merchant, cashflow) DO NOTHING`,
     [
       transaction.description,
-      transaction.merchant,
+      merchant,
       transaction.date,
       transaction.cashflow,
       transaction.account,
       transaction.category,
       transaction.label,
       transaction.amount,
+      userId,
+      accountId,
     ]
   );
   return result.rowCount;
@@ -222,7 +343,53 @@ async function seedSampleData() {
   if (disableDb) {
     return;
   }
-  const existing = await pool.query('SELECT COUNT(*)::int AS count FROM transactions');
+  const userResult = await pool.query(
+    `INSERT INTO users (email, password_hash, display_name)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (email) DO UPDATE SET display_name = EXCLUDED.display_name
+     RETURNING id`,
+    [DEMO_USER_EMAIL, DEMO_USER_PASSWORD_HASH, DEMO_USER_DISPLAY_NAME]
+  );
+  const demoUserId = userResult.rows[0].id;
+
+  const accountNames = Array.from(
+    new Set(
+      sampleTransactions
+        .map((tx) => (tx.account || '').toString().trim().toLowerCase())
+        .filter(Boolean)
+    )
+  );
+  for (const accountName of accountNames) {
+    await pool.query(
+      `INSERT INTO accounts (user_id, name)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, name) DO UPDATE SET name = EXCLUDED.name`,
+      [demoUserId, accountName]
+    );
+  }
+
+  const accountsResult = await pool.query(
+    'SELECT id, name FROM accounts WHERE user_id = $1',
+    [demoUserId]
+  );
+  setDefaultUserContext(demoUserId, accountsResult.rows);
+
+  await pool.query('UPDATE transactions SET user_id = $1 WHERE user_id IS NULL', [demoUserId]);
+  await pool.query(
+    `UPDATE transactions t
+     SET account_id = a.id
+     FROM accounts a
+     WHERE t.user_id = $1
+       AND t.account_id IS NULL
+       AND LOWER(t.account) = LOWER(a.name)
+       AND a.user_id = $1`,
+    [demoUserId]
+  );
+
+  const existing = await pool.query(
+    'SELECT COUNT(*)::int AS count FROM transactions WHERE user_id = $1',
+    [demoUserId]
+  );
   if ((existing.rows[0] && existing.rows[0].count) > 0) {
     return;
   }
@@ -235,6 +402,8 @@ async function seedSampleData() {
       ...tx,
       date: date.format('YYYY-MM-DD'),
       merchant: normaliseMerchant(tx.description),
+      user_id: demoUserId,
+      account_id: getAccountIdForName(tx.account),
     });
   }
 }
@@ -395,9 +564,14 @@ function buildTransaction(record) {
 async function ingestFile(buffer) {
   const records = await parseCSV(buffer);
   let inserted = 0;
+  const userId = disableDb ? null : getDefaultUserId();
   for (const record of records) {
     const transaction = buildTransaction(record);
     if (!transaction) continue;
+    if (userId) {
+      transaction.user_id = userId;
+      transaction.account_id = getAccountIdForName(transaction.account);
+    }
     const changes = await insertTransaction(transaction);
     inserted += changes;
   }
@@ -432,7 +606,11 @@ async function getLatestMonthRange(months = 1) {
     const start = end.subtract(months - 1, 'month').startOf('month');
     return { start, end };
   }
-  const latest = await pool.query('SELECT date FROM transactions ORDER BY date DESC LIMIT 1');
+  const userId = getDefaultUserId();
+  const latest = await pool.query(
+    'SELECT date FROM transactions WHERE user_id = $1 ORDER BY date DESC LIMIT 1',
+    [userId]
+  );
   const latestDate = latest.rows[0] ? latest.rows[0].date : null;
   const end = latestDate ? dayjs(latestDate).endOf('month') : dayjs().endOf('month');
   const start = end.subtract(months - 1, 'month').startOf('month');
@@ -572,10 +750,12 @@ async function generateInsights(cohort = 'all') {
     return buildInsightsFromTransactions(inMemoryTransactions, cohort);
   }
 
+  const userId = getDefaultUserId();
   const expensesResult = await pool.query(
     `SELECT id, description, merchant, date, amount, category
      FROM transactions
-     WHERE cashflow = 'expense'`
+     WHERE user_id = $1 AND cashflow = 'expense'`,
+    [userId]
   );
 
   const expenses = expensesResult.rows.map((row) => ({
@@ -583,30 +763,37 @@ async function generateInsights(cohort = 'all') {
     amount: Number(row.amount),
   }));
 
-  const duplicatesResult = await pool.query(`
-    SELECT t1.description, t1.date, ABS(t1.amount) AS amount
-    FROM transactions t1
-    JOIN transactions t2 ON t1.date = t2.date AND t1.amount = t2.amount AND t1.id != t2.id
-    WHERE t1.cashflow = 'expense'
-    GROUP BY t1.description, t1.date, t1.amount
-  `);
+  const duplicatesResult = await pool.query(
+    `SELECT t1.description, t1.date, ABS(t1.amount) AS amount
+     FROM transactions t1
+     JOIN transactions t2
+       ON t1.date = t2.date
+      AND t1.amount = t2.amount
+      AND t1.id != t2.id
+      AND t1.user_id = t2.user_id
+     WHERE t1.user_id = $1 AND t1.cashflow = 'expense'
+     GROUP BY t1.description, t1.date, t1.amount`,
+    [userId]
+  );
 
-  const feeRows = await pool.query(`
-      SELECT description, ABS(amount) AS amount, date
-      FROM transactions
-      WHERE lower(description) LIKE '%fee%' OR lower(category) LIKE '%fee%'
-      ORDER BY date DESC
-      LIMIT 3
-    `);
+  const feeRows = await pool.query(
+    `SELECT description, ABS(amount) AS amount, date
+     FROM transactions
+     WHERE user_id = $1 AND (lower(description) LIKE '%fee%' OR lower(category) LIKE '%fee%')
+     ORDER BY date DESC
+     LIMIT 3`,
+    [userId]
+  );
 
-  const categorySpendResult = await pool.query(`
-    SELECT category, ABS(SUM(amount)) AS total
-    FROM transactions
-    WHERE cashflow = 'expense'
-    GROUP BY category
-    ORDER BY total DESC
-    LIMIT 5
-  `);
+  const categorySpendResult = await pool.query(
+    `SELECT category, ABS(SUM(amount)) AS total
+     FROM transactions
+     WHERE user_id = $1 AND cashflow = 'expense'
+     GROUP BY category
+     ORDER BY total DESC
+     LIMIT 5`,
+    [userId]
+  );
 
   const insightsFromDb = buildInsightsFromTransactions(expenses, cohort);
 
@@ -676,9 +863,10 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/transactions', async (req, res) => {
   try {
     const { search = '', cashflow = 'all', account = 'all', category = 'all', label = 'all', limit = 500 } = req.query;
-    const filters = [];
-    const values = [];
-    let index = 1;
+    const userId = getDefaultUserId();
+    const filters = [`user_id = $1`];
+    const values = [userId];
+    let index = 2;
 
     if (disableDb) {
       const term = search.toLowerCase();
@@ -760,10 +948,12 @@ app.get('/api/transactions', async (req, res) => {
     }));
 
     const categoriesResult = await pool.query(
-      'SELECT DISTINCT category FROM transactions ORDER BY category ASC'
+      'SELECT DISTINCT category FROM transactions WHERE user_id = $1 ORDER BY category ASC',
+      [userId]
     );
     const labelsResult = await pool.query(
-      "SELECT DISTINCT label FROM transactions WHERE label <> '' ORDER BY label ASC"
+      "SELECT DISTINCT label FROM transactions WHERE user_id = $1 AND label <> '' ORDER BY label ASC",
+      [userId]
     );
 
     res.json({
@@ -824,12 +1014,13 @@ app.get('/api/summary', async (req, res) => {
       return res.json({ ...chart, categories });
     }
 
+    const userId = getDefaultUserId();
     const summaryResult = await pool.query(
       `SELECT TO_CHAR(date, 'YYYY-MM') AS month, cashflow, SUM(amount) AS total
        FROM transactions
-       WHERE date BETWEEN $1 AND $2
+       WHERE user_id = $3 AND date BETWEEN $1 AND $2
        GROUP BY month, cashflow`,
-      [start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD')]
+      [start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD'), userId]
     );
 
     const chart = {
@@ -853,11 +1044,11 @@ app.get('/api/summary', async (req, res) => {
     const categoriesResult = await pool.query(
       `SELECT category, ABS(SUM(amount)) AS total
        FROM transactions
-       WHERE cashflow = 'expense' AND TO_CHAR(date, 'YYYY-MM') = $1
+       WHERE user_id = $1 AND cashflow = 'expense' AND TO_CHAR(date, 'YYYY-MM') = $2
        GROUP BY category
        ORDER BY total DESC
        LIMIT 12`,
-      [latestMonth]
+      [userId, latestMonth]
     );
 
     const categories = categoriesResult.rows.map((row) => ({
@@ -955,25 +1146,26 @@ app.get('/api/budget', async (req, res) => {
       });
     }
 
+    const userId = getDefaultUserId();
     const expenseRow = await pool.query(
       `SELECT COALESCE(ABS(SUM(amount)), 0) AS spent
        FROM transactions
-       WHERE cashflow = 'expense' AND date BETWEEN $1 AND $2`,
-      [startDate, endDate]
+       WHERE user_id = $3 AND cashflow = 'expense' AND date BETWEEN $1 AND $2`,
+      [startDate, endDate, userId]
     );
 
     const incomeRow = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) AS income
        FROM transactions
-       WHERE cashflow = 'income' AND date BETWEEN $1 AND $2`,
-      [startDate, endDate]
+       WHERE user_id = $3 AND cashflow = 'income' AND date BETWEEN $1 AND $2`,
+      [startDate, endDate, userId]
     );
 
     const otherRow = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) AS other
        FROM transactions
-       WHERE cashflow = 'other' AND date BETWEEN $1 AND $2`,
-      [startDate, endDate]
+       WHERE user_id = $3 AND cashflow = 'other' AND date BETWEEN $1 AND $2`,
+      [startDate, endDate, userId]
     );
 
     const spent = Number(expenseRow.rows[0].spent) || 0;
@@ -986,11 +1178,12 @@ app.get('/api/budget', async (req, res) => {
     const baselineExpensesResult = await pool.query(
       `SELECT TO_CHAR(date, 'YYYY-MM') as month, ABS(SUM(amount)) AS total
        FROM transactions
-       WHERE cashflow = 'expense' AND date BETWEEN $1 AND $2
+       WHERE user_id = $3 AND cashflow = 'expense' AND date BETWEEN $1 AND $2
        GROUP BY month`,
       [
         baselineRange.start.format('YYYY-MM-DD'),
         baselineRange.end.format('YYYY-MM-DD'),
+        userId,
       ]
     );
 
@@ -1002,11 +1195,11 @@ app.get('/api/budget', async (req, res) => {
     const categoriesResult = await pool.query(
       `SELECT category, ABS(SUM(amount)) AS spent
        FROM transactions
-       WHERE cashflow = 'expense' AND date BETWEEN $1 AND $2
+       WHERE user_id = $3 AND cashflow = 'expense' AND date BETWEEN $1 AND $2
        GROUP BY category
        ORDER BY spent DESC
        LIMIT 10`,
-      [startDate, endDate]
+      [startDate, endDate, userId]
     );
 
     const categories = categoriesResult.rows.map((row) => {
@@ -1101,14 +1294,15 @@ app.get('/api/savings', async (req, res) => {
       });
     }
 
+    const userId = getDefaultUserId();
     const totalsResult = await pool.query(
       `SELECT
         SUM(CASE WHEN cashflow = 'income' THEN amount ELSE 0 END) AS income,
         SUM(CASE WHEN cashflow = 'other' THEN amount ELSE 0 END) AS other,
         SUM(CASE WHEN cashflow = 'expense' THEN amount ELSE 0 END) AS expense
        FROM transactions
-       WHERE date BETWEEN $1 AND $2`,
-      [startDate, endDate]
+       WHERE user_id = $3 AND date BETWEEN $1 AND $2`,
+      [startDate, endDate, userId]
     );
 
     const totalsRow = totalsResult.rows[0] || { income: 0, other: 0, expense: 0 };
@@ -1122,7 +1316,9 @@ app.get('/api/savings', async (req, res) => {
         SUM(CASE WHEN cashflow = 'income' THEN amount ELSE 0 END) AS income,
         SUM(CASE WHEN cashflow = 'other' THEN amount ELSE 0 END) AS other,
         SUM(CASE WHEN cashflow = 'expense' THEN amount ELSE 0 END) AS expense
-       FROM transactions`
+       FROM transactions
+       WHERE user_id = $1`,
+      [userId]
     );
 
     const cumulativeRow = cumulativeResult.rows[0] || { income: 0, other: 0, expense: 0 };
@@ -1134,10 +1330,10 @@ app.get('/api/savings', async (req, res) => {
     const savingsCategoriesResult = await pool.query(
       `SELECT category, SUM(amount) AS total
        FROM transactions
-       WHERE amount > 0 AND date BETWEEN $1 AND $2
+       WHERE user_id = $3 AND amount > 0 AND date BETWEEN $1 AND $2
        GROUP BY category
        ORDER BY total DESC`,
-      [startDate, endDate]
+      [startDate, endDate, userId]
     );
 
     const savingsCategories = savingsCategoriesResult.rows.map((row) => ({
