@@ -1,13 +1,5 @@
 {
   "version": 2,
-  "framework": null,
-  "buildCommand": "npm run vercel-build",
-  "functions": {
-    "api/server.js": {
-      "runtime": "nodejs20.x",
-      "includeFiles": "{index.html,app.js,styles.css,logo.svg}"
-    }
-  },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/server.js" }
   ]
