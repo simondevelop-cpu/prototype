@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const multer = require('multer');
+const busboy = require('busboy');
 const { parse } = require('csv-parse');
 const dayjs = require('dayjs');
 const cors = require('cors');
@@ -111,13 +111,109 @@ function authenticate(req, res, next) {
   }
 }
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 5 * 1024 * 1024,
-    files: 6,
-  },
-});
+const MAX_UPLOAD_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_UPLOAD_FILES = 6;
+
+function statementsUpload(req, res, next) {
+  const contentType = req.headers['content-type'] || '';
+  if (!/^multipart\/form-data/i.test(contentType)) {
+    return res.status(400).json({ error: 'Expected multipart/form-data request' });
+  }
+
+  const bb = busboy({
+    headers: req.headers,
+    limits: {
+      fileSize: MAX_UPLOAD_FILE_SIZE,
+      files: MAX_UPLOAD_FILES,
+    },
+  });
+
+  const files = [];
+  req.body = req.body || {};
+  let aborted = false;
+  let errorMessage = null;
+
+  function abort(message) {
+    if (aborted) return;
+    aborted = true;
+    errorMessage = message || 'Failed to process upload';
+    req.unpipe(bb);
+    req.resume();
+    if (!res.headersSent) {
+      res.status(400).json({ error: errorMessage });
+    }
+  }
+
+  bb.on('file', (fieldname, file, info = {}) => {
+    const { filename = 'unknown', encoding, mimeType } = info;
+    if (fieldname !== 'statements') {
+      file.resume();
+      return;
+    }
+
+    const chunks = [];
+    let size = 0;
+
+    file.on('data', (chunk) => {
+      if (aborted) return;
+      size += chunk.length;
+      chunks.push(chunk);
+    });
+
+    file.on('limit', () => {
+      file.resume();
+      abort(`File "${filename}" exceeds the 5MB limit`);
+    });
+
+    file.on('error', (error) => {
+      file.resume();
+      abort(error instanceof Error ? error.message : 'Failed to read uploaded file');
+    });
+
+    file.on('end', () => {
+      if (aborted) return;
+      files.push({
+        fieldname,
+        originalname: filename,
+        encoding,
+        mimetype: mimeType,
+        size,
+        buffer: Buffer.concat(chunks),
+      });
+    });
+  });
+
+  bb.on('field', (fieldname, value) => {
+    if (aborted) return;
+    if (Object.prototype.hasOwnProperty.call(req.body, fieldname)) {
+      if (Array.isArray(req.body[fieldname])) {
+        req.body[fieldname].push(value);
+      } else {
+        req.body[fieldname] = [req.body[fieldname], value];
+      }
+    } else {
+      req.body[fieldname] = value;
+    }
+  });
+
+  bb.on('filesLimit', () => {
+    abort(`Exceeded maximum number of files (${MAX_UPLOAD_FILES})`);
+  });
+
+  bb.on('error', (error) => {
+    abort(error instanceof Error ? error.message : 'Failed to process upload');
+  });
+
+  bb.on('finish', () => {
+    if (aborted) {
+      return;
+    }
+    req.files = files;
+    next();
+  });
+
+  req.pipe(bb);
+}
 
 app.use(cors());
 app.use(express.json());
@@ -1602,7 +1698,7 @@ app.post('/api/insights/:type/feedback', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/upload', authenticate, upload.array('statements', 6), async (req, res) => {
+app.post('/api/upload', authenticate, statementsUpload, async (req, res) => {
   if (!req.files || !req.files.length) {
     return res.status(400).json({ error: 'No files uploaded' });
   }
