@@ -124,6 +124,7 @@ app.use(express.json());
 app.use(express.static(__dirnameResolved));
 
 app.post('/api/auth/login', async (req, res) => {
+  console.log('[AUTH] Login attempt - path:', req.path, 'url:', req.url);
   try {
     const { email, password } = req.body || {};
     if (!email || !password) {
@@ -164,6 +165,81 @@ app.get('/api/auth/me', authenticate, (req, res) => {
 });
 
 app.post('/api/auth/register', async (req, res) => {
+  console.log('[AUTH] Register attempt - path:', req.path, 'url:', req.url);
+  try {
+    const { email, password, name } = req.body || {};
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'Email, password, and name are required' });
+    }
+
+    // Check if user already exists
+    const existingUser = users.find((entry) => entry.email.toLowerCase() === email.toLowerCase());
+    if (existingUser) {
+      return res.status(409).json({ error: 'User already exists with this email' });
+    }
+
+    // Create new user
+    const newUser = {
+      id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      email: email.toLowerCase().trim(),
+      name: name.trim(),
+      passwordHash: hashPassword(password),
+    };
+
+    // Add to users array and map
+    users.push(newUser);
+    usersById.set(newUser.id, newUser);
+
+    const token = createToken(newUser);
+    res.status(201).json({ token, user: publicUser(newUser) });
+  } catch (error) {
+    console.error('Registration failed', error);
+    res.status(500).json({ error: 'Unable to create account' });
+  }
+});
+
+// Vercel serverless compatibility - routes without /api prefix
+// These will handle requests after Vercel strips the /api prefix
+app.post('/auth/login', async (req, res) => {
+  console.log('[AUTH] Login (no prefix) - path:', req.path, 'url:', req.url);
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const user = users.find((entry) => entry.email.toLowerCase() === email.toLowerCase());
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const valid = await verifyPassword(user, password);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = createToken(user);
+    res.json({ token, user: publicUser(user) });
+  } catch (error) {
+    console.error('Login failed', error);
+    res.status(500).json({ error: 'Unable to sign in' });
+  }
+});
+
+app.post('/auth/demo', (req, res) => {
+  console.log('[AUTH] Demo (no prefix) - path:', req.path, 'url:', req.url);
+  try {
+    const user = users[0];
+    const token = createToken(user);
+    res.json({ token, user: publicUser(user) });
+  } catch (error) {
+    console.error('Demo login failed', error);
+    res.status(500).json({ error: 'Unable to start demo session' });
+  }
+});
+
+app.post('/auth/register', async (req, res) => {
+  console.log('[AUTH] Register (no prefix) - path:', req.path, 'url:', req.url);
   try {
     const { email, password, name } = req.body || {};
     if (!email || !password || !name) {
@@ -655,12 +731,28 @@ function authenticateRequest(req, res, next) {
   next();
 }
 
-app.use('/api', (req, res, next) => {
+// Authentication middleware - skip for auth endpoints and health check
+// Note: In Vercel serverless, /api prefix is stripped, so we check both patterns
+app.use((req, res, next) => {
+  const path = req.path;
+  const url = req.url;
+  
   // Skip authentication for auth endpoints and health check
-  if (req.path === '/health' || req.path.startsWith('/auth/')) {
+  if (path === '/health' || 
+      path.startsWith('/auth/') || 
+      path === '/api/health' || 
+      path.startsWith('/api/auth/') ||
+      url.startsWith('/api/auth/') ||
+      url.startsWith('/auth/')) {
     return next();
   }
-  return authenticateRequest(req, res, next);
+  
+  // Only apply authentication to /api routes
+  if (path.startsWith('/api/') || path.startsWith('/api')) {
+    return authenticateRequest(req, res, next);
+  }
+  
+  next();
 });
 
 function parseCSV(buffer) {
