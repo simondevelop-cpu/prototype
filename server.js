@@ -673,7 +673,22 @@ const readiness = disableDb
       }
     })();
 
+// Readiness middleware - ensure database is initialized
+// Skip for auth endpoints to prevent blocking
 app.use(async (req, res, next) => {
+  const path = req.path;
+  const url = req.url;
+  
+  // Skip readiness check for auth endpoints
+  if (path === '/health' || 
+      path.startsWith('/auth/') || 
+      path === '/api/health' || 
+      path.startsWith('/api/auth/') ||
+      url.startsWith('/api/auth/') ||
+      url.startsWith('/auth/')) {
+    return next();
+  }
+  
   try {
     await readiness;
     next();
