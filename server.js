@@ -124,10 +124,11 @@ app.use(express.json());
 app.use(express.static(__dirnameResolved));
 
 app.post('/api/auth/login', async (req, res) => {
-  console.log('[AUTH] Login attempt - path:', req.path, 'url:', req.url);
+  console.log('[AUTH] Login attempt - method:', req.method, 'path:', req.path, 'url:', req.url, 'body:', req.body);
   try {
     const { email, password } = req.body || {};
     if (!email || !password) {
+      console.log('[AUTH] Login failed - missing credentials');
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
@@ -1196,6 +1197,28 @@ app.get('/api/health', async (req, res) => {
     console.error('Health check failed', error);
     res.status(500).json({ status: 'error', message: 'Database connection failed' });
   }
+});
+
+// Debug endpoint to test routing
+app.all('/api/debug-routes', (req, res) => {
+  res.json({
+    method: req.method,
+    path: req.path,
+    url: req.url,
+    originalUrl: req.originalUrl,
+    baseUrl: req.baseUrl,
+    headers: {
+      host: req.headers.host,
+      'content-type': req.headers['content-type'],
+    },
+    timestamp: new Date().toISOString(),
+    message: 'Debug endpoint working - auth routes should work too'
+  });
+});
+
+// Health check without /api prefix for Vercel
+app.get('/health', async (req, res) => {
+  res.json({ status: 'ok', mode: 'vercel-serverless', timestamp: new Date().toISOString() });
 });
 
 app.get('/api/transactions', authenticate, async (req, res) => {
