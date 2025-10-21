@@ -220,7 +220,8 @@ const defaultAccountIds = new Map();
 
 function getDefaultUserId() {
   if (defaultUserId === null) {
-    throw new Error('Default user context has not been initialised');
+    // Return demo user ID if not initialized
+    return DEFAULT_USER_ID;
   }
   return defaultUserId;
 }
@@ -624,6 +625,25 @@ function resolveUserId(req) {
 }
 
 function authenticateRequest(req, res, next) {
+  // First try to get user from JWT token
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  
+  if (token) {
+    try {
+      const payload = decodeToken(token);
+      const user = payload?.sub ? usersById.get(payload.sub) : null;
+      if (user) {
+        req.userId = user.id;
+        req.user = publicUser(user);
+        return next();
+      }
+    } catch (error) {
+      console.warn('Failed to verify token in authenticateRequest', error);
+    }
+  }
+  
+  // Fallback to old system for demo purposes
   let userId = resolveUserId(req);
   if (!userId) {
     if (!disableDb && process.env.ALLOW_DEMO_USER !== '1') {
@@ -636,7 +656,8 @@ function authenticateRequest(req, res, next) {
 }
 
 app.use('/api', (req, res, next) => {
-  if (req.path === '/health') {
+  // Skip authentication for auth endpoints and health check
+  if (req.path === '/health' || req.path.startsWith('/auth/')) {
     return next();
   }
   return authenticateRequest(req, res, next);
@@ -777,11 +798,11 @@ function buildTransaction(record) {
 async function ingestFile(buffer, userId) {
   const records = await parseCSV(buffer);
   let inserted = 0;
-  const effectiveUserId = disableDb ? null : getDefaultUserId();
+  const effectiveUserId = disableDb ? userId : (userId || DEFAULT_USER_ID);
   for (const record of records) {
     const transaction = buildTransaction(record);
     if (!transaction) continue;
-    const changes = await insertTransaction(transaction, effectiveUserId ?? userId);
+    const changes = await insertTransaction(transaction, effectiveUserId);
     inserted += changes;
   }
   return inserted;
@@ -959,7 +980,7 @@ async function generateInsights(cohort = 'all', userId = DEFAULT_USER_ID) {
     return buildInsightsFromTransactions(getInMemoryTransactions(userId), cohort);
   }
 
-  const effectiveUserId = getDefaultUserId();
+  const effectiveUserId = userId || DEFAULT_USER_ID;
   const expensesResult = await pool.query(
     `SELECT id, description, merchant, date, amount, category
      FROM transactions
@@ -1073,7 +1094,7 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/transactions', authenticate, async (req, res) => {
   try {
     const { search = '', cashflow = 'all', account = 'all', category = 'all', label = 'all', limit = 500 } = req.query;
-    const userId = getDefaultUserId();
+    const userId = req.userId || DEFAULT_USER_ID;
     const filters = [`user_id = $1`];
     const values = [userId];
     let index = 2;
@@ -1081,7 +1102,7 @@ app.get('/api/transactions', authenticate, async (req, res) => {
     if (disableDb) {
       const term = search.toLowerCase();
       const limitValue = Number(limit) || 500;
-      const userTransactions = getInMemoryTransactions(req.userId);
+      const userTransactions = getInMemoryTransactions(userId);
       const filtered = userTransactions
         .filter((tx) => {
           const matchesSearch =
@@ -1114,7 +1135,7 @@ app.get('/api/transactions', authenticate, async (req, res) => {
     }
 
     filters.push(`user_id = $${index}`);
-    values.push(req.userId);
+    values.push(userId);
     index += 1;
 
     if (search) {
@@ -1164,11 +1185,11 @@ app.get('/api/transactions', authenticate, async (req, res) => {
 
     const categoriesResult = await pool.query(
       'SELECT DISTINCT category FROM transactions WHERE user_id = $1 ORDER BY category ASC',
-      [req.userId]
+      [userId]
     );
     const labelsResult = await pool.query(
       "SELECT DISTINCT label FROM transactions WHERE user_id = $1 AND label <> '' ORDER BY label ASC",
-      [req.userId]
+      [userId]
     );
 
     res.json({
@@ -1190,7 +1211,7 @@ app.get('/api/summary', authenticate, async (req, res) => {
     const labels = monthLabels(start, monthCount);
 
     if (disableDb) {
-      const userTransactions = getInMemoryTransactions(req.userId);
+      const userTransactions = getInMemoryTransactions(userId);
       const chart = {
         months: labels.map((label) => dayjs(label).format('MMM YY')),
         income: Array(monthCount).fill(0),
@@ -1230,13 +1251,13 @@ app.get('/api/summary', authenticate, async (req, res) => {
       return res.json({ ...chart, categories, monthKeys: labels });
     }
 
-    const userId = getDefaultUserId();
+    const userId = req.userId || DEFAULT_USER_ID;
     const summaryResult = await pool.query(
       `SELECT TO_CHAR(date, 'YYYY-MM') AS month, cashflow, SUM(amount) AS total
        FROM transactions
        WHERE user_id = $1 AND date BETWEEN $2 AND $3
        GROUP BY month, cashflow`,
-      [req.userId, start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD')]
+      [userId, start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD')]
     );
 
     const chart = {
@@ -1264,7 +1285,7 @@ app.get('/api/summary', authenticate, async (req, res) => {
        GROUP BY category
        ORDER BY total DESC
        LIMIT 12`,
-      [req.userId, latestMonth]
+      [userId, latestMonth]
     );
 
     const categories = categoriesResult.rows.map((row) => ({
@@ -1283,7 +1304,8 @@ app.get('/api/budget', authenticate, async (req, res) => {
   try {
     const period = req.query.period === 'quarterly' ? 'quarterly' : 'monthly';
     const months = period === 'quarterly' ? 3 : 1;
-    const { start, end } = await getLatestMonthRange(months, req.userId);
+    const userId = req.userId || DEFAULT_USER_ID;
+    const { start, end } = await getLatestMonthRange(months, userId);
     const monthLabelsDisplay = [];
 
     if (period === 'quarterly') {
@@ -1296,7 +1318,7 @@ app.get('/api/budget', authenticate, async (req, res) => {
     const endDate = end.format('YYYY-MM-DD');
 
     if (disableDb) {
-      const userTransactions = getInMemoryTransactions(req.userId);
+      const userTransactions = getInMemoryTransactions(userId);
       const relevant = userTransactions.filter((tx) =>
         dayjs(tx.date).isBetween(startDate, endDate, 'day', '[]')
       );
@@ -1313,8 +1335,8 @@ app.get('/api/budget', authenticate, async (req, res) => {
       const saved = income + other - spent;
 
       const baselineMonths = period === 'quarterly' ? 6 : 3;
-      const baselineRange = await getLatestMonthRange(baselineMonths, req.userId);
-      const baselineExpenses = getInMemoryTransactions(req.userId)
+      const baselineRange = await getLatestMonthRange(baselineMonths, userId);
+      const baselineExpenses = getInMemoryTransactions(userId)
         .filter((tx) =>
           tx.cashflow === 'expense' &&
           dayjs(tx.date).isBetween(
@@ -1363,26 +1385,26 @@ app.get('/api/budget', authenticate, async (req, res) => {
       });
     }
 
-    const userId = getDefaultUserId();
+    const userId = req.userId || DEFAULT_USER_ID;
     const expenseRow = await pool.query(
       `SELECT COALESCE(ABS(SUM(amount)), 0) AS spent
        FROM transactions
        WHERE user_id = $1 AND cashflow = 'expense' AND date BETWEEN $2 AND $3`,
-      [req.userId, startDate, endDate]
+      [userId, startDate, endDate]
     );
 
     const incomeRow = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) AS income
        FROM transactions
        WHERE user_id = $1 AND cashflow = 'income' AND date BETWEEN $2 AND $3`,
-      [req.userId, startDate, endDate]
+      [userId, startDate, endDate]
     );
 
     const otherRow = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) AS other
        FROM transactions
        WHERE user_id = $1 AND cashflow = 'other' AND date BETWEEN $2 AND $3`,
-      [req.userId, startDate, endDate]
+      [userId, startDate, endDate]
     );
 
     const spent = Number(expenseRow.rows[0].spent) || 0;
@@ -1398,7 +1420,7 @@ app.get('/api/budget', authenticate, async (req, res) => {
        WHERE user_id = $1 AND cashflow = 'expense' AND date BETWEEN $2 AND $3
        GROUP BY month`,
       [
-        req.userId,
+        userId,
         baselineRange.start.format('YYYY-MM-DD'),
         baselineRange.end.format('YYYY-MM-DD'),
         userId,
@@ -1417,7 +1439,7 @@ app.get('/api/budget', authenticate, async (req, res) => {
        GROUP BY category
        ORDER BY spent DESC
        LIMIT 10`,
-      [req.userId, startDate, endDate]
+      [userId, startDate, endDate]
     );
 
     const categories = categoriesResult.rows.map((row) => {
@@ -1452,7 +1474,7 @@ app.get('/api/savings', authenticate, async (req, res) => {
     const endDate = end.format('YYYY-MM-DD');
 
     if (disableDb) {
-      const userTransactions = getInMemoryTransactions(req.userId);
+      const userTransactions = getInMemoryTransactions(userId);
       const relevant = userTransactions.filter((tx) =>
         dayjs(tx.date).isBetween(startDate, endDate, 'day', '[]')
       );
@@ -1513,7 +1535,7 @@ app.get('/api/savings', authenticate, async (req, res) => {
       });
     }
 
-    const userId = getDefaultUserId();
+    const userId = req.userId || DEFAULT_USER_ID;
     const totalsResult = await pool.query(
       `SELECT
         SUM(CASE WHEN cashflow = 'income' THEN amount ELSE 0 END) AS income,
@@ -1521,7 +1543,7 @@ app.get('/api/savings', authenticate, async (req, res) => {
         SUM(CASE WHEN cashflow = 'expense' THEN amount ELSE 0 END) AS expense
        FROM transactions
        WHERE user_id = $1 AND date BETWEEN $2 AND $3`,
-      [req.userId, startDate, endDate]
+      [userId, startDate, endDate]
     );
 
     const totalsRow = totalsResult.rows[0] || { income: 0, other: 0, expense: 0 };
@@ -1537,7 +1559,7 @@ app.get('/api/savings', authenticate, async (req, res) => {
         SUM(CASE WHEN cashflow = 'expense' THEN amount ELSE 0 END) AS expense
        FROM transactions
        WHERE user_id = $1`,
-      [req.userId]
+      [userId]
     );
 
     const cumulativeRow = cumulativeResult.rows[0] || { income: 0, other: 0, expense: 0 };
@@ -1552,7 +1574,7 @@ app.get('/api/savings', authenticate, async (req, res) => {
        WHERE user_id = $1 AND amount > 0 AND date BETWEEN $2 AND $3
        GROUP BY category
        ORDER BY total DESC`,
-      [req.userId, startDate, endDate]
+      [userId, startDate, endDate]
     );
 
     const savingsCategories = savingsCategoriesResult.rows.map((row) => ({
@@ -1602,7 +1624,7 @@ app.get('/api/savings', authenticate, async (req, res) => {
 app.get('/api/insights', authenticate, async (req, res) => {
   try {
     const cohort = req.query.cohort || 'all';
-    const insights = await generateInsights(cohort, req.userId);
+    const insights = await generateInsights(cohort, req.userId || DEFAULT_USER_ID);
     res.json(insights);
   } catch (error) {
     console.error('Failed to load insights', error);
@@ -1642,7 +1664,7 @@ app.post('/api/upload', authenticate, upload.array('statements', 6), async (req,
   const summary = [];
   for (const file of req.files) {
     try {
-      const inserted = await ingestFile(file.buffer, req.userId);
+      const inserted = await ingestFile(file.buffer, req.userId || DEFAULT_USER_ID);
       summary.push({ file: file.originalname, inserted });
     } catch (error) {
       console.error(`Failed to ingest ${file.originalname}`, error);
