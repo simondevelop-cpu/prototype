@@ -134,19 +134,22 @@ app.post('/api/auth/login', async (req, res) => {
 
     const user = users.find((entry) => entry.email.toLowerCase() === email.toLowerCase());
     if (!user) {
+      console.log('[AUTH] Login failed - user not found');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const valid = await verifyPassword(user, password);
     if (!valid) {
+      console.log('[AUTH] Login failed - invalid password');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const token = createToken(user);
+    console.log('[AUTH] Login successful for:', email);
     res.json({ token, user: publicUser(user) });
   } catch (error) {
-    console.error('Login failed', error);
-    res.status(500).json({ error: 'Unable to sign in' });
+    console.error('[AUTH] Login error:', error.message, error.stack);
+    res.status(500).json({ error: 'Unable to sign in', details: IS_VERCEL ? error.message : undefined });
   }
 });
 
@@ -662,7 +665,11 @@ async function seedSampleData() {
   }
 }
 
-const readiness = disableDb
+// Database initialization - skip in Vercel serverless to avoid cold start issues
+const IS_VERCEL = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+const DISABLE_DB_INIT = IS_VERCEL || disableDb;
+
+const readiness = DISABLE_DB_INIT
   ? Promise.resolve()
   : (async () => {
       try {
@@ -670,15 +677,25 @@ const readiness = disableDb
         await seedSampleData();
       } catch (error) {
         console.error('Database initialisation failed', error);
+        // Don't throw in serverless - just log and continue
+        if (IS_VERCEL) {
+          console.warn('Skipping database init in Vercel serverless');
+          return;
+        }
         throw error;
       }
     })();
 
 // Readiness middleware - ensure database is initialized
-// Skip for auth endpoints to prevent blocking
+// Skip for auth endpoints and in Vercel serverless
 app.use(async (req, res, next) => {
   const path = req.path;
   const url = req.url;
+  
+  // Always skip in Vercel serverless environment
+  if (IS_VERCEL) {
+    return next();
+  }
   
   // Skip readiness check for auth endpoints
   if (path === '/health' || 
