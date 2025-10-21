@@ -667,7 +667,8 @@ async function seedSampleData() {
 
 // Database initialization - skip in Vercel serverless to avoid cold start issues
 const IS_VERCEL = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
-const DISABLE_DB_INIT = IS_VERCEL || disableDb;
+// Force disable DB in Vercel unless DATABASE_URL is explicitly set
+const DISABLE_DB_INIT = (IS_VERCEL && !process.env.DATABASE_URL) || disableDb;
 
 const readiness = DISABLE_DB_INIT
   ? Promise.resolve()
