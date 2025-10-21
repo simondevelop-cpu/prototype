@@ -477,8 +477,8 @@ async function insertTransaction(transaction, userId) {
     return setInMemoryTransaction(userId, transaction) ? 1 : 0;
   }
   const merchant = transaction.merchant || normaliseMerchant(transaction.description);
-  const userId = transaction.user_id ?? (defaultUserId !== null ? defaultUserId : null);
-  if (!userId) {
+  const effectiveUserId = transaction.user_id ?? (defaultUserId !== null ? defaultUserId : null);
+  if (!effectiveUserId) {
     throw new Error('Transactions require a user_id when the database is enabled');
   }
   let accountId =
@@ -486,13 +486,13 @@ async function insertTransaction(transaction, userId) {
       ? transaction.account_id
       : getAccountIdForName(transaction.account);
   const accountKey = (transaction.account || '').toString().trim().toLowerCase();
-  if (userId && accountKey && accountId == null) {
+  if (effectiveUserId && accountKey && accountId == null) {
     const accountResult = await pool.query(
       `INSERT INTO accounts (user_id, name)
        VALUES ($1, $2)
        ON CONFLICT (user_id, name) DO UPDATE SET name = EXCLUDED.name
        RETURNING id, name`,
-      [userId, accountKey]
+      [effectiveUserId, accountKey]
     );
     accountId = accountResult.rows[0]?.id || null;
     if (accountResult.rows[0]) {
@@ -508,7 +508,7 @@ async function insertTransaction(transaction, userId) {
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (user_id, date, amount, merchant, cashflow) DO NOTHING`,
     [
-      userId,
+      effectiveUserId,
       transaction.description,
       merchant,
       transaction.date,
@@ -517,7 +517,7 @@ async function insertTransaction(transaction, userId) {
       transaction.category,
       transaction.label,
       transaction.amount,
-      userId,
+      effectiveUserId,
       accountId,
     ]
   );
@@ -744,11 +744,11 @@ function buildTransaction(record) {
 async function ingestFile(buffer, userId) {
   const records = await parseCSV(buffer);
   let inserted = 0;
-  const userId = disableDb ? null : getDefaultUserId();
+  const effectiveUserId = disableDb ? null : getDefaultUserId();
   for (const record of records) {
     const transaction = buildTransaction(record);
     if (!transaction) continue;
-    const changes = await insertTransaction(transaction, userId);
+    const changes = await insertTransaction(transaction, effectiveUserId ?? userId);
     inserted += changes;
   }
   return inserted;
@@ -926,12 +926,12 @@ async function generateInsights(cohort = 'all', userId = DEFAULT_USER_ID) {
     return buildInsightsFromTransactions(getInMemoryTransactions(userId), cohort);
   }
 
-  const userId = getDefaultUserId();
+  const effectiveUserId = getDefaultUserId();
   const expensesResult = await pool.query(
     `SELECT id, description, merchant, date, amount, category
      FROM transactions
      WHERE user_id = $1 AND cashflow = 'expense'`,
-    [userId]
+    [effectiveUserId]
   );
 
   const expenses = expensesResult.rows.map((row) => ({
@@ -949,17 +949,17 @@ async function generateInsights(cohort = 'all', userId = DEFAULT_USER_ID) {
       AND t1.id != t2.id
      WHERE t1.user_id = $1 AND t1.cashflow = 'expense'
      GROUP BY t1.description, t1.date, t1.amount`,
-    [userId]
+    [effectiveUserId]
   );
 
   const feeRows = await pool.query(
     `SELECT description, ABS(amount) AS amount, date
      FROM transactions
-     WHERE user_id = $1
-       AND (lower(description) LIKE '%fee%' OR lower(category) LIKE '%fee%')
+      WHERE user_id = $1
+        AND (lower(description) LIKE '%fee%' OR lower(category) LIKE '%fee%')
      ORDER BY date DESC
      LIMIT 3`,
-    [userId]
+    [effectiveUserId]
   );
 
   const categorySpendResult = await pool.query(
@@ -969,7 +969,7 @@ async function generateInsights(cohort = 'all', userId = DEFAULT_USER_ID) {
      GROUP BY category
      ORDER BY total DESC
      LIMIT 5`,
-    [userId]
+    [effectiveUserId]
   );
 
   const insightsFromDb = buildInsightsFromTransactions(expenses, cohort);
