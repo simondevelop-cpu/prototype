@@ -163,6 +163,39 @@ app.get('/api/auth/me', authenticate, (req, res) => {
   res.json({ user: req.user });
 });
 
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { email, password, name } = req.body || {};
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'Email, password, and name are required' });
+    }
+
+    // Check if user already exists
+    const existingUser = users.find((entry) => entry.email.toLowerCase() === email.toLowerCase());
+    if (existingUser) {
+      return res.status(409).json({ error: 'User already exists with this email' });
+    }
+
+    // Create new user
+    const newUser = {
+      id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      email: email.toLowerCase().trim(),
+      name: name.trim(),
+      passwordHash: hashPassword(password),
+    };
+
+    // Add to users array and map
+    users.push(newUser);
+    usersById.set(newUser.id, newUser);
+
+    const token = createToken(newUser);
+    res.status(201).json({ token, user: publicUser(newUser) });
+  } catch (error) {
+    console.error('Registration failed', error);
+    res.status(500).json({ error: 'Unable to create account' });
+  }
+});
+
 let pool = null;
 if (disableDb) {
   console.warn('DISABLE_DB is set. The server will use in-memory data only.');

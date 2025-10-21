@@ -415,31 +415,68 @@
     </footer>
 
     <dialog id="auth-dialog" class="auth-dialog">
-      <form class="auth-modal" data-form="login">
-        <h2>Sign in to Canadian Insights</h2>
-        <p class="lead">Use your credentials or jump into the seeded demo account.</p>
-        <label>
-          Email address
-          <input type="email" name="email" placeholder="demo@canadianinsights.ca" autocomplete="username" required />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            name="password"
-            placeholder="northstar-demo"
-            autocomplete="current-password"
-            required
-          />
-        </label>
-        <p class="form-error" data-auth-error role="alert" aria-live="polite"></p>
-        <p class="tiny">Sessions last two hours. Demo access skips the form for quick previews.</p>
-        <menu class="dialog-actions column">
-          <button type="submit">Sign in</button>
-          <button type="button" class="secondary" data-action="demo-login">Demo login</button>
-          <button type="button" class="secondary" data-action="close-login">Cancel</button>
-        </menu>
-      </form>
+      <div class="auth-modal">
+        <div class="auth-tabs">
+          <button class="auth-tab active" data-tab="login">Sign In</button>
+          <button class="auth-tab" data-tab="register">Create Account</button>
+        </div>
+        
+        <form class="auth-form active" data-form="login" data-tab-content="login">
+          <h2>Sign in to Canadian Insights</h2>
+          <p class="lead">Use your credentials or jump into the seeded demo account.</p>
+          <label>
+            Email address
+            <input type="email" name="email" placeholder="demo@canadianinsights.ca" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              name="password"
+              placeholder="northstar-demo"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+          <p class="form-error" data-auth-error role="alert" aria-live="polite"></p>
+          <p class="tiny">Sessions last two hours. Demo access skips the form for quick previews.</p>
+          <menu class="dialog-actions column">
+            <button type="submit">Sign in</button>
+            <button type="button" class="secondary" data-action="demo-login">Demo login</button>
+            <button type="button" class="secondary" data-action="close-login">Cancel</button>
+          </menu>
+        </form>
+
+        <form class="auth-form" data-form="register" data-tab-content="register">
+          <h2>Create your account</h2>
+          <p class="lead">Start tracking your Canadian finances with personalized insights.</p>
+          <label>
+            Full name
+            <input type="text" name="name" placeholder="Taylor Nguyen" autocomplete="name" required />
+          </label>
+          <label>
+            Email address
+            <input type="email" name="email" placeholder="you@example.com" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              name="password"
+              placeholder="Choose a secure password"
+              autocomplete="new-password"
+              required
+            />
+          </label>
+          <p class="form-error" data-auth-error role="alert" aria-live="polite"></p>
+          <p class="tiny">Your data is encrypted and never shared. Sessions last two hours.</p>
+          <menu class="dialog-actions column">
+            <button type="submit">Create account</button>
+            <button type="button" class="secondary" data-action="demo-login">Try demo instead</button>
+            <button type="button" class="secondary" data-action="close-login">Cancel</button>
+          </menu>
+        </form>
+      </div>
     </dialog>
 
     <dialog id="upload-dialog">
