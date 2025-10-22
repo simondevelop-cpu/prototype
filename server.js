@@ -231,7 +231,7 @@ async function seedSampleTransactions(userId) {
     
     // Generate 12 months of realistic Canadian transactions (Nov 2024 - Oct 2025)
     const transactions = [];
-    const today = dayjs('2025-10-21'); // Current date
+    const today = dayjs('2025-10-22'); // Current date: Oct 22, 2025
     const startDate = today.subtract(11, 'month').startOf('month');
     
     // Monthly recurring transactions

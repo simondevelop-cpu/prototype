@@ -307,7 +307,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   <div>
                     <p className="text-sm text-gray-600">Total Income</p>
                     <p className="text-2xl font-bold text-green-600 mt-1">
-                      ${summary.reduce((sum, m) => sum + (m.income || 0), 0).toLocaleString()}
+                      ${Math.round(summary.reduce((sum, m) => sum + (m.income || 0), 0)).toLocaleString()}
                     </p>
                     <p className="text-xs text-gray-500 mt-2">Click to see breakdown</p>
                   </div>
@@ -327,7 +327,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   <div>
                     <p className="text-sm text-gray-600">Total Expenses</p>
                     <p className="text-2xl font-bold text-red-600 mt-1">
-                      ${summary.reduce((sum, m) => sum + (m.expense || 0), 0).toLocaleString()}
+                      ${Math.round(summary.reduce((sum, m) => sum + (m.expense || 0), 0)).toLocaleString()}
                     </p>
                     <p className="text-xs text-gray-500 mt-2">Click to see breakdown</p>
                   </div>
@@ -344,7 +344,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   <div>
                     <p className="text-sm text-gray-600">Net Cash Flow</p>
                     <p className="text-2xl font-bold text-blue-600 mt-1">
-                      ${summary.reduce((sum, m) => sum + (m.income || 0) - (m.expense || 0), 0).toLocaleString()}
+                      ${Math.round(summary.reduce((sum, m) => sum + (m.income || 0) - (m.expense || 0), 0)).toLocaleString()}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -386,7 +386,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                                 selectedCashflow === 'income' ? 'text-green-600' : 
                                 selectedCashflow === 'expense' ? 'text-red-600' : 'text-blue-600'
                               }`}>
-                                {selectedCashflow === 'income' ? '+' : selectedCashflow === 'expense' ? '-' : ''}${cat.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {selectedCashflow === 'income' ? '+' : selectedCashflow === 'expense' ? '-' : ''}${Math.round(cat.total).toLocaleString()}
                                 <span className="text-xs text-gray-500 ml-1">({percentage}%)</span>
                               </span>
                             </div>

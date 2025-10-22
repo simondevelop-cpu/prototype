@@ -14,6 +14,7 @@ export default function TransactionsList({ transactions, loading }: Transactions
   const [selectedAccount, setSelectedAccount] = useState('All accounts');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
 
   if (loading) {
     return (
@@ -46,6 +47,30 @@ export default function TransactionsList({ transactions, loading }: Transactions
   // Get unique categories and accounts
   const categories = ['All categories', ...Array.from(new Set(transactions.map(tx => tx.category).filter(Boolean)))];
   const accounts = ['All accounts', ...Array.from(new Set(transactions.map(tx => tx.account).filter(Boolean)))];
+
+  // Selection handlers
+  const handleSelectAll = () => {
+    if (selectedTransactions.size === filteredTransactions.length) {
+      setSelectedTransactions(new Set());
+    } else {
+      setSelectedTransactions(new Set(filteredTransactions.map((_, idx) => idx)));
+    }
+  };
+
+  const handleSelectTransaction = (idx: number) => {
+    const newSelected = new Set(selectedTransactions);
+    if (newSelected.has(idx)) {
+      newSelected.delete(idx);
+    } else {
+      newSelected.add(idx);
+    }
+    setSelectedTransactions(newSelected);
+  };
+
+  // Calculate selected totals
+  const selectedTotal = Array.from(selectedTransactions).reduce((sum, idx) => {
+    return sum + (filteredTransactions[idx]?.amount || 0);
+  }, 0);
 
   const getCashflowBadge = (cashflow: string) => {
     if (cashflow === 'income') {
@@ -173,15 +198,35 @@ export default function TransactionsList({ transactions, loading }: Transactions
       {/* Transactions Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">Recent Transactions</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            {filteredTransactions.length} {filteredTransactions.length === 1 ? 'transaction' : 'transactions'}
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Recent Transactions</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {filteredTransactions.length} {filteredTransactions.length === 1 ? 'transaction' : 'transactions'}
+              </p>
+            </div>
+            {selectedTransactions.size > 0 && (
+              <div className="text-sm text-gray-600">
+                <span className="font-semibold">{selectedTransactions.size}</span> selected
+                <span className="ml-2">
+                  (${Math.abs(selectedTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total)
+                </span>
+              </div>
+            )}
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={selectedTransactions.size === filteredTransactions.length && filteredTransactions.length > 0}
+                    onChange={handleSelectAll}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
@@ -207,7 +252,15 @@ export default function TransactionsList({ transactions, loading }: Transactions
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredTransactions.slice(0, 100).map((tx, idx) => (
-                <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                <tr key={idx} className={`transition-colors ${selectedTransactions.has(idx) ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                  <td className="px-4 py-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedTransactions.has(idx)}
+                      onChange={() => handleSelectTransaction(idx)}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                    />
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {dayjs(tx.date).format('MMM D, YYYY')}
                   </td>
