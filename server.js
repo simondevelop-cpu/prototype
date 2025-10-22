@@ -1449,10 +1449,10 @@ app.get('/api/summary', authenticate, async (req, res) => {
 });
 
 app.get('/api/budget', authenticate, async (req, res) => {
+  const userId = req.userId || DEFAULT_USER_ID;
   try {
     const period = req.query.period === 'quarterly' ? 'quarterly' : 'monthly';
     const months = period === 'quarterly' ? 3 : 1;
-    const userId = req.userId || DEFAULT_USER_ID;
     const { start, end } = await getLatestMonthRange(months, userId);
     const monthLabelsDisplay = [];
 
@@ -1533,7 +1533,6 @@ app.get('/api/budget', authenticate, async (req, res) => {
       });
     }
 
-    const userId = req.userId || DEFAULT_USER_ID;
     const expenseRow = await pool.query(
       `SELECT COALESCE(ABS(SUM(amount)), 0) AS spent
        FROM transactions
@@ -1615,6 +1614,7 @@ app.get('/api/budget', authenticate, async (req, res) => {
 });
 
 app.get('/api/savings', authenticate, async (req, res) => {
+  const userId = req.userId || DEFAULT_USER_ID;
   try {
     const rangeParam = req.query.range || 'last-month';
     const { start, end } = savingsRange(rangeParam);
@@ -1683,7 +1683,6 @@ app.get('/api/savings', authenticate, async (req, res) => {
       });
     }
 
-    const userId = req.userId || DEFAULT_USER_ID;
     const totalsResult = await pool.query(
       `SELECT
         SUM(CASE WHEN cashflow = 'income' THEN amount ELSE 0 END) AS income,
