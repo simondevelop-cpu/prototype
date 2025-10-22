@@ -5,12 +5,14 @@ import dayjs from 'dayjs';
 
 interface CashflowChartProps {
   data: any[];
+  onBarClick?: (month: string, cashflow: string) => void;
 }
 
-export default function CashflowChart({ data }: CashflowChartProps) {
+export default function CashflowChart({ data, onBarClick }: CashflowChartProps) {
   // Transform data for Recharts
   const chartData = data.map((month) => ({
     month: dayjs(month.month).format('MMM'),
+    monthKey: dayjs(month.month).format('YYYY-MM'),
     fullMonth: dayjs(month.month).format('MMMM YYYY'),
     income: month.income || 0,
     expense: Math.abs(month.expense || 0), // Make positive for display
@@ -103,18 +105,24 @@ export default function CashflowChart({ data }: CashflowChartProps) {
             fill="url(#incomeGradient)" 
             radius={[8, 8, 0, 0]}
             name="Income"
+            onClick={(data) => onBarClick?.(data.monthKey, 'income')}
+            cursor="pointer"
           />
           <Bar 
             dataKey="expense" 
             fill="url(#expenseGradient)" 
             radius={[8, 8, 0, 0]}
             name="Expenses"
+            onClick={(data) => onBarClick?.(data.monthKey, 'expense')}
+            cursor="pointer"
           />
           <Bar 
             dataKey="other" 
             fill="url(#otherGradient)" 
             radius={[8, 8, 0, 0]}
             name="Other"
+            onClick={(data) => onBarClick?.(data.monthKey, 'other')}
+            cursor="pointer"
           />
         </BarChart>
       </ResponsiveContainer>

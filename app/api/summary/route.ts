@@ -23,23 +23,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Get months parameter
+    // Get date range parameters
     const url = new URL(request.url);
+    const startParam = url.searchParams.get('start');
+    const endParam = url.searchParams.get('end');
     const months = parseInt(url.searchParams.get('months') || '6');
 
-    // Calculate date range based on latest transaction
-    const latestResult = await pool.query(
-      'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
-      [userId]
-    );
-
     let endDate, startDate;
-    if (latestResult.rows[0]?.latest) {
-      endDate = dayjs(latestResult.rows[0].latest).endOf('month');
-      startDate = endDate.subtract(months - 1, 'month').startOf('month');
+    
+    if (startParam && endParam) {
+      // Use custom date range
+      startDate = dayjs(startParam).startOf('month');
+      endDate = dayjs(endParam).endOf('month');
     } else {
-      endDate = dayjs().endOf('month');
-      startDate = endDate.subtract(months - 1, 'month').startOf('month');
+      // Calculate date range based on latest transaction
+      const latestResult = await pool.query(
+        'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
+        [userId]
+      );
+
+      if (latestResult.rows[0]?.latest) {
+        endDate = dayjs(latestResult.rows[0].latest).endOf('month');
+        startDate = endDate.subtract(months - 1, 'month').startOf('month');
+      } else {
+        endDate = dayjs().endOf('month');
+        startDate = endDate.subtract(months - 1, 'month').startOf('month');
+      }
     }
 
     // Query transactions

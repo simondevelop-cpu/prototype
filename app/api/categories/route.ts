@@ -23,9 +23,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Get month parameter (default to current month)
+    // Get month and cashflow parameters
     const url = new URL(request.url);
     const monthParam = url.searchParams.get('month');
+    const cashflowParam = url.searchParams.get('cashflow') || 'expense';
     
     let startDate, endDate;
     if (monthParam) {
@@ -53,13 +54,13 @@ export async function GET(request: NextRequest) {
         SUM(ABS(amount)) as total
        FROM transactions
        WHERE user_id = $1
-         AND cashflow = 'expense'
-         AND date >= $2
-         AND date <= $3
+         AND cashflow = $2
+         AND date >= $3
+         AND date <= $4
          AND category IS NOT NULL
        GROUP BY category
        ORDER BY total DESC`,
-      [userId, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')]
+      [userId, cashflowParam, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')]
     );
 
     const categories = result.rows.map(row => ({
