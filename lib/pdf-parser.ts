@@ -101,27 +101,35 @@ export async function parseBankStatement(
   // Parse transactions based on bank
   let transactions: Transaction[] = [];
   
+  // Normalize TD text format (add line breaks)
+  let processedText = text;
+  if (bank === 'TD' && accountType.toLowerCase().includes('credit')) {
+    console.log('[PDF Parser] Normalizing TD credit card text format...');
+    processedText = normalizeTDText(text);
+    console.log('[PDF Parser] After normalization, first 500 chars:', processedText.substring(0, 500));
+  }
+  
   switch (bank) {
     case 'RBC':
-      transactions = parseRBCTransactions(text, accountType);
+      transactions = parseRBCTransactions(processedText, accountType);
       break;
     case 'TD':
-      transactions = parseTDTransactions(text, accountType);
+      transactions = parseTDTransactions(processedText, accountType);
       break;
     case 'Scotiabank':
-      transactions = parseScotiabankTransactions(text, accountType);
+      transactions = parseScotiabankTransactions(processedText, accountType);
       break;
     case 'BMO':
-      transactions = parseBMOTransactions(text, accountType);
+      transactions = parseBMOTransactions(processedText, accountType);
       break;
     case 'CIBC':
-      transactions = parseCIBCTransactions(text, accountType);
+      transactions = parseCIBCTransactions(processedText, accountType);
       break;
     case 'Tangerine':
-      transactions = parseTangerineTransactions(text, accountType);
+      transactions = parseTangerineTransactions(processedText, accountType);
       break;
     default:
-      transactions = parseGenericTransactions(text, accountType);
+      transactions = parseGenericTransactions(processedText, accountType);
   }
 
   console.log(`[PDF Parser] Parsed ${transactions.length} transactions`);
@@ -149,6 +157,21 @@ async function extractPDFText(buffer: Buffer): Promise<string> {
     console.error('[PDF Parser] Text extraction failed:', error);
     throw new Error('Failed to extract text from PDF. Make sure pdf-parse is installed.');
   }
+}
+
+/**
+ * Normalize TD credit card text - add line breaks and spaces between transactions
+ * TD credit cards often have compact format: AUG12AUG13$18.39MERCHANTNAME
+ */
+function normalizeTDText(text: string): string {
+  // Pattern: Date + Date + $Amount + Description
+  // Insert line break before each transaction date pattern
+  const dateAmountPattern = /([A-Z]{3}\d{1,2})([A-Z]{3}\d{1,2})\$(\d+\.\d{2})/g;
+  
+  // Add newline before each transaction (before first date) and spaces between fields
+  let normalized = text.replace(dateAmountPattern, '\n$1 $2 $$$3 ');
+  
+  return normalized;
 }
 
 /**
