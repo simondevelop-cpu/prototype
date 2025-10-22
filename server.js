@@ -714,12 +714,6 @@ app.get('/api/transactions', authenticate, async (req, res) => {
 
 app.get('/api/summary', authenticate, async (req, res) => {
   try {
-    // Check and refresh demo data if needed (for demo user only)
-    const userEmail = await pool.query('SELECT email FROM users WHERE id = $1', [req.userId]);
-    if (userEmail.rows[0]?.email === DEMO_EMAIL.toLowerCase()) {
-      await seedSampleTransactions(req.userId);
-    }
-    
     const window = req.query.window || '3m';
     const monthCount = Number.parseInt(window, 10) || 3;
     const userId = req.userId;
