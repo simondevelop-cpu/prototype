@@ -15,6 +15,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [timeframe, setTimeframe] = useState('6m');
   const [summary, setSummary] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,6 +38,13 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
       });
       const txData = await txRes.json();
       setTransactions(txData.transactions || []);
+
+      // Fetch categories
+      const catRes = await fetch(`/api/categories`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const catData = await catRes.json();
+      setCategories(catData.categories || []);
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -194,6 +202,37 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Category Breakdown */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mt-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-6">Expense Breakdown</h2>
+              {loading ? (
+                <div className="text-center text-gray-500 py-8">Loading categories...</div>
+              ) : categories.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">No expense data available</div>
+              ) : (
+                <div className="space-y-4">
+                  {categories.slice(0, 10).map((cat, idx) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium text-gray-900 capitalize">{cat.category}</span>
+                          <span className="text-sm font-bold text-red-600">-${cat.total.toFixed(2)}</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-red-500 h-2 rounded-full transition-all duration-300"
+                            style={{ 
+                              width: `${(cat.total / categories[0].total) * 100}%`
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

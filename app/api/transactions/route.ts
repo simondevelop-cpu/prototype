@@ -49,7 +49,11 @@ export async function GET(request: NextRequest) {
         date,
         description,
         merchant,
+        cashflow,
+        account,
         category,
+        subcategory,
+        label,
         amount
        FROM transactions
        WHERE user_id = $1
@@ -65,7 +69,11 @@ export async function GET(request: NextRequest) {
       date: row.date,
       description: row.description,
       merchant: row.merchant,
+      cashflow: row.cashflow,
+      account: row.account,
       category: row.category,
+      subcategory: row.subcategory,
+      label: row.label,
       amount: parseFloat(row.amount),
     }));
 
