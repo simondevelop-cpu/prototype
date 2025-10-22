@@ -212,7 +212,8 @@ function parseTDCreditCardTransactions(text: string): Transaction[] {
       .replace(/\r?\n/g, ' ') // replace newlines with spaces
       .replace(/\s{2,}/g, ' ') // collapse multiple spaces
       .replace(/[^\w\s\-&'\.]/g, '') // remove special chars except common ones
-      .trim();
+      .trim()
+      .substring(0, 200); // Truncate to 200 chars to avoid database index errors
     
     if (cleanMerchant.length >= 3) {
       transactions.push(createTransaction(date, cleanMerchant, amount, 'Credit Card'));
