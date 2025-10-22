@@ -3,6 +3,9 @@ import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import dayjs from 'dayjs';
 
+// Force dynamic rendering (required for auth headers)
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     // Verify auth

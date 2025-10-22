@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { hashPassword, createToken } from '@/lib/auth';
 
+// Force dynamic rendering (POST endpoint requires runtime request body)
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
