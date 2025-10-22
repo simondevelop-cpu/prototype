@@ -55,14 +55,17 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
   const handleUpload = async () => {
     if (files.length === 0) return;
     
+    console.log('[Upload] Starting upload of', files.length, 'files');
     setUploading(true);
     const formData = new FormData();
     
     files.forEach(file => {
+      console.log('[Upload] Adding file:', file.name, file.type, file.size, 'bytes');
       formData.append('statements', file);
     });
 
     try {
+      console.log('[Upload] Sending request to /api/statements/upload');
       const response = await fetch('/api/statements/upload', {
         method: 'POST',
         headers: {
@@ -71,7 +74,9 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
         body: formData,
       });
 
+      console.log('[Upload] Response status:', response.status);
       const result = await response.json();
+      console.log('[Upload] Response data:', result);
       
       if (response.ok) {
         setUploadProgress(result.summary || {});
@@ -80,9 +85,11 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
           handleClose();
         }, 3000);
       } else {
+        console.error('[Upload] Upload failed:', result);
         alert(`Upload failed: ${result.error || 'Unknown error'}`);
       }
     } catch (error: any) {
+      console.error('[Upload] Upload error:', error);
       alert(`Upload error: ${error.message}`);
     } finally {
       setUploading(false);
