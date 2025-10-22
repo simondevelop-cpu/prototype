@@ -208,18 +208,21 @@ async function seedSampleTransactions(userId) {
     
     if (parseInt(existing.rows[0].count) > 0) {
       console.log('[DB] Demo transactions already exist, checking if refresh needed...');
-      // Check if data is old (more than 30 days)
+      // Check if data is old (compare to expected end date: Oct 2025)
       const oldestDate = await pool.query(
         'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
         [userId]
       );
       if (oldestDate.rows[0]?.latest) {
-        const daysSinceLatest = dayjs().diff(dayjs(oldestDate.rows[0].latest), 'day');
-        if (daysSinceLatest > 30) {
-          console.log('[DB] Data is outdated, refreshing with current dates...');
+        const latestDate = dayjs(oldestDate.rows[0].latest);
+        const expectedLatest = dayjs('2025-10-22'); // Should end at Oct 22, 2025
+        
+        // If latest transaction is before Oct 2025, refresh data
+        if (latestDate.isBefore('2025-10-01')) {
+          console.log('[DB] Data is outdated (latest:', latestDate.format('YYYY-MM-DD'), '), refreshing to Oct 2025...');
           await pool.query('DELETE FROM transactions WHERE user_id = $1', [userId]);
         } else {
-          console.log('[DB] Data is current, skipping reseed');
+          console.log('[DB] Data is current (latest:', latestDate.format('YYYY-MM-DD'), '), skipping reseed');
           return;
         }
       } else {

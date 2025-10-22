@@ -222,7 +222,11 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                 {['3m', '6m', '12m'].map((tf) => (
                   <button
                     key={tf}
-                    onClick={() => setTimeframe(tf)}
+                    onClick={() => {
+                      setTimeframe(tf);
+                      setSelectedMonth(null);
+                      setSelectedCashflow(null);
+                    }}
                     className={`px-4 py-2 text-sm font-medium transition-colors ${
                       timeframe === tf
                         ? 'bg-blue-600 text-white'

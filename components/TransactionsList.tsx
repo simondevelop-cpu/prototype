@@ -251,7 +251,7 @@ export default function TransactionsList({ transactions, loading }: Transactions
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredTransactions.slice(0, 100).map((tx, idx) => (
+              {filteredTransactions.map((tx, idx) => (
                 <tr key={idx} className={`transition-colors ${selectedTransactions.has(idx) ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
                   <td className="px-4 py-4">
                     <input
