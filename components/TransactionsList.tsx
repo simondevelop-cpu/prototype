@@ -209,6 +209,36 @@ export default function TransactionsList({ transactions, loading, token, onRefre
     }
   };
 
+  const handleBulkDelete = async () => {
+    try {
+      const selectedIds = getSelectedIds();
+      if (selectedIds.length === 0) {
+        throw new Error('No transactions selected');
+      }
+
+      // Delete each transaction
+      for (const id of selectedIds) {
+        const response = await fetch(`/api/transactions/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to delete transaction');
+        }
+      }
+
+      setSelectedTransactionIds(new Set()); // Clear selection
+      onRefresh(); // Refresh the list
+    } catch (error: any) {
+      console.error('Bulk delete error:', error);
+      throw error;
+    }
+  };
+
   const getCashflowBadge = (cashflow: string) => {
     if (cashflow === 'income') {
       return (
@@ -251,12 +281,23 @@ export default function TransactionsList({ transactions, loading, token, onRefre
         </div>
         <p className="text-gray-600">No transactions found</p>
         <p className="text-sm text-gray-500 mt-1">Start adding transactions to see them here</p>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-        >
-          Add Transaction
-        </button>
+        <div className="mt-4 flex gap-3 justify-center">
+          <button
+            onClick={() => setIsUploadModalOpen(true)}
+            className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Upload Statements
+          </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          >
+            Add Transaction
+          </button>
+        </div>
       </div>
     </div>
   ) : null;
@@ -544,6 +585,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
         isOpen={isBulkModalOpen}
         onClose={() => setIsBulkModalOpen(false)}
         onApply={handleBulkUpdate}
+        onDelete={handleBulkDelete}
         selectedCount={selectedTransactionIds.size}
         categories={categories.filter(c => c !== 'All categories')}
         accounts={accounts.filter(a => a !== 'All accounts')}

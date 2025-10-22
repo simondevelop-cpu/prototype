@@ -6,6 +6,7 @@ interface BulkRecategorizeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onApply: (updates: any) => Promise<void>;
+  onDelete?: () => Promise<void>;
   selectedCount: number;
   categories: string[];
   accounts: string[];
@@ -15,6 +16,7 @@ export default function BulkRecategorizeModal({
   isOpen,
   onClose,
   onApply,
+  onDelete,
   selectedCount,
   categories,
   accounts,
@@ -26,6 +28,7 @@ export default function BulkRecategorizeModal({
     label: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -60,6 +63,28 @@ export default function BulkRecategorizeModal({
       setError(err.message || 'Failed to update transactions');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    
+    const confirmed = confirm(
+      `Are you sure you want to delete ${selectedCount} ${selectedCount === 1 ? 'transaction' : 'transactions'}? This cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+    
+    setError('');
+    setIsDeleting(true);
+
+    try {
+      await onDelete();
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete transactions');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -178,14 +203,29 @@ export default function BulkRecategorizeModal({
               type="button"
               onClick={onClose}
               className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isDeleting}
             >
               Cancel
             </button>
+            
+            {onDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                disabled={isSubmitting || isDeleting}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            )}
+            
             <button
               type="submit"
               className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isDeleting}
             >
               {isSubmitting ? 'Updating...' : 'Apply Changes'}
             </button>
