@@ -295,7 +295,8 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
   const lines = text.split('\n');
 
   // More flexible date patterns for Canadian banks
-  const datePattern = /(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\w{3}\s+\d{1,2}(?:,?\s*\d{4})?|\d{4}-\d{2}-\d{2})/;
+  // Matches: MM/DD, MM/DD/YY, MM/DD/YYYY, AUG 12, AUG 12 2025, YYYY-MM-DD, etc.
+  const datePattern = /\b([A-Z]{3}\s+\d{1,2}(?:,?\s*\d{4})?|\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\d{4}-\d{2}-\d{2})\b/;
   const amountPattern = /\$\s*([\d,]+\.\d{2})/g;
 
   for (let i = 0; i < lines.length; i++) {
@@ -364,23 +365,35 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
  * Flexible date parser - handles multiple formats
  */
 function parseDateFlexible(dateStr: string): string | null {
+  // Clean up the date string
+  const cleanDate = dateStr.trim().toUpperCase();
+  
   // Try various date formats
   const formats = [
-    'MM/DD/YYYY',
-    'DD/MM/YYYY',
-    'YYYY-MM-DD',
-    'MMM D',
-    'MMM DD',
-    'M/D/YY',
-    'D/M/YY',
+    'MMM DD, YYYY',  // Aug 12, 2025
+    'MMM DD',        // Aug 12 (no year)
+    'MMM D',         // Aug 1 (no year)
+    'MM/DD/YYYY',    // 08/12/2025
+    'MM/DD/YY',      // 08/12/25
+    'MM/DD',         // 08/12 (no year)
+    'DD/MM/YYYY',    // 12/08/2025
+    'YYYY-MM-DD',    // 2025-08-12
+    'M/D/YY',        // 8/1/25
+    'M/D',           // 8/1 (no year)
   ];
 
   for (const format of formats) {
-    const parsed = dayjs(dateStr, format);
+    const parsed = dayjs(cleanDate, format, true); // strict parsing
     if (parsed.isValid()) {
-      // If year is missing, assume current year
-      if (!dateStr.match(/\d{4}/)) {
-        return parsed.year(dayjs().year()).format('YYYY-MM-DD');
+      // If year is missing, assume current year or previous year if month is in future
+      if (!cleanDate.match(/\d{4}/)) {
+        const currentYear = dayjs().year();
+        const currentMonth = dayjs().month();
+        const parsedMonth = parsed.month();
+        
+        // If parsed month is greater than current month, it's probably from last year
+        const year = parsedMonth > currentMonth + 2 ? currentYear - 1 : currentYear;
+        return parsed.year(year).format('YYYY-MM-DD');
       }
       return parsed.format('YYYY-MM-DD');
     }
