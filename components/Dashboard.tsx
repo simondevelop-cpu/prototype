@@ -23,6 +23,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [selectedCashflow, setSelectedCashflow] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [transactionsLoading, setTransactionsLoading] = useState(true);
+  const [hasLoadedTransactions, setHasLoadedTransactions] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -36,10 +37,16 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
 
   // Fetch all transactions when switching to transactions tab
   useEffect(() => {
-    if (activeTab === 'transactions' && allTransactions.length === 0) {
+    if (activeTab === 'transactions' && !hasLoadedTransactions) {
       fetchAllTransactions();
     }
   }, [activeTab, token]);
+
+  // Reset loaded state when token changes (user logs in/out)
+  useEffect(() => {
+    setHasLoadedTransactions(false);
+    setAllTransactions([]);
+  }, [token]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -85,8 +92,10 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
       });
       const txData = await txRes.json();
       setAllTransactions(txData.transactions || []);
+      setHasLoadedTransactions(true); // Mark as loaded
     } catch (err) {
       console.error('Error fetching all transactions:', err);
+      setHasLoadedTransactions(true); // Still mark as attempted even on error
     } finally {
       setTransactionsLoading(false);
     }
