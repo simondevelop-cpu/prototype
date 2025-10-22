@@ -46,24 +46,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Query transactions grouped by subcategory
+    // Query transactions grouped by category
     const result = await pool.query(
       `SELECT 
-        subcategory,
+        category,
         SUM(ABS(amount)) as total
        FROM transactions
        WHERE user_id = $1
-         AND category = 'expense'
+         AND cashflow = 'expense'
          AND date >= $2
          AND date <= $3
-         AND subcategory IS NOT NULL
-       GROUP BY subcategory
+         AND category IS NOT NULL
+       GROUP BY category
        ORDER BY total DESC`,
       [userId, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')]
     );
 
     const categories = result.rows.map(row => ({
-      category: row.subcategory,
+      category: row.category,
       total: parseFloat(row.total),
     }));
 

@@ -52,7 +52,6 @@ export async function GET(request: NextRequest) {
         cashflow,
         account,
         category,
-        subcategory,
         label,
         amount
        FROM transactions
@@ -72,7 +71,6 @@ export async function GET(request: NextRequest) {
       cashflow: row.cashflow,
       account: row.account,
       category: row.category,
-      subcategory: row.subcategory,
       label: row.label,
       amount: parseFloat(row.amount),
     }));

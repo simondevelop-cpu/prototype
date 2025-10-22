@@ -46,13 +46,13 @@ export async function GET(request: NextRequest) {
     const result = await pool.query(
       `SELECT 
         DATE_TRUNC('month', date) as month,
-        category,
+        cashflow,
         SUM(amount) as total
        FROM transactions
        WHERE user_id = $1
          AND date >= $2
          AND date <= $3
-       GROUP BY DATE_TRUNC('month', date), category
+       GROUP BY DATE_TRUNC('month', date), cashflow
        ORDER BY month`,
       [userId, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')]
     );
@@ -70,12 +70,12 @@ export async function GET(request: NextRequest) {
         });
       }
       const monthData = monthMap.get(monthKey);
-      if (row.category === 'income') {
+      if (row.cashflow === 'income') {
         monthData.income += parseFloat(row.total);
-      } else if (row.category === 'expense') {
+      } else if (row.cashflow === 'expense') {
         monthData.expense += Math.abs(parseFloat(row.total));
       } else {
-        monthData.other += parseFloat(row.total);
+        monthData.other += Math.abs(parseFloat(row.total));
       }
     }
 
