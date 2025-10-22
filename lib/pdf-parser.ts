@@ -410,6 +410,10 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
       
       description = line.substring(descStart, firstAmountIdx).trim();
       
+      if (parsedCount < 5) {
+        console.log(`[PDF Parser] Extracted description from line[${descStart}:${firstAmountIdx}]: "${description}"`);
+      }
+      
       // For credit cards, all transactions are expenses
       amount = amounts[amounts.length - 1];
       if (accountType.toLowerCase().includes('credit')) {
@@ -417,13 +421,17 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
       }
     }
     
-    // Clean up description - remove transaction IDs and extra whitespace
+    // Clean up description - remove transaction IDs, dates, and extra whitespace
     const cleanDescription = description
       .replace(/^\d{8,}\s*/, '') // Remove 8+ digit transaction IDs
+      .replace(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{1,2}\s*/i, '') // Remove any remaining date at start
       .replace(/\s{2,}/g, ' ') // Collapse multiple spaces
       .trim();
 
     if (!cleanDescription || cleanDescription.length < 3) {
+      if (parsedCount < 5) {
+        console.log(`[PDF Parser] Skipping - description too short after cleaning: "${cleanDescription}" (was: "${description}")`);
+      }
       skippedCount++;
       continue;
     }
