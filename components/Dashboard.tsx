@@ -439,7 +439,10 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                 </div>
               </button>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 group relative">
+              <button
+                onClick={() => handleStatCardClick('other')}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all hover:border-blue-300 cursor-pointer text-left group relative"
+              >
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600 flex items-center gap-1">
@@ -453,7 +456,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                     <p className="text-2xl font-bold text-blue-600 mt-1">
                       ${Math.round(summary.reduce((sum, m) => sum + (m.other || 0), 0)).toLocaleString()}
                     </p>
-                    <p className="text-xs text-gray-500 mt-2">Transfers & payments</p>
+                    <p className="text-xs text-gray-500 mt-2">Click to see breakdown</p>
                   </div>
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                     <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -462,11 +465,11 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   </div>
                 </div>
                 {/* Tooltip on hover */}
-                <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 pointer-events-none">
                   <p className="font-semibold mb-1">What is "Other"?</p>
                   <p>Transfers between your accounts, credit card payments, and internal movements that don't affect your net income or expenses.</p>
                 </div>
-              </div>
+              </button>
             </div>
 
             {/* Category Breakdown */}
