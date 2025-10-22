@@ -168,20 +168,20 @@ app.get('/api/auth/me', authenticate, (req, res) => {
   res.json({ user: req.user });
 });
 
-// Database initialization endpoint - one-time setup for Vercel
+// Database initialization endpoint - manual trigger for Vercel
 app.post('/api/init-database', async (req, res) => {
   if (disableDb) {
     return res.status(400).json({ error: 'Database is disabled' });
   }
 
   try {
-    console.log('[INIT] Starting database initialization...');
+    console.log('[INIT] Manual database initialization requested...');
     
-    await ensureSchema();
-    console.log('[INIT] Schema created');
+    // Reset and reinitialize
+    dbInitialized = false;
+    dbInitPromise = null;
     
-    await seedSampleData();
-    console.log('[INIT] Sample data seeded');
+    await ensureDatabaseReady();
     
     res.json({ 
       success: true, 
@@ -698,55 +698,90 @@ async function seedSampleData() {
   }
 }
 
-// Database initialization - skip in Vercel serverless to avoid cold start issues
+// Database initialization with lazy loading for Vercel serverless
 const IS_VERCEL = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
-// Force disable DB in Vercel unless DATABASE_URL is explicitly set
-const DISABLE_DB_INIT = (IS_VERCEL && !process.env.DATABASE_URL) || disableDb;
 
-const readiness = DISABLE_DB_INIT
+let dbInitialized = false;
+let dbInitPromise = null;
+
+async function ensureDatabaseReady() {
+  if (disableDb) {
+    return;
+  }
+  
+  // Return existing promise if initialization is in progress
+  if (dbInitPromise) {
+    return dbInitPromise;
+  }
+  
+  // Already initialized
+  if (dbInitialized) {
+    return;
+  }
+  
+  // Start initialization
+  dbInitPromise = (async () => {
+    try {
+      console.log('[DB] Initializing database schema and data...');
+      await ensureSchema();
+      await seedSampleData();
+      dbInitialized = true;
+      console.log('[DB] Database initialization complete');
+    } catch (error) {
+      console.error('[DB] Database initialization failed:', error.message);
+      // Reset so it can be retried
+      dbInitPromise = null;
+      throw error;
+    }
+  })();
+  
+  return dbInitPromise;
+}
+
+// For local development, initialize immediately
+const readiness = IS_VERCEL || disableDb
   ? Promise.resolve()
-  : (async () => {
-      try {
-        await ensureSchema();
-        await seedSampleData();
-      } catch (error) {
-        console.error('Database initialisation failed', error);
-        // Don't throw in serverless - just log and continue
-        if (IS_VERCEL) {
-          console.warn('Skipping database init in Vercel serverless');
-          return;
-        }
-        throw error;
-      }
-    })();
+  : ensureDatabaseReady();
 
 // Readiness middleware - ensure database is initialized
-// Skip for auth endpoints and in Vercel serverless
 app.use(async (req, res, next) => {
   const path = req.path;
   const url = req.url;
   
-  // Always skip in Vercel serverless environment
-  if (IS_VERCEL) {
-    return next();
-  }
-  
-  // Skip readiness check for auth endpoints
+  // Skip for health and auth endpoints
   if (path === '/health' || 
       path.startsWith('/auth/') || 
       path === '/api/health' || 
       path.startsWith('/api/auth/') ||
+      path === '/api/init-database' ||
       url.startsWith('/api/auth/') ||
       url.startsWith('/auth/')) {
     return next();
   }
   
-  try {
-    await readiness;
-    next();
-  } catch (error) {
-    next(error);
+  // For local dev, wait for readiness
+  if (!IS_VERCEL) {
+    try {
+      await readiness;
+    } catch (error) {
+      return next(error);
+    }
   }
+  
+  // For Vercel AND database endpoints, ensure DB is ready (lazy init)
+  if (!disableDb && (path.startsWith('/api/') || url.startsWith('/api/'))) {
+    try {
+      await ensureDatabaseReady();
+    } catch (error) {
+      console.error('[DB] Failed to initialize database:', error);
+      return res.status(500).json({ 
+        error: 'Database initialization failed',
+        details: IS_VERCEL ? error.message : undefined
+      });
+    }
+  }
+  
+  next();
 });
 
 function resolveUserId(req) {
