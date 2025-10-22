@@ -588,7 +588,7 @@ function createTransaction(
   // Determine cashflow type
   // First check if it's a transfer/payment (categorize as 'other' regardless of amount)
   const descLower = cleanDescription.toLowerCase();
-  const isTransfer = /transfer|preauthori[sz]ed payment|payment.*thank you|credit card payment|interac e-transfer|e-transfer|bill payment|auto payment|withdrawal to|deposit from/i.test(descLower);
+  const isTransfer = /transfer|preauthori[sz]ed\s*payment|payment.*thank you|credit card payment|interac e-?transfer|e-?transfer|bill payment|auto payment|withdrawal to|deposit from/i.test(descLower);
   
   let cashflow: 'income' | 'expense' | 'other' = 'expense';
   if (isTransfer) {
