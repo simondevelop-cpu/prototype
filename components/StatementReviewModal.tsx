@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
 
 interface Transaction {
@@ -54,8 +54,6 @@ export default function StatementReviewModal({
   
   // Editing state
   const [editingTransaction, setEditingTransaction] = useState<{ key: string; tx: Transaction } | null>(null);
-
-  if (!isOpen || parsedStatements.length === 0) return null;
 
   // Generate unique key for transaction
   const getTxKey = (tx: Transaction) => `${tx.date}_${tx.merchant}_${tx.amount}`;
@@ -157,11 +155,19 @@ export default function StatementReviewModal({
   };
 
   // Initialize excluded transactions (all duplicates are excluded by default)
-  if (excludedTransactions.size === 0 && currentStep === 'duplicates') {
-    const duplicates = getAllTransactions('duplicates');
-    const initialExcluded = new Set(duplicates.map(d => d.key));
-    setExcludedTransactions(initialExcluded);
-  }
+  useEffect(() => {
+    if (isOpen && excludedTransactions.size === 0 && parsedStatements.length > 0) {
+      const duplicates: { key: string; tx: Transaction; statement: ParsedStatement }[] = [];
+      for (const statement of parsedStatements) {
+        for (const tx of statement.categorized.duplicates) {
+          const key = `${tx.date}_${tx.merchant}_${tx.amount}`;
+          duplicates.push({ key, tx, statement });
+        }
+      }
+      const initialExcluded = new Set(duplicates.map(d => d.key));
+      setExcludedTransactions(initialExcluded);
+    }
+  }, [isOpen, parsedStatements, excludedTransactions.size]);
 
   // Render transaction row
   const renderTransactionRow = (key: string, tx: Transaction, statement: ParsedStatement, isDuplicate: boolean = false) => {
@@ -385,6 +391,8 @@ export default function StatementReviewModal({
   const currentStepIndex = steps.indexOf(currentStep);
   const canGoNext = currentStepIndex < steps.length - 1;
   const canGoPrev = currentStepIndex > 0;
+
+  if (!isOpen || parsedStatements.length === 0) return null;
 
   return (
     <>

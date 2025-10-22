@@ -31,8 +31,6 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
   const [showReviewModal, setShowReviewModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (!isOpen) return null;
-
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -146,6 +144,8 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
+
+  if (!isOpen) return null;
 
   return (
     <>
