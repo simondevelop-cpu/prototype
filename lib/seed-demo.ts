@@ -7,7 +7,8 @@ export async function seedDemoTransactions(pool: any, userId: string) {
   
   const transactions = [];
   const today = dayjs('2025-10-22'); // Current date: Oct 22, 2025
-  const startDate = today.subtract(11, 'month').startOf('month');
+  // Start from Nov 2024, end at Oct 2025 (12 full months)
+  const startDate = dayjs('2024-11-01'); // November 2024
 
   // Monthly recurring transactions
   for (let month = 0; month < 12; month++) {
