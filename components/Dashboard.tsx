@@ -374,32 +374,37 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   <div className="text-center text-gray-500 py-8">No categories for this selection</div>
                 ) : (
                   <div className="space-y-4">
-                    {categories.slice(0, 10).map((cat, idx) => (
-                      <div key={idx} className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-medium text-gray-900 capitalize">{cat.category}</span>
-                            <span className={`text-sm font-bold ${
-                              selectedCashflow === 'income' ? 'text-green-600' : 
-                              selectedCashflow === 'expense' ? 'text-red-600' : 'text-blue-600'
-                            }`}>
-                              {selectedCashflow === 'income' ? '+' : selectedCashflow === 'expense' ? '-' : ''}${cat.total.toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className={`h-2 rounded-full transition-all duration-300 ${
-                                selectedCashflow === 'income' ? 'bg-green-500' : 
-                                selectedCashflow === 'expense' ? 'bg-red-500' : 'bg-blue-500'
-                              }`}
-                              style={{ 
-                                width: `${(cat.total / categories[0].total) * 100}%`
-                              }}
-                            />
+                    {categories.slice(0, 10).map((cat, idx) => {
+                      const totalAmount = categories.reduce((sum, c) => sum + c.total, 0);
+                      const percentage = ((cat.total / totalAmount) * 100).toFixed(1);
+                      return (
+                        <div key={idx} className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium text-gray-900 capitalize">{cat.category}</span>
+                              <span className={`text-sm font-bold ${
+                                selectedCashflow === 'income' ? 'text-green-600' : 
+                                selectedCashflow === 'expense' ? 'text-red-600' : 'text-blue-600'
+                              }`}>
+                                {selectedCashflow === 'income' ? '+' : selectedCashflow === 'expense' ? '-' : ''}${cat.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                <span className="text-xs text-gray-500 ml-1">({percentage}%)</span>
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className={`h-2 rounded-full transition-all duration-300 ${
+                                  selectedCashflow === 'income' ? 'bg-green-500' : 
+                                  selectedCashflow === 'expense' ? 'bg-red-500' : 'bg-blue-500'
+                                }`}
+                                style={{ 
+                                  width: `${percentage}%`
+                                }}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

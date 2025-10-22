@@ -12,6 +12,8 @@ export default function TransactionsList({ transactions, loading }: Transactions
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All categories');
   const [selectedAccount, setSelectedAccount] = useState('All accounts');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   if (loading) {
     return (
@@ -23,15 +25,22 @@ export default function TransactionsList({ transactions, loading }: Transactions
 
   // Filter transactions
   const filteredTransactions = transactions.filter(tx => {
+    // Universal search: searches across description, merchant, category, label, amount
     const matchesSearch = searchTerm === '' || 
       tx.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.merchant?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tx.category?.toLowerCase().includes(searchTerm.toLowerCase());
+      tx.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tx.label?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tx.amount?.toString().includes(searchTerm) ||
+      Math.abs(tx.amount)?.toFixed(2).includes(searchTerm);
     
     const matchesCategory = selectedCategory === 'All categories' || tx.category === selectedCategory;
     const matchesAccount = selectedAccount === 'All accounts' || tx.account === selectedAccount;
     
-    return matchesSearch && matchesCategory && matchesAccount;
+    // Date range filter
+    const matchesDateRange = (!startDate || tx.date >= startDate) && (!endDate || tx.date <= endDate);
+    
+    return matchesSearch && matchesCategory && matchesAccount && matchesDateRange;
   });
 
   // Get unique categories and accounts
@@ -89,14 +98,32 @@ export default function TransactionsList({ transactions, loading }: Transactions
     <div className="space-y-6">
       {/* Filters */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="lg:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Search Everything</label>
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search merchant, category..."
+              placeholder="Description, amount, category, label..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -112,6 +139,8 @@ export default function TransactionsList({ transactions, loading }: Transactions
               ))}
             </select>
           </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Account</label>
             <select
@@ -123,6 +152,20 @@ export default function TransactionsList({ transactions, loading }: Transactions
                 <option key={acc} value={acc}>{acc}</option>
               ))}
             </select>
+          </div>
+          <div className="md:col-span-2 flex items-end">
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setStartDate('');
+                setEndDate('');
+                setSelectedCategory('All categories');
+                setSelectedAccount('All accounts');
+              }}
+              className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+            >
+              Clear All Filters
+            </button>
           </div>
         </div>
       </div>
