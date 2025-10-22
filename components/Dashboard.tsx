@@ -27,10 +27,10 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   }, [timeframe, token]);
 
   useEffect(() => {
-    if (selectedMonth && selectedCashflow) {
+    if (selectedCashflow) {
       fetchCategories();
     }
-  }, [selectedMonth, selectedCashflow]);
+  }, [selectedMonth, selectedCashflow, timeframe]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -70,8 +70,26 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const fetchCategories = async () => {
     try {
       let catUrl = `/api/categories`;
-      if (selectedMonth && selectedCashflow) {
-        catUrl = `/api/categories?month=${selectedMonth}&cashflow=${selectedCashflow}`;
+      const params = new URLSearchParams();
+      
+      if (selectedCashflow) {
+        params.append('cashflow', selectedCashflow);
+      }
+      
+      if (selectedMonth) {
+        // Single month
+        params.append('month', selectedMonth);
+      } else if (timeframe === 'custom' && customDateRange.start && customDateRange.end) {
+        // Custom date range
+        params.append('start', customDateRange.start);
+        params.append('end', customDateRange.end);
+      } else {
+        // Standard timeframe (3m, 6m, 12m)
+        params.append('months', getMonthCount(timeframe).toString());
+      }
+      
+      if (params.toString()) {
+        catUrl += `?${params.toString()}`;
       }
       
       const catRes = await fetch(catUrl, {
@@ -98,6 +116,12 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     setSelectedCashflow(cashflow);
   };
 
+  const handleStatCardClick = (cashflow: string) => {
+    // Clear month selection and show aggregated data for entire range
+    setSelectedMonth(null);
+    setSelectedCashflow(cashflow);
+  };
+
   const handleCustomDateApply = () => {
     if (customDateRange.start && customDateRange.end) {
       setTimeframe('custom');
@@ -108,10 +132,28 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
 
   // Filter transactions based on selected month and cashflow
   const filteredTransactionsForBreakdown = transactions.filter(tx => {
-    if (!selectedMonth || !selectedCashflow) return false;
-    const txMonth = tx.date.substring(0, 7); // YYYY-MM
-    return txMonth === selectedMonth && tx.cashflow === selectedCashflow;
+    if (!selectedCashflow) return false;
+    
+    // If month is selected, filter by specific month
+    if (selectedMonth) {
+      const txMonth = tx.date.substring(0, 7); // YYYY-MM
+      return txMonth === selectedMonth && tx.cashflow === selectedCashflow;
+    }
+    
+    // Otherwise, show all transactions in current range with selected cashflow
+    return tx.cashflow === selectedCashflow;
   });
+
+  // Calculate date range display
+  const getDateRangeDisplay = () => {
+    if (summary.length === 0) return '';
+    const dates = summary.map(s => s.month);
+    const earliest = dates[0];
+    const latest = dates[dates.length - 1];
+    const start = new Date(earliest).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    const end = new Date(latest).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    return `${start} - ${end}`;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -240,7 +282,12 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
 
             {/* Chart */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Cash Flow</h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">Cash Flow</h2>
+                {!loading && summary.length > 0 && (
+                  <span className="text-xs text-gray-500">{getDateRangeDisplay()}</span>
+                )}
+              </div>
               {loading ? (
                 <div className="h-96 flex items-center justify-center">
                   <div className="text-gray-500">Loading data...</div>
@@ -252,13 +299,17 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <button
+                onClick={() => handleStatCardClick('income')}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all hover:border-green-300 cursor-pointer text-left"
+              >
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Total Income</p>
                     <p className="text-2xl font-bold text-green-600 mt-1">
                       ${summary.reduce((sum, m) => sum + (m.income || 0), 0).toLocaleString()}
                     </p>
+                    <p className="text-xs text-gray-500 mt-2">Click to see breakdown</p>
                   </div>
                   <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                     <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -266,15 +317,19 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                     </svg>
                   </div>
                 </div>
-              </div>
+              </button>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <button
+                onClick={() => handleStatCardClick('expense')}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all hover:border-red-300 cursor-pointer text-left"
+              >
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Total Expenses</p>
                     <p className="text-2xl font-bold text-red-600 mt-1">
                       ${summary.reduce((sum, m) => sum + (m.expense || 0), 0).toLocaleString()}
                     </p>
+                    <p className="text-xs text-gray-500 mt-2">Click to see breakdown</p>
                   </div>
                   <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                     <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -282,15 +337,19 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                     </svg>
                   </div>
                 </div>
-              </div>
+              </button>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <button
+                onClick={() => handleStatCardClick('other')}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all hover:border-blue-300 cursor-pointer text-left"
+              >
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Net Cash Flow</p>
                     <p className="text-2xl font-bold text-blue-600 mt-1">
                       ${summary.reduce((sum, m) => sum + (m.income || 0) - (m.expense || 0), 0).toLocaleString()}
                     </p>
+                    <p className="text-xs text-gray-500 mt-2">Click to see transfers</p>
                   </div>
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                     <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -298,18 +357,21 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                     </svg>
                   </div>
                 </div>
-              </div>
+              </button>
             </div>
 
             {/* Category Breakdown */}
-            {selectedMonth && selectedCashflow && (
+            {selectedCashflow && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mt-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-bold text-gray-900">
                     {selectedCashflow.charAt(0).toUpperCase() + selectedCashflow.slice(1)} Breakdown
                   </h2>
                   <span className="text-sm text-gray-600">
-                    {new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    {selectedMonth 
+                      ? new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                      : getDateRangeDisplay()
+                    }
                   </span>
                 </div>
                 {categories.length === 0 ? (
@@ -348,13 +410,16 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
             )}
 
             {/* Filtered Transactions */}
-            {selectedMonth && selectedCashflow && filteredTransactionsForBreakdown.length > 0 && (
+            {selectedCashflow && filteredTransactionsForBreakdown.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mt-6">
                 <div className="p-6 border-b border-gray-200">
                   <h2 className="text-xl font-bold text-gray-900">Transactions</h2>
                   <p className="text-sm text-gray-600 mt-1">
-                    {filteredTransactionsForBreakdown.length} {filteredTransactionsForBreakdown.length === 1 ? 'transaction' : 'transactions'} in{' '}
-                    {new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    {filteredTransactionsForBreakdown.length} {filteredTransactionsForBreakdown.length === 1 ? 'transaction' : 'transactions'}
+                    {selectedMonth 
+                      ? ` in ${new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
+                      : ` (${getDateRangeDisplay()})`
+                    }
                   </p>
                 </div>
                 <div className="overflow-x-auto">

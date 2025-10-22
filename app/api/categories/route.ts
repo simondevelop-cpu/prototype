@@ -23,27 +23,36 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Get month and cashflow parameters
+    // Get date range and cashflow parameters
     const url = new URL(request.url);
     const monthParam = url.searchParams.get('month');
+    const startParam = url.searchParams.get('start');
+    const endParam = url.searchParams.get('end');
+    const monthsParam = parseInt(url.searchParams.get('months') || '6');
     const cashflowParam = url.searchParams.get('cashflow') || 'expense';
     
     let startDate, endDate;
+    
     if (monthParam) {
+      // Single month
       startDate = dayjs(monthParam).startOf('month');
       endDate = dayjs(monthParam).endOf('month');
+    } else if (startParam && endParam) {
+      // Custom date range
+      startDate = dayjs(startParam).startOf('day');
+      endDate = dayjs(endParam).endOf('day');
     } else {
-      // Use latest transaction month
+      // Standard timeframe based on latest transaction
       const latestResult = await pool.query(
         'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
         [userId]
       );
       if (latestResult.rows[0]?.latest) {
         endDate = dayjs(latestResult.rows[0].latest).endOf('month');
-        startDate = endDate.startOf('month');
+        startDate = endDate.subtract(monthsParam - 1, 'month').startOf('month');
       } else {
         endDate = dayjs().endOf('month');
-        startDate = endDate.startOf('month');
+        startDate = endDate.subtract(monthsParam - 1, 'month').startOf('month');
       }
     }
 
