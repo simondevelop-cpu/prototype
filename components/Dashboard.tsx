@@ -506,7 +506,12 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         )}
 
         {activeTab === 'transactions' && (
-          <TransactionsList transactions={allTransactions} loading={transactionsLoading} />
+          <TransactionsList 
+            transactions={allTransactions} 
+            loading={transactionsLoading}
+            token={token}
+            onRefresh={fetchAllTransactions}
+          />
         )}
       </main>
     </div>
