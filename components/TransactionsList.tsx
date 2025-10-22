@@ -218,7 +218,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
 
       // Delete each transaction
       for (const id of selectedIds) {
-        const response = await fetch(`/api/transactions/${id}`, {
+        const response = await fetch(`/api/transactions/delete?id=${id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
