@@ -295,8 +295,8 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
   const lines = text.split('\n');
 
   // More flexible date patterns for Canadian banks
-  // Matches: MM/DD, MM/DD/YY, MM/DD/YYYY, AUG 12, AUG 12 2025, YYYY-MM-DD, etc.
-  const datePattern = /\b([A-Z]{3}\s+\d{1,2}(?:,?\s*\d{4})?|\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\d{4}-\d{2}-\d{2})\b/;
+  // Matches: MM/DD, MM/DD/YY, MM/DD/YYYY, AUG 12, AUG12, JUL02, YYYY-MM-DD, etc.
+  const datePattern = /\b([A-Z]{3}\s*\d{1,2}(?:,?\s*\d{4})?|\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\d{4}-\d{2}-\d{2})\b/;
   const amountPattern = /\$\s*([\d,]+\.\d{2})/g;
 
   for (let i = 0; i < lines.length; i++) {
@@ -366,13 +366,19 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
  */
 function parseDateFlexible(dateStr: string): string | null {
   // Clean up the date string
-  const cleanDate = dateStr.trim().toUpperCase();
+  let cleanDate = dateStr.trim().toUpperCase();
+  
+  // Handle compact formats like JUL02, AUG12 - add space between month and day
+  if (/^[A-Z]{3}\d{1,2}$/.test(cleanDate)) {
+    cleanDate = cleanDate.replace(/^([A-Z]{3})(\d{1,2})$/, '$1 $2');
+  }
   
   // Try various date formats
   const formats = [
     'MMM DD, YYYY',  // Aug 12, 2025
-    'MMM DD',        // Aug 12 (no year)
+    'MMM DD',        // Aug 12 (no year) or JUL 02
     'MMM D',         // Aug 1 (no year)
+    'MMMDD',         // JUL02 (compact, now with space added above)
     'MM/DD/YYYY',    // 08/12/2025
     'MM/DD/YY',      // 08/12/25
     'MM/DD',         // 08/12 (no year)
