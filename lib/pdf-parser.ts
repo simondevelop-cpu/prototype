@@ -588,10 +588,32 @@ function createTransaction(
   // Determine cashflow type
   // First check if it's a transfer/payment (categorize as 'other' regardless of amount)
   const descLower = cleanDescription.toLowerCase();
-  const isTransfer = /transfer|preauthori[sz]ed\s*payment|payment.*thank you|credit card payment|interac e-?transfer|e-?transfer|bill payment|auto payment|withdrawal to|deposit from/i.test(descLower);
+  
+  // Comprehensive payment/transfer detection
+  const isTransfer = 
+    // Generic payment patterns (works with or without spaces/hyphens)
+    /payment/i.test(descLower) && (
+      /preauth|pre-auth|authorized|authorised/i.test(descLower) ||
+      /thank\s*you|merci/i.test(descLower) ||
+      /bill|auto|scheduled|recurring/i.test(descLower)
+    ) ||
+    // Transfer patterns
+    /transfer|virement/i.test(descLower) ||
+    /e-?transfer|interac/i.test(descLower) ||
+    // Credit card payment patterns
+    /credit\s*card\s*payment|cc\s*payment|visa\s*payment|mastercard\s*payment/i.test(descLower) ||
+    // Banking movement patterns
+    /withdrawal\s+to|deposit\s+from|funds\s+transfer/i.test(descLower) ||
+    // Common payment descriptions (often used on statements)
+    /^(pmt|pymt|payment|paiement)\b/i.test(descLower);
+  
+  // Additional check: On credit cards, positive amounts with "payment" in description are always transfers
+  const isCreditCardPayment = accountType.toLowerCase().includes('credit') && 
+                               amount > 0 && 
+                               /payment|pmt|pymt|paiement/i.test(descLower);
   
   let cashflow: 'income' | 'expense' | 'other' = 'expense';
-  if (isTransfer) {
+  if (isTransfer || isCreditCardPayment) {
     cashflow = 'other';
   } else if (amount > 0) {
     cashflow = 'income';
