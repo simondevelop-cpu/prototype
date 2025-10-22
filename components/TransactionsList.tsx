@@ -64,8 +64,9 @@ export default function TransactionsList({ transactions, loading }: Transactions
       filteredIds.forEach(id => newSelected.delete(id));
       setSelectedTransactionIds(newSelected);
     } else {
-      // Select all filtered
-      setSelectedTransactionIds(new Set([...selectedTransactionIds, ...filteredIds]));
+      // Select all filtered - use Array.from for TypeScript compatibility
+      const combined = Array.from(selectedTransactionIds).concat(Array.from(filteredIds));
+      setSelectedTransactionIds(new Set(combined));
     }
   };
 
