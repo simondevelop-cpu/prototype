@@ -176,18 +176,26 @@ async function extractPDFText(buffer: Buffer): Promise<string> {
 function parseTDCreditCardTransactions(text: string): Transaction[] {
   const transactions: Transaction[] = [];
   
+  console.log('[TD Parser] Using direct regex to extract transactions...');
+  console.log(`[TD Parser] Total text length: ${text.length} characters`);
+  
   // Tight regex to match TD credit card format:
   // (DATE1)(DATE2)$(AMOUNT)(MERCHANT until next transaction or end)
   // DATE format: 3 letters + 1-2 digits (e.g., AUG12, SEP7)
-  const pattern = /([A-Z]{3}\d{1,2})([A-Z]{3}\d{1,2})\$([\d,]+\.\d{2})([A-Z][A-Za-z0-9\s\-\.\(\)&'*#\/]+?)(?=[A-Z]{3}\d{1,2}[A-Z]{3}\d{1,2}\$|$)/g;
+  // Merchant: everything until the next date pattern or specific end markers
+  const pattern = /([A-Z]{3}\d{1,2})([A-Z]{3}\d{1,2})\$([\d,]+\.\d{2})([\s\S]+?)(?=[A-Z]{3}\d{1,2}[A-Z]{3}\d{1,2}\$|FOREIGNCURRENCY|@EXCHANGERATE|THISMONTH|HAPPYBIRTHDAY|$)/g;
   
   let match;
   let count = 0;
-  
-  console.log('[TD Parser] Using direct regex to extract transactions...');
+  let lastIndex = 0;
   
   while ((match = pattern.exec(text)) !== null && count < 1000) { // safety limit
-    const [_, transactionDate, postingDate, amountStr, merchant] = match;
+    const [fullMatch, transactionDate, postingDate, amountStr, merchant] = match;
+    
+    // Track regex progress through the text
+    if (count === 0 || count === 5 || count % 10 === 0) {
+      console.log(`[TD Parser] Regex at position ${pattern.lastIndex} of ${text.length}`);
+    }
     
     // Parse the transaction date (use first date, posting date is just for reference)
     const date = parseDateFlexible(transactionDate);
@@ -199,9 +207,10 @@ function parseTDCreditCardTransactions(text: string): Transaction[] {
     // Parse amount (negative for credit cards)
     const amount = -Math.abs(parseFloat(amountStr.replace(/,/g, '')));
     
-    // Clean merchant name
-    const cleanMerchant = merchant.trim()
-      .replace(/\s{2,}/g, ' ') // collapse spaces
+    // Clean merchant name - remove newlines, extra spaces, special chars
+    const cleanMerchant = merchant
+      .replace(/\r?\n/g, ' ') // replace newlines with spaces
+      .replace(/\s{2,}/g, ' ') // collapse multiple spaces
       .replace(/[^\w\s\-&'\.]/g, '') // remove special chars except common ones
       .trim();
     
@@ -209,12 +218,17 @@ function parseTDCreditCardTransactions(text: string): Transaction[] {
       transactions.push(createTransaction(date, cleanMerchant, amount, 'Credit Card'));
       count++;
       
-      if (count <= 5) {
-        console.log(`[TD Parser] ${count}. ${date} | ${cleanMerchant} | ${amount}`);
+      if (count <= 5 || count === transactions.length) {
+        console.log(`[TD Parser] ${count}. ${date} | ${cleanMerchant.substring(0, 40)} | ${amount}`);
       }
+    } else {
+      console.log(`[TD Parser] Skipping - merchant too short: "${cleanMerchant}" from raw: "${merchant.substring(0, 50)}"`);
     }
+    
+    lastIndex = pattern.lastIndex;
   }
   
+  console.log(`[TD Parser] Regex stopped at position ${lastIndex} of ${text.length}`);
   console.log(`[TD Parser] Extracted ${transactions.length} transactions using direct regex`);
   return transactions;
 }
