@@ -250,42 +250,13 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
 
 /**
  * Parse TD transactions
- * Format: Date | Description | Debit | Credit | Balance
+ * Uses the enhanced generic parser which handles:
+ * - Dual dates (transaction + posting date)
+ * - Credit card and chequing formats
+ * - Compact text (already normalized before this is called)
  */
 function parseTDTransactions(text: string, accountType: string): Transaction[] {
-  const transactions: Transaction[] = [];
-  const lines = text.split('\n');
-
-  const datePattern = /(\d{2}\/\d{2}\/\d{4}|\w{3}\s+\d{1,2})/;
-  const amountPattern = /[\$\s]*([\d,]+\.\d{2})/g;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    if (!line || line.length < 10) continue;
-    if (/^(date|description|debit|credit|balance)/i.test(line)) continue;
-
-    const dateMatch = line.match(datePattern);
-    if (!dateMatch) continue;
-
-    const date = parseDateFlexible(dateMatch[1]);
-    if (!date) continue;
-
-    const amounts = Array.from(line.matchAll(amountPattern), m => parseFloat(m[1].replace(/,/g, '')));
-    const descStart = line.indexOf(dateMatch[0]) + dateMatch[0].length;
-    const firstAmountIdx = line.search(amountPattern);
-    const description = line.substring(descStart, firstAmountIdx > 0 ? firstAmountIdx : undefined).trim();
-
-    if (!description || amounts.length === 0) continue;
-
-    // TD format: debit amounts are negative, credit amounts are positive
-    const isDebit = amounts.length >= 2 && amounts[0] > 0;
-    const amount = isDebit ? -amounts[0] : amounts[0];
-
-    transactions.push(createTransaction(date, description, amount, accountType));
-  }
-
-  return transactions;
+  return parseGenericTransactions(text, accountType);
 }
 
 /**

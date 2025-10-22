@@ -80,10 +80,11 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
       
       if (response.ok) {
         setUploadProgress(result.summary || {});
+        // Keep modal open for 8 seconds so user can see results
         setTimeout(() => {
           onSuccess();
           handleClose();
-        }, 3000);
+        }, 8000);
       } else {
         console.error('[Upload] Upload failed:', result);
         alert(`Upload failed: ${result.error || 'Unknown error'}`);
