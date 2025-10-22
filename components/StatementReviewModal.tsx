@@ -20,7 +20,7 @@ interface ParsedStatement {
   accountType: string;
   categorized: {
     duplicates: Transaction[];
-    uncategorized: Transaction[];
+    other: Transaction[];
     expenses: Transaction[];
     income: Transaction[];
   };
@@ -34,7 +34,7 @@ interface StatementReviewModalProps {
   onSuccess: () => void;
 }
 
-type ReviewStep = 'duplicates' | 'uncategorized' | 'expenses' | 'income' | 'confirm';
+type ReviewStep = 'duplicates' | 'other' | 'expenses' | 'income' | 'confirm';
 
 export default function StatementReviewModal({ 
   isOpen, 
@@ -51,6 +51,9 @@ export default function StatementReviewModal({
   
   // Track edited transactions (keyed by unique ID: date_merchant_amount)
   const [editedTransactions, setEditedTransactions] = useState<Map<string, Transaction>>(new Map());
+  
+  // Track account name (editable on confirm screen)
+  const [accountName, setAccountName] = useState<string>('');
   
   // Editing state
   const [editingTransaction, setEditingTransaction] = useState<{ key: string; tx: Transaction } | null>(null);
@@ -126,6 +129,12 @@ export default function StatementReviewModal({
       return;
     }
 
+    // Apply custom account name to all transactions
+    const transactionsWithAccount = transactionsToImport.map(tx => ({
+      ...tx,
+      account: accountName || tx.account
+    }));
+
     setImporting(true);
     try {
       const response = await fetch('/api/statements/import', {
@@ -134,7 +143,7 @@ export default function StatementReviewModal({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ transactions: transactionsToImport }),
+        body: JSON.stringify({ transactions: transactionsWithAccount }),
       });
 
       const result = await response.json();
@@ -264,29 +273,29 @@ export default function StatementReviewModal({
         );
       }
 
-      case 'uncategorized': {
-        const uncategorized = getAllTransactions('uncategorized');
-        const includedCount = uncategorized.filter(d => !excludedTransactions.has(d.key)).length;
+      case 'other': {
+        const other = getAllTransactions('other');
+        const includedCount = other.filter(d => !excludedTransactions.has(d.key)).length;
         
         return (
           <div>
-            <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-              <h3 className="font-semibold text-orange-900 mb-1">⚠️ Uncategorized Transactions</h3>
-              <p className="text-sm text-orange-700">
-                These transactions couldn't be automatically categorized. Review and edit as needed.
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="font-semibold text-blue-900 mb-1">🔄 Other Transactions</h3>
+              <p className="text-sm text-blue-700">
+                Transfers, credit card payments, and other transactions that don't affect net income/expenses.
               </p>
-              <p className="text-sm text-orange-700 mt-2">
-                <strong>{includedCount}</strong> of <strong>{uncategorized.length}</strong> will be imported.
+              <p className="text-sm text-blue-700 mt-2">
+                <strong>{includedCount}</strong> of <strong>{other.length}</strong> will be imported.
               </p>
             </div>
             
-            {uncategorized.length === 0 ? (
+            {other.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                ✅ All transactions were categorized!
+                ✅ No other transactions found!
               </div>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {uncategorized.map(({ key, tx, statement }) => renderTransactionRow(key, tx, statement))}
+                {other.map(({ key, tx, statement }) => renderTransactionRow(key, tx, statement))}
               </div>
             )}
           </div>
@@ -310,7 +319,30 @@ export default function StatementReviewModal({
             </div>
             
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {expenses.map(({ key, tx, statement }) => renderTransactionRow(key, tx, statement))}
+              {expenses.map(({ key, tx, statement }) => {
+                const isExcluded = excludedTransactions.has(key);
+                const willImport = !isExcluded;
+                
+                return (
+                  <div 
+                    key={key} 
+                    className={`p-3 border rounded-lg flex items-center justify-between ${willImport ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-300 opacity-60'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={willImport}
+                      onChange={() => toggleInclude(key)}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-3"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{tx.description || tx.merchant}</p>
+                    </div>
+                    <p className="text-lg font-semibold text-red-600 ml-4">
+                      ${Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
@@ -341,28 +373,67 @@ export default function StatementReviewModal({
 
       case 'confirm': {
         const toImport = getTransactionsToImport();
-        const totalAmount = toImport.reduce((sum, tx) => sum + tx.amount, 0);
+        const expenses = toImport.filter(tx => tx.cashflow === 'expense');
+        const income = toImport.filter(tx => tx.cashflow === 'income');
+        const other = toImport.filter(tx => tx.cashflow === 'other');
+        
+        const expensesTotal = expenses.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+        const incomeTotal = income.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+        const otherTotal = other.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+        
+        // Initialize account name from first statement if not set
+        if (!accountName && parsedStatements.length > 0) {
+          setAccountName(parsedStatements[0].accountType || 'Credit Card');
+        }
         
         return (
           <div>
+            {/* Account Name Editor */}
+            <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Account Name</label>
+              <input
+                type="text"
+                value={accountName}
+                onChange={(e) => setAccountName(e.target.value)}
+                placeholder="e.g., TD Visa, BMO Mastercard"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">This will be the account name for all imported transactions</p>
+            </div>
+            
+            {/* Import Summary */}
             <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h3 className="font-semibold text-blue-900 mb-2">📊 Import Summary</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <h3 className="font-semibold text-blue-900 mb-3">📊 Import Summary</h3>
+              <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
-                  <p className="text-gray-600">Total Transactions</p>
-                  <p className="text-2xl font-bold text-blue-900">{toImport.length}</p>
+                  <p className="text-gray-600">Expenses</p>
+                  <p className="text-xl font-bold text-red-600">{expenses.length} txns</p>
+                  <p className="text-sm text-gray-700">${expensesTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
                 </div>
                 <div>
-                  <p className="text-gray-600">Net Amount</p>
-                  <p className={`text-2xl font-bold ${totalAmount < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    ${Math.abs(totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </p>
+                  <p className="text-gray-600">Income</p>
+                  <p className="text-xl font-bold text-green-600">{income.length} txns</p>
+                  <p className="text-sm text-gray-700">${incomeTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Other</p>
+                  <p className="text-xl font-bold text-blue-600">{other.length} txns</p>
+                  <p className="text-sm text-gray-700">${otherTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                </div>
+              </div>
+              <div className="mt-3 pt-3 border-t border-blue-200">
+                <div className="flex justify-between items-center">
+                  <p className="font-semibold text-gray-900">Total</p>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-blue-900">{toImport.length} transactions</p>
+                    <p className="text-sm text-gray-600">{expenses.length} outflows totalling ${expensesTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                  </div>
                 </div>
               </div>
             </div>
             
             <div className="space-y-4">
-              <h4 className="font-semibold text-gray-900">Preview</h4>
+              <h4 className="font-semibold text-gray-900">Preview (first 10)</h4>
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {toImport.slice(0, 10).map((tx, idx) => (
                   <div key={idx} className="p-3 bg-gray-50 rounded-lg flex justify-between">
@@ -387,7 +458,7 @@ export default function StatementReviewModal({
   };
 
   // Step navigation
-  const steps: ReviewStep[] = ['duplicates', 'uncategorized', 'expenses', 'income', 'confirm'];
+  const steps: ReviewStep[] = ['duplicates', 'other', 'expenses', 'income', 'confirm'];
   const currentStepIndex = steps.indexOf(currentStep);
   const canGoNext = currentStepIndex < steps.length - 1;
   const canGoPrev = currentStepIndex > 0;

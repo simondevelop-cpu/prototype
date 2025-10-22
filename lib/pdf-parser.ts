@@ -551,11 +551,13 @@ function parseDateFlexible(dateStr: string): string | null {
         
         // If parsed month is greater than current month, it's probably from last year
         const year = parsedMonth > currentMonth + 2 ? currentYear - 1 : currentYear;
-        const finalDate = parsed.year(year).format('YYYY-MM-DD');
+        // Set to start of day (midnight) to avoid timezone issues
+        const finalDate = parsed.year(year).startOf('day').format('YYYY-MM-DD');
         console.log(`[PDF Parser] Parsed date '${originalDate}' → '${cleanDate}' → '${finalDate}' using format '${format}'`);
         return finalDate;
       }
-      const finalDate = parsed.format('YYYY-MM-DD');
+      // Set to start of day (midnight) to avoid timezone issues
+      const finalDate = parsed.startOf('day').format('YYYY-MM-DD');
       console.log(`[PDF Parser] Parsed date '${originalDate}' → '${finalDate}' using format '${format}'`);
       return finalDate;
     }

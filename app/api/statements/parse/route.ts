@@ -75,9 +75,9 @@ export async function POST(request: NextRequest) {
         // Categorize transactions for review
         const categorized = {
           duplicates: parseResult.duplicateTransactions || [],
-          uncategorized: parseResult.newTransactions.filter(tx => !tx.category || tx.category === 'Uncategorised'),
-          expenses: parseResult.newTransactions.filter(tx => tx.cashflow === 'expense' && tx.category && tx.category !== 'Uncategorised'),
-          income: parseResult.newTransactions.filter(tx => tx.cashflow === 'income' && tx.category && tx.category !== 'Uncategorised'),
+          other: parseResult.newTransactions.filter(tx => tx.cashflow === 'other'),
+          expenses: parseResult.newTransactions.filter(tx => tx.cashflow === 'expense'),
+          income: parseResult.newTransactions.filter(tx => tx.cashflow === 'income'),
         };
 
         results.push({

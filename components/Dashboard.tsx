@@ -283,6 +283,16 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
             >
               Insights
             </button>
+            <button
+              onClick={() => setActiveTab('budget')}
+              className={`py-4 border-b-2 font-medium transition-colors ${
+                activeTab === 'budget'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Budget
+            </button>
           </nav>
         </div>
       </div>
@@ -558,6 +568,25 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
               </p>
               <p className="text-sm text-gray-500">
                 Stay tuned for automated categorization, spending predictions, and personalized recommendations!
+              </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'budget' && (
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center max-w-md">
+              <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-3">Budget Coming Soon</h2>
+              <p className="text-gray-600 mb-2">
+                Set spending limits, track progress, and get alerts when you're approaching your budget goals.
+              </p>
+              <p className="text-sm text-gray-500">
+                Stay tuned for category-based budgets, monthly tracking, and overspending alerts!
               </p>
             </div>
           </div>

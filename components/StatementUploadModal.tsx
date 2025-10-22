@@ -16,7 +16,7 @@ interface ParsedStatement {
   accountType: string;
   categorized: {
     duplicates: any[];
-    uncategorized: any[];
+    other: any[];
     expenses: any[];
     income: any[];
   };
