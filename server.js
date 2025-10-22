@@ -470,6 +470,33 @@ async function ensureDatabaseReady() {
   return dbInitPromise;
 }
 
+// Helper to ensure demo data exists (can be called on every request)
+async function ensureDemoDataExists() {
+  if (disableDb || !pool) return;
+  
+  try {
+    const demoUser = await pool.query(
+      'SELECT id FROM users WHERE email = $1',
+      [DEMO_EMAIL.toLowerCase()]
+    );
+    
+    if (demoUser.rows.length > 0) {
+      const userId = demoUser.rows[0].id;
+      const txCount = await pool.query(
+        'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1',
+        [userId]
+      );
+      
+      if (parseInt(txCount.rows[0].count) === 0) {
+        console.log('[DB] Demo user has no transactions, seeding...');
+        await seedSampleTransactions(userId);
+      }
+    }
+  } catch (error) {
+    console.error('[DB] Error checking demo data:', error);
+  }
+}
+
 // Initialize immediately in local dev, lazily in Vercel
 if (!IS_VERCEL && !disableDb) {
   ensureDatabaseReady().catch(err => {
@@ -714,6 +741,9 @@ app.get('/api/transactions', authenticate, async (req, res) => {
 
 app.get('/api/summary', authenticate, async (req, res) => {
   try {
+    // Ensure demo data exists (only seeds if count = 0, preserves edits)
+    await ensureDemoDataExists();
+    
     const window = req.query.window || '3m';
     const monthCount = Number.parseInt(window, 10) || 3;
     const userId = req.userId;
