@@ -13,7 +13,7 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<{[key: string]: { status: string; message?: string; transactions?: number }}>({}});
+  const [uploadProgress, setUploadProgress] = useState<Record<string, { status: string; message?: string; transactions?: number }>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
