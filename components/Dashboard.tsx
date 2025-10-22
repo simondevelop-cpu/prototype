@@ -16,11 +16,13 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
   const [showCustomDate, setShowCustomDate] = useState(false);
   const [summary, setSummary] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]); // For dashboard breakdown/chart
+  const [allTransactions, setAllTransactions] = useState<any[]>([]); // For transactions tab (all data)
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [selectedCashflow, setSelectedCashflow] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [transactionsLoading, setTransactionsLoading] = useState(true);
 
   useEffect(() => {
     fetchData();
@@ -31,6 +33,13 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
       fetchCategories();
     }
   }, [selectedMonth, selectedCashflow, timeframe]);
+
+  // Fetch all transactions when switching to transactions tab
+  useEffect(() => {
+    if (activeTab === 'transactions' && allTransactions.length === 0) {
+      fetchAllTransactions();
+    }
+  }, [activeTab, token]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -51,7 +60,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
       const summaryData = await summaryRes.json();
       setSummary(summaryData.summary || []);
 
-      // Fetch transactions
+      // Fetch transactions (filtered by timeframe for dashboard)
       const txRes = await fetch(txUrl, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -64,6 +73,22 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
       console.error('Error fetching data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAllTransactions = async () => {
+    setTransactionsLoading(true);
+    try {
+      // Fetch ALL transactions (no date filter) for transactions tab
+      const txRes = await fetch('/api/transactions', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const txData = await txRes.json();
+      setAllTransactions(txData.transactions || []);
+    } catch (err) {
+      console.error('Error fetching all transactions:', err);
+    } finally {
+      setTransactionsLoading(false);
     }
   };
 
@@ -461,7 +486,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         )}
 
         {activeTab === 'transactions' && (
-          <TransactionsList transactions={transactions} loading={loading} />
+          <TransactionsList transactions={allTransactions} loading={transactionsLoading} />
         )}
       </main>
     </div>
