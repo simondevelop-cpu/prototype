@@ -5,6 +5,9 @@ import { parseBankStatement } from '@/lib/pdf-parser';
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
+// Use Node.js runtime (required for PDF parsing libraries)
+export const runtime = 'nodejs';
+
 // Note: Next.js App Router handles multipart/form-data automatically
 // No need for bodyParser config
 

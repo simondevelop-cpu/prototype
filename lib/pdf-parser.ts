@@ -18,13 +18,22 @@ import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 dayjs.extend(customParseFormat);
 
-// PDF parsing library - install with: npm install pdf-parse
-// For now, we'll use a placeholder until the library is installed
+// PDF parsing library - dynamically imported for server-side only
 let pdfParse: any = null;
-try {
-  pdfParse = require('pdf-parse');
-} catch (e) {
-  console.warn('[PDF Parser] pdf-parse not installed. Install with: npm install pdf-parse');
+
+// Function to ensure pdf-parse is loaded
+async function loadPdfParse() {
+  if (pdfParse) return pdfParse;
+  
+  try {
+    // Dynamic import for Next.js compatibility
+    const module = await import('pdf-parse/lib/pdf-parse.js');
+    pdfParse = module.default || module;
+    return pdfParse;
+  } catch (e) {
+    console.error('[PDF Parser] Failed to load pdf-parse:', e);
+    throw new Error('PDF parsing library not available. Please ensure pdf-parse is installed.');
+  }
 }
 
 interface Transaction {
@@ -130,16 +139,13 @@ export async function parseBankStatement(
  * Extract text from PDF buffer
  */
 async function extractPDFText(buffer: Buffer): Promise<string> {
-  if (!pdfParse) {
-    throw new Error('PDF parsing library not installed. Please install pdf-parse.');
-  }
-
   try {
-    const data = await pdfParse(buffer);
+    const parse = await loadPdfParse();
+    const data = await parse(buffer);
     return data.text;
   } catch (error) {
     console.error('[PDF Parser] Text extraction failed:', error);
-    throw new Error('Failed to extract text from PDF');
+    throw new Error('Failed to extract text from PDF. Make sure pdf-parse is installed.');
   }
 }
 
