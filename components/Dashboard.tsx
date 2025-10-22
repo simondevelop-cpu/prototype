@@ -25,6 +25,8 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [hasLoadedTransactions, setHasLoadedTransactions] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [cashflowFilter, setCashflowFilter] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -157,6 +159,20 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     setSelectedCashflow(cashflow);
   };
 
+  const handleCategoryClick = (category: string) => {
+    // Load transactions if not loaded
+    if (!hasLoadedTransactions) {
+      fetchAllTransactions();
+    }
+    // Set the category filter and cashflow type, then switch to transactions tab
+    setCategoryFilter(category);
+    // Set cashflow based on current breakdown view (income/expense/other)
+    if (selectedCashflow) {
+      setCashflowFilter(selectedCashflow);
+    }
+    setActiveTab('transactions');
+  };
+
   const handleCustomDateApply = () => {
     if (customDateRange.start && customDateRange.end) {
       setTimeframe('custom');
@@ -282,6 +298,16 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
               }`}
             >
               Insights
+            </button>
+            <button
+              onClick={() => setActiveTab('budget')}
+              className={`py-4 border-b-2 font-medium transition-colors ${
+                activeTab === 'budget'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Budget
             </button>
           </nav>
         </div>
@@ -418,21 +444,37 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                 </div>
               </button>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <button
+                onClick={() => handleStatCardClick('other')}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all hover:border-blue-300 cursor-pointer text-left group relative"
+              >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Net Cash Flow</p>
-                    <p className="text-2xl font-bold text-blue-600 mt-1">
-                      ${Math.round(summary.reduce((sum, m) => sum + (m.income || 0) - (m.expense || 0), 0)).toLocaleString()}
+                    <p className="text-sm text-gray-600 flex items-center gap-1">
+                      Total Other
+                      <span className="inline-block w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" title="Transfers between accounts, credit card payments, and other internal movements">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </span>
                     </p>
+                    <p className="text-2xl font-bold text-blue-600 mt-1">
+                      ${Math.round(summary.reduce((sum, m) => sum + (m.other || 0), 0)).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">Click to see breakdown</p>
                   </div>
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                     <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                     </svg>
                   </div>
                 </div>
-              </div>
+                {/* Tooltip on hover */}
+                <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 pointer-events-none">
+                  <p className="font-semibold mb-1">What is "Other"?</p>
+                  <p>Transfers between your accounts, credit card payments, and internal movements that don't affect your net income or expenses.</p>
+                </div>
+              </button>
             </div>
 
             {/* Category Breakdown */}
@@ -457,7 +499,11 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                       const totalAmount = categories.reduce((sum, c) => sum + c.total, 0);
                       const percentage = ((cat.total / totalAmount) * 100).toFixed(1);
                       return (
-                        <div key={idx} className="flex items-center justify-between">
+                        <button
+                          key={idx}
+                          onClick={() => handleCategoryClick(cat.category)}
+                          className="w-full flex items-center justify-between hover:bg-gray-50 p-2 rounded-lg transition-colors cursor-pointer"
+                        >
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-sm font-medium text-gray-900 capitalize">{cat.category}</span>
@@ -481,7 +527,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                               />
                             </div>
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -541,6 +587,10 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
             loading={transactionsLoading}
             token={token}
             onRefresh={fetchAllTransactions}
+            initialCategoryFilter={categoryFilter}
+            onClearCategoryFilter={() => setCategoryFilter(null)}
+            initialCashflowFilter={cashflowFilter}
+            onClearCashflowFilter={() => setCashflowFilter(null)}
           />
         )}
 
@@ -558,6 +608,25 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
               </p>
               <p className="text-sm text-gray-500">
                 Stay tuned for automated categorization, spending predictions, and personalized recommendations!
+              </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'budget' && (
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center max-w-md">
+              <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-3">Budget Coming Soon</h2>
+              <p className="text-gray-600 mb-2">
+                Set spending limits, track progress, and get alerts when you're approaching your budget goals.
+              </p>
+              <p className="text-sm text-gray-500">
+                Stay tuned for category-based budgets, monthly tracking, and overspending alerts!
               </p>
             </div>
           </div>

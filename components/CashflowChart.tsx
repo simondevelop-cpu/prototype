@@ -42,11 +42,16 @@ export default function CashflowChart({ data, onBarClick }: CashflowChartProps) 
         <div className="bg-white p-4 rounded-lg shadow-xl border border-gray-200">
           <p className="font-semibold text-gray-900 mb-2">{payload[0]?.payload?.fullMonth}</p>
           {payload.map((entry: any, index: number) => (
-            <div key={index} className="flex items-center justify-between gap-4 text-sm">
-              <span className="font-medium" style={{ color: entry.color }}>
-                {entry.name}:
-              </span>
-              <span className="font-bold">${entry.value.toLocaleString()}</span>
+            <div key={index} className="mb-1">
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="font-medium" style={{ color: entry.color }}>
+                  {entry.name}:
+                </span>
+                <span className="font-bold">${entry.value.toLocaleString()}</span>
+              </div>
+              {entry.name === 'Other' && (
+                <p className="text-xs text-gray-500 mt-0.5 italic">Transfers & internal payments</p>
+              )}
             </div>
           ))}
           <div className="border-t border-gray-200 mt-2 pt-2">
@@ -62,6 +67,9 @@ export default function CashflowChart({ data, onBarClick }: CashflowChartProps) 
     }
     return null;
   };
+
+  // Custom Legend (removed - using default to show colors properly)
+  // Recharts default legend will automatically show the correct gradient colors
 
   return (
     <div className="h-96">

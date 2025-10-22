@@ -4,19 +4,24 @@ import { useState } from 'react';
 import dayjs from 'dayjs';
 import TransactionModal from './TransactionModal';
 import BulkRecategorizeModal from './BulkRecategorizeModal';
+import StatementUploadModal from './StatementUploadModal';
 
 interface TransactionsListProps {
   transactions: any[];
   loading: boolean;
   token: string;
   onRefresh: () => void;
+  initialCategoryFilter?: string | null;
+  onClearCategoryFilter?: () => void;
+  initialCashflowFilter?: string | null;
+  onClearCashflowFilter?: () => void;
 }
 
-export default function TransactionsList({ transactions, loading, token, onRefresh }: TransactionsListProps) {
+export default function TransactionsList({ transactions, loading, token, onRefresh, initialCategoryFilter, onClearCategoryFilter, initialCashflowFilter, onClearCashflowFilter }: TransactionsListProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All categories');
+  const [selectedCategory, setSelectedCategory] = useState(initialCategoryFilter || 'All categories');
   const [selectedAccount, setSelectedAccount] = useState('All accounts');
-  const [selectedCashflow, setSelectedCashflow] = useState('All cashflows');
+  const [selectedCashflow, setSelectedCashflow] = useState(initialCashflowFilter || 'All cashflows');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
@@ -24,7 +29,16 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
+
+  // Apply initial filters when they change
+  if (initialCategoryFilter && selectedCategory !== initialCategoryFilter) {
+    setSelectedCategory(initialCategoryFilter);
+  }
+  if (initialCashflowFilter && selectedCashflow !== initialCashflowFilter) {
+    setSelectedCashflow(initialCashflowFilter);
+  }
 
   if (loading) {
     return (
@@ -207,6 +221,36 @@ export default function TransactionsList({ transactions, loading, token, onRefre
     }
   };
 
+  const handleBulkDelete = async () => {
+    try {
+      const selectedIds = getSelectedIds();
+      if (selectedIds.length === 0) {
+        throw new Error('No transactions selected');
+      }
+
+      // Delete each transaction
+      for (const id of selectedIds) {
+        const response = await fetch(`/api/transactions/delete?id=${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to delete transaction');
+        }
+      }
+
+      setSelectedTransactionIds(new Set()); // Clear selection
+      onRefresh(); // Refresh the list
+    } catch (error: any) {
+      console.error('Bulk delete error:', error);
+      throw error;
+    }
+  };
+
   const getCashflowBadge = (cashflow: string) => {
     if (cashflow === 'income') {
       return (
@@ -249,12 +293,23 @@ export default function TransactionsList({ transactions, loading, token, onRefre
         </div>
         <p className="text-gray-600">No transactions found</p>
         <p className="text-sm text-gray-500 mt-1">Start adding transactions to see them here</p>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-        >
-          Add Transaction
-        </button>
+        <div className="mt-4 flex gap-3 justify-center">
+          <button
+            onClick={() => setIsUploadModalOpen(true)}
+            className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Upload Statements
+          </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          >
+            Add Transaction
+          </button>
+        </div>
       </div>
     </div>
   ) : null;
@@ -264,29 +319,51 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       {/* Show empty state or normal content */}
       {emptyStateContent || (
         <>
-          {/* Action Bar */}
+          {/* Header with Title and Action Buttons */}
           <div className="flex items-center justify-between">
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Transaction
-            </button>
-
-            {selectedTransactionIds.size > 0 && (
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">All Transactions</h2>
+              {selectedTransactionIds.size > 0 && (
+                <p className="text-sm text-gray-600 mt-1">
+                  {selectedTransactionIds.size} transaction{selectedTransactionIds.size !== 1 ? 's' : ''} selected 
+                  {selectedTotal !== 0 && ` ($${Math.abs(selectedTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total)`}
+                </p>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {selectedTransactionIds.size > 0 && (
+                <button
+                  onClick={() => setIsBulkModalOpen(true)}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Bulk Update ({selectedTransactionIds.size})
+                </button>
+              )}
+              
               <button
-                onClick={() => setIsBulkModalOpen(true)}
-                className="px-6 py-2.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center gap-2"
+                onClick={() => setIsUploadModalOpen(true)}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                Bulk Update ({selectedTransactionIds.size})
+                Upload Statements
               </button>
-            )}
+              
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Transaction
+              </button>
+            </div>
           </div>
 
       {/* Filters */}
@@ -321,16 +398,44 @@ export default function TransactionsList({ transactions, loading, token, onRefre
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Category
+              {initialCategoryFilter && selectedCategory === initialCategoryFilter && (
+                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                  From dashboard
+                </span>
+              )}
+            </label>
+            <div className="flex gap-2">
+              <select
+                value={selectedCategory}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  if (e.target.value === 'All categories' && onClearCategoryFilter) {
+                    onClearCategoryFilter();
+                  }
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+              {initialCategoryFilter && selectedCategory === initialCategoryFilter && (
+                <button
+                  onClick={() => {
+                    setSelectedCategory('All categories');
+                    if (onClearCategoryFilter) {
+                      onClearCategoryFilter();
+                    }
+                  }}
+                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Clear category filter"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
@@ -347,16 +452,44 @@ export default function TransactionsList({ transactions, loading, token, onRefre
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Cashflow Type</label>
-            <select
-              value={selectedCashflow}
-              onChange={(e) => setSelectedCashflow(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {cashflows.map(cf => (
-                <option key={cf} value={cf}>{cf}</option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Cashflow Type
+              {initialCashflowFilter && selectedCashflow === initialCashflowFilter && (
+                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                  From dashboard
+                </span>
+              )}
+            </label>
+            <div className="flex gap-2">
+              <select
+                value={selectedCashflow}
+                onChange={(e) => {
+                  setSelectedCashflow(e.target.value);
+                  if (e.target.value === 'All cashflows' && onClearCashflowFilter) {
+                    onClearCashflowFilter();
+                  }
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {cashflows.map(cf => (
+                  <option key={cf} value={cf}>{cf}</option>
+                ))}
+              </select>
+              {initialCashflowFilter && selectedCashflow === initialCashflowFilter && (
+                <button
+                  onClick={() => {
+                    setSelectedCashflow('All cashflows');
+                    if (onClearCashflowFilter) {
+                      onClearCashflowFilter();
+                    }
+                  }}
+                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Clear cashflow filter"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
           <div className="md:col-span-2 flex items-end">
             <button
@@ -367,6 +500,12 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 setSelectedCategory('All categories');
                 setSelectedAccount('All accounts');
                 setSelectedCashflow('All cashflows');
+                if (onClearCategoryFilter) {
+                  onClearCategoryFilter();
+                }
+                if (onClearCashflowFilter) {
+                  onClearCashflowFilter();
+                }
               }}
               className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
             >
@@ -381,8 +520,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">All Transactions</h2>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-gray-600">
                 {filteredTransactions.length} {filteredTransactions.length === 1 ? 'transaction' : 'transactions'}
               </p>
             </div>
@@ -521,9 +659,17 @@ export default function TransactionsList({ transactions, loading, token, onRefre
         isOpen={isBulkModalOpen}
         onClose={() => setIsBulkModalOpen(false)}
         onApply={handleBulkUpdate}
+        onDelete={handleBulkDelete}
         selectedCount={selectedTransactionIds.size}
         categories={categories.filter(c => c !== 'All categories')}
         accounts={accounts.filter(a => a !== 'All accounts')}
+      />
+
+      <StatementUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        token={token}
+        onSuccess={onRefresh}
       />
     </div>
   );
