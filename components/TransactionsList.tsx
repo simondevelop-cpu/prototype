@@ -12,9 +12,11 @@ export default function TransactionsList({ transactions, loading }: Transactions
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All categories');
   const [selectedAccount, setSelectedAccount] = useState('All accounts');
+  const [selectedCashflow, setSelectedCashflow] = useState('All cashflows');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
+  // Use transaction ID (or unique identifier) instead of index for persistence
+  const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
 
   if (loading) {
     return (
@@ -37,40 +39,51 @@ export default function TransactionsList({ transactions, loading }: Transactions
     
     const matchesCategory = selectedCategory === 'All categories' || tx.category === selectedCategory;
     const matchesAccount = selectedAccount === 'All accounts' || tx.account === selectedAccount;
+    const matchesCashflow = selectedCashflow === 'All cashflows' || tx.cashflow === selectedCashflow;
     
     // Date range filter
     const matchesDateRange = (!startDate || tx.date >= startDate) && (!endDate || tx.date <= endDate);
     
-    return matchesSearch && matchesCategory && matchesAccount && matchesDateRange;
+    return matchesSearch && matchesCategory && matchesAccount && matchesCashflow && matchesDateRange;
   });
 
-  // Get unique categories and accounts
+  // Get unique categories, accounts, and cashflows
   const categories = ['All categories', ...Array.from(new Set(transactions.map(tx => tx.category).filter(Boolean)))];
   const accounts = ['All accounts', ...Array.from(new Set(transactions.map(tx => tx.account).filter(Boolean)))];
+  const cashflows = ['All cashflows', ...Array.from(new Set(transactions.map(tx => tx.cashflow).filter(Boolean)))];
 
-  // Selection handlers
+  // Helper to create unique ID for each transaction (using date + description + amount)
+  const getTxId = (tx: any) => `${tx.date}_${tx.description}_${tx.amount}`;
+
+  // Selection handlers - now using transaction IDs for persistence across filters
   const handleSelectAll = () => {
-    if (selectedTransactions.size === filteredTransactions.length) {
-      setSelectedTransactions(new Set());
+    const filteredIds = new Set(filteredTransactions.map(getTxId));
+    if (filteredTransactions.every(tx => selectedTransactionIds.has(getTxId(tx)))) {
+      // If all filtered are selected, deselect them
+      const newSelected = new Set(selectedTransactionIds);
+      filteredIds.forEach(id => newSelected.delete(id));
+      setSelectedTransactionIds(newSelected);
     } else {
-      setSelectedTransactions(new Set(filteredTransactions.map((_, idx) => idx)));
+      // Select all filtered
+      setSelectedTransactionIds(new Set([...selectedTransactionIds, ...filteredIds]));
     }
   };
 
-  const handleSelectTransaction = (idx: number) => {
-    const newSelected = new Set(selectedTransactions);
-    if (newSelected.has(idx)) {
-      newSelected.delete(idx);
+  const handleSelectTransaction = (tx: any) => {
+    const txId = getTxId(tx);
+    const newSelected = new Set(selectedTransactionIds);
+    if (newSelected.has(txId)) {
+      newSelected.delete(txId);
     } else {
-      newSelected.add(idx);
+      newSelected.add(txId);
     }
-    setSelectedTransactions(newSelected);
+    setSelectedTransactionIds(newSelected);
   };
 
-  // Calculate selected totals
-  const selectedTotal = Array.from(selectedTransactions).reduce((sum, idx) => {
-    return sum + (filteredTransactions[idx]?.amount || 0);
-  }, 0);
+  // Calculate selected totals (from all transactions, not just filtered)
+  const selectedTotal = transactions
+    .filter(tx => selectedTransactionIds.has(getTxId(tx)))
+    .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
   const getCashflowBadge = (cashflow: string) => {
     if (cashflow === 'income') {
@@ -165,7 +178,7 @@ export default function TransactionsList({ transactions, loading }: Transactions
             </select>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Account</label>
             <select
@@ -178,6 +191,18 @@ export default function TransactionsList({ transactions, loading }: Transactions
               ))}
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Cashflow Type</label>
+            <select
+              value={selectedCashflow}
+              onChange={(e) => setSelectedCashflow(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              {cashflows.map(cf => (
+                <option key={cf} value={cf}>{cf}</option>
+              ))}
+            </select>
+          </div>
           <div className="md:col-span-2 flex items-end">
             <button
               onClick={() => {
@@ -186,6 +211,7 @@ export default function TransactionsList({ transactions, loading }: Transactions
                 setEndDate('');
                 setSelectedCategory('All categories');
                 setSelectedAccount('All accounts');
+                setSelectedCashflow('All cashflows');
               }}
               className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
             >
@@ -205,9 +231,9 @@ export default function TransactionsList({ transactions, loading }: Transactions
                 {filteredTransactions.length} {filteredTransactions.length === 1 ? 'transaction' : 'transactions'}
               </p>
             </div>
-            {selectedTransactions.size > 0 && (
+            {selectedTransactionIds.size > 0 && (
               <div className="text-sm text-gray-600">
-                <span className="font-semibold">{selectedTransactions.size}</span> selected
+                <span className="font-semibold">{selectedTransactionIds.size}</span> selected
                 <span className="ml-2">
                   (${Math.abs(selectedTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total)
                 </span>
@@ -222,7 +248,7 @@ export default function TransactionsList({ transactions, loading }: Transactions
                 <th className="px-4 py-3 text-left">
                   <input
                     type="checkbox"
-                    checked={selectedTransactions.size === filteredTransactions.length && filteredTransactions.length > 0}
+                    checked={filteredTransactions.length > 0 && filteredTransactions.every(tx => selectedTransactionIds.has(getTxId(tx)))}
                     onChange={handleSelectAll}
                     className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
                   />
@@ -251,16 +277,19 @@ export default function TransactionsList({ transactions, loading }: Transactions
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredTransactions.map((tx, idx) => (
-                <tr key={idx} className={`transition-colors ${selectedTransactions.has(idx) ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
-                  <td className="px-4 py-4">
-                    <input
-                      type="checkbox"
-                      checked={selectedTransactions.has(idx)}
-                      onChange={() => handleSelectTransaction(idx)}
-                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
-                    />
-                  </td>
+              {filteredTransactions.map((tx, idx) => {
+                const txId = getTxId(tx);
+                const isSelected = selectedTransactionIds.has(txId);
+                return (
+                  <tr key={idx} className={`transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                    <td className="px-4 py-4">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleSelectTransaction(tx)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                      />
+                    </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {dayjs(tx.date).format('MMM D, YYYY')}
                   </td>
@@ -288,7 +317,8 @@ export default function TransactionsList({ transactions, loading }: Transactions
                     </span>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
