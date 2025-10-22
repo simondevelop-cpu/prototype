@@ -658,7 +658,7 @@ app.get('/api/summary', authenticate, async (req, res) => {
     const monthCount = Number.parseInt(window, 10) || 3;
     const userId = req.userId;
     
-    const { start, end } = ensureRangeMonths(monthCount);
+    const { start, end } = await ensureRangeMonths(monthCount, userId);
     const labels = monthLabels(start, monthCount);
 
     const summaryResult = await pool.query(
@@ -712,7 +712,26 @@ app.get('/api/summary', authenticate, async (req, res) => {
 });
 
 // Helper functions for date ranges
-function ensureRangeMonths(monthCount) {
+async function ensureRangeMonths(monthCount, userId) {
+  // For demo data, use the actual date range of transactions
+  if (pool && userId) {
+    try {
+      const result = await pool.query(
+        'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
+        [userId]
+      );
+      
+      if (result.rows[0]?.latest) {
+        const end = dayjs(result.rows[0].latest).endOf('month');
+        const start = end.subtract(monthCount - 1, 'month').startOf('month');
+        return { start, end };
+      }
+    } catch (error) {
+      console.error('[DATE] Error getting date range:', error);
+    }
+  }
+  
+  // Fallback to current date
   const end = dayjs().endOf('month');
   const start = end.subtract(monthCount - 1, 'month').startOf('month');
   return { start, end };
