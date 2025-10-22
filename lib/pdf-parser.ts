@@ -104,38 +104,39 @@ export async function parseBankStatement(
   const accountType = detectAccountType(text);
   console.log(`[PDF Parser] Detected account type: ${accountType}`);
 
-  // Parse transactions based on bank
+  // Parse transactions based on bank and account type
   let transactions: Transaction[] = [];
   
-  // Normalize TD text format (add line breaks)
-  let processedText = text;
+  // TD Credit Cards have a unique compact format - use specialized parser
   if (bank === 'TD' && accountType.toLowerCase().includes('credit')) {
-    console.log('[PDF Parser] Normalizing TD credit card text format...');
-    processedText = normalizeTDText(text);
-    console.log('[PDF Parser] After normalization, first 500 chars:', processedText.substring(0, 500));
+    console.log('[PDF Parser] Using specialized TD credit card parser...');
+    transactions = parseTDCreditCardTransactions(text);
   }
-  
-  switch (bank) {
-    case 'RBC':
-      transactions = parseRBCTransactions(processedText, accountType);
-      break;
-    case 'TD':
-      transactions = parseTDTransactions(processedText, accountType);
-      break;
-    case 'Scotiabank':
-      transactions = parseScotiabankTransactions(processedText, accountType);
-      break;
-    case 'BMO':
-      transactions = parseBMOTransactions(processedText, accountType);
-      break;
-    case 'CIBC':
-      transactions = parseCIBCTransactions(processedText, accountType);
-      break;
-    case 'Tangerine':
-      transactions = parseTangerineTransactions(processedText, accountType);
-      break;
-    default:
-      transactions = parseGenericTransactions(processedText, accountType);
+  // For all other banks/accounts, use the standard parsers
+  else {
+    switch (bank) {
+      case 'RBC':
+        transactions = parseRBCTransactions(text, accountType);
+        break;
+      case 'TD':
+        // TD chequing/savings use generic parser
+        transactions = parseTDTransactions(text, accountType);
+        break;
+      case 'Scotiabank':
+        transactions = parseScotiabankTransactions(text, accountType);
+        break;
+      case 'BMO':
+        transactions = parseBMOTransactions(text, accountType);
+        break;
+      case 'CIBC':
+        transactions = parseCIBCTransactions(text, accountType);
+        break;
+      case 'Tangerine':
+        transactions = parseTangerineTransactions(text, accountType);
+        break;
+      default:
+        transactions = parseGenericTransactions(text, accountType);
+    }
   }
 
   console.log(`[PDF Parser] Parsed ${transactions.length} transactions`);
@@ -166,18 +167,56 @@ async function extractPDFText(buffer: Buffer): Promise<string> {
 }
 
 /**
- * Normalize TD credit card text - add line breaks and spaces between transactions
- * TD credit cards often have compact format: AUG12AUG13$18.39MERCHANTNAME
+ * Parse TD credit card transactions directly using a tight regex
+ * Format: TRANSACTIONDATE POSTINGDATE $AMOUNT MERCHANT (all smooshed together)
+ * Example: AUG12AUG13$18.39METROPLUSWESTMOUNT
+ * 
+ * This is more reliable than normalizing + line parsing
  */
-function normalizeTDText(text: string): string {
-  // Pattern: Date + Date + $Amount + Description
-  // Insert line break before each transaction date pattern
-  const dateAmountPattern = /([A-Z]{3}\d{1,2})([A-Z]{3}\d{1,2})\$(\d+\.\d{2})/g;
+function parseTDCreditCardTransactions(text: string): Transaction[] {
+  const transactions: Transaction[] = [];
   
-  // Add newline before each transaction (before first date) and spaces between fields
-  let normalized = text.replace(dateAmountPattern, '\n$1 $2 $$$3 ');
+  // Tight regex to match TD credit card format:
+  // (DATE1)(DATE2)$(AMOUNT)(MERCHANT until next transaction or end)
+  // DATE format: 3 letters + 1-2 digits (e.g., AUG12, SEP7)
+  const pattern = /([A-Z]{3}\d{1,2})([A-Z]{3}\d{1,2})\$([\d,]+\.\d{2})([A-Z][A-Za-z0-9\s\-\.\(\)&'*#\/]+?)(?=[A-Z]{3}\d{1,2}[A-Z]{3}\d{1,2}\$|$)/g;
   
-  return normalized;
+  let match;
+  let count = 0;
+  
+  console.log('[TD Parser] Using direct regex to extract transactions...');
+  
+  while ((match = pattern.exec(text)) !== null && count < 1000) { // safety limit
+    const [_, transactionDate, postingDate, amountStr, merchant] = match;
+    
+    // Parse the transaction date (use first date, posting date is just for reference)
+    const date = parseDateFlexible(transactionDate);
+    if (!date) {
+      console.log(`[TD Parser] Failed to parse transaction date: ${transactionDate}`);
+      continue;
+    }
+    
+    // Parse amount (negative for credit cards)
+    const amount = -Math.abs(parseFloat(amountStr.replace(/,/g, '')));
+    
+    // Clean merchant name
+    const cleanMerchant = merchant.trim()
+      .replace(/\s{2,}/g, ' ') // collapse spaces
+      .replace(/[^\w\s\-&'\.]/g, '') // remove special chars except common ones
+      .trim();
+    
+    if (cleanMerchant.length >= 3) {
+      transactions.push(createTransaction(date, cleanMerchant, amount, 'Credit Card'));
+      count++;
+      
+      if (count <= 5) {
+        console.log(`[TD Parser] ${count}. ${date} | ${cleanMerchant} | ${amount}`);
+      }
+    }
+  }
+  
+  console.log(`[TD Parser] Extracted ${transactions.length} transactions using direct regex`);
+  return transactions;
 }
 
 /**
