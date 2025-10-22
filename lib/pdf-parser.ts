@@ -180,10 +180,11 @@ function parseTDCreditCardTransactions(text: string): Transaction[] {
   console.log(`[TD Parser] Total text length: ${text.length} characters`);
   
   // Tight regex to match TD credit card format:
-  // (DATE1)(DATE2)$(AMOUNT)(MERCHANT until next transaction or end)
+  // (DATE1)(DATE2)$AMOUNT or -$AMOUNT (MERCHANT until next transaction or end)
   // DATE format: 3 letters + 1-2 digits (e.g., AUG12, SEP7)
+  // Amount can be: $123.45 (purchase) or -$890.90 (payment/credit)
   // Merchant: everything until the next date pattern or specific end markers
-  const pattern = /([A-Z]{3}\d{1,2})([A-Z]{3}\d{1,2})\$([\d,]+\.\d{2})([\s\S]+?)(?=[A-Z]{3}\d{1,2}[A-Z]{3}\d{1,2}\$|FOREIGNCURRENCY|@EXCHANGERATE|THISMONTH|HAPPYBIRTHDAY|$)/g;
+  const pattern = /([A-Z]{3}\d{1,2})([A-Z]{3}\d{1,2})(-?\$[\d,]+\.\d{2})([\s\S]+?)(?=[A-Z]{3}\d{1,2}[A-Z]{3}\d{1,2}-?\$|FOREIGNCURRENCY|@EXCHANGERATE|THISMONTH|HAPPYBIRTHDAY|$)/g;
   
   let match;
   let count = 0;
@@ -204,8 +205,13 @@ function parseTDCreditCardTransactions(text: string): Transaction[] {
       continue;
     }
     
-    // Parse amount (negative for credit cards)
-    const amount = -Math.abs(parseFloat(amountStr.replace(/,/g, '')));
+    // Parse amount
+    // For credit cards: purchases are expenses (negative), payments/credits are income (positive)
+    // amountStr can be "$123.45" or "-$890.90"
+    const numericAmount = parseFloat(amountStr.replace(/[$,]/g, ''));
+    // If it already has a minus sign, it's a payment (keep positive for income)
+    // If no minus sign, it's a purchase (make negative for expense)
+    const amount = amountStr.startsWith('-') ? Math.abs(numericAmount) : -Math.abs(numericAmount);
     
     // Clean merchant name - remove newlines, extra spaces, special chars
     const cleanMerchant = merchant
