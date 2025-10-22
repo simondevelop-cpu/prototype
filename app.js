@@ -8,10 +8,12 @@ const avatarInitial = document.querySelector('[data-user-initial]');
 
 const authDialog = document.getElementById('auth-dialog');
 const loginForm = document.querySelector('[data-form="login"]');
+const registerForm = document.querySelector('[data-form="register"]');
 const demoLoginButton = document.querySelector('[data-action="demo-login"]');
 const closeLoginButton = document.querySelector('[data-action="close-login"]');
 const authError = document.querySelector('[data-auth-error]');
 const logoutButton = document.querySelector('[data-action="logout"]');
+const authTabs = document.querySelectorAll('.auth-tab');
 
 const AUTH_TOKEN_KEY = 'ci.session.token';
 const AUTH_USER_KEY = 'ci.session.user';
@@ -177,6 +179,22 @@ function closeAuthDialog() {
   }
   if (authError) authError.textContent = '';
   loginForm?.reset();
+  registerForm?.reset();
+  // Reset to login tab
+  switchAuthTab('login');
+}
+
+function switchAuthTab(tabName) {
+  // Update tab buttons
+  authTabs.forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.tab === tabName);
+  });
+  
+  // Update forms
+  const forms = document.querySelectorAll('.auth-form');
+  forms.forEach(form => {
+    form.classList.toggle('active', form.dataset.tabContent === tabName);
+  });
 }
 
 function handleUnauthorized() {
@@ -652,6 +670,21 @@ async function startDemoSession() {
   return result;
 }
 
+async function registerUser(email, password, name) {
+  const trimmedEmail = email?.trim();
+  const trimmedPassword = password?.trim();
+  const trimmedName = name?.trim();
+  if (!trimmedEmail || !trimmedPassword || !trimmedName) {
+    throw new Error('Email, password, and name are required');
+  }
+  const result = await apiFetch('/api/auth/register', {
+    method: 'POST',
+    body: { email: trimmedEmail, password: trimmedPassword, name: trimmedName },
+    skipAuthHandling: true,
+  });
+  return result;
+}
+
 async function loadSummary(timeframe = state.dashboard.timeframe) {
   if (!state.auth.token) return;
   try {
@@ -1009,6 +1042,13 @@ function attachEventListeners() {
     feedbackForm.addEventListener('submit', handleFeedbackSubmit);
   }
 
+  // Auth tab switching
+  authTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      switchAuthTab(tab.dataset.tab);
+    });
+  });
+
   if (loginForm) {
     loginForm.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -1024,6 +1064,32 @@ function attachEventListeners() {
       } catch (error) {
         console.error('Login failed', error);
         if (authError) authError.textContent = 'Invalid email or password. Try the demo login if needed.';
+      }
+    });
+  }
+
+  if (registerForm) {
+    registerForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!registerForm) return;
+      const formData = new FormData(registerForm);
+      const email = formData.get('email');
+      const password = formData.get('password');
+      const name = formData.get('name');
+      try {
+        if (authError) authError.textContent = '';
+        const result = await registerUser(email, password, name);
+        setSession(result.token, result.user);
+        closeAuthDialog();
+        showToast('Account created successfully! Welcome to Canadian Insights.');
+      } catch (error) {
+        console.error('Registration failed', error);
+        if (authError) {
+          const errorMessage = error.message.includes('already exists') 
+            ? 'An account with this email already exists. Try signing in instead.'
+            : 'Unable to create account. Please try again.';
+          authError.textContent = errorMessage;
+        }
       }
     });
   }
