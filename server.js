@@ -168,6 +168,39 @@ app.get('/api/auth/me', authenticate, (req, res) => {
   res.json({ user: req.user });
 });
 
+// Database initialization endpoint - one-time setup for Vercel
+app.post('/api/init-database', async (req, res) => {
+  if (disableDb) {
+    return res.status(400).json({ error: 'Database is disabled' });
+  }
+
+  try {
+    console.log('[INIT] Starting database initialization...');
+    
+    await ensureSchema();
+    console.log('[INIT] Schema created');
+    
+    await seedSampleData();
+    console.log('[INIT] Sample data seeded');
+    
+    res.json({ 
+      success: true, 
+      message: 'Database initialized successfully!',
+      details: {
+        schema: 'created',
+        demoUser: 'created',
+        sampleData: 'seeded'
+      }
+    });
+  } catch (error) {
+    console.error('[INIT] Database initialization failed:', error);
+    res.status(500).json({ 
+      error: 'Database initialization failed', 
+      details: error.message 
+    });
+  }
+});
+
 app.post('/api/auth/register', async (req, res) => {
   console.log('[AUTH] Register attempt - path:', req.path, 'url:', req.url);
   try {
