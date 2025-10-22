@@ -1,125 +1,402 @@
-# Canadian Insights prototype
+# Canadian Insights - Personal Finance Web App
 
-This repository contains a static prototype for **Canadian Insights**, a personal finance web app built for Canadian households. The goal is to translate the product specification into a browsable, interactive experience that can be shared with stakeholders and prospective users.
+A personal finance application built for Canadian households, featuring transaction tracking, budgeting, insights, and financial analytics.
 
-## Status
+## 🏗️ **Architecture**
 
-The prototype is functional and ready for stakeholder walkthroughs, but it remains a work in progress. Follow-up iterations will continue to land here as we expand coverage of the specification and gather feedback.
+### **Frontend**
+- **Framework:** Vanilla JavaScript (no build tooling required)
+- **Future:** Can migrate to React when needed (API-compatible)
+- **Styling:** Custom CSS
+- **Charts:** Vanilla JS with Chart.js or similar
 
-## What’s included
+### **Backend**
+- **Runtime:** Node.js + Express.js
+- **Database:** PostgreSQL (Neon on Vercel)
+- **Authentication:** JWT-based, database-backed
+- **Architecture:** Multi-tenant SaaS (shared database, isolated by user_id)
 
-- **Static SPA-style experience** powered by vanilla HTML, CSS and JavaScript (no build tooling required).
-- **Four primary tabs** that mirror the product areas in the specification:
-  - Cash flow & budget dashboard with locked sample modules
-  - Categorise transactions workspace with filters and table interactions
-  - Insight modules for subscriptions, fraud detection and peer benchmarks
-  - Account settings, privacy messaging and feedback collection
-- **Sample data** for cash flow trends, budgets, savings goals, transactions and insight cards to demonstrate core flows.
-- **Lightweight interaction layer** for tab switching, filtering, module unlocking, feedback capture and toast notifications.
+### **Deployment**
+- **Platform:** Vercel Serverless Functions
+- **Static Assets:** Served by Vercel CDN
+- **Database:** Neon PostgreSQL (Canada Central region)
 
-## Getting started
+---
 
-The prototype assets are still static, but the ingestion and insight APIs now run from a managed PostgreSQL database. To explore the end-to-end flow locally you can either open the static HTML (no API calls) or run the Node.js server with a database URL.
+## ✨ **Features**
+
+### **Core Functionality**
+- ✅ **User Authentication**
+  - JWT-based secure authentication
+  - Demo account with pre-populated data
+  - User registration for personal accounts
+
+- ✅ **Transaction Management**
+  - View transactions with filtering and search
+  - Categories and labels
+  - CSV import support
+  - 200+ realistic Canadian demo transactions (12 months)
+
+- ✅ **Financial Dashboard**
+  - Monthly cash flow visualization
+  - Income vs expenses tracking
+  - Category breakdown
+  - Spending trends
+
+- ✅ **Budgeting**
+  - Monthly and quarterly budget analysis
+  - Category-wise spending breakdown
+  - Spending vs budget comparison
+  - Savings calculation
+
+- ✅ **Savings Tracking**
+  - Cumulative savings calculation
+  - Savings goals
+  - Year-to-date and lifetime views
+
+- ✅ **Insights**
+  - Top spending categories
+  - Average monthly spending
+  - Savings rate analysis
+  - Personalized recommendations
+
+---
+
+## 🚀 **Getting Started**
+
+### **Prerequisites**
+- Node.js 18+ (for local development)
+- PostgreSQL database (Neon recommended for production)
+
+### **Local Development**
 
 ```bash
-# Static walkthrough (no API calls)
-open index.html     # macOS
-xdg-open index.html # Linux
-start index.html    # Windows
+# Clone the repository
+git clone <repository-url>
+cd prototype
 
-# Interactive API walkthrough
+# Install dependencies
 npm install
-DATABASE_URL="postgres://user:password@host:5432/db" npm start
+
+# Set up environment variables (optional for local dev)
+cp .env.example .env.local
+# Edit .env.local with your DATABASE_URL
+
+# Run the server
+npm start
+
+# Open in browser
+open http://localhost:3000
 ```
 
-## Design & interaction notes
+### **Static Mode (No Database)**
+```bash
+# Just open the HTML file
+open index.html
+```
 
-- Modules start in a locked state to mirror the upload-first journey; choosing “Explore sample data” reveals the sample charts and lists.
-- Filters and dropdowns update the sample data in-place, providing a feel for the analytical workflows.
-- Transactions can be filtered, searched and selected to simulate bulk actions, with running totals updated in real-time.
-- Insight cards capture qualitative feedback and keep a running tally of “useful” insights to demonstrate how we will measure value.
-- A modal upload prompt and global toast component illustrate supporting UI needed for CSV imports and confirmations.
+---
 
-## Next steps
+## 🔐 **Authentication**
 
-- Replace sample data with live imports once data ingestion and categorisation services are ready.
-- Extend the insights module lists with additional rules from the specification.
-- Hook the feedback form into the chosen support tooling (e.g., email or CRM) and persist responses.
-- Add French language copy to satisfy the bilingual requirement noted in the specification.
+### **Demo Account**
+Perfect for exploring the app with realistic data:
+- **Email:** `demo@canadianinsights.ca`
+- **Password:** `northstar-demo`
+- **Data:** 12 months of realistic Canadian transactions
 
-## Managed database configuration
+### **Create Your Own Account**
+1. Click "Create Account"
+2. Enter email, password, and name
+3. Start with empty state
+4. Upload CSV to populate your data
 
-The prototype now uses a hosted PostgreSQL instance for long-lived storage. We provisioned a [Supabase](https://supabase.com/) project in the **Canada (Central)** region (`ca-central-1`, Montréal) so data residency remains in Canada. The application server manages schema creation and migrations on boot, so no external migration tool is required.
+### **Multi-Tenant Architecture**
+- All users share the same database
+- Data is isolated by `user_id` (integer foreign key)
+- Users can only see their own transactions
+- Demo user has ID: 1, new users get sequential IDs
 
-### 1. Provision the database
+---
 
-1. Create a new Supabase project and select the **Canada (Central)** region.
-2. Once the project is ready, open **Project Settings → Database → Connection string** and copy the `Direct Connection` URL (format: `postgres://USER:PASSWORD@HOST:5432/postgres?sslmode=require`).
-3. (Optional) Run the following snippet in the Supabase SQL editor if you want to pre-create the tables manually—otherwise the server will create them on first run:
+## 📊 **Demo Data**
 
+The demo account includes 12 months of realistic Canadian financial data:
+
+### **Income**
+- Monthly salary: $4,800
+- Occasional freelance: $600-1,100 (quarterly)
+
+### **Expenses**
+- **Housing:** Rent ($1,650/month)
+- **Utilities:** Hydro-Québec ($90-150), Rogers Internet ($85), Telus Mobile ($65)
+- **Groceries:** Loblaws, Metro, Sobeys, No Frills (4x/month, $120-200 each)
+- **Transportation:** Presto Card ($156), Gas ($50-80), occasional Uber
+- **Dining:** Tim Hortons, Starbucks (15-20x/month, $4-12), Restaurants (3-5x/month, $40-100)
+- **Shopping:** Amazon.ca, Winners, Canadian Tire, Shoppers Drug Mart
+- **Entertainment:** Netflix, Spotify, Cineplex
+
+### **Savings**
+- Monthly transfer: $500 to savings account
+
+**Total Transactions:** 200+ across 12 months (Nov 2023 - Oct 2024)
+
+---
+
+## 🗂️ **API Endpoints**
+
+### **Authentication**
+```
+POST   /api/auth/login      - Login with email/password
+POST   /api/auth/register   - Create new account
+GET    /api/auth/me         - Get current user info
+```
+
+### **Data Endpoints** (all require authentication)
+```
+GET    /api/transactions    - List transactions with filters
+GET    /api/summary         - Monthly cash flow summary
+GET    /api/budget          - Budget analysis by category
+GET    /api/savings         - Savings tracking
+GET    /api/insights        - Personalized insights
+```
+
+### **Example Requests**
+
+**Login:**
+```bash
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"demo@canadianinsights.ca","password":"northstar-demo"}'
+```
+
+**Get Transactions:**
+```bash
+curl http://localhost:3000/api/transactions?limit=50 \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+---
+
+## 🗄️ **Database Schema**
+
+### **users**
 ```sql
-CREATE TABLE IF NOT EXISTS transactions (
+CREATE TABLE users (
   id SERIAL PRIMARY KEY,
-  description TEXT NOT NULL,
-  merchant TEXT NOT NULL,
-  date DATE NOT NULL,
-  cashflow TEXT NOT NULL,
-  account TEXT NOT NULL,
-  category TEXT NOT NULL,
-  label TEXT DEFAULT '',
-  amount NUMERIC NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT transactions_unique UNIQUE (date, amount, merchant, cashflow)
-);
-
-CREATE TABLE IF NOT EXISTS insight_feedback (
-  id SERIAL PRIMARY KEY,
-  insight_type TEXT NOT NULL,
-  insight_title TEXT NOT NULL,
-  response TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  display_name TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-### 2. Configure environment variables
+### **transactions**
+```sql
+CREATE TABLE transactions (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  merchant TEXT,
+  date DATE NOT NULL,
+  cashflow TEXT NOT NULL CHECK (cashflow IN ('income', 'expense', 'other')),
+  account TEXT NOT NULL,
+  category TEXT NOT NULL,
+  label TEXT DEFAULT '',
+  amount NUMERIC(12, 2) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 
-Add the following environment variables locally (e.g., `.env.local`) and in Vercel (`Project Settings → Environment Variables`) for **Development**, **Preview**, and **Production**:
-
-| Name | Description |
-| --- | --- |
-| `DATABASE_URL` | Supabase PostgreSQL connection string (`postgres://…`). |
-| `DATABASE_SSL` | Optional. Leave unset to enforce SSL (recommended for Supabase). Set to `false` only for trusted local Postgres instances. |
-
-Vercel will expose these variables to `server.js`. After updating the variables, redeploy the project so the new configuration is applied.
-
-## Refreshing demo data
-
-Before a stakeholder walkthrough, you can reset the demo account’s data back to the curated baseline. The repository includes a helper script that truncates the `transactions` and `insight_feedback` tables and reloads the canonical CSV found in `scripts/demo-transactions.csv`.
-
-```bash
-# Supabase connection string must be provided
-DATABASE_URL="postgres://user:password@host:5432/db" npm run refresh-demo-data
-
-# Optionally point to a different CSV
-DATABASE_URL="postgres://user:password@host:5432/db" npm run refresh-demo-data -- ./path/to/custom.csv
+CREATE INDEX idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX idx_transactions_date ON transactions(date);
+CREATE INDEX idx_transactions_cashflow ON transactions(cashflow);
 ```
 
-The script honours the `DATABASE_SSL` flag (defaults to SSL on) in case you are targeting a local PostgreSQL instance without TLS.
+---
 
-### Demo account credentials
+## 🚢 **Deployment to Vercel**
 
-Share these credentials with anyone rehearsing the product demo so that all presenters use the same dataset:
+### **1. Connect Repository**
+1. Go to [vercel.com](https://vercel.com)
+2. Import your Git repository
+3. Framework Preset: **Other**
+4. Build Command: *(leave empty)*
+5. Deploy
 
-- **Email:** `demo@canadianinsights.ca`
-- **Password:** `DemoUser!2024`
+### **2. Set Up Database**
+1. In Vercel dashboard, go to **Storage** tab
+2. Click **Create Database** → **Neon Postgres**
+3. Choose **Canada (Central)** region
+4. Database automatically connects and sets `DATABASE_URL`
 
-### 3. Deployment notes
+### **3. First Deployment**
+- On first API request after deployment, database initializes automatically
+- Schema created, demo user seeded, sample transactions loaded
+- Takes 1-2 seconds on first load
+- Subsequent requests are instant
 
-- The repository includes a `vercel.json` file that disables automatic Next.js detection and maps `/api/*` routes to the Express
-  server defined in `server.js`. This avoids the `No Next.js version detected` build failure reported by Vercel and keeps the
-  static prototype assets (`index.html`, `app.js`, `styles.css`, `logo.svg`) served by Vercel’s static hosting.
-- The Express app now exports its instance so Vercel’s Node runtime can mount it while local development continues to use `npm start`.
+### **4. Environment Variables** (Optional)
+```
+DATABASE_URL     - (Auto-set by Neon)
+JWT_SECRET       - Custom JWT signing key (optional)
+DEMO_EMAIL       - Override demo email (optional)
+DEMO_PASSWORD    - Override demo password (optional)
+```
 
-## License
+---
 
-Proprietary – internal prototype for discovery and user feedback.
+## 🧪 **Testing**
+
+### **Manual Testing Checklist**
+
+**Authentication:**
+- [ ] Login with demo account works
+- [ ] Create new account works
+- [ ] Sign out works
+- [ ] Token persists across page reloads
+- [ ] Invalid credentials rejected
+
+**Data Endpoints:**
+- [ ] Dashboard shows charts and data
+- [ ] Transactions tab shows list
+- [ ] Budget tab shows category breakdown
+- [ ] Savings tab shows goals
+- [ ] Insights tab shows recommendations
+
+**Multi-Tenancy:**
+- [ ] Demo user sees 200+ transactions
+- [ ] New user sees empty state
+- [ ] Different users see different data
+- [ ] Users can't access others' transactions
+
+---
+
+## 📝 **Development Notes**
+
+### **Why Vanilla JavaScript?**
+- ✅ **Simple:** No build step, no complex tooling
+- ✅ **Fast:** Instant page loads, no bundle size
+- ✅ **Flexible:** Easy to understand and modify
+- ✅ **Vercel-ready:** Works perfectly with serverless
+
+### **When to Migrate to React?**
+Consider React when:
+- UI complexity increases significantly
+- Need component reusability
+- Want better state management
+- Team prefers React ecosystem
+
+**Migration path:**
+- API endpoints stay the same (no changes needed)
+- Rebuild frontend incrementally
+- Keep working on current version while migrating
+
+### **Current Tech Stack**
+```
+Frontend:  Vanilla JS + HTML + CSS
+Backend:   Node.js + Express.js
+Database:  PostgreSQL (Neon)
+Auth:      JWT tokens
+Hosting:   Vercel Serverless Functions
+```
+
+---
+
+## 🐛 **Troubleshooting**
+
+### **Login Returns 401**
+- Check email is lowercase (demo@canadianinsights.ca)
+- Verify password is correct
+- Check Vercel logs for database errors
+
+### **Empty Dashboard**
+- Wait 1-2 seconds on first load (database initializing)
+- Check Network tab for 200/304 responses
+- Verify demo data was seeded (check Vercel logs)
+
+### **Database Connection Issues**
+- Verify `DATABASE_URL` is set in Vercel
+- Check Neon dashboard that database is active
+- Review Vercel function logs for connection errors
+
+### **500 Errors on Data Endpoints**
+- Check Vercel function logs for SQL errors
+- Verify schema was created successfully
+- Ensure user_id is an integer (not text)
+
+---
+
+## 📚 **Documentation**
+
+- **ARCHITECTURE_EXPLAINED.md** - Detailed architecture and design decisions
+- **ARCHITECTURE_FIX.md** - Technical details on the auth system redesign
+- **VERCEL_DATABASE_SETUP.md** - Step-by-step Vercel deployment guide
+- **TESTING_CHECKLIST.md** - Comprehensive testing procedures
+
+---
+
+## 🗺️ **Roadmap**
+
+### **Phase 1: Core Functionality** ✅ **COMPLETE**
+- [x] JWT authentication
+- [x] User registration
+- [x] Transaction management
+- [x] Dashboard with charts
+- [x] Budget analysis
+- [x] Savings tracking
+- [x] Insights
+
+### **Phase 2: Enhanced Features** (Future)
+- [ ] CSV upload and import
+- [ ] Transaction editing and deletion
+- [ ] Custom budget categories
+- [ ] Recurring transactions
+- [ ] Export data (PDF, CSV)
+- [ ] Mobile-responsive design
+
+### **Phase 3: Advanced Features** (Future)
+- [ ] Multi-currency support
+- [ ] Bill reminders
+- [ ] Debt tracking
+- [ ] Investment tracking
+- [ ] Financial goals with milestones
+- [ ] French language support
+
+### **Phase 4: React Migration** (Optional)
+- [ ] Set up Next.js or Vite
+- [ ] Rebuild UI components in React
+- [ ] Implement routing
+- [ ] Add animations and transitions
+- [ ] Enhance mobile experience
+
+---
+
+## 🤝 **Contributing**
+
+This is currently a prototype for stakeholder review. If you'd like to contribute:
+
+1. Check the roadmap for planned features
+2. Open an issue to discuss your idea
+3. Fork the repository
+4. Create a feature branch
+5. Submit a pull request
+
+---
+
+## 📄 **License**
+
+Proprietary – Internal prototype for discovery and user feedback.
+
+---
+
+## 🙋 **Support**
+
+For questions or issues:
+1. Check the troubleshooting section above
+2. Review the documentation files
+3. Check Vercel function logs
+4. Open an issue with detailed error information
+
+---
+
+**Built with ❤️ for Canadians, by Canadians** 🇨🇦
