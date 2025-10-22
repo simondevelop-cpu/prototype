@@ -13,13 +13,15 @@ interface TransactionsListProps {
   onRefresh: () => void;
   initialCategoryFilter?: string | null;
   onClearCategoryFilter?: () => void;
+  initialCashflowFilter?: string | null;
+  onClearCashflowFilter?: () => void;
 }
 
-export default function TransactionsList({ transactions, loading, token, onRefresh, initialCategoryFilter, onClearCategoryFilter }: TransactionsListProps) {
+export default function TransactionsList({ transactions, loading, token, onRefresh, initialCategoryFilter, onClearCategoryFilter, initialCashflowFilter, onClearCashflowFilter }: TransactionsListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(initialCategoryFilter || 'All categories');
   const [selectedAccount, setSelectedAccount] = useState('All accounts');
-  const [selectedCashflow, setSelectedCashflow] = useState('All cashflows');
+  const [selectedCashflow, setSelectedCashflow] = useState(initialCashflowFilter || 'All cashflows');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
@@ -30,9 +32,12 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
 
-  // Apply initial category filter when it changes
+  // Apply initial filters when they change
   if (initialCategoryFilter && selectedCategory !== initialCategoryFilter) {
     setSelectedCategory(initialCategoryFilter);
+  }
+  if (initialCashflowFilter && selectedCashflow !== initialCashflowFilter) {
+    setSelectedCashflow(initialCashflowFilter);
   }
 
   if (loading) {
@@ -447,16 +452,44 @@ export default function TransactionsList({ transactions, loading, token, onRefre
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Cashflow Type</label>
-            <select
-              value={selectedCashflow}
-              onChange={(e) => setSelectedCashflow(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {cashflows.map(cf => (
-                <option key={cf} value={cf}>{cf}</option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Cashflow Type
+              {initialCashflowFilter && selectedCashflow === initialCashflowFilter && (
+                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                  From dashboard
+                </span>
+              )}
+            </label>
+            <div className="flex gap-2">
+              <select
+                value={selectedCashflow}
+                onChange={(e) => {
+                  setSelectedCashflow(e.target.value);
+                  if (e.target.value === 'All cashflows' && onClearCashflowFilter) {
+                    onClearCashflowFilter();
+                  }
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {cashflows.map(cf => (
+                  <option key={cf} value={cf}>{cf}</option>
+                ))}
+              </select>
+              {initialCashflowFilter && selectedCashflow === initialCashflowFilter && (
+                <button
+                  onClick={() => {
+                    setSelectedCashflow('All cashflows');
+                    if (onClearCashflowFilter) {
+                      onClearCashflowFilter();
+                    }
+                  }}
+                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Clear cashflow filter"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
           <div className="md:col-span-2 flex items-end">
             <button
@@ -469,6 +502,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 setSelectedCashflow('All cashflows');
                 if (onClearCategoryFilter) {
                   onClearCategoryFilter();
+                }
+                if (onClearCashflowFilter) {
+                  onClearCashflowFilter();
                 }
               }}
               className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"

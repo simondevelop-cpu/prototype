@@ -26,6 +26,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [hasLoadedTransactions, setHasLoadedTransactions] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [cashflowFilter, setCashflowFilter] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -163,8 +164,12 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     if (!hasLoadedTransactions) {
       fetchAllTransactions();
     }
-    // Set the category filter and switch to transactions tab
+    // Set the category filter and cashflow type, then switch to transactions tab
     setCategoryFilter(category);
+    // Set cashflow based on current breakdown view (income/expense/other)
+    if (selectedCashflow) {
+      setCashflowFilter(selectedCashflow);
+    }
     setActiveTab('transactions');
   };
 
@@ -584,6 +589,8 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
             onRefresh={fetchAllTransactions}
             initialCategoryFilter={categoryFilter}
             onClearCategoryFilter={() => setCategoryFilter(null)}
+            initialCashflowFilter={cashflowFilter}
+            onClearCashflowFilter={() => setCashflowFilter(null)}
           />
         )}
 
