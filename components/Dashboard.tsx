@@ -439,19 +439,32 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                 </div>
               </button>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 group relative">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Net Cash Flow</p>
-                    <p className="text-2xl font-bold text-blue-600 mt-1">
-                      ${Math.round(summary.reduce((sum, m) => sum + (m.income || 0) - (m.expense || 0), 0)).toLocaleString()}
+                    <p className="text-sm text-gray-600 flex items-center gap-1">
+                      Total Other
+                      <span className="inline-block w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" title="Transfers between accounts, credit card payments, and other internal movements">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </span>
                     </p>
+                    <p className="text-2xl font-bold text-blue-600 mt-1">
+                      ${Math.round(summary.reduce((sum, m) => sum + (m.other || 0), 0)).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">Transfers & payments</p>
                   </div>
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                     <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                     </svg>
                   </div>
+                </div>
+                {/* Tooltip on hover */}
+                <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                  <p className="font-semibold mb-1">What is "Other"?</p>
+                  <p>Transfers between your accounts, credit card payments, and internal movements that don't affect your net income or expenses.</p>
                 </div>
               </div>
             </div>

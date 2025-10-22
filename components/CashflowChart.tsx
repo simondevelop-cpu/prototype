@@ -42,11 +42,16 @@ export default function CashflowChart({ data, onBarClick }: CashflowChartProps) 
         <div className="bg-white p-4 rounded-lg shadow-xl border border-gray-200">
           <p className="font-semibold text-gray-900 mb-2">{payload[0]?.payload?.fullMonth}</p>
           {payload.map((entry: any, index: number) => (
-            <div key={index} className="flex items-center justify-between gap-4 text-sm">
-              <span className="font-medium" style={{ color: entry.color }}>
-                {entry.name}:
-              </span>
-              <span className="font-bold">${entry.value.toLocaleString()}</span>
+            <div key={index} className="mb-1">
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="font-medium" style={{ color: entry.color }}>
+                  {entry.name}:
+                </span>
+                <span className="font-bold">${entry.value.toLocaleString()}</span>
+              </div>
+              {entry.name === 'Other' && (
+                <p className="text-xs text-gray-500 mt-0.5 italic">Transfers & internal payments</p>
+              )}
             </div>
           ))}
           <div className="border-t border-gray-200 mt-2 pt-2">
@@ -61,6 +66,31 @@ export default function CashflowChart({ data, onBarClick }: CashflowChartProps) 
       );
     }
     return null;
+  };
+
+  // Custom Legend with tooltip for "Other"
+  const CustomLegend = ({ payload }: any) => {
+    return (
+      <div className="flex justify-center gap-6 pt-4">
+        {payload.map((entry: any, index: number) => (
+          <div key={index} className="group relative">
+            <div className="flex items-center gap-2 cursor-help">
+              <div 
+                className="w-3 h-3 rounded-full" 
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-sm text-gray-700">{entry.value}</span>
+            </div>
+            {entry.value === 'Other' && (
+              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 pointer-events-none">
+                <p className="font-semibold mb-1">What is "Other"?</p>
+                <p>Transfers between accounts, credit card payments, and other internal movements that don't affect net income/expenses.</p>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -97,8 +127,8 @@ export default function CashflowChart({ data, onBarClick }: CashflowChartProps) 
           />
           <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }} />
           <Legend 
+            content={<CustomLegend />}
             wrapperStyle={{ paddingTop: '20px' }}
-            iconType="circle"
           />
           <Bar 
             dataKey="income" 
