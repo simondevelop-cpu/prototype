@@ -52,6 +52,8 @@ interface ParseResult {
   accountType: string;
   transactions: Transaction[];
   transactionsImported: number;
+  newTransactions: Transaction[];
+  duplicateTransactions: Transaction[];
 }
 
 /**
@@ -141,14 +143,16 @@ export async function parseBankStatement(
 
   console.log(`[PDF Parser] Parsed ${transactions.length} transactions`);
 
-  // Insert transactions into database
-  const inserted = await insertTransactions(transactions, userId);
+  // Check for duplicates and insert new transactions
+  const { inserted, newTransactions, duplicateTransactions } = await insertTransactionsWithDuplicateCheck(transactions, userId);
 
   return {
     bank,
     accountType,
     transactions,
     transactionsImported: inserted,
+    newTransactions,
+    duplicateTransactions,
   };
 }
 
@@ -643,29 +647,70 @@ function categorizeTransaction(description: string, merchant: string): string {
 /**
  * Insert transactions into the database
  */
-async function insertTransactions(transactions: Transaction[], userId: string): Promise<number> {
+async function insertTransactionsWithDuplicateCheck(
+  transactions: Transaction[], 
+  userId: string
+): Promise<{ inserted: number; newTransactions: Transaction[]; duplicateTransactions: Transaction[] }> {
   const pool = getPool();
   if (!pool) {
     throw new Error('Database not available');
   }
 
-  let inserted = 0;
+  const newTransactions: Transaction[] = [];
+  const duplicateTransactions: Transaction[] = [];
 
   for (const tx of transactions) {
     try {
-      await pool.query(
-        `INSERT INTO transactions (user_id, date, description, merchant, amount, cashflow, category, account, label, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-         ON CONFLICT (user_id, date, amount, merchant, cashflow) DO NOTHING`,
-        [userId, tx.date, tx.description, tx.merchant, tx.amount, tx.cashflow, tx.category, tx.account, tx.label]
+      // Check if transaction already exists
+      const existingCheck = await pool.query(
+        `SELECT id FROM transactions 
+         WHERE user_id = $1 AND date = $2 AND amount = $3 AND merchant = $4 AND cashflow = $5`,
+        [userId, tx.date, tx.amount, tx.merchant, tx.cashflow]
       );
-      inserted++;
+
+      if (existingCheck.rows.length > 0) {
+        // Transaction is a duplicate
+        duplicateTransactions.push(tx);
+      } else {
+        // Transaction is new - mark it
+        newTransactions.push(tx);
+      }
     } catch (error) {
-      console.error('[PDF Parser] Failed to insert transaction:', error);
-      // Continue with other transactions
+      console.error('[PDF Parser] Failed to check transaction:', error);
+      // On error, assume it's new
+      newTransactions.push(tx);
     }
   }
 
-  return inserted;
+  console.log(`[PDF Parser] Found ${newTransactions.length} new transactions, ${duplicateTransactions.length} duplicates`);
+
+  return {
+    inserted: newTransactions.length,
+    newTransactions,
+    duplicateTransactions,
+  };
+}
+
+// Keep the old function for backwards compatibility but mark as deprecated
+async function insertTransactions(transactions: Transaction[], userId: string): Promise<number> {
+  const result = await insertTransactionsWithDuplicateCheck(transactions, userId);
+  
+  // Actually insert the new transactions
+  const pool = getPool();
+  if (!pool) return 0;
+  
+  for (const tx of result.newTransactions) {
+    try {
+      await pool.query(
+        `INSERT INTO transactions (user_id, date, description, merchant, amount, cashflow, category, account, label, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+        [userId, tx.date, tx.description, tx.merchant, tx.amount, tx.cashflow, tx.category, tx.account, tx.label]
+      );
+    } catch (error) {
+      console.error('[PDF Parser] Failed to insert transaction:', error);
+    }
+  }
+  
+  return result.inserted;
 }
 

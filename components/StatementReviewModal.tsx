@@ -1,0 +1,556 @@
+'use client';
+
+import { useState } from 'react';
+import dayjs from 'dayjs';
+
+interface Transaction {
+  date: string;
+  description: string;
+  merchant: string;
+  amount: number;
+  cashflow: 'income' | 'expense' | 'other';
+  category: string;
+  account: string;
+  label: string;
+}
+
+interface ParsedStatement {
+  filename: string;
+  bank: string;
+  accountType: string;
+  categorized: {
+    duplicates: Transaction[];
+    uncategorized: Transaction[];
+    expenses: Transaction[];
+    income: Transaction[];
+  };
+}
+
+interface StatementReviewModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  parsedStatements: ParsedStatement[];
+  token: string;
+  onSuccess: () => void;
+}
+
+type ReviewStep = 'duplicates' | 'uncategorized' | 'expenses' | 'income' | 'confirm';
+
+export default function StatementReviewModal({ 
+  isOpen, 
+  onClose, 
+  parsedStatements, 
+  token,
+  onSuccess 
+}: StatementReviewModalProps) {
+  const [currentStep, setCurrentStep] = useState<ReviewStep>('duplicates');
+  const [importing, setImporting] = useState(false);
+  
+  // Track which transactions are included/excluded
+  const [excludedTransactions, setExcludedTransactions] = useState<Set<string>>(new Set());
+  
+  // Track edited transactions (keyed by unique ID: date_merchant_amount)
+  const [editedTransactions, setEditedTransactions] = useState<Map<string, Transaction>>(new Map());
+  
+  // Editing state
+  const [editingTransaction, setEditingTransaction] = useState<{ key: string; tx: Transaction } | null>(null);
+
+  if (!isOpen || parsedStatements.length === 0) return null;
+
+  // Generate unique key for transaction
+  const getTxKey = (tx: Transaction) => `${tx.date}_${tx.merchant}_${tx.amount}`;
+
+  // Get all transactions from all statements for a given category
+  const getAllTransactions = (category: keyof ParsedStatement['categorized']): { key: string; tx: Transaction; statement: ParsedStatement }[] => {
+    const all: { key: string; tx: Transaction; statement: ParsedStatement }[] = [];
+    for (const statement of parsedStatements) {
+      for (const tx of statement.categorized[category]) {
+        const key = getTxKey(tx);
+        const finalTx = editedTransactions.get(key) || tx;
+        all.push({ key, tx: finalTx, statement });
+      }
+    }
+    return all;
+  };
+
+  // Toggle transaction inclusion
+  const toggleInclude = (key: string) => {
+    const newExcluded = new Set(excludedTransactions);
+    if (newExcluded.has(key)) {
+      newExcluded.delete(key);
+    } else {
+      newExcluded.add(key);
+    }
+    setExcludedTransactions(newExcluded);
+  };
+
+  // Update transaction after editing
+  const saveEdit = (key: string, updatedTx: Transaction) => {
+    const newEdited = new Map(editedTransactions);
+    newEdited.set(key, updatedTx);
+    setEditedTransactions(newEdited);
+    setEditingTransaction(null);
+  };
+
+  // Get all transactions that will be imported
+  const getTransactionsToImport = (): Transaction[] => {
+    const toImport: Transaction[] = [];
+    
+    // Skip duplicates by default (unless user explicitly included them)
+    const duplicates = getAllTransactions('duplicates');
+    for (const { key, tx } of duplicates) {
+      if (!excludedTransactions.has(key)) {
+        // User wants to import this duplicate
+        toImport.push(tx);
+      }
+    }
+    
+    // Include all non-duplicate transactions unless explicitly excluded
+    const categories: Array<keyof ParsedStatement['categorized']> = ['uncategorized', 'expenses', 'income'];
+    for (const category of categories) {
+      const transactions = getAllTransactions(category);
+      for (const { key, tx } of transactions) {
+        if (!excludedTransactions.has(key)) {
+          toImport.push(tx);
+        }
+      }
+    }
+    
+    return toImport;
+  };
+
+  // Handle import
+  const handleImport = async () => {
+    const transactionsToImport = getTransactionsToImport();
+    
+    if (transactionsToImport.length === 0) {
+      alert('No transactions selected for import');
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const response = await fetch('/api/statements/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ transactions: transactionsToImport }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        alert(`Successfully imported ${result.imported} of ${result.total} transactions!`);
+        onSuccess();
+        onClose();
+      } else {
+        alert(`Import failed: ${result.error}`);
+      }
+    } catch (error: any) {
+      console.error('Import error:', error);
+      alert(`Import error: ${error.message}`);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Initialize excluded transactions (all duplicates are excluded by default)
+  if (excludedTransactions.size === 0 && currentStep === 'duplicates') {
+    const duplicates = getAllTransactions('duplicates');
+    const initialExcluded = new Set(duplicates.map(d => d.key));
+    setExcludedTransactions(initialExcluded);
+  }
+
+  // Render transaction row
+  const renderTransactionRow = (key: string, tx: Transaction, statement: ParsedStatement, isDuplicate: boolean = false) => {
+    const isExcluded = excludedTransactions.has(key);
+    const isIncluded = !isExcluded;
+    
+    // For duplicates, default is excluded; for others, default is included
+    const willImport = isDuplicate ? isIncluded : !isExcluded;
+
+    return (
+      <div 
+        key={key} 
+        className={`p-4 border rounded-lg ${willImport ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-300 opacity-60'}`}
+      >
+        <div className="flex items-start gap-3">
+          {/* Checkbox */}
+          <input
+            type="checkbox"
+            checked={willImport}
+            onChange={() => toggleInclude(key)}
+            className="mt-1 w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+          />
+          
+          {/* Transaction Details */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <p className="font-medium text-gray-900">{tx.merchant}</p>
+                <p className="text-sm text-gray-600">{tx.description}</p>
+                <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                  <span>{dayjs(tx.date).format('MMM D, YYYY')}</span>
+                  <span>•</span>
+                  <span>{tx.account}</span>
+                  {tx.category && (
+                    <>
+                      <span>•</span>
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded">{tx.category}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              <div className="text-right">
+                <p className={`text-lg font-semibold ${tx.amount < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  ${Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-gray-500">{statement.filename}</p>
+              </div>
+            </div>
+            
+            {/* Edit Button */}
+            <button
+              onClick={() => setEditingTransaction({ key, tx })}
+              className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-medium"
+            >
+              ✏️ Edit
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Render current step
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 'duplicates': {
+        const duplicates = getAllTransactions('duplicates');
+        const includedCount = duplicates.filter(d => !excludedTransactions.has(d.key)).length;
+        
+        return (
+          <div>
+            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <h3 className="font-semibold text-yellow-900 mb-1">🔴 Duplicate Transactions</h3>
+              <p className="text-sm text-yellow-700">
+                These transactions already exist in your database. By default, they are <strong>excluded</strong> from import.
+                Check the box to include them if you want duplicates.
+              </p>
+              <p className="text-sm text-yellow-700 mt-2">
+                <strong>{includedCount}</strong> of <strong>{duplicates.length}</strong> duplicates will be imported.
+              </p>
+            </div>
+            
+            {duplicates.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                ✅ No duplicate transactions found!
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {duplicates.map(({ key, tx, statement }) => renderTransactionRow(key, tx, statement, true))}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      case 'uncategorized': {
+        const uncategorized = getAllTransactions('uncategorized');
+        const includedCount = uncategorized.filter(d => !excludedTransactions.has(d.key)).length;
+        
+        return (
+          <div>
+            <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+              <h3 className="font-semibold text-orange-900 mb-1">⚠️ Uncategorized Transactions</h3>
+              <p className="text-sm text-orange-700">
+                These transactions couldn't be automatically categorized. Review and edit as needed.
+              </p>
+              <p className="text-sm text-orange-700 mt-2">
+                <strong>{includedCount}</strong> of <strong>{uncategorized.length}</strong> will be imported.
+              </p>
+            </div>
+            
+            {uncategorized.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                ✅ All transactions were categorized!
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {uncategorized.map(({ key, tx, statement }) => renderTransactionRow(key, tx, statement))}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      case 'expenses': {
+        const expenses = getAllTransactions('expenses');
+        const includedCount = expenses.filter(d => !excludedTransactions.has(d.key)).length;
+        
+        return (
+          <div>
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <h3 className="font-semibold text-red-900 mb-1">💸 Expense Transactions</h3>
+              <p className="text-sm text-red-700">
+                These transactions were automatically categorized as expenses.
+              </p>
+              <p className="text-sm text-red-700 mt-2">
+                <strong>{includedCount}</strong> of <strong>{expenses.length}</strong> will be imported.
+              </p>
+            </div>
+            
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {expenses.map(({ key, tx, statement }) => renderTransactionRow(key, tx, statement))}
+            </div>
+          </div>
+        );
+      }
+
+      case 'income': {
+        const income = getAllTransactions('income');
+        const includedCount = income.filter(d => !excludedTransactions.has(d.key)).length;
+        
+        return (
+          <div>
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <h3 className="font-semibold text-green-900 mb-1">💰 Income Transactions</h3>
+              <p className="text-sm text-green-700">
+                These transactions were automatically categorized as income.
+              </p>
+              <p className="text-sm text-green-700 mt-2">
+                <strong>{includedCount}</strong> of <strong>{income.length}</strong> will be imported.
+              </p>
+            </div>
+            
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {income.map(({ key, tx, statement }) => renderTransactionRow(key, tx, statement))}
+            </div>
+          </div>
+        );
+      }
+
+      case 'confirm': {
+        const toImport = getTransactionsToImport();
+        const totalAmount = toImport.reduce((sum, tx) => sum + tx.amount, 0);
+        
+        return (
+          <div>
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="font-semibold text-blue-900 mb-2">📊 Import Summary</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-600">Total Transactions</p>
+                  <p className="text-2xl font-bold text-blue-900">{toImport.length}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Net Amount</p>
+                  <p className={`text-2xl font-bold ${totalAmount < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    ${Math.abs(totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <h4 className="font-semibold text-gray-900">Preview</h4>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {toImport.slice(0, 10).map((tx, idx) => (
+                  <div key={idx} className="p-3 bg-gray-50 rounded-lg flex justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900">{tx.merchant}</p>
+                      <p className="text-xs text-gray-500">{dayjs(tx.date).format('MMM D, YYYY')} • {tx.category}</p>
+                    </div>
+                    <p className={`font-semibold ${tx.amount < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      ${Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                ))}
+                {toImport.length > 10 && (
+                  <p className="text-center text-sm text-gray-500">... and {toImport.length - 10} more</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+    }
+  };
+
+  // Step navigation
+  const steps: ReviewStep[] = ['duplicates', 'uncategorized', 'expenses', 'income', 'confirm'];
+  const currentStepIndex = steps.indexOf(currentStep);
+  const canGoNext = currentStepIndex < steps.length - 1;
+  const canGoPrev = currentStepIndex > 0;
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          {/* Header */}
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Review Transactions</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Review and edit transactions before importing
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                disabled={importing}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Step Indicator */}
+            <div className="mt-4 flex items-center gap-2">
+              {steps.map((step, idx) => (
+                <div key={step} className="flex items-center gap-2">
+                  <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    idx === currentStepIndex 
+                      ? 'bg-blue-600 text-white' 
+                      : idx < currentStepIndex 
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {step}
+                  </div>
+                  {idx < steps.length - 1 && <div className="w-4 h-px bg-gray-300" />}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-6">
+            {renderStepContent()}
+          </div>
+
+          {/* Footer */}
+          <div className="p-6 border-t border-gray-200 flex items-center justify-between">
+            <button
+              onClick={canGoPrev ? () => setCurrentStep(steps[currentStepIndex - 1]) : onClose}
+              disabled={importing}
+              className="px-6 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition-colors disabled:opacity-50"
+            >
+              {canGoPrev ? '← Previous' : 'Cancel'}
+            </button>
+
+            <div className="flex gap-3">
+              {canGoNext ? (
+                <button
+                  onClick={() => setCurrentStep(steps[currentStepIndex + 1])}
+                  disabled={importing}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  Next →
+                </button>
+              ) : (
+                <button
+                  onClick={handleImport}
+                  disabled={importing || getTransactionsToImport().length === 0}
+                  className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {importing ? (
+                    <>
+                      <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      ✓ Import {getTransactionsToImport().length} Transactions
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Edit Modal (simplified inline editor) */}
+      {editingTransaction && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Edit Transaction</h3>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Merchant</label>
+                <input
+                  type="text"
+                  value={editingTransaction.tx.merchant}
+                  onChange={(e) => setEditingTransaction({
+                    ...editingTransaction,
+                    tx: { ...editingTransaction.tx, merchant: e.target.value }
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <input
+                  type="text"
+                  value={editingTransaction.tx.category}
+                  onChange={(e) => setEditingTransaction({
+                    ...editingTransaction,
+                    tx: { ...editingTransaction.tx, category: e.target.value }
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={Math.abs(editingTransaction.tx.amount)}
+                  onChange={(e) => {
+                    const newAmount = parseFloat(e.target.value) || 0;
+                    setEditingTransaction({
+                      ...editingTransaction,
+                      tx: { 
+                        ...editingTransaction.tx, 
+                        amount: editingTransaction.tx.amount < 0 ? -newAmount : newAmount 
+                      }
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setEditingTransaction(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => saveEdit(editingTransaction.key, editingTransaction.tx)}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import StatementReviewModal from './StatementReviewModal';
 
 interface StatementUploadModalProps {
   isOpen: boolean;
@@ -9,11 +10,25 @@ interface StatementUploadModalProps {
   onSuccess: () => void;
 }
 
+interface ParsedStatement {
+  filename: string;
+  bank: string;
+  accountType: string;
+  categorized: {
+    duplicates: any[];
+    uncategorized: any[];
+    expenses: any[];
+    income: any[];
+  };
+}
+
 export default function StatementUploadModal({ isOpen, onClose, token, onSuccess }: StatementUploadModalProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, { status: string; message?: string; transactions?: number }>>({});
+  const [parsedStatements, setParsedStatements] = useState<ParsedStatement[]>([]);
+  const [showReviewModal, setShowReviewModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -55,7 +70,7 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
   const handleUpload = async () => {
     if (files.length === 0) return;
     
-    console.log('[Upload] Starting upload of', files.length, 'files');
+    console.log('[Upload] Starting parse of', files.length, 'files');
     setUploading(true);
     const formData = new FormData();
     
@@ -65,8 +80,8 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
     });
 
     try {
-      console.log('[Upload] Sending request to /api/statements/upload');
-      const response = await fetch('/api/statements/upload', {
+      console.log('[Upload] Sending request to /api/statements/parse');
+      const response = await fetch('/api/statements/parse', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -79,19 +94,28 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
       console.log('[Upload] Response data:', result);
       
       if (response.ok) {
-        setUploadProgress(result.summary || {});
-        // Keep modal open for 8 seconds so user can see results
-        setTimeout(() => {
-          onSuccess();
-          handleClose();
-        }, 8000);
+        // Filter successful parses
+        const successfulParses = result.results.filter((r: any) => r.status === 'success');
+        
+        if (successfulParses.length === 0) {
+          alert('No statements could be parsed. Please check the error messages.');
+          setUploadProgress(result.results.reduce((acc: any, r: any) => {
+            acc[r.filename] = { status: r.status, message: r.message };
+            return acc;
+          }, {}));
+          return;
+        }
+        
+        // Transition to review modal
+        setParsedStatements(successfulParses);
+        setShowReviewModal(true);
       } else {
-        console.error('[Upload] Upload failed:', result);
-        alert(`Upload failed: ${result.error || 'Unknown error'}`);
+        console.error('[Upload] Parse failed:', result);
+        alert(`Parse failed: ${result.error || 'Unknown error'}`);
       }
     } catch (error: any) {
-      console.error('[Upload] Upload error:', error);
-      alert(`Upload error: ${error.message}`);
+      console.error('[Upload] Parse error:', error);
+      alert(`Parse error: ${error.message}`);
     } finally {
       setUploading(false);
     }
@@ -101,7 +125,20 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
     setFiles([]);
     setUploadProgress({});
     setUploading(false);
+    setParsedStatements([]);
+    setShowReviewModal(false);
     onClose();
+  };
+  
+  const handleReviewClose = () => {
+    setShowReviewModal(false);
+    handleClose();
+  };
+  
+  const handleReviewSuccess = () => {
+    setShowReviewModal(false);
+    handleClose();
+    onSuccess();
   };
 
   const formatFileSize = (bytes: number) => {
@@ -111,8 +148,22 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+    <>
+      {/* Review Modal */}
+      {showReviewModal && (
+        <StatementReviewModal
+          isOpen={showReviewModal}
+          onClose={handleReviewClose}
+          parsedStatements={parsedStatements}
+          token={token}
+          onSuccess={handleReviewSuccess}
+        />
+      )}
+      
+      {/* Upload Modal */}
+      {!showReviewModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -297,8 +348,10 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
             )}
           </button>
         </div>
-      </div>
-    </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
