@@ -200,7 +200,7 @@ async function seedSampleTransactions(userId) {
   if (disableDb || !pool || !userId) return;
   
   try {
-    // Check if transactions already exist
+    // Check if transactions already exist (only seeds once, preserves user edits)
     const existing = await pool.query(
       'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1',
       [userId]
