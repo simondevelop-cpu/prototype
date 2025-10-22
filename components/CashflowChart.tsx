@@ -68,30 +68,8 @@ export default function CashflowChart({ data, onBarClick }: CashflowChartProps) 
     return null;
   };
 
-  // Custom Legend with tooltip for "Other"
-  const CustomLegend = ({ payload }: any) => {
-    return (
-      <div className="flex justify-center gap-6 pt-4">
-        {payload.map((entry: any, index: number) => (
-          <div key={index} className="group relative">
-            <div className="flex items-center gap-2 cursor-help">
-              <div 
-                className="w-3 h-3 rounded-full" 
-                style={{ backgroundColor: entry.color }}
-              />
-              <span className="text-sm text-gray-700">{entry.value}</span>
-            </div>
-            {entry.value === 'Other' && (
-              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 pointer-events-none">
-                <p className="font-semibold mb-1">What is "Other"?</p>
-                <p>Transfers between accounts, credit card payments, and other internal movements that don't affect net income/expenses.</p>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  };
+  // Custom Legend (removed - using default to show colors properly)
+  // Recharts default legend will automatically show the correct gradient colors
 
   return (
     <div className="h-96">
@@ -127,8 +105,8 @@ export default function CashflowChart({ data, onBarClick }: CashflowChartProps) 
           />
           <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }} />
           <Legend 
-            content={<CustomLegend />}
             wrapperStyle={{ paddingTop: '20px' }}
+            iconType="circle"
           />
           <Bar 
             dataKey="income" 

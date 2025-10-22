@@ -467,6 +467,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 setSelectedCategory('All categories');
                 setSelectedAccount('All accounts');
                 setSelectedCashflow('All cashflows');
+                if (onClearCategoryFilter) {
+                  onClearCategoryFilter();
+                }
               }}
               className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
             >
