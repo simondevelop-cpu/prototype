@@ -164,7 +164,7 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
       {!showReviewModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200">
+            <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Upload Bank Statements</h2>
@@ -347,7 +347,7 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
               </>
             )}
           </button>
-        </div>
+            </div>
           </div>
         </div>
       )}
