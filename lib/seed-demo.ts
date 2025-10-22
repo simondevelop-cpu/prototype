@@ -104,11 +104,15 @@ export async function seedDemoTransactions(pool: any, userId: string) {
     const coffeeCount = 15 + Math.floor(Math.random() * 6);
     for (let i = 0; i < coffeeCount; i++) {
       const dayOffset = Math.floor(Math.random() * 28);
+      const coffeeVendors = ['Starbucks', 'Tim Hortons', 'Second Cup', 'Local Café'];
+      const vendor = coffeeVendors[Math.floor(Math.random() * coffeeVendors.length)];
+      // Add time-based variance to avoid duplicates
+      const amount = -(Math.floor(Math.random() * 10) + 5 + (i * 0.01)); // $5-15 with micro-variance
       transactions.push({
         date: monthStart.add(dayOffset, 'day').format('YYYY-MM-DD'),
-        description: ['Starbucks', 'Tim Hortons', 'Second Cup', 'Local Café'][Math.floor(Math.random() * 4)],
-        merchant: ['Starbucks', 'Tim Hortons', 'Second Cup', 'Local Café'][Math.floor(Math.random() * 4)],
-        amount: -(Math.floor(Math.random() * 10) + 5), // $5-15
+        description: `${vendor} #${i + 1}`,
+        merchant: vendor,
+        amount: Math.round(amount * 100) / 100, // Round to 2 decimals
         cashflow: 'expense',
         category: 'Dining',
         account: 'Credit Card',
@@ -120,11 +124,15 @@ export async function seedDemoTransactions(pool: any, userId: string) {
     const restaurantCount = 8 + Math.floor(Math.random() * 5);
     for (let i = 0; i < restaurantCount; i++) {
       const dayOffset = Math.floor(Math.random() * 28);
+      const restaurants = ['Boston Pizza', 'Swiss Chalet', 'The Keg', 'Montréal Poutine', 'Sushi Shop'];
+      const restaurant = restaurants[Math.floor(Math.random() * restaurants.length)];
+      // Add index-based variance to avoid duplicates
+      const amount = -(Math.floor(Math.random() * 60) + 30 + (i * 0.01)); // $30-90 with micro-variance
       transactions.push({
         date: monthStart.add(dayOffset, 'day').format('YYYY-MM-DD'),
-        description: ['Boston Pizza', 'Swiss Chalet', 'The Keg', 'Montréal Poutine', 'Sushi Shop'][Math.floor(Math.random() * 5)],
-        merchant: ['Boston Pizza', 'Swiss Chalet', 'The Keg', 'Montréal Poutine', 'Sushi Shop'][Math.floor(Math.random() * 5)],
-        amount: -(Math.floor(Math.random() * 60) + 30), // $30-90
+        description: `${restaurant} #${i + 1}`,
+        merchant: restaurant,
+        amount: Math.round(amount * 100) / 100, // Round to 2 decimals
         cashflow: 'expense',
         category: 'Dining',
         account: 'Credit Card',
