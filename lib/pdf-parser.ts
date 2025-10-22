@@ -445,13 +445,22 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
  */
 function parseDateFlexible(dateStr: string): string | null {
   // Clean up the date string
-  let cleanDate = dateStr.trim().toUpperCase();
+  let cleanDate = dateStr.trim();
   const originalDate = cleanDate;
   
+  // Convert to uppercase first for pattern matching
+  const upperDate = cleanDate.toUpperCase();
+  
   // Handle compact formats like JUL02, AUG12 - add space between month and day
-  if (/^[A-Z]{3}\d{1,2}$/.test(cleanDate)) {
-    cleanDate = cleanDate.replace(/^([A-Z]{3})(\d{1,2})$/, '$1 $2');
+  if (/^[A-Z]{3}\d{1,2}$/i.test(cleanDate)) {
+    cleanDate = cleanDate.replace(/^([A-Z]{3})(\d{1,2})$/i, '$1 $2');
   }
+  
+  // Convert month abbreviations to title case (Aug not AUG) for dayjs
+  // dayjs expects: Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec
+  cleanDate = cleanDate.replace(/\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\b/gi, (match) => {
+    return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
+  });
   
   // Try various date formats
   const formats = [
