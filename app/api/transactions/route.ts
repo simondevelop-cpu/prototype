@@ -27,33 +27,16 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const startParam = url.searchParams.get('start');
     const endParam = url.searchParams.get('end');
-    const months = parseInt(url.searchParams.get('months') || '6');
+    const monthsParam = url.searchParams.get('months');
 
-    let endDate, startDate;
+    let query, params;
     
     if (startParam && endParam) {
       // Use custom date range
-      startDate = dayjs(startParam).startOf('day');
-      endDate = dayjs(endParam).endOf('day');
-    } else {
-      // Calculate date range based on latest transaction
-      const latestResult = await pool.query(
-        'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
-        [userId]
-      );
-
-      if (latestResult.rows[0]?.latest) {
-        endDate = dayjs(latestResult.rows[0].latest).endOf('month');
-        startDate = endDate.subtract(months - 1, 'month').startOf('month');
-      } else {
-        endDate = dayjs().endOf('month');
-        startDate = endDate.subtract(months - 1, 'month').startOf('month');
-      }
-    }
-
-    // Query transactions
-    const result = await pool.query(
-      `SELECT 
+      const startDate = dayjs(startParam).startOf('day');
+      const endDate = dayjs(endParam).endOf('day');
+      
+      query = `SELECT 
         id,
         date,
         description,
@@ -67,10 +50,61 @@ export async function GET(request: NextRequest) {
        WHERE user_id = $1
          AND date >= $2
          AND date <= $3
-       ORDER BY date DESC
-       LIMIT 500`,
-      [userId, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')]
-    );
+       ORDER BY date DESC`;
+      params = [userId, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')];
+    } else if (monthsParam) {
+      // Calculate date range based on months parameter
+      const months = parseInt(monthsParam);
+      const latestResult = await pool.query(
+        'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
+        [userId]
+      );
+
+      let endDate, startDate;
+      if (latestResult.rows[0]?.latest) {
+        endDate = dayjs(latestResult.rows[0].latest).endOf('month');
+        startDate = endDate.subtract(months - 1, 'month').startOf('month');
+      } else {
+        endDate = dayjs().endOf('month');
+        startDate = endDate.subtract(months - 1, 'month').startOf('month');
+      }
+      
+      query = `SELECT 
+        id,
+        date,
+        description,
+        merchant,
+        cashflow,
+        account,
+        category,
+        label,
+        amount
+       FROM transactions
+       WHERE user_id = $1
+         AND date >= $2
+         AND date <= $3
+       ORDER BY date DESC`;
+      params = [userId, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')];
+    } else {
+      // No date filter - return ALL transactions
+      query = `SELECT 
+        id,
+        date,
+        description,
+        merchant,
+        cashflow,
+        account,
+        category,
+        label,
+        amount
+       FROM transactions
+       WHERE user_id = $1
+       ORDER BY date DESC`;
+      params = [userId];
+    }
+
+    // Query transactions (no LIMIT - show all)
+    const result = await pool.query(query, params);
 
     const transactions = result.rows.map(row => ({
       id: row.id,
