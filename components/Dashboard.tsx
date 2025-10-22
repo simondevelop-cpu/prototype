@@ -175,8 +175,15 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     const dates = summary.map(s => s.month);
     const earliest = dates[0];
     const latest = dates[dates.length - 1];
-    const start = new Date(earliest).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-    const end = new Date(latest).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    
+    // Show full date with day for first and last of month range
+    const startDate = new Date(earliest + '-01'); // First day of earliest month
+    const latestDate = new Date(latest + '-01');
+    const lastDay = new Date(latestDate.getFullYear(), latestDate.getMonth() + 1, 0).getDate(); // Last day of latest month
+    const endDate = new Date(latest + `-${lastDay}`);
+    
+    const start = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const end = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     return `${start} - ${end}`;
   };
 

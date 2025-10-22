@@ -66,25 +66,32 @@ export async function GET(request: NextRequest) {
       [userId, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')]
     );
 
-    // Aggregate by month
+    // Create a map with ALL months in the range (including empty ones)
     const monthMap = new Map();
+    let currentMonth = startDate.clone();
+    while (currentMonth.isBefore(endDate) || currentMonth.isSame(endDate, 'month')) {
+      const monthKey = currentMonth.format('YYYY-MM');
+      monthMap.set(monthKey, {
+        month: currentMonth.format('YYYY-MM-DD'),
+        income: 0,
+        expense: 0,
+        other: 0,
+      });
+      currentMonth = currentMonth.add(1, 'month');
+    }
+
+    // Fill in actual transaction data
     for (const row of result.rows) {
       const monthKey = dayjs(row.month).format('YYYY-MM');
-      if (!monthMap.has(monthKey)) {
-        monthMap.set(monthKey, {
-          month: dayjs(row.month).format('YYYY-MM-DD'),
-          income: 0,
-          expense: 0,
-          other: 0,
-        });
-      }
-      const monthData = monthMap.get(monthKey);
-      if (row.cashflow === 'income') {
-        monthData.income += parseFloat(row.total);
-      } else if (row.cashflow === 'expense') {
-        monthData.expense += Math.abs(parseFloat(row.total));
-      } else {
-        monthData.other += Math.abs(parseFloat(row.total));
+      if (monthMap.has(monthKey)) {
+        const monthData = monthMap.get(monthKey);
+        if (row.cashflow === 'income') {
+          monthData.income += parseFloat(row.total);
+        } else if (row.cashflow === 'expense') {
+          monthData.expense += Math.abs(parseFloat(row.total));
+        } else {
+          monthData.other += Math.abs(parseFloat(row.total));
+        }
       }
     }
 

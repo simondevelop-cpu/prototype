@@ -227,7 +227,7 @@ export default function TransactionsList({ transactions, loading }: Transactions
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Recent Transactions</h2>
+              <h2 className="text-xl font-bold text-gray-900">All Transactions</h2>
               <p className="text-sm text-gray-600 mt-1">
                 {filteredTransactions.length} {filteredTransactions.length === 1 ? 'transaction' : 'transactions'}
               </p>

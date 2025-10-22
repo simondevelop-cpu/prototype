@@ -217,8 +217,9 @@ async function seedSampleTransactions(userId) {
         const latestDate = dayjs(oldestDate.rows[0].latest);
         const expectedLatest = dayjs('2025-10-22'); // Should end at Oct 22, 2025
         
-        // If latest transaction is before Oct 2025, refresh data
-        if (latestDate.isBefore('2025-10-01')) {
+        // If latest transaction is NOT in October 2025, refresh data
+        // This catches any data from 2024 or wrong months
+        if (!latestDate.isSame('2025-10', 'month')) {
           console.log('[DB] Data is outdated (latest:', latestDate.format('YYYY-MM-DD'), '), refreshing to Oct 2025...');
           await pool.query('DELETE FROM transactions WHERE user_id = $1', [userId]);
         } else {
