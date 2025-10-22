@@ -339,17 +339,13 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                 </div>
               </button>
 
-              <button
-                onClick={() => handleStatCardClick('other')}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all hover:border-blue-300 cursor-pointer text-left"
-              >
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Net Cash Flow</p>
                     <p className="text-2xl font-bold text-blue-600 mt-1">
                       ${summary.reduce((sum, m) => sum + (m.income || 0) - (m.expense || 0), 0).toLocaleString()}
                     </p>
-                    <p className="text-xs text-gray-500 mt-2">Click to see transfers</p>
                   </div>
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                     <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -357,7 +353,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                     </svg>
                   </div>
                 </div>
-              </button>
+              </div>
             </div>
 
             {/* Category Breakdown */}

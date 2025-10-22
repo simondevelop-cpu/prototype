@@ -207,15 +207,32 @@ async function seedSampleTransactions(userId) {
     );
     
     if (parseInt(existing.rows[0].count) > 0) {
-      console.log('[DB] Sample transactions already exist');
-      return;
+      console.log('[DB] Demo transactions already exist, checking if refresh needed...');
+      // Check if data is old (more than 30 days)
+      const oldestDate = await pool.query(
+        'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
+        [userId]
+      );
+      if (oldestDate.rows[0]?.latest) {
+        const daysSinceLatest = dayjs().diff(dayjs(oldestDate.rows[0].latest), 'day');
+        if (daysSinceLatest > 30) {
+          console.log('[DB] Data is outdated, refreshing with current dates...');
+          await pool.query('DELETE FROM transactions WHERE user_id = $1', [userId]);
+        } else {
+          console.log('[DB] Data is current, skipping reseed');
+          return;
+        }
+      } else {
+        return;
+      }
     }
 
     console.log('[DB] Seeding 12 months of realistic Canadian demo transactions...');
     
-    // Generate 12 months of realistic Canadian transactions (Nov 2023 - Oct 2024)
+    // Generate 12 months of realistic Canadian transactions (last 12 months from today)
     const transactions = [];
-    const startDate = dayjs('2023-11-01');
+    const today = dayjs();
+    const startDate = today.subtract(11, 'month').startOf('month');
     
     // Monthly recurring transactions
     for (let month = 0; month < 12; month++) {
