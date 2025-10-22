@@ -90,6 +90,12 @@ export async function parseBankStatement(
   console.log(`[PDF Parser] Extracted ${text.length} characters of text`);
   console.log(`[PDF Parser] First 500 chars: ${text.substring(0, 500)}`);
   
+  // Check if PDF extraction failed (likely image-based PDF)
+  if (text.length < 100) {
+    console.error('[PDF Parser] Very little text extracted - likely an image-based or scanned PDF');
+    throw new Error('This appears to be a scanned/image-based PDF. Please upload a text-based PDF statement, or try downloading the statement again from your bank\'s website.');
+  }
+  
   // Detect bank
   const bank = detectBank(text);
   console.log(`[PDF Parser] Detected bank: ${bank}`);
