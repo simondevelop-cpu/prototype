@@ -353,6 +353,9 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
 
     const dateMatch = line.match(datePattern);
     if (!dateMatch) {
+      if (parsedCount < 5) {
+        console.log(`[PDF Parser] No date match in line: ${line.substring(0, 80)}`);
+      }
       skippedCount++;
       continue;
     }
@@ -362,6 +365,10 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
       console.log(`[PDF Parser] Failed to parse date: ${dateMatch[1]} in line: ${line.substring(0, 80)}`);
       skippedCount++;
       continue;
+    }
+    
+    if (parsedCount < 5) {
+      console.log(`[PDF Parser] Processing line with date ${date}: ${line.substring(0, 80)}`);
     }
 
     // Extract all amounts in the line (with or without $ signs)
@@ -404,11 +411,28 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
       }
     } else {
       // Credit card format: Date at start, amount later
-      // Extract description (text between date and first amount)
-      const descStart = line.indexOf(dateMatch[0]) + dateMatch[0].length;
+      // TD credit cards have TWO dates: transaction date + posting date
+      // Format: AUG12 AUG13 $18.39 MERCHANT
+      
+      // Find all dates in the line
+      const allDates = Array.from(line.matchAll(new RegExp(datePattern.source, 'g')));
+      
+      // If there are 2 dates at the start (credit card), use the first one and skip both when extracting description
+      let descStart;
+      if (allDates.length >= 2 && line.indexOf(allDates[1][0]) < 30) {
+        // Two dates at the beginning - skip both (use posting date)
+        descStart = line.indexOf(allDates[1][0]) + allDates[1][0].length;
+      } else {
+        // Single date - skip it
+        descStart = line.indexOf(dateMatch[0]) + dateMatch[0].length;
+      }
+      
       const firstAmountIdx = line.search(/\$?\s*[\d,]+\.\d{2}/);
       
       if (firstAmountIdx <= descStart) {
+        if (parsedCount < 5) {
+          console.log(`[PDF Parser] Skipping - amount before description. descStart: ${descStart}, amountIdx: ${firstAmountIdx}`);
+        }
         skippedCount++;
         continue;
       }
