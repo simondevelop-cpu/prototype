@@ -81,12 +81,14 @@ const ACCOUNT_TYPE_PATTERNS = {
 export async function parseBankStatement(
   pdfBuffer: Buffer,
   userId: string,
-  filename: string
+  filename: string = 'unknown'
 ): Promise<ParseResult> {
-  console.log(`[PDF Parser] Processing ${filename} for user ${userId}`);
+  console.log(`[PDF Parser] ===== Processing ${filename} for user ${userId} =====`);
 
   // Extract text from PDF
   const text = await extractPDFText(pdfBuffer);
+  console.log(`[PDF Parser] Extracted ${text.length} characters of text`);
+  console.log(`[PDF Parser] First 500 chars: ${text.substring(0, 500)}`);
   
   // Detect bank
   const bank = detectBank(text);
@@ -294,36 +296,102 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
   const transactions: Transaction[] = [];
   const lines = text.split('\n');
 
+  console.log(`[PDF Parser] parseGenericTransactions called with accountType: ${accountType}`);
+  console.log(`[PDF Parser] Total lines to process: ${lines.length}`);
+
   // More flexible date patterns for Canadian banks
   // Matches: MM/DD, MM/DD/YY, MM/DD/YYYY, AUG 12, AUG12, JUL02, YYYY-MM-DD, etc.
   const datePattern = /\b([A-Z]{3}\s*\d{1,2}(?:,?\s*\d{4})?|\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\d{4}-\d{2}-\d{2})\b/;
-  const amountPattern = /\$\s*([\d,]+\.\d{2})/g;
+  
+  // Enhanced amount pattern - with or without $ sign
+  const amountPattern = /\$?\s*([\d,]+\.\d{2})/g;
+
+  let parsedCount = 0;
+  let skippedCount = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
     // Skip empty, short, or header lines
-    if (!line || line.length < 10) continue;
-    if (/^(date|trans|posting|description|amount|balance|statement|payment|debit|credit)/i.test(line)) continue;
+    if (!line || line.length < 10) {
+      skippedCount++;
+      continue;
+    }
+    if (/^(date|trans|posting|description|amount|balance|statement|payment|debit|credit|withdrawals|deposits)/i.test(line)) {
+      skippedCount++;
+      continue;
+    }
 
     const dateMatch = line.match(datePattern);
-    if (!dateMatch) continue;
+    if (!dateMatch) {
+      skippedCount++;
+      continue;
+    }
 
     const date = parseDateFlexible(dateMatch[1]);
-    if (!date) continue;
+    if (!date) {
+      console.log(`[PDF Parser] Failed to parse date: ${dateMatch[1]} in line: ${line.substring(0, 80)}`);
+      skippedCount++;
+      continue;
+    }
 
-    // Extract all amounts in the line
+    // Extract all amounts in the line (with or without $ signs)
     const amounts = Array.from(line.matchAll(amountPattern), m => parseFloat(m[1].replace(/,/g, '')));
     
-    if (amounts.length === 0) continue;
+    if (amounts.length === 0) {
+      skippedCount++;
+      continue;
+    }
 
-    // Extract description (text between date and first amount)
-    const descStart = line.indexOf(dateMatch[0]) + dateMatch[0].length;
-    const firstAmountIdx = line.search(/\$\s*[\d,]+\.\d{2}/);
+    // For TD chequing format: Description | Withdrawals | Deposits | Date | Balance
+    // Date comes AFTER amounts, so we need different extraction logic
     
-    if (firstAmountIdx <= descStart) continue;
+    let description = '';
+    let amount = 0;
     
-    const description = line.substring(descStart, firstAmountIdx).trim();
+    // Find date position in line
+    const dateIdx = line.indexOf(dateMatch[0]);
+    
+    // Check if this looks like a table format (date at end with | separators)
+    if (line.includes('|') && dateIdx > line.length / 2) {
+      // TD Chequing format: split by | and extract fields
+      const parts = line.split('|').map(p => p.trim());
+      
+      if (parts.length >= 3) {
+        description = parts[0]; // First column is description
+        
+        // Look for amounts in the Withdrawals and Deposits columns
+        const withdrawalMatch = parts[1].match(/[\d,]+\.\d{2}/);
+        const depositMatch = parts[2].match(/[\d,]+\.\d{2}/);
+        
+        if (withdrawalMatch) {
+          amount = -Math.abs(parseFloat(withdrawalMatch[0].replace(/,/g, '')));
+        } else if (depositMatch) {
+          amount = Math.abs(parseFloat(depositMatch[0].replace(/,/g, '')));
+        } else {
+          // Try to get any amount from the line
+          amount = amounts[0];
+        }
+      }
+    } else {
+      // Credit card format: Date at start, amount later
+      // Extract description (text between date and first amount)
+      const descStart = line.indexOf(dateMatch[0]) + dateMatch[0].length;
+      const firstAmountIdx = line.search(/\$?\s*[\d,]+\.\d{2}/);
+      
+      if (firstAmountIdx <= descStart) {
+        skippedCount++;
+        continue;
+      }
+      
+      description = line.substring(descStart, firstAmountIdx).trim();
+      
+      // For credit cards, all transactions are expenses
+      amount = amounts[amounts.length - 1];
+      if (accountType.toLowerCase().includes('credit')) {
+        amount = -Math.abs(amount);
+      }
+    }
     
     // Clean up description - remove transaction IDs and extra whitespace
     const cleanDescription = description
@@ -331,33 +399,20 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
       .replace(/\s{2,}/g, ' ') // Collapse multiple spaces
       .trim();
 
-    if (!cleanDescription || cleanDescription.length < 3) continue;
-
-    // Smart amount detection:
-    // - If multiple amounts: last one is usually the final transaction amount
-    // - For credit cards: all are expenses (negative)
-    // - For bank accounts: check for withdrawal/deposit indicators
-    let amount = amounts[amounts.length - 1];
-    
-    // For credit card statements, make all transactions negative (expenses)
-    if (accountType.toLowerCase().includes('credit')) {
-      amount = -Math.abs(amount);
-    } else {
-      // For bank accounts, try to detect if it's a debit or credit
-      // If there are 2 amounts and second is larger, it's likely balance - use first amount
-      if (amounts.length >= 2 && amounts[1] > amounts[0] * 2) {
-        amount = amounts[0];
-      }
-      
-      // Check for withdrawal/debit keywords
-      if (/withdrawal|debit|payment|purchase|atm/i.test(line)) {
-        amount = -Math.abs(amount);
-      }
+    if (!cleanDescription || cleanDescription.length < 3) {
+      skippedCount++;
+      continue;
     }
 
     transactions.push(createTransaction(date, cleanDescription, amount, accountType));
+    parsedCount++;
+    
+    if (parsedCount <= 5) {
+      console.log(`[PDF Parser] Parsed transaction: ${date} | ${cleanDescription} | ${amount}`);
+    }
   }
 
+  console.log(`[PDF Parser] Parsing complete: ${parsedCount} transactions parsed, ${skippedCount} lines skipped`);
   return transactions;
 }
 
