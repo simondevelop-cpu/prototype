@@ -1,402 +1,358 @@
-# Canadian Insights - Personal Finance Web App
+# Canadian Insights 💰📊
 
-A personal finance application built for Canadian households, featuring transaction tracking, budgeting, insights, and financial analytics.
+A modern, AI-ready personal finance management application built for Canadians. Track your spending, visualize cash flow, and gain insights into your financial habits.
 
-## 🏗️ **Architecture**
-
-### **Frontend**
-- **Framework:** Vanilla JavaScript (no build tooling required)
-- **Future:** Can migrate to React when needed (API-compatible)
-- **Styling:** Custom CSS
-- **Charts:** Vanilla JS with Chart.js or similar
-
-### **Backend**
-- **Runtime:** Node.js + Express.js
-- **Database:** PostgreSQL (Neon on Vercel)
-- **Authentication:** JWT-based, database-backed
-- **Architecture:** Multi-tenant SaaS (shared database, isolated by user_id)
-
-### **Deployment**
-- **Platform:** Vercel Serverless Functions
-- **Static Assets:** Served by Vercel CDN
-- **Database:** Neon PostgreSQL (Canada Central region)
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![Next.js](https://img.shields.io/badge/Next.js-14.2.0-black.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ---
 
-## ✨ **Features**
+## ✨ Features
 
-### **Core Functionality**
-- ✅ **User Authentication**
-  - JWT-based secure authentication
-  - Demo account with pre-populated data
-  - User registration for personal accounts
+### 📊 **Dashboard**
+- **Interactive Cash Flow Chart** - Visualize income, expenses, and other transactions over time
+- **Time Range Filters** - View data for 3 months, 6 months, 12 months, or custom date ranges
+- **Clickable Charts** - Click on bars to drill down into specific months and categories
+- **Real-time Stats Cards** - Total Income, Total Expenses, and Net Cash Flow at a glance
+- **Category Breakdown** - See where your money goes with detailed expense categorization
+- **Percentage Analysis** - Visual breakdowns showing % of total for each category
 
-- ✅ **Transaction Management**
-  - View transactions with filtering and search
-  - Categories and labels
-  - CSV import support
-  - 200+ realistic Canadian demo transactions (12 months)
+### 💳 **Transactions**
+- **Complete Transaction Management**
+  - ✅ Add new transactions manually
+  - ✅ Edit existing transactions inline
+  - ✅ Delete transactions with confirmation
+  - ✅ Bulk update multiple transactions at once
+- **Powerful Filtering & Search**
+  - Universal search across description, amount, category, label
+  - Filter by date range, category, account, cashflow type
+  - Persistent selection across filters
+- **Smart Categorization**
+  - Auto-categorize as "Uncategorised" if no category provided
+  - Autocomplete for categories and accounts
+- **Bulk Operations**
+  - Select multiple transactions with checkboxes
+  - Bulk recategorize, change account, or update labels
+  - Shows selection count and total amount
 
-- ✅ **Financial Dashboard**
-  - Monthly cash flow visualization
-  - Income vs expenses tracking
-  - Category breakdown
-  - Spending trends
+### 🔐 **Authentication**
+- Secure JWT-based authentication
+- User registration with hashed passwords
+- Demo account with 12 months of realistic Canadian transaction data
+- Multi-user support with data isolation
 
-- ✅ **Budgeting**
-  - Monthly and quarterly budget analysis
-  - Category-wise spending breakdown
-  - Spending vs budget comparison
-  - Savings calculation
-
-- ✅ **Savings Tracking**
-  - Cumulative savings calculation
-  - Savings goals
-  - Year-to-date and lifetime views
-
-- ✅ **Insights**
-  - Top spending categories
-  - Average monthly spending
-  - Savings rate analysis
-  - Personalized recommendations
+### 🎨 **Modern UI/UX**
+- Built with Next.js 14 and React
+- Styled with Tailwind CSS
+- Responsive design (mobile, tablet, desktop)
+- Beautiful modals and interactive components
+- Smooth transitions and loading states
 
 ---
 
-## 🚀 **Getting Started**
+## 🚀 Quick Start
 
-### **Prerequisites**
-- Node.js 18+ (for local development)
-- PostgreSQL database (Neon recommended for production)
+### Prerequisites
+- Node.js 18+ (or use Vercel serverless)
+- PostgreSQL database (Vercel Neon recommended)
 
-### **Local Development**
+### Environment Variables
+
+Create a `.env` file in the root directory:
+
+```env
+DATABASE_URL=postgresql://user:password@host:port/database
+JWT_SECRET=your-super-secret-key-change-this-in-production
+DEMO_EMAIL=demo@example.com
+DEMO_PASSWORD=demo123
+```
+
+### Installation
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd prototype
-
 # Install dependencies
 npm install
 
-# Set up environment variables (optional for local dev)
-cp .env.example .env.local
-# Edit .env.local with your DATABASE_URL
+# Run database initialization (creates tables and seeds demo data)
+node init-db.js
 
-# Run the server
-npm start
-
-# Open in browser
-open http://localhost:3000
+# Start development server
+npm run dev
 ```
 
-### **Static Mode (No Database)**
-```bash
-# Just open the HTML file
-open index.html
+Visit `http://localhost:3000` and log in with:
+- **Email**: demo@example.com
+- **Password**: demo123
+
+### Deployment (Vercel)
+
+1. **Connect to GitHub**
+   - Push your code to GitHub
+   - Import project in Vercel
+
+2. **Add Neon Postgres**
+   - In Vercel dashboard → Storage → Create Database
+   - Choose Neon (serverless Postgres)
+   - Select your region and auth method
+
+3. **Set Environment Variables**
+   - Vercel auto-creates `DATABASE_URL`
+   - Add `JWT_SECRET`, `DEMO_EMAIL`, `DEMO_PASSWORD`
+
+4. **Deploy**
+   ```bash
+   git push origin main
+   ```
+   - Vercel auto-deploys on push
+   - Database initializes lazily on first request
+
+---
+
+## 📁 Project Structure
+
+```
+prototype/
+├── app/                          # Next.js App Router
+│   ├── api/                      # API Routes
+│   │   ├── auth/                 # Authentication endpoints
+│   │   │   ├── login/            # POST /api/auth/login
+│   │   │   └── register/         # POST /api/auth/register
+│   │   ├── transactions/         # Transaction CRUD
+│   │   │   ├── create/           # POST /api/transactions/create
+│   │   │   ├── update/           # PUT /api/transactions/update
+│   │   │   ├── delete/           # DELETE /api/transactions/delete
+│   │   │   ├── bulk-update/      # POST /api/transactions/bulk-update
+│   │   │   └── route.ts          # GET /api/transactions
+│   │   ├── summary/              # GET /api/summary (dashboard data)
+│   │   └── categories/           # GET /api/categories (breakdown)
+│   ├── globals.css               # Tailwind directives
+│   ├── layout.tsx                # Root layout
+│   └── page.tsx                  # Main entry (auth wrapper)
+├── components/                   # React Components
+│   ├── Dashboard.tsx             # Main dashboard with tabs
+│   ├── CashflowChart.tsx         # Interactive Recharts bar chart
+│   ├── TransactionsList.tsx      # Transaction table with CRUD
+│   ├── TransactionModal.tsx      # Add/Edit transaction form
+│   ├── BulkRecategorizeModal.tsx # Bulk update modal
+│   └── Login.tsx                 # Login/Register forms
+├── lib/                          # Shared utilities
+│   ├── auth.ts                   # JWT & password hashing
+│   └── db.ts                     # PostgreSQL connection pool
+├── server.js                     # Express backend (demo data seeding)
+├── init-db.js                    # Database initialization script
+├── package.json                  # Dependencies
+├── next.config.js                # Next.js configuration
+├── tailwind.config.ts            # Tailwind configuration
+├── tsconfig.json                 # TypeScript configuration
+└── vercel.json                   # Vercel deployment config
 ```
 
 ---
 
-## 🔐 **Authentication**
+## 🔧 Tech Stack
 
-### **Demo Account**
-Perfect for exploring the app with realistic data:
-- **Email:** `demo@canadianinsights.ca`
-- **Password:** `northstar-demo`
-- **Data:** 12 months of realistic Canadian transactions
+### **Frontend**
+- **Next.js 14** - React framework with App Router
+- **React 18** - UI library
+- **TypeScript** - Type safety
+- **Tailwind CSS** - Utility-first styling
+- **Recharts** - Chart library
+- **Day.js** - Date manipulation
 
-### **Create Your Own Account**
-1. Click "Create Account"
-2. Enter email, password, and name
-3. Start with empty state
-4. Upload CSV to populate your data
+### **Backend**
+- **Next.js API Routes** - Serverless functions
+- **Express.js** - (Legacy, for demo data seeding)
+- **PostgreSQL** - Database
+- **JWT** - Authentication tokens
+- **bcryptjs** - Password hashing
 
-### **Multi-Tenant Architecture**
-- All users share the same database
-- Data is isolated by `user_id` (integer foreign key)
-- Users can only see their own transactions
-- Demo user has ID: 1, new users get sequential IDs
-
----
-
-## 📊 **Demo Data**
-
-The demo account includes 12 months of realistic Canadian financial data:
-
-### **Income**
-- Monthly salary: $4,800
-- Occasional freelance: $600-1,100 (quarterly)
-
-### **Expenses**
-- **Housing:** Rent ($1,650/month)
-- **Utilities:** Hydro-Québec ($90-150), Rogers Internet ($85), Telus Mobile ($65)
-- **Groceries:** Loblaws, Metro, Sobeys, No Frills (4x/month, $120-200 each)
-- **Transportation:** Presto Card ($156), Gas ($50-80), occasional Uber
-- **Dining:** Tim Hortons, Starbucks (15-20x/month, $4-12), Restaurants (3-5x/month, $40-100)
-- **Shopping:** Amazon.ca, Winners, Canadian Tire, Shoppers Drug Mart
-- **Entertainment:** Netflix, Spotify, Cineplex
-
-### **Savings**
-- Monthly transfer: $500 to savings account
-
-**Total Transactions:** 200+ across 12 months (Nov 2023 - Oct 2024)
+### **Deployment**
+- **Vercel** - Hosting and serverless functions
+- **Neon** - Serverless Postgres
 
 ---
 
-## 🗂️ **API Endpoints**
+## 🗄️ Database Schema
 
-### **Authentication**
-```
-POST   /api/auth/login      - Login with email/password
-POST   /api/auth/register   - Create new account
-GET    /api/auth/me         - Get current user info
-```
-
-### **Data Endpoints** (all require authentication)
-```
-GET    /api/transactions    - List transactions with filters
-GET    /api/summary         - Monthly cash flow summary
-GET    /api/budget          - Budget analysis by category
-GET    /api/savings         - Savings tracking
-GET    /api/insights        - Personalized insights
-```
-
-### **Example Requests**
-
-**Login:**
-```bash
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"demo@canadianinsights.ca","password":"northstar-demo"}'
-```
-
-**Get Transactions:**
-```bash
-curl http://localhost:3000/api/transactions?limit=50 \
-  -H "Authorization: Bearer <your-jwt-token>"
-```
-
----
-
-## 🗄️ **Database Schema**
-
-### **users**
+### **users** table
 ```sql
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
-  email TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  display_name TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  name VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-### **transactions**
+### **transactions** table
 ```sql
 CREATE TABLE transactions (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id),
+  date DATE NOT NULL,
   description TEXT NOT NULL,
   merchant TEXT,
-  date DATE NOT NULL,
-  cashflow TEXT NOT NULL CHECK (cashflow IN ('income', 'expense', 'other')),
-  account TEXT NOT NULL,
-  category TEXT NOT NULL,
-  label TEXT DEFAULT '',
-  amount NUMERIC(12, 2) NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+  amount DECIMAL(10, 2) NOT NULL,
+  cashflow VARCHAR(50),
+  category VARCHAR(255),
+  account VARCHAR(255),
+  label VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_transactions_user_id ON transactions(user_id);
-CREATE INDEX idx_transactions_date ON transactions(date);
-CREATE INDEX idx_transactions_cashflow ON transactions(cashflow);
 ```
 
 ---
 
-## 🚢 **Deployment to Vercel**
+## 🔑 API Endpoints
 
-### **1. Connect Repository**
-1. Go to [vercel.com](https://vercel.com)
-2. Import your Git repository
-3. Framework Preset: **Other**
-4. Build Command: *(leave empty)*
-5. Deploy
+### Authentication
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/login` | POST | Login with email/password |
+| `/api/auth/register` | POST | Register new user |
 
-### **2. Set Up Database**
-1. In Vercel dashboard, go to **Storage** tab
-2. Click **Create Database** → **Neon Postgres**
-3. Choose **Canada (Central)** region
-4. Database automatically connects and sets `DATABASE_URL`
+### Transactions
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/transactions` | GET | Get all transactions (or filtered by date) |
+| `/api/transactions/create` | POST | Create new transaction |
+| `/api/transactions/update` | PUT | Update existing transaction |
+| `/api/transactions/delete` | DELETE | Delete transaction |
+| `/api/transactions/bulk-update` | POST | Bulk update multiple transactions |
 
-### **3. First Deployment**
-- On first API request after deployment, database initializes automatically
-- Schema created, demo user seeded, sample transactions loaded
-- Takes 1-2 seconds on first load
-- Subsequent requests are instant
-
-### **4. Environment Variables** (Optional)
-```
-DATABASE_URL     - (Auto-set by Neon)
-JWT_SECRET       - Custom JWT signing key (optional)
-DEMO_EMAIL       - Override demo email (optional)
-DEMO_PASSWORD    - Override demo password (optional)
-```
+### Analytics
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/summary` | GET | Monthly income/expense summary for charts |
+| `/api/categories` | GET | Category breakdown for selected period |
 
 ---
 
-## 🧪 **Testing**
+## 🎯 Roadmap & Next Steps
 
-### **Manual Testing Checklist**
+### 🚧 Phase 1: Core Infrastructure (Q1 2025)
+- [ ] **Onboarding Journey**
+  - Welcome flow for new users
+  - Guided tour of features
+  - Quick setup wizard
+  - Sample data generator
 
-**Authentication:**
-- [ ] Login with demo account works
-- [ ] Create new account works
-- [ ] Sign out works
-- [ ] Token persists across page reloads
-- [ ] Invalid credentials rejected
+- [ ] **Settings Page**
+  - Profile management
+  - Password change
+  - Account preferences
+  - Data export (CSV, JSON)
+  - Dark mode toggle
+  - Notification preferences
 
-**Data Endpoints:**
-- [ ] Dashboard shows charts and data
-- [ ] Transactions tab shows list
-- [ ] Budget tab shows category breakdown
-- [ ] Savings tab shows goals
-- [ ] Insights tab shows recommendations
+### 🤖 Phase 2: AI & Automation (Q2 2025)
+- [ ] **Smart Categorization Engine**
+  - Machine learning for auto-categorization
+  - Pattern recognition for merchants
+  - User training/correction loop
+  - Canadian-specific merchant database
 
-**Multi-Tenancy:**
-- [ ] Demo user sees 200+ transactions
-- [ ] New user sees empty state
-- [ ] Different users see different data
-- [ ] Users can't access others' transactions
+- [ ] **PDF Bank Statement Parser**
+  - Upload PDF statements
+  - OCR text extraction
+  - Intelligent transaction parsing
+  - Support for major Canadian banks (RBC, TD, Scotia, BMO, CIBC)
+  - CSV import as fallback
 
----
+- [ ] **Automated Insights Engine**
+  - Spending pattern analysis
+  - Anomaly detection (unusual transactions)
+  - Month-over-month comparisons
+  - Budget recommendations
+  - Savings opportunities
+  - Predictive cash flow forecasting
 
-## 📝 **Development Notes**
+### 📊 Phase 3: Advanced Analytics (Q3 2025)
+- [ ] **Enhanced Insights Tab**
+  - Spending trends and forecasts
+  - Category deep-dives
+  - Merchant analysis
+  - Budget vs. actual tracking
+  - Goal setting and tracking
+  - Net worth dashboard
 
-### **Why Vanilla JavaScript?**
-- ✅ **Simple:** No build step, no complex tooling
-- ✅ **Fast:** Instant page loads, no bundle size
-- ✅ **Flexible:** Easy to understand and modify
-- ✅ **Vercel-ready:** Works perfectly with serverless
+- [ ] **Reporting**
+  - Customizable reports
+  - Tax preparation exports
+  - Yearly summaries
+  - Quarterly reviews
+  - Downloadable PDFs
 
-### **When to Migrate to React?**
-Consider React when:
-- UI complexity increases significantly
-- Need component reusability
-- Want better state management
-- Team prefers React ecosystem
+### 🔗 Phase 4: Integrations (Q4 2025)
+- [ ] **Bank Connections**
+  - Plaid integration for Canadian banks
+  - Automatic transaction sync
+  - Balance tracking
+  - Account aggregation
 
-**Migration path:**
-- API endpoints stay the same (no changes needed)
-- Rebuild frontend incrementally
-- Keep working on current version while migrating
+- [ ] **Third-party Integrations**
+  - Export to accounting software (QuickBooks, FreshBooks)
+  - Calendar integration for bill reminders
+  - Email parsing for e-receipts
 
-### **Current Tech Stack**
-```
-Frontend:  Vanilla JS + HTML + CSS
-Backend:   Node.js + Express.js
-Database:  PostgreSQL (Neon)
-Auth:      JWT tokens
-Hosting:   Vercel Serverless Functions
-```
+### 🎨 Phase 5: UX Enhancements (Ongoing)
+- [ ] **Mobile App**
+  - Native iOS and Android apps
+  - Offline mode
+  - Push notifications
+  - Quick expense entry
 
----
-
-## 🐛 **Troubleshooting**
-
-### **Login Returns 401**
-- Check email is lowercase (demo@canadianinsights.ca)
-- Verify password is correct
-- Check Vercel logs for database errors
-
-### **Empty Dashboard**
-- Wait 1-2 seconds on first load (database initializing)
-- Check Network tab for 200/304 responses
-- Verify demo data was seeded (check Vercel logs)
-
-### **Database Connection Issues**
-- Verify `DATABASE_URL` is set in Vercel
-- Check Neon dashboard that database is active
-- Review Vercel function logs for connection errors
-
-### **500 Errors on Data Endpoints**
-- Check Vercel function logs for SQL errors
-- Verify schema was created successfully
-- Ensure user_id is an integer (not text)
-
----
-
-## 📚 **Documentation**
-
-- **ARCHITECTURE_EXPLAINED.md** - Detailed architecture and design decisions
-- **ARCHITECTURE_FIX.md** - Technical details on the auth system redesign
-- **VERCEL_DATABASE_SETUP.md** - Step-by-step Vercel deployment guide
-- **TESTING_CHECKLIST.md** - Comprehensive testing procedures
+- [ ] **Collaboration Features**
+  - Shared accounts for couples/families
+  - Split expenses
+  - Expense approval workflows
 
 ---
 
-## 🗺️ **Roadmap**
+## 🐛 Known Issues & Limitations
 
-### **Phase 1: Core Functionality** ✅ **COMPLETE**
-- [x] JWT authentication
-- [x] User registration
-- [x] Transaction management
-- [x] Dashboard with charts
-- [x] Budget analysis
-- [x] Savings tracking
-- [x] Insights
-
-### **Phase 2: Enhanced Features** (Future)
-- [ ] CSV upload and import
-- [ ] Transaction editing and deletion
-- [ ] Custom budget categories
-- [ ] Recurring transactions
-- [ ] Export data (PDF, CSV)
-- [ ] Mobile-responsive design
-
-### **Phase 3: Advanced Features** (Future)
-- [ ] Multi-currency support
-- [ ] Bill reminders
-- [ ] Debt tracking
-- [ ] Investment tracking
-- [ ] Financial goals with milestones
-- [ ] French language support
-
-### **Phase 4: React Migration** (Optional)
-- [ ] Set up Next.js or Vite
-- [ ] Rebuild UI components in React
-- [ ] Implement routing
-- [ ] Add animations and transitions
-- [ ] Enhance mobile experience
+- Settings page is placeholder (coming soon modal)
+- Insights tab is placeholder (coming soon)
+- No mobile app yet (responsive web only)
+- Manual transaction entry only (no bank import yet)
+- Single currency support (CAD)
 
 ---
 
-## 🤝 **Contributing**
+## 🤝 Contributing
 
-This is currently a prototype for stakeholder review. If you'd like to contribute:
+This is a prototype project. Contributions welcome!
 
-1. Check the roadmap for planned features
-2. Open an issue to discuss your idea
-3. Fork the repository
-4. Create a feature branch
-5. Submit a pull request
-
----
-
-## 📄 **License**
-
-Proprietary – Internal prototype for discovery and user feedback.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ---
 
-## 🙋 **Support**
+## 📝 License
 
-For questions or issues:
-1. Check the troubleshooting section above
-2. Review the documentation files
-3. Check Vercel function logs
-4. Open an issue with detailed error information
+MIT License - feel free to use this project for personal or commercial purposes.
 
 ---
 
-**Built with ❤️ for Canadians, by Canadians** 🇨🇦
+## 🙏 Acknowledgments
+
+- Built with ❤️ for the Canadian financial management community
+- Demo data includes realistic Canadian merchants and spending patterns
+- Inspired by modern fintech apps like Mint, YNAB, and Monarch Money
+
+---
+
+## 📞 Support
+
+For questions, issues, or feature requests, please open an issue on GitHub.
+
+**Demo Account Credentials:**
+- Email: demo@example.com
+- Password: demo123
+
+**Happy tracking!** 🎉💸

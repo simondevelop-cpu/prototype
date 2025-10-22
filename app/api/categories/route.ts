@@ -62,15 +62,14 @@ export async function GET(request: NextRequest) {
     // Query transactions grouped by category
     const result = await pool.query(
       `SELECT 
-        category,
+        COALESCE(category, 'Uncategorised') as category,
         SUM(ABS(amount)) as total
        FROM transactions
        WHERE user_id = $1
          AND cashflow = $2
          AND date >= $3
          AND date <= $4
-         AND category IS NOT NULL
-       GROUP BY category
+       GROUP BY COALESCE(category, 'Uncategorised')
        ORDER BY total DESC`,
       [userId, cashflowParam, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')]
     );

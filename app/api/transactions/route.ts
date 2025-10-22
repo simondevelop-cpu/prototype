@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
       merchant: row.merchant,
       cashflow: row.cashflow,
       account: row.account,
-      category: row.category,
+      category: row.category || 'Uncategorised',
       label: row.label,
       amount: parseFloat(row.amount),
     }));
