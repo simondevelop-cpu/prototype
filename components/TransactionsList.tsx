@@ -4,7 +4,6 @@ import { useState } from 'react';
 import dayjs from 'dayjs';
 import TransactionModal from './TransactionModal';
 import BulkRecategorizeModal from './BulkRecategorizeModal';
-import StatementUploadModal from './StatementUploadModal';
 
 interface TransactionsListProps {
   transactions: any[];
