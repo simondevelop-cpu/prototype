@@ -266,9 +266,70 @@ function parseScotiabankTransactions(text: string, accountType: string): Transac
 
 /**
  * Parse BMO transactions
+ * Format for credit cards: Trans Date | Posting Date/Trans ID | Description | Pre-Tax | Tax | Trans Amount
  */
 function parseBMOTransactions(text: string, accountType: string): Transaction[] {
-  return parseGenericTransactions(text, accountType);
+  const transactions: Transaction[] = [];
+  const lines = text.split('\n');
+
+  // BMO credit card specific parsing
+  let inTransactionSection = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Detect transaction section
+    if (/transaction summary/i.test(line)) {
+      inTransactionSection = true;
+      continue;
+    }
+    
+    if (!inTransactionSection) continue;
+    
+    // Skip headers and empty lines
+    if (!line || line.length < 10) continue;
+    if (/trans date|posting date|description/i.test(line)) continue;
+    
+    // BMO format: MM/DD date at start
+    const dateMatch = line.match(/^(\d{2}\/\d{2})/);
+    if (!dateMatch) continue;
+
+    const transDate = dateMatch[1];
+    const date = parseDateFlexible(transDate);
+    if (!date) continue;
+
+    // Extract description and amounts
+    // Pattern: date, then description (multiple words), then amounts at the end
+    const amountPattern = /\$\s*([\d,]+\.\d{2})/g;
+    const amounts = Array.from(line.matchAll(amountPattern), m => parseFloat(m[1].replace(/,/g, '')));
+    
+    if (amounts.length === 0) continue;
+
+    // The last amount is the transaction amount
+    const amount = -Math.abs(amounts[amounts.length - 1]); // Negative for expenses
+
+    // Extract description (between date and first amount)
+    const descStart = line.indexOf(transDate) + transDate.length;
+    const firstAmountIdx = line.search(/\$\s*[\d,]+\.\d{2}/);
+    
+    if (firstAmountIdx <= descStart) continue;
+    
+    const description = line.substring(descStart, firstAmountIdx).trim();
+    
+    // Remove transaction ID if present (numbers at start of description)
+    const cleanDescription = description.replace(/^\d+\s*/, '').trim();
+    
+    if (!cleanDescription || cleanDescription.length < 3) continue;
+
+    transactions.push(createTransaction(date, cleanDescription, amount, accountType));
+  }
+
+  // If no transactions found with BMO-specific parser, fallback to generic
+  if (transactions.length === 0) {
+    return parseGenericTransactions(text, accountType);
+  }
+
+  return transactions;
 }
 
 /**
