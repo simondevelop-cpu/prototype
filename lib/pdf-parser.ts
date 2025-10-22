@@ -446,6 +446,7 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
 function parseDateFlexible(dateStr: string): string | null {
   // Clean up the date string
   let cleanDate = dateStr.trim().toUpperCase();
+  const originalDate = cleanDate;
   
   // Handle compact formats like JUL02, AUG12 - add space between month and day
   if (/^[A-Z]{3}\d{1,2}$/.test(cleanDate)) {
@@ -457,7 +458,6 @@ function parseDateFlexible(dateStr: string): string | null {
     'MMM DD, YYYY',  // Aug 12, 2025
     'MMM DD',        // Aug 12 (no year) or JUL 02
     'MMM D',         // Aug 1 (no year)
-    'MMMDD',         // JUL02 (compact, now with space added above)
     'MM/DD/YYYY',    // 08/12/2025
     'MM/DD/YY',      // 08/12/25
     'MM/DD',         // 08/12 (no year)
@@ -478,12 +478,17 @@ function parseDateFlexible(dateStr: string): string | null {
         
         // If parsed month is greater than current month, it's probably from last year
         const year = parsedMonth > currentMonth + 2 ? currentYear - 1 : currentYear;
-        return parsed.year(year).format('YYYY-MM-DD');
+        const finalDate = parsed.year(year).format('YYYY-MM-DD');
+        console.log(`[PDF Parser] Parsed date '${originalDate}' → '${cleanDate}' → '${finalDate}' using format '${format}'`);
+        return finalDate;
       }
-      return parsed.format('YYYY-MM-DD');
+      const finalDate = parsed.format('YYYY-MM-DD');
+      console.log(`[PDF Parser] Parsed date '${originalDate}' → '${finalDate}' using format '${format}'`);
+      return finalDate;
     }
   }
 
+  console.log(`[PDF Parser] Failed to parse date '${originalDate}' (tried ${formats.length} formats)`);
   return null;
 }
 
