@@ -266,70 +266,10 @@ function parseScotiabankTransactions(text: string, accountType: string): Transac
 
 /**
  * Parse BMO transactions
- * Format for credit cards: Trans Date | Posting Date/Trans ID | Description | Pre-Tax | Tax | Trans Amount
  */
 function parseBMOTransactions(text: string, accountType: string): Transaction[] {
-  const transactions: Transaction[] = [];
-  const lines = text.split('\n');
-
-  // BMO credit card specific parsing
-  let inTransactionSection = false;
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Detect transaction section
-    if (/transaction summary/i.test(line)) {
-      inTransactionSection = true;
-      continue;
-    }
-    
-    if (!inTransactionSection) continue;
-    
-    // Skip headers and empty lines
-    if (!line || line.length < 10) continue;
-    if (/trans date|posting date|description/i.test(line)) continue;
-    
-    // BMO format: MM/DD date at start
-    const dateMatch = line.match(/^(\d{2}\/\d{2})/);
-    if (!dateMatch) continue;
-
-    const transDate = dateMatch[1];
-    const date = parseDateFlexible(transDate);
-    if (!date) continue;
-
-    // Extract description and amounts
-    // Pattern: date, then description (multiple words), then amounts at the end
-    const amountPattern = /\$\s*([\d,]+\.\d{2})/g;
-    const amounts = Array.from(line.matchAll(amountPattern), m => parseFloat(m[1].replace(/,/g, '')));
-    
-    if (amounts.length === 0) continue;
-
-    // The last amount is the transaction amount
-    const amount = -Math.abs(amounts[amounts.length - 1]); // Negative for expenses
-
-    // Extract description (between date and first amount)
-    const descStart = line.indexOf(transDate) + transDate.length;
-    const firstAmountIdx = line.search(/\$\s*[\d,]+\.\d{2}/);
-    
-    if (firstAmountIdx <= descStart) continue;
-    
-    const description = line.substring(descStart, firstAmountIdx).trim();
-    
-    // Remove transaction ID if present (numbers at start of description)
-    const cleanDescription = description.replace(/^\d+\s*/, '').trim();
-    
-    if (!cleanDescription || cleanDescription.length < 3) continue;
-
-    transactions.push(createTransaction(date, cleanDescription, amount, accountType));
-  }
-
-  // If no transactions found with BMO-specific parser, fallback to generic
-  if (transactions.length === 0) {
-    return parseGenericTransactions(text, accountType);
-  }
-
-  return transactions;
+  // Use enhanced generic parser
+  return parseGenericTransactions(text, accountType);
 }
 
 /**
@@ -348,21 +288,22 @@ function parseTangerineTransactions(text: string, accountType: string): Transact
 
 /**
  * Generic transaction parser (fallback)
- * Uses common patterns found across Canadian banks
+ * Enhanced to handle various Canadian bank statement formats
  */
 function parseGenericTransactions(text: string, accountType: string): Transaction[] {
   const transactions: Transaction[] = [];
   const lines = text.split('\n');
 
-  // Generic patterns
-  const datePattern = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\w{3}\s+\d{1,2}|\d{4}-\d{2}-\d{2})/;
-  const amountPattern = /[\$\s]*([\d,]+\.\d{2})/g;
+  // More flexible date patterns for Canadian banks
+  const datePattern = /(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\w{3}\s+\d{1,2}(?:,?\s*\d{4})?|\d{4}-\d{2}-\d{2})/;
+  const amountPattern = /\$\s*([\d,]+\.\d{2})/g;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
+    // Skip empty, short, or header lines
     if (!line || line.length < 10) continue;
-    if (/^(date|transaction|description|amount|balance|statement period)/i.test(line)) continue;
+    if (/^(date|trans|posting|description|amount|balance|statement|payment|debit|credit)/i.test(line)) continue;
 
     const dateMatch = line.match(datePattern);
     if (!dateMatch) continue;
@@ -370,18 +311,50 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
     const date = parseDateFlexible(dateMatch[1]);
     if (!date) continue;
 
+    // Extract all amounts in the line
     const amounts = Array.from(line.matchAll(amountPattern), m => parseFloat(m[1].replace(/,/g, '')));
     
+    if (amounts.length === 0) continue;
+
+    // Extract description (text between date and first amount)
     const descStart = line.indexOf(dateMatch[0]) + dateMatch[0].length;
-    const firstAmountIdx = line.search(amountPattern);
-    const description = line.substring(descStart, firstAmountIdx > 0 ? firstAmountIdx : undefined).trim();
+    const firstAmountIdx = line.search(/\$\s*[\d,]+\.\d{2}/);
+    
+    if (firstAmountIdx <= descStart) continue;
+    
+    const description = line.substring(descStart, firstAmountIdx).trim();
+    
+    // Clean up description - remove transaction IDs and extra whitespace
+    const cleanDescription = description
+      .replace(/^\d{8,}\s*/, '') // Remove 8+ digit transaction IDs
+      .replace(/\s{2,}/g, ' ') // Collapse multiple spaces
+      .trim();
 
-    if (!description || amounts.length === 0) continue;
+    if (!cleanDescription || cleanDescription.length < 3) continue;
 
-    // Heuristic: if there are 2+ amounts, first is likely the transaction, last is balance
-    const amount = amounts.length >= 2 ? amounts[0] : amounts[0];
+    // Smart amount detection:
+    // - If multiple amounts: last one is usually the final transaction amount
+    // - For credit cards: all are expenses (negative)
+    // - For bank accounts: check for withdrawal/deposit indicators
+    let amount = amounts[amounts.length - 1];
+    
+    // For credit card statements, make all transactions negative (expenses)
+    if (accountType.toLowerCase().includes('credit')) {
+      amount = -Math.abs(amount);
+    } else {
+      // For bank accounts, try to detect if it's a debit or credit
+      // If there are 2 amounts and second is larger, it's likely balance - use first amount
+      if (amounts.length >= 2 && amounts[1] > amounts[0] * 2) {
+        amount = amounts[0];
+      }
+      
+      // Check for withdrawal/debit keywords
+      if (/withdrawal|debit|payment|purchase|atm/i.test(line)) {
+        amount = -Math.abs(amount);
+      }
+    }
 
-    transactions.push(createTransaction(date, description, amount, accountType));
+    transactions.push(createTransaction(date, cleanDescription, amount, accountType));
   }
 
   return transactions;
