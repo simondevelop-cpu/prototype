@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { ensureDemoDataExists } from '@/lib/seed-demo';
 import dayjs from 'dayjs';
 
 // Force dynamic rendering (required for auth headers)
@@ -25,6 +26,9 @@ export async function GET(request: NextRequest) {
     if (!pool) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
+    
+    // Ensure demo data exists (only seeds if count = 0)
+    await ensureDemoDataExists(pool);
 
     // Get date range parameters
     const url = new URL(request.url);
