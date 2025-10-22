@@ -201,15 +201,15 @@ async function seedSampleTransactions(userId) {
   
   try {
     // Check if transactions already exist
-  const existing = await pool.query(
+    const existing = await pool.query(
       'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1',
       [userId]
-  );
+    );
     
     if (parseInt(existing.rows[0].count) > 0) {
       console.log('[DB] Sample transactions already exist');
-    return;
-  }
+      return;
+    }
 
     console.log('[DB] Seeding 12 months of realistic Canadian demo transactions...');
     
@@ -605,6 +605,45 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Reset demo data endpoint (admin only - use carefully!)
+app.post('/api/reset-demo-data', async (req, res) => {
+  if (disableDb || !pool) {
+    return res.status(503).json({ error: 'Database not available' });
+  }
+
+  try {
+    console.log('[RESET] Resetting demo data...');
+    
+    // Delete all transactions for demo user
+    await pool.query('DELETE FROM transactions WHERE user_id = (SELECT id FROM users WHERE email = $1)', [DEMO_EMAIL.toLowerCase()]);
+    console.log('[RESET] Deleted existing transactions');
+    
+    // Get demo user ID
+    const userResult = await pool.query('SELECT id FROM users WHERE email = $1', [DEMO_EMAIL.toLowerCase()]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Demo user not found' });
+    }
+    
+    const userId = userResult.rows[0].id;
+    
+    // Reseed transactions
+    await seedSampleTransactions(userId);
+    console.log('[RESET] Reseeded demo data');
+    
+    // Count transactions
+    const count = await pool.query('SELECT COUNT(*) as count FROM transactions WHERE user_id = $1', [userId]);
+    
+    res.json({ 
+      success: true, 
+      message: 'Demo data reset successfully',
+      transactionCount: parseInt(count.rows[0].count)
+    });
+  } catch (error) {
+    console.error('[RESET] Failed to reset demo data:', error);
+    res.status(500).json({ error: 'Failed to reset demo data', details: error.message });
+  }
 });
 
 // ============================================================================
