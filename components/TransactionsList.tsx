@@ -11,11 +11,13 @@ interface TransactionsListProps {
   loading: boolean;
   token: string;
   onRefresh: () => void;
+  initialCategoryFilter?: string | null;
+  onClearCategoryFilter?: () => void;
 }
 
-export default function TransactionsList({ transactions, loading, token, onRefresh }: TransactionsListProps) {
+export default function TransactionsList({ transactions, loading, token, onRefresh, initialCategoryFilter, onClearCategoryFilter }: TransactionsListProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All categories');
+  const [selectedCategory, setSelectedCategory] = useState(initialCategoryFilter || 'All categories');
   const [selectedAccount, setSelectedAccount] = useState('All accounts');
   const [selectedCashflow, setSelectedCashflow] = useState('All cashflows');
   const [startDate, setStartDate] = useState('');
@@ -27,6 +29,11 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
+
+  // Apply initial category filter when it changes
+  if (initialCategoryFilter && selectedCategory !== initialCategoryFilter) {
+    setSelectedCategory(initialCategoryFilter);
+  }
 
   if (loading) {
     return (
@@ -386,16 +393,44 @@ export default function TransactionsList({ transactions, loading, token, onRefre
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Category
+              {initialCategoryFilter && selectedCategory === initialCategoryFilter && (
+                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                  From dashboard
+                </span>
+              )}
+            </label>
+            <div className="flex gap-2">
+              <select
+                value={selectedCategory}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  if (e.target.value === 'All categories' && onClearCategoryFilter) {
+                    onClearCategoryFilter();
+                  }
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+              {initialCategoryFilter && selectedCategory === initialCategoryFilter && (
+                <button
+                  onClick={() => {
+                    setSelectedCategory('All categories');
+                    if (onClearCategoryFilter) {
+                      onClearCategoryFilter();
+                    }
+                  }}
+                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Clear category filter"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">

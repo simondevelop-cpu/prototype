@@ -586,8 +586,14 @@ function createTransaction(
   const merchant = cleanDescription.split(/\s{2,}|  /)[0] || cleanDescription;
 
   // Determine cashflow type
+  // First check if it's a transfer/payment (categorize as 'other' regardless of amount)
+  const descLower = cleanDescription.toLowerCase();
+  const isTransfer = /transfer|preauthori[sz]ed payment|payment.*thank you|credit card payment|interac e-transfer|e-transfer|bill payment|auto payment|withdrawal to|deposit from/i.test(descLower);
+  
   let cashflow: 'income' | 'expense' | 'other' = 'expense';
-  if (amount > 0) {
+  if (isTransfer) {
+    cashflow = 'other';
+  } else if (amount > 0) {
     cashflow = 'income';
   } else if (amount < 0) {
     cashflow = 'expense';

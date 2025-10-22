@@ -25,6 +25,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [hasLoadedTransactions, setHasLoadedTransactions] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -155,6 +156,16 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     // Clear month selection and show aggregated data for entire range
     setSelectedMonth(null);
     setSelectedCashflow(cashflow);
+  };
+
+  const handleCategoryClick = (category: string) => {
+    // Load transactions if not loaded
+    if (!hasLoadedTransactions) {
+      fetchAllTransactions();
+    }
+    // Set the category filter and switch to transactions tab
+    setCategoryFilter(category);
+    setActiveTab('transactions');
   };
 
   const handleCustomDateApply = () => {
@@ -467,7 +478,11 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                       const totalAmount = categories.reduce((sum, c) => sum + c.total, 0);
                       const percentage = ((cat.total / totalAmount) * 100).toFixed(1);
                       return (
-                        <div key={idx} className="flex items-center justify-between">
+                        <button
+                          key={idx}
+                          onClick={() => handleCategoryClick(cat.category)}
+                          className="w-full flex items-center justify-between hover:bg-gray-50 p-2 rounded-lg transition-colors cursor-pointer"
+                        >
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-sm font-medium text-gray-900 capitalize">{cat.category}</span>
@@ -491,7 +506,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                               />
                             </div>
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -551,6 +566,8 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
             loading={transactionsLoading}
             token={token}
             onRefresh={fetchAllTransactions}
+            initialCategoryFilter={categoryFilter}
+            onClearCategoryFilter={() => setCategoryFilter(null)}
           />
         )}
 

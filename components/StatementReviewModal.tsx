@@ -251,7 +251,15 @@ export default function StatementReviewModal({
   const getSummaryStats = () => {
     const toImport = getTransactionsToImport();
     const duplicates = getAllTransactions('duplicates');
-    const duplicatesIncluded = duplicates.filter(d => !excludedTransactions.has(d.key)).length;
+    
+    // Split duplicates by cashflow type
+    const duplicateExpenses = duplicates.filter(d => d.tx.cashflow === 'expense');
+    const duplicateIncome = duplicates.filter(d => d.tx.cashflow === 'income');
+    const duplicateOther = duplicates.filter(d => d.tx.cashflow === 'other');
+    
+    const duplicatesIncludedExpenses = duplicateExpenses.filter(d => !excludedTransactions.has(d.key)).length;
+    const duplicatesIncludedIncome = duplicateIncome.filter(d => !excludedTransactions.has(d.key)).length;
+    const duplicatesIncludedOther = duplicateOther.filter(d => !excludedTransactions.has(d.key)).length;
     
     const expenses = toImport.filter(tx => tx.cashflow === 'expense');
     const income = toImport.filter(tx => tx.cashflow === 'income');
@@ -262,7 +270,13 @@ export default function StatementReviewModal({
     const otherTotal = other.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
     
     return {
-      duplicates: { count: duplicates.length, included: duplicatesIncluded },
+      duplicates: { 
+        expenses: { count: duplicateExpenses.length, included: duplicatesIncludedExpenses },
+        income: { count: duplicateIncome.length, included: duplicatesIncludedIncome },
+        other: { count: duplicateOther.length, included: duplicatesIncludedOther },
+        total: duplicates.length,
+        totalIncluded: duplicatesIncludedExpenses + duplicatesIncludedIncome + duplicatesIncludedOther
+      },
       expenses: { count: expenses.length, total: expensesTotal },
       income: { count: income.length, total: incomeTotal },
       other: { count: other.length, total: otherTotal },
@@ -305,31 +319,89 @@ export default function StatementReviewModal({
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {/* Duplicates Row */}
-                    <tr className="hover:bg-gray-50">
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <span className="text-2xl mr-3">🔴</span>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">Duplicates</p>
-                            <p className="text-xs text-gray-500">Already in database</p>
+                    {/* Duplicates - Expenses Row */}
+                    {stats.duplicates.expenses.count > 0 && (
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <span className="text-2xl mr-3">🔴</span>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Duplicates - Expenses</p>
+                              <p className="text-xs text-gray-500">Already in database</p>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-right">
-                        <p className="text-sm font-semibold text-gray-900">{stats.duplicates.count}</p>
-                        <p className="text-xs text-yellow-600">{stats.duplicates.included} to import</p>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-500">—</td>
-                      <td className="px-4 py-4 whitespace-nowrap text-center">
-                        <button
-                          onClick={() => setCurrentStep('duplicates')}
-                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                        >
-                          Investigate →
-                        </button>
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          <p className="text-sm font-semibold text-gray-900">{stats.duplicates.expenses.count}</p>
+                          <p className="text-xs text-yellow-600">{stats.duplicates.expenses.included} to import</p>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-500">—</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-center">
+                          <button
+                            onClick={() => setCurrentStep('duplicates')}
+                            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          >
+                            Investigate →
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Duplicates - Income Row */}
+                    {stats.duplicates.income.count > 0 && (
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <span className="text-2xl mr-3">🔴</span>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Duplicates - Income</p>
+                              <p className="text-xs text-gray-500">Already in database</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          <p className="text-sm font-semibold text-gray-900">{stats.duplicates.income.count}</p>
+                          <p className="text-xs text-yellow-600">{stats.duplicates.income.included} to import</p>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-500">—</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-center">
+                          <button
+                            onClick={() => setCurrentStep('duplicates')}
+                            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          >
+                            Investigate →
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Duplicates - Other Row */}
+                    {stats.duplicates.other.count > 0 && (
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <span className="text-2xl mr-3">🔴</span>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Duplicates - Other</p>
+                              <p className="text-xs text-gray-500">Already in database</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          <p className="text-sm font-semibold text-gray-900">{stats.duplicates.other.count}</p>
+                          <p className="text-xs text-yellow-600">{stats.duplicates.other.included} to import</p>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-500">—</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-center">
+                          <button
+                            onClick={() => setCurrentStep('duplicates')}
+                            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          >
+                            Investigate →
+                          </button>
+                        </td>
+                      </tr>
+                    )}
 
                     {/* Expenses Row */}
                     <tr className="hover:bg-gray-50">
@@ -471,7 +543,30 @@ export default function StatementReviewModal({
               </div>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {duplicates.map(({ key, tx, statement }) => renderTransactionRow(key, tx, statement, true))}
+                {duplicates.map(({ key, tx, statement }) => {
+                  const isExcluded = excludedTransactions.has(key);
+                  const willImport = !isExcluded;
+                  
+                  return (
+                    <div 
+                      key={key} 
+                      className={`p-3 border rounded-lg flex items-center justify-between ${willImport ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-300 opacity-60'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={willImport}
+                        onChange={() => toggleInclude(key)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-3"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{tx.description || tx.merchant}</p>
+                      </div>
+                      <p className={`text-lg font-semibold ml-4 ${tx.cashflow === 'income' ? 'text-green-600' : tx.cashflow === 'other' ? 'text-blue-600' : 'text-red-600'}`}>
+                        ${Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -500,7 +595,30 @@ export default function StatementReviewModal({
               </div>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {other.map(({ key, tx, statement }) => renderTransactionRow(key, tx, statement))}
+                {other.map(({ key, tx, statement }) => {
+                  const isExcluded = excludedTransactions.has(key);
+                  const willImport = !isExcluded;
+                  
+                  return (
+                    <div 
+                      key={key} 
+                      className={`p-3 border rounded-lg flex items-center justify-between ${willImport ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-300 opacity-60'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={willImport}
+                        onChange={() => toggleInclude(key)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-3"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{tx.description || tx.merchant}</p>
+                      </div>
+                      <p className="text-lg font-semibold text-blue-600 ml-4">
+                        ${Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -570,7 +688,30 @@ export default function StatementReviewModal({
             </div>
             
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {income.map(({ key, tx, statement }) => renderTransactionRow(key, tx, statement))}
+              {income.map(({ key, tx, statement }) => {
+                const isExcluded = excludedTransactions.has(key);
+                const willImport = !isExcluded;
+                
+                return (
+                  <div 
+                    key={key} 
+                    className={`p-3 border rounded-lg flex items-center justify-between ${willImport ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-300 opacity-60'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={willImport}
+                      onChange={() => toggleInclude(key)}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-3"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{tx.description || tx.merchant}</p>
+                    </div>
+                    <p className="text-lg font-semibold text-green-600 ml-4">
+                      ${Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
