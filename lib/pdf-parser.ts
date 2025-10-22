@@ -388,30 +388,22 @@ function parseGenericTransactions(text: string, accountType: string): Transactio
       // Find all dates in the line
       const allDates = Array.from(line.matchAll(new RegExp(datePattern.source, 'g')));
       
-      // If there are 2 dates at the start (credit card), use the first one and skip both when extracting description
-      let descStart;
-      if (allDates.length >= 2 && line.indexOf(allDates[1][0]) < 30) {
-        // Two dates at the beginning - skip both (use posting date)
-        descStart = line.indexOf(allDates[1][0]) + allDates[1][0].length;
-      } else {
-        // Single date - skip it
-        descStart = line.indexOf(dateMatch[0]) + dateMatch[0].length;
-      }
-      
-      const firstAmountIdx = line.search(/\$?\s*[\d,]+\.\d{2}/);
-      
-      if (firstAmountIdx <= descStart) {
-        if (parsedCount < 5) {
-          console.log(`[PDF Parser] Skipping - amount before description. descStart: ${descStart}, amountIdx: ${firstAmountIdx}`);
-        }
+      // Find where the amount starts (look for $ sign or just the number pattern)
+      const amountMatch = line.match(/\$\s*([\d,]+\.\d{2})/);
+      if (!amountMatch || !amountMatch.index) {
         skippedCount++;
         continue;
       }
       
-      description = line.substring(descStart, firstAmountIdx).trim();
+      const amountStartIdx = amountMatch.index;
+      const amountEndIdx = amountStartIdx + amountMatch[0].length;
+      
+      // For TD credit cards: DATE1 DATE2 $AMOUNT MERCHANT
+      // The merchant comes AFTER the amount!
+      description = line.substring(amountEndIdx).trim();
       
       if (parsedCount < 5) {
-        console.log(`[PDF Parser] Extracted description from line[${descStart}:${firstAmountIdx}]: "${description}"`);
+        console.log(`[PDF Parser] Extracted description AFTER amount at ${amountEndIdx}: "${description}"`);
       }
       
       // For credit cards, all transactions are expenses
