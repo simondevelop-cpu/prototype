@@ -176,11 +176,24 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     const earliest = dates[0];
     const latest = dates[dates.length - 1];
     
+    if (!earliest || !latest) return '';
+    
+    // Parse the month strings (format: YYYY-MM-DD or YYYY-MM)
+    // Extract just YYYY-MM if full date is provided
+    const earliestMonth = earliest.substring(0, 7); // Get YYYY-MM
+    const latestMonth = latest.substring(0, 7);
+    
     // Show full date with day for first and last of month range
-    const startDate = new Date(earliest + '-01'); // First day of earliest month
-    const latestDate = new Date(latest + '-01');
+    const startDate = new Date(earliestMonth + '-01'); // First day of earliest month
+    const latestDate = new Date(latestMonth + '-01');
+    
+    // Validate dates
+    if (isNaN(startDate.getTime()) || isNaN(latestDate.getTime())) {
+      return '';
+    }
+    
     const lastDay = new Date(latestDate.getFullYear(), latestDate.getMonth() + 1, 0).getDate(); // Last day of latest month
-    const endDate = new Date(latest + `-${lastDay}`);
+    const endDate = new Date(latestDate.getFullYear(), latestDate.getMonth(), lastDay);
     
     const start = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const end = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
