@@ -5,12 +5,8 @@ import { parseBankStatement } from '@/lib/pdf-parser';
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
-// Increase body size limit for file uploads
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+// Note: Next.js App Router handles multipart/form-data automatically
+// No need for bodyParser config
 
 export async function POST(request: NextRequest) {
   try {
