@@ -172,7 +172,7 @@ async function seedDemoUser() {
     // Check if demo user exists
     const existingUser = await pool.query(
       'SELECT id, email, display_name FROM users WHERE email = $1',
-      [DEMO_EMAIL]
+      [DEMO_EMAIL.toLowerCase()]
     );
     
     if (existingUser.rows.length > 0) {
@@ -184,7 +184,7 @@ async function seedDemoUser() {
     const passwordHash = hashPassword(DEMO_PASSWORD);
     const result = await pool.query(
       'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id',
-      [DEMO_EMAIL, passwordHash, 'Taylor Nguyen']
+      [DEMO_EMAIL.toLowerCase(), passwordHash, 'Taylor Nguyen']
     );
     
     const userId = result.rows[0].id;
