@@ -34,7 +34,7 @@ interface StatementReviewModalProps {
   onSuccess: () => void;
 }
 
-type ReviewStep = 'duplicates' | 'other' | 'expenses' | 'income' | 'confirm';
+type ReviewStep = 'summary' | 'duplicates' | 'other' | 'expenses' | 'income';
 
 export default function StatementReviewModal({ 
   isOpen, 
@@ -43,7 +43,7 @@ export default function StatementReviewModal({
   token,
   onSuccess 
 }: StatementReviewModalProps) {
-  const [currentStep, setCurrentStep] = useState<ReviewStep>('duplicates');
+  const [currentStep, setCurrentStep] = useState<ReviewStep>('summary');
   const [importing, setImporting] = useState(false);
   
   // Track which transactions are included/excluded
@@ -52,7 +52,7 @@ export default function StatementReviewModal({
   // Track edited transactions (keyed by unique ID: date_merchant_amount)
   const [editedTransactions, setEditedTransactions] = useState<Map<string, Transaction>>(new Map());
   
-  // Track account name (editable on confirm screen)
+  // Track account name (editable on summary screen)
   const [accountName, setAccountName] = useState<string>('');
   
   // Editing state
@@ -164,19 +164,26 @@ export default function StatementReviewModal({
   };
 
   // Initialize excluded transactions (all duplicates are excluded by default)
+  // and account name from first statement
   useEffect(() => {
-    if (isOpen && excludedTransactions.size === 0 && parsedStatements.length > 0) {
-      const duplicates: { key: string; tx: Transaction; statement: ParsedStatement }[] = [];
-      for (const statement of parsedStatements) {
-        for (const tx of statement.categorized.duplicates) {
-          const key = `${tx.date}_${tx.merchant}_${tx.amount}`;
-          duplicates.push({ key, tx, statement });
+    if (isOpen && parsedStatements.length > 0) {
+      if (excludedTransactions.size === 0) {
+        const duplicates: { key: string; tx: Transaction; statement: ParsedStatement }[] = [];
+        for (const statement of parsedStatements) {
+          for (const tx of statement.categorized.duplicates) {
+            const key = `${tx.date}_${tx.merchant}_${tx.amount}`;
+            duplicates.push({ key, tx, statement });
+          }
         }
+        const initialExcluded = new Set(duplicates.map(d => d.key));
+        setExcludedTransactions(initialExcluded);
       }
-      const initialExcluded = new Set(duplicates.map(d => d.key));
-      setExcludedTransactions(initialExcluded);
+      
+      if (!accountName) {
+        setAccountName(parsedStatements[0].accountType || 'Credit Card');
+      }
     }
-  }, [isOpen, parsedStatements, excludedTransactions.size]);
+  }, [isOpen, parsedStatements, excludedTransactions.size, accountName]);
 
   // Render transaction row
   const renderTransactionRow = (key: string, tx: Transaction, statement: ParsedStatement, isDuplicate: boolean = false) => {
@@ -240,9 +247,207 @@ export default function StatementReviewModal({
     );
   };
 
+  // Calculate summary statistics
+  const getSummaryStats = () => {
+    const toImport = getTransactionsToImport();
+    const duplicates = getAllTransactions('duplicates');
+    const duplicatesIncluded = duplicates.filter(d => !excludedTransactions.has(d.key)).length;
+    
+    const expenses = toImport.filter(tx => tx.cashflow === 'expense');
+    const income = toImport.filter(tx => tx.cashflow === 'income');
+    const other = toImport.filter(tx => tx.cashflow === 'other');
+    
+    const expensesTotal = expenses.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+    const incomeTotal = income.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+    const otherTotal = other.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+    
+    return {
+      duplicates: { count: duplicates.length, included: duplicatesIncluded },
+      expenses: { count: expenses.length, total: expensesTotal },
+      income: { count: income.length, total: incomeTotal },
+      other: { count: other.length, total: otherTotal },
+      totalTransactions: toImport.length,
+    };
+  };
+
   // Render current step
   const renderStepContent = () => {
     switch (currentStep) {
+      case 'summary': {
+        const stats = getSummaryStats();
+        
+        return (
+          <div>
+            {/* Account Name Editor */}
+            <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Account Name</label>
+              <input
+                type="text"
+                value={accountName}
+                onChange={(e) => setAccountName(e.target.value)}
+                placeholder="e.g., TD Visa, BMO Mastercard"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">This will be the account name for all imported transactions</p>
+            </div>
+
+            {/* Summary Table */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">📊 Transaction Summary</h3>
+              <div className="overflow-hidden border border-gray-200 rounded-lg">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Transactions</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Value</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {/* Duplicates Row */}
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <span className="text-2xl mr-3">🔴</span>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Duplicates</p>
+                            <p className="text-xs text-gray-500">Already in database</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <p className="text-sm font-semibold text-gray-900">{stats.duplicates.count}</p>
+                        <p className="text-xs text-yellow-600">{stats.duplicates.included} to import</p>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-500">—</td>
+                      <td className="px-4 py-4 whitespace-nowrap text-center">
+                        <button
+                          onClick={() => setCurrentStep('duplicates')}
+                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          Investigate →
+                        </button>
+                      </td>
+                    </tr>
+
+                    {/* Expenses Row */}
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <span className="text-2xl mr-3">💸</span>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Expenses</p>
+                            <p className="text-xs text-gray-500">Money spent</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <p className="text-sm font-semibold text-red-600">{stats.expenses.count}</p>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <p className="text-sm font-semibold text-red-600">
+                          ${stats.expenses.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-center">
+                        <button
+                          onClick={() => setCurrentStep('expenses')}
+                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          Investigate →
+                        </button>
+                      </td>
+                    </tr>
+
+                    {/* Income Row */}
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <span className="text-2xl mr-3">💰</span>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Income</p>
+                            <p className="text-xs text-gray-500">Money received</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <p className="text-sm font-semibold text-green-600">{stats.income.count}</p>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <p className="text-sm font-semibold text-green-600">
+                          ${stats.income.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-center">
+                        <button
+                          onClick={() => setCurrentStep('income')}
+                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          Investigate →
+                        </button>
+                      </td>
+                    </tr>
+
+                    {/* Other Row */}
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <span className="text-2xl mr-3">🔄</span>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Other</p>
+                            <p className="text-xs text-gray-500">Transfers, payments</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <p className="text-sm font-semibold text-blue-600">{stats.other.count}</p>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <p className="text-sm font-semibold text-blue-600">
+                          ${stats.other.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-center">
+                        <button
+                          onClick={() => setCurrentStep('other')}
+                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          Investigate →
+                        </button>
+                      </td>
+                    </tr>
+
+                    {/* Total Row */}
+                    <tr className="bg-blue-50 font-semibold">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <p className="text-sm font-bold text-gray-900">Total to Import</p>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <p className="text-sm font-bold text-blue-900">{stats.totalTransactions}</p>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <p className="text-xs text-gray-600">
+                          {stats.expenses.count} outflows totalling ${stats.expenses.total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-center">—</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Info Box */}
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>💡 Tip:</strong> You can confirm the upload immediately, or click "Investigate" on any row to review and edit individual transactions.
+              </p>
+            </div>
+          </div>
+        );
+      }
+
       case 'duplicates': {
         const duplicates = getAllTransactions('duplicates');
         const includedCount = duplicates.filter(d => !excludedTransactions.has(d.key)).length;
@@ -371,97 +576,8 @@ export default function StatementReviewModal({
         );
       }
 
-      case 'confirm': {
-        const toImport = getTransactionsToImport();
-        const expenses = toImport.filter(tx => tx.cashflow === 'expense');
-        const income = toImport.filter(tx => tx.cashflow === 'income');
-        const other = toImport.filter(tx => tx.cashflow === 'other');
-        
-        const expensesTotal = expenses.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
-        const incomeTotal = income.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
-        const otherTotal = other.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
-        
-        // Initialize account name from first statement if not set
-        if (!accountName && parsedStatements.length > 0) {
-          setAccountName(parsedStatements[0].accountType || 'Credit Card');
-        }
-        
-        return (
-          <div>
-            {/* Account Name Editor */}
-            <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Account Name</label>
-              <input
-                type="text"
-                value={accountName}
-                onChange={(e) => setAccountName(e.target.value)}
-                placeholder="e.g., TD Visa, BMO Mastercard"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="text-xs text-gray-500 mt-1">This will be the account name for all imported transactions</p>
-            </div>
-            
-            {/* Import Summary */}
-            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h3 className="font-semibold text-blue-900 mb-3">📊 Import Summary</h3>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-600">Expenses</p>
-                  <p className="text-xl font-bold text-red-600">{expenses.length} txns</p>
-                  <p className="text-sm text-gray-700">${expensesTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Income</p>
-                  <p className="text-xl font-bold text-green-600">{income.length} txns</p>
-                  <p className="text-sm text-gray-700">${incomeTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Other</p>
-                  <p className="text-xl font-bold text-blue-600">{other.length} txns</p>
-                  <p className="text-sm text-gray-700">${otherTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-                </div>
-              </div>
-              <div className="mt-3 pt-3 border-t border-blue-200">
-                <div className="flex justify-between items-center">
-                  <p className="font-semibold text-gray-900">Total</p>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-blue-900">{toImport.length} transactions</p>
-                    <p className="text-sm text-gray-600">{expenses.length} outflows totalling ${expensesTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              <h4 className="font-semibold text-gray-900">Preview (first 10)</h4>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {toImport.slice(0, 10).map((tx, idx) => (
-                  <div key={idx} className="p-3 bg-gray-50 rounded-lg flex justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900">{tx.merchant}</p>
-                      <p className="text-xs text-gray-500">{dayjs(tx.date).format('MMM D, YYYY')} • {tx.category}</p>
-                    </div>
-                    <p className={`font-semibold ${tx.amount < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                      ${Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                ))}
-                {toImport.length > 10 && (
-                  <p className="text-center text-sm text-gray-500">... and {toImport.length - 10} more</p>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      }
     }
   };
-
-  // Step navigation
-  const steps: ReviewStep[] = ['duplicates', 'other', 'expenses', 'income', 'confirm'];
-  const currentStepIndex = steps.indexOf(currentStep);
-  const canGoNext = currentStepIndex < steps.length - 1;
-  const canGoPrev = currentStepIndex > 0;
 
   if (!isOpen || parsedStatements.length === 0) return null;
 
@@ -473,9 +589,14 @@ export default function StatementReviewModal({
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Review Transactions</h2>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {currentStep === 'summary' ? 'Review & Import Transactions' : `Review ${currentStep.charAt(0).toUpperCase() + currentStep.slice(1)}`}
+                </h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Review and edit transactions before importing
+                  {currentStep === 'summary' 
+                    ? 'Review the summary and confirm import, or investigate individual categories'
+                    : 'Review and edit transactions in this category'
+                  }
                 </p>
               </div>
               <button
@@ -488,24 +609,6 @@ export default function StatementReviewModal({
                 </svg>
               </button>
             </div>
-
-            {/* Step Indicator */}
-            <div className="mt-4 flex items-center gap-2">
-              {steps.map((step, idx) => (
-                <div key={step} className="flex items-center gap-2">
-                  <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    idx === currentStepIndex 
-                      ? 'bg-blue-600 text-white' 
-                      : idx < currentStepIndex 
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-gray-100 text-gray-500'
-                  }`}>
-                    {step}
-                  </div>
-                  {idx < steps.length - 1 && <div className="w-4 h-px bg-gray-300" />}
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Content */}
@@ -516,44 +619,32 @@ export default function StatementReviewModal({
           {/* Footer */}
           <div className="p-6 border-t border-gray-200 flex items-center justify-between">
             <button
-              onClick={canGoPrev ? () => setCurrentStep(steps[currentStepIndex - 1]) : onClose}
+              onClick={currentStep === 'summary' ? onClose : () => setCurrentStep('summary')}
               disabled={importing}
               className="px-6 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition-colors disabled:opacity-50"
             >
-              {canGoPrev ? '← Previous' : 'Cancel'}
+              {currentStep === 'summary' ? 'Cancel' : '← Back to Summary'}
             </button>
 
-            <div className="flex gap-3">
-              {canGoNext ? (
-                <button
-                  onClick={() => setCurrentStep(steps[currentStepIndex + 1])}
-                  disabled={importing}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
-                >
-                  Next →
-                </button>
+            <button
+              onClick={handleImport}
+              disabled={importing || getTransactionsToImport().length === 0}
+              className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              {importing ? (
+                <>
+                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Importing...
+                </>
               ) : (
-                <button
-                  onClick={handleImport}
-                  disabled={importing || getTransactionsToImport().length === 0}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  {importing ? (
-                    <>
-                      <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Importing...
-                    </>
-                  ) : (
-                    <>
-                      ✓ Import {getTransactionsToImport().length} Transactions
-                    </>
-                  )}
-                </button>
+                <>
+                  ✓ Confirm & Import {getTransactionsToImport().length} Transactions
+                </>
               )}
-            </div>
+            </button>
           </div>
         </div>
       </div>
