@@ -107,7 +107,7 @@ export default function StatementReviewModal({
     }
     
     // Include all non-duplicate transactions unless explicitly excluded
-    const categories: Array<keyof ParsedStatement['categorized']> = ['uncategorized', 'expenses', 'income'];
+    const categories: Array<keyof ParsedStatement['categorized']> = ['other', 'expenses', 'income'];
     for (const category of categories) {
       const transactions = getAllTransactions(category);
       for (const { key, tx } of transactions) {
