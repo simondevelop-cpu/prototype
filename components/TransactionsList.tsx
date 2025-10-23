@@ -2,9 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import TransactionModal from './TransactionModal';
 import BulkRecategorizeModal from './BulkRecategorizeModal';
 import StatementUploadModal from './StatementUploadModal';
+
+dayjs.extend(utc);
 
 interface TransactionsListProps {
   transactions: any[];
@@ -637,7 +640,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {dayjs(tx.date).format('MMM D, YYYY')}
+                      {dayjs.utc(tx.date).format('MMM D, YYYY')}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       <div className="font-medium">{tx.description}</div>
