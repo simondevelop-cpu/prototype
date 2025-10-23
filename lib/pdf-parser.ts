@@ -689,11 +689,13 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
   }
   
   console.log(`[PDF Parser] Sample transaction lines (starting from ${transactionStartIndex}):`);
-  for (let i = transactionStartIndex; i < Math.min(transactionStartIndex + 20, lines.length); i++) {
+  for (let i = transactionStartIndex; i < Math.min(transactionStartIndex + 30, lines.length); i++) {
     if (lines[i].trim().length > 5) {
-      console.log(`[PDF Parser] Line ${i}: ${lines[i].trim().substring(0, 100)}`);
+      console.log(`[PDF Parser] Line ${i}: ${lines[i].trim().substring(0, 120)}`);
     }
   }
+  
+  console.log(`[PDF Parser] Processing transactions from line ${transactionStartIndex} to ${lines.length}...`);
   
   for (let i = transactionStartIndex; i < lines.length; i++) {
     let line = lines[i].trim();
@@ -732,10 +734,17 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
     }
     
     // Pattern: Compact dates (no space) + description + category + amount
+    // Note: Line may contain special characters (⬥, ⬦) for cash back indicators
     let pattern = /^([A-Z][a-z]{2}\s*\d{1,2})([A-Z][a-z]{2}\s*\d{1,2})(.+?)([\d,]+\.\d{2})$/;
     let match = line.match(pattern);
     
-    if (!match) continue;
+    if (!match) {
+      // Log lines that look like they might be transactions but don't match
+      if (/^[A-Z][a-z]{2}\s*\d{1,2}/.test(line) && transactions.length < 5) {
+        console.log(`[PDF Parser] Skipped line ${i} (no match): ${line.substring(0, 100)}`);
+      }
+      continue;
+    }
     
     // Extract parts
     const [fullMatch, transDateStr, postDateStr, middlePart, amountStr] = match;
@@ -768,7 +777,11 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
     }
   }
   
-  console.log(`[PDF Parser] Parsed ${transactions.length} CIBC credit card transactions`);
+  console.log(`[PDF Parser] ===== CIBC Credit Card Summary =====`);
+  console.log(`[PDF Parser] Total lines processed: ${lines.length}`);
+  console.log(`[PDF Parser] Transaction section started at line: ${transactionStartIndex}`);
+  console.log(`[PDF Parser] Transactions parsed: ${transactions.length}`);
+  console.log(`[PDF Parser] =====================================`);
   return transactions;
 }
 
