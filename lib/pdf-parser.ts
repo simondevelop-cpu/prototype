@@ -535,9 +535,174 @@ function parseBMOTransactions(text: string, accountType: string): Transaction[] 
 
 /**
  * Parse CIBC transactions
+ * 
+ * CIBC statements have a clean columnar format:
+ * 
+ * Credit Card (Dividend Visa):
+ * TransDate PostDate Description                                Amount
+ * Jun 11    Jun 13   PHARMAPRIX #3558  MONTREAL  QC            13.63
+ * Jun 15    Jun 16   PIZZAMANIA MONTREAL QC                    43.97
+ * 
+ * Chequing/Savings:
+ * Date      Description                  Withdrawals($)  Deposits($)  Balance($)
+ * Aug 1     Opening balance                                           -$4.00
+ * Aug 6     DEPOSIT                                      3,940.24     3,936.24
+ * Aug 12    CREDIT MEMO                                  0.49         3,936.73
+ * 
+ * Format is consistent and easier to parse than RBC/TD
  */
 function parseCIBCTransactions(text: string, accountType: string): Transaction[] {
-  return parseGenericTransactions(text, accountType);
+  const transactions: Transaction[] = [];
+  const lines = text.split('\n');
+  
+  console.log('[PDF Parser] parseCIBCTransactions called');
+  console.log(`[PDF Parser] Account type: ${accountType}`);
+  
+  // Check if this is a columnar chequing/savings format or credit card
+  const hasWithdrawalsDeposits = /Withdrawals\s*\(\$\)|Deposits\s*\(\$\)/i.test(text);
+  
+  if (hasWithdrawalsDeposits) {
+    // Chequing/Savings format with Withdrawals and Deposits columns
+    return parseCIBCChequingTransactions(text, accountType);
+  } else {
+    // Credit card format
+    return parseCIBCCreditCardTransactions(text, accountType);
+  }
+}
+
+/**
+ * Parse CIBC Credit Card transactions
+ * Format: TransDate PostDate Description Amount
+ * Example: Jun 11    Jun 13   PHARMAPRIX #3558  MONTREAL  QC    13.63
+ */
+function parseCIBCCreditCardTransactions(text: string, accountType: string): Transaction[] {
+  const transactions: Transaction[] = [];
+  const lines = text.split('\n');
+  
+  console.log('[PDF Parser] Using CIBC credit card parser');
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Skip empty lines, headers, and metadata
+    if (!line || line.length < 10) continue;
+    if (/^(trans|post|date|description|amount|page|statement|account)/i.test(line)) continue;
+    
+    // CIBC credit card pattern: Two dates at start, then description, then amount at end
+    // Dates can be: "Jun 11" or "Jun  1" (with extra space for single digits)
+    // Pattern: MONTH DAY  MONTH DAY  DESCRIPTION  AMOUNT
+    const pattern = /^([A-Z][a-z]{2}\s+\d{1,2})\s+([A-Z][a-z]{2}\s+\d{1,2})\s+(.+?)\s+([\d,]+\.\d{2})$/;
+    const match = line.match(pattern);
+    
+    if (!match) continue;
+    
+    const [fullMatch, transDateStr, postDateStr, description, amountStr] = match;
+    
+    // Parse transaction date
+    const transDate = parseDateFlexible(transDateStr);
+    if (!transDate) {
+      console.log(`[PDF Parser] Failed to parse CIBC date: ${transDateStr}`);
+      continue;
+    }
+    
+    const amount = parseFloat(amountStr.replace(/,/g, ''));
+    
+    // Clean description
+    const cleanDesc = description
+      .replace(/\s{2,}/g, ' ') // Collapse spaces
+      .trim();
+    
+    if (cleanDesc.length < 3) continue;
+    
+    // For credit cards: all transactions are negative (expenses) except payments
+    const isPayment = cleanDesc.toLowerCase().includes('payment') || cleanDesc.toLowerCase().includes('thank you');
+    const finalAmount = isPayment ? Math.abs(amount) : -Math.abs(amount);
+    
+    transactions.push(createTransaction(transDate, cleanDesc, finalAmount, accountType));
+    
+    if (transactions.length <= 5) {
+      console.log(`[PDF Parser] CIBC CC #${transactions.length}: ${transDate} | ${cleanDesc.substring(0, 40)} | ${finalAmount}`);
+    }
+  }
+  
+  console.log(`[PDF Parser] Parsed ${transactions.length} CIBC credit card transactions`);
+  return transactions;
+}
+
+/**
+ * Parse CIBC Chequing/Savings transactions
+ * Format: Date  Description  Withdrawals($)  Deposits($)  Balance($)
+ */
+function parseCIBCChequingTransactions(text: string, accountType: string): Transaction[] {
+  const transactions: Transaction[] = [];
+  const lines = text.split('\n');
+  
+  console.log('[PDF Parser] Using CIBC chequing/savings parser');
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Skip empty lines and headers
+    if (!line || line.length < 10) continue;
+    if (/^(date|description|withdrawals|deposits|balance|opening|closing)/i.test(line)) continue;
+    
+    // Look for lines starting with a date
+    // Format: "Aug 6" or "Aug  1" (may have extra space)
+    const datePattern = /^([A-Z][a-z]{2}\s+\d{1,2})\s+(.+)$/;
+    const match = line.match(datePattern);
+    
+    if (!match) continue;
+    
+    const [fullMatch, dateStr, remainder] = match;
+    
+    const date = parseDateFlexible(dateStr);
+    if (!date) continue;
+    
+    // Extract all amounts from the line
+    const amountPattern = /(-?\$?\s*[\d,]+\.\d{2})/g;
+    const amounts: number[] = [];
+    let amountMatch;
+    while ((amountMatch = amountPattern.exec(remainder)) !== null) {
+      amounts.push(parseFloat(amountMatch[1].replace(/[$,\s]/g, '')));
+    }
+    
+    // Remove amounts to get description
+    const description = remainder
+      .replace(amountPattern, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    
+    if (!description || amounts.length === 0) continue;
+    
+    // Determine transaction amount
+    // Last amount is usually balance, second-to-last is the transaction
+    let amount = 0;
+    
+    if (amounts.length >= 2) {
+      amount = amounts[amounts.length - 2];
+      
+      // Check if this is a deposit (positive) or withdrawal (negative)
+      const isDeposit = /deposit|credit|interest|refund|transfer.*in|autodeposit/i.test(description);
+      
+      if (!isDeposit && amount > 0) {
+        amount = -amount; // Withdrawals are negative
+      }
+    } else if (amounts.length === 1) {
+      // Only one amount - might be opening/closing balance, skip
+      continue;
+    }
+    
+    if (amount === 0) continue;
+    
+    transactions.push(createTransaction(date, description, amount, accountType));
+    
+    if (transactions.length <= 5) {
+      console.log(`[PDF Parser] CIBC Chequing #${transactions.length}: ${date} | ${description.substring(0, 40)} | ${amount}`);
+    }
+  }
+  
+  console.log(`[PDF Parser] Parsed ${transactions.length} CIBC chequing transactions`);
+  return transactions;
 }
 
 /**
