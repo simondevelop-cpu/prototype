@@ -18,16 +18,18 @@ interface TransactionsListProps {
   onClearCategoryFilter?: () => void;
   initialCashflowFilter?: string | null;
   onClearCashflowFilter?: () => void;
+  initialDateRange?: { start: string; end: string } | null;
+  onClearDateRange?: () => void;
 }
 
-export default function TransactionsList({ transactions, loading, token, onRefresh, initialCategoryFilter, onClearCategoryFilter, initialCashflowFilter, onClearCashflowFilter }: TransactionsListProps) {
+export default function TransactionsList({ transactions, loading, token, onRefresh, initialCategoryFilter, onClearCategoryFilter, initialCashflowFilter, onClearCashflowFilter, initialDateRange, onClearDateRange }: TransactionsListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>(initialCategoryFilter ? [initialCategoryFilter] : []);
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [selectedCashflows, setSelectedCashflows] = useState<string[]>(initialCashflowFilter ? [initialCashflowFilter] : []);
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(initialDateRange?.start || '');
+  const [endDate, setEndDate] = useState(initialDateRange?.end || '');
   const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
   
   // Modal states
@@ -460,6 +462,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
               if (onClearCashflowFilter) {
                 onClearCashflowFilter();
               }
+              if (onClearDateRange) {
+                onClearDateRange();
+              }
             }}
             className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
           >
@@ -758,6 +763,12 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                   </tr>
                 );
               })}
+              {/* Add empty rows to ensure dropdowns have space when there are few transactions */}
+              {Array.from({ length: Math.max(0, 10 - filteredTransactions.length) }).map((_, idx) => (
+                <tr key={`empty-${idx}`} className="h-16">
+                  <td colSpan={9} className="border-0">&nbsp;</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

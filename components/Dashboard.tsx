@@ -27,6 +27,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [cashflowFilter, setCashflowFilter] = useState<string | null>(null);
+  const [dateRangeFilter, setDateRangeFilter] = useState<{ start: string; end: string } | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -170,14 +171,46 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     if (selectedCashflow) {
       setCashflowFilter(selectedCashflow);
     }
+    // Set date range filter based on current dashboard view
+    if (timeframe === 'custom' && customDateRange.start && customDateRange.end) {
+      setDateRangeFilter({ start: customDateRange.start, end: customDateRange.end });
+    } else {
+      // For preset timeframes, calculate the date range from summary data
+      if (summary.length > 0) {
+        const dates = summary.map(s => s.month);
+        const earliest = dates[0];
+        const latest = dates[dates.length - 1];
+        if (earliest && latest) {
+          const earliestMonth = earliest.substring(0, 7);
+          const latestMonth = latest.substring(0, 7);
+          const startDate = earliestMonth + '-01';
+          const [endYear, endMonth] = latestMonth.split('-');
+          const lastDay = new Date(parseInt(endYear), parseInt(endMonth), 0).getDate();
+          const endDate = `${latestMonth}-${String(lastDay).padStart(2, '0')}`;
+          setDateRangeFilter({ start: startDate, end: endDate });
+        }
+      }
+    }
     setActiveTab('transactions');
   };
 
   const handleCustomDateApply = () => {
     if (customDateRange.start && customDateRange.end) {
+      // Convert YYYY-MM format to full date ranges (first day to last day of month)
+      const startDate = customDateRange.start + '-01'; // First day of start month
+      
+      // Calculate last day of end month
+      const [endYear, endMonth] = customDateRange.end.split('-');
+      const lastDay = new Date(parseInt(endYear), parseInt(endMonth), 0).getDate();
+      const endDate = `${customDateRange.end}-${String(lastDay).padStart(2, '0')}`;
+      
+      // Update customDateRange with full dates for API
+      setCustomDateRange({ start: startDate, end: endDate });
       setTimeframe('custom');
       setShowCustomDate(false);
-      fetchData();
+      
+      // Fetch data with new date range
+      setTimeout(() => fetchData(), 0); // Allow state to update before fetch
     }
   };
 
@@ -356,18 +389,18 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Custom Date Range</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Month</label>
                     <input
-                      type="date"
+                      type="month"
                       value={customDateRange.start}
                       onChange={(e) => setCustomDateRange({ ...customDateRange, start: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">End Month</label>
                     <input
-                      type="date"
+                      type="month"
                       value={customDateRange.end}
                       onChange={(e) => setCustomDateRange({ ...customDateRange, end: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -591,6 +624,8 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
             onClearCategoryFilter={() => setCategoryFilter(null)}
             initialCashflowFilter={cashflowFilter}
             onClearCashflowFilter={() => setCashflowFilter(null)}
+            initialDateRange={dateRangeFilter}
+            onClearDateRange={() => setDateRangeFilter(null)}
           />
         )}
 
