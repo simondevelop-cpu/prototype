@@ -68,17 +68,14 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
   const handleUpload = async () => {
     if (files.length === 0) return;
     
-    console.log('[Upload] Starting parse of', files.length, 'files');
     setUploading(true);
     const formData = new FormData();
     
     files.forEach(file => {
-      console.log('[Upload] Adding file:', file.name, file.type, file.size, 'bytes');
       formData.append('statements', file);
     });
-
+    
     try {
-      console.log('[Upload] Sending request to /api/statements/parse');
       const response = await fetch('/api/statements/parse', {
         method: 'POST',
         headers: {
@@ -87,9 +84,7 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
         body: formData,
       });
 
-      console.log('[Upload] Response status:', response.status);
       const result = await response.json();
-      console.log('[Upload] Response data:', result);
       
       if (response.ok) {
         // Filter successful parses
@@ -108,7 +103,6 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
         setParsedStatements(successfulParses);
         setShowReviewModal(true);
       } else {
-        console.error('[Upload] Parse failed:', result);
         alert(`Parse failed: ${result.error || 'Unknown error'}`);
       }
     } catch (error: any) {

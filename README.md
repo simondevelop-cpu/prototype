@@ -269,12 +269,12 @@ CREATE TABLE transactions (
     - ✅ TD (Credit Card, Chequing, Savings)
     - ✅ RBC (Credit Card, Chequing, Savings)
     - ✅ CIBC (Credit Card, Chequing)
-    - ✅ National Bank (Credit Card)
-    - ✅ American Express
+    - ✅ BMO (Credit Card, Chequing)
   - **Coming soon:**
+    - 🚧 National Bank
+    - 🚧 American Express
     - 🚧 Scotiabank
     - 🚧 Desjardins
-    - 🚧 BMO
   - **Next generation support:**
     - 📅 Tangerine
     - 📅 Simplii Financial
@@ -337,8 +337,9 @@ CREATE TABLE transactions (
 
 - Settings page is placeholder (coming soon modal)
 - Insights tab is placeholder (coming soon)
+- Budget tab is placeholder (coming soon)
 - No mobile app yet (responsive web only)
-- Manual transaction entry only (no bank import yet)
+- PDF statement parsing is beta (supported banks: TD, RBC, CIBC, BMO)
 - Single currency support (CAD)
 
 ---

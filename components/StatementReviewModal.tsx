@@ -197,15 +197,12 @@ export default function StatementReviewModal({
           }).join(', ');
           
           const newName = `Multiple Accounts (${accountDescriptions})`;
-          console.log('[Review Modal] Multiple statements:', newName);
           setAccountName(newName);
         } else {
           // Single statement - use bank and account type
           const statement = parsedStatements[0];
           const bank = statement.bank || 'Unknown Bank';
           const type = statement.accountType || 'Credit Card';
-          
-          console.log('[Review Modal] Setting account name:', { bank, type });
           
           // Format account type for display
           let accountTypeDisplay = type;
@@ -219,7 +216,6 @@ export default function StatementReviewModal({
           
           // Simple format: "[Bank] [Account Type]" (e.g., "RBC Credit Card", "CIBC Chequing Account")
           const newName = `${bank} ${accountTypeDisplay}`;
-          console.log('[Review Modal] Account name:', newName);
           setAccountName(newName);
         }
       }
