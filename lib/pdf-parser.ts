@@ -1154,13 +1154,51 @@ function parseDateFlexible(dateStr: string): string | null {
     return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
   });
   
-  // Try various date formats
+  // Month name to number mapping
+  const monthMap: Record<string, number> = {
+    'JAN': 1, 'FEB': 2, 'MAR': 3, 'APR': 4, 'MAY': 5, 'JUN': 6,
+    'JUL': 7, 'AUG': 8, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DEC': 12
+  };
+
+  // Try manual parsing for "D MMM" format (e.g., "8 Aug")
+  const dayMonthMatch = cleanDate.match(/^(\d{1,2})\s+([A-Z]{3})$/i);
+  if (dayMonthMatch) {
+    const day = parseInt(dayMonthMatch[1]);
+    const monthStr = dayMonthMatch[2].toUpperCase();
+    const month = monthMap[monthStr];
+    if (month && day >= 1 && day <= 31) {
+      const nowUtc = dayjs.utc();
+      const currentYear = nowUtc.year();
+      const currentMonth = nowUtc.month() + 1; // dayjs months are 0-indexed
+      // If parsed month is greater than current month, it's probably from last year
+      const year = month > currentMonth + 2 ? currentYear - 1 : currentYear;
+      const finalDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      console.log(`[PDF Parser] MANUAL PARSE: '${originalDate}' → day=${day}, month=${month}, year=${year} → '${finalDate}'`);
+      return finalDate;
+    }
+  }
+
+  // Try manual parsing for "MMM D" or "MMM DD" format (e.g., "Aug 8", "Aug 08")
+  const monthDayMatch = cleanDate.match(/^([A-Z]{3})\s+(\d{1,2})$/i);
+  if (monthDayMatch) {
+    const monthStr = monthDayMatch[1].toUpperCase();
+    const day = parseInt(monthDayMatch[2]);
+    const month = monthMap[monthStr];
+    if (month && day >= 1 && day <= 31) {
+      const nowUtc = dayjs.utc();
+      const currentYear = nowUtc.year();
+      const currentMonth = nowUtc.month() + 1; // dayjs months are 0-indexed
+      // If parsed month is greater than current month, it's probably from last year
+      const year = month > currentMonth + 2 ? currentYear - 1 : currentYear;
+      const finalDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      console.log(`[PDF Parser] MANUAL PARSE: '${originalDate}' → month=${month}, day=${day}, year=${year} → '${finalDate}'`);
+      return finalDate;
+    }
+  }
+
+  // Fall back to dayjs parsing for other formats
   const formats = [
     'MMM DD, YYYY',  // Aug 12, 2025
-    'MMM DD',        // Aug 12 (no year) or JUL 02
-    'MMM D',         // Aug 1 (no year)
-    'D MMM',         // 8 Aug, 11 Aug (day first, common in international formats)
-    'DD MMM',        // 08 Aug
     'MM/DD/YYYY',    // 08/12/2025
     'MM/DD/YY',      // 08/12/25
     'MM/DD',         // 08/12 (no year)
