@@ -269,13 +269,90 @@ function detectAccountType(text: string): string {
 
 /**
  * Parse RBC transactions
+ * 
  * RBC Credit Card Format: TRANSACTION_DATE  POSTING_DATE  DESCRIPTION  $AMOUNT
  * Example: AUG 19  AUG 21  SOBEYS #776 ENFIELD SOUTH NS    $65.33
  * 
- * Uses the generic parser which handles dual-date formats
+ * RBC Chequing Format (columnar):
+ * Date        Description                              Withdrawals($)  Deposits($)  Balance($)
+ * 8 Aug       e-Transfer - Autodeposit EMMA BROWN                      1,500.00     24,989.24
+ * 11 Aug      e-Transfer sent bill QMCXE9              1,475.00                     23,514.24
  */
 function parseRBCTransactions(text: string, accountType: string): Transaction[] {
-  return parseGenericTransactions(text, accountType);
+  const transactions: Transaction[] = [];
+  const lines = text.split('\n');
+  
+  // Check if this is a columnar format (chequing) or single-line format (credit card)
+  const hasColumnarFormat = /Withdrawals\s*\(\$\)|Deposits\s*\(\$\)/i.test(text);
+  
+  if (!hasColumnarFormat) {
+    // Credit card format - use generic parser
+    return parseGenericTransactions(text, accountType);
+  }
+  
+  // Chequing account - columnar format
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Skip empty lines and headers
+    if (!line || line.length < 10) continue;
+    if (/^(date|description|withdrawals|deposits|balance|opening|closing)/i.test(line)) continue;
+    
+    // Look for lines starting with a date (e.g., "8 Aug", "11 Aug", "15 Aug")
+    const dateMatch = line.match(/^(\d{1,2}\s+\w{3})/);
+    if (!dateMatch) continue;
+    
+    const dateStr = dateMatch[1];
+    const date = parseDateFlexible(dateStr);
+    if (!date) continue;
+    
+    // Extract description and amounts
+    // Format: DATE  DESCRIPTION  [WITHDRAWAL]  [DEPOSIT]  BALANCE
+    // Remove the date from the start
+    let remainder = line.substring(dateMatch[0].length).trim();
+    
+    // Extract all amounts (withdrawal, deposit, balance)
+    const amountPattern = /(\d{1,3}(?:,\d{3})*\.\d{2})/g;
+    const amounts: number[] = [];
+    let match;
+    while ((match = amountPattern.exec(remainder)) !== null) {
+      amounts.push(parseFloat(match[1].replace(/,/g, '')));
+    }
+    
+    // Remove amounts from description
+    const description = remainder.replace(amountPattern, '').trim();
+    
+    if (!description || amounts.length === 0) continue;
+    
+    // Determine transaction amount
+    // If there are 3 amounts: [withdrawal, deposit, balance] or [description with number, withdrawal/deposit, balance]
+    // If there are 2 amounts: [withdrawal OR deposit, balance]
+    let amount = 0;
+    
+    if (amounts.length >= 2) {
+      // Last amount is always the balance, second-to-last is the transaction
+      const transactionAmount = amounts[amounts.length - 2];
+      
+      // Check if this is a withdrawal (negative) or deposit (positive)
+      // Look for the amount in context to determine which column it's in
+      const beforeLastAmount = remainder.substring(0, remainder.lastIndexOf(amounts[amounts.length - 2].toLocaleString()));
+      
+      // Simple heuristic: if the description suggests income/deposit, make it positive
+      const isDeposit = /deposit|transfer.*autodeposit|dividend|interest|refund/i.test(description);
+      
+      amount = isDeposit ? transactionAmount : -transactionAmount;
+    } else if (amounts.length === 1) {
+      // Only one amount - could be withdrawal or deposit
+      const isDeposit = /deposit|transfer.*autodeposit|dividend|interest|refund/i.test(description);
+      amount = isDeposit ? amounts[0] : -amounts[0];
+    }
+    
+    if (amount === 0) continue;
+    
+    transactions.push(createTransaction(date, description, amount, accountType));
+  }
+  
+  return transactions;
 }
 
 /**
