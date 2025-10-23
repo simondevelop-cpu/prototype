@@ -14,6 +14,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [timeframe, setTimeframe] = useState('3m');
   const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
+  const [customMonthRange, setCustomMonthRange] = useState({ start: '', end: '' }); // Store YYYY-MM for month picker
   const [showCustomDate, setShowCustomDate] = useState(false);
   const [summary, setSummary] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]); // For dashboard breakdown/chart
@@ -195,22 +196,20 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   };
 
   const handleCustomDateApply = () => {
-    if (customDateRange.start && customDateRange.end) {
+    if (customMonthRange.start && customMonthRange.end) {
       // Convert YYYY-MM format to full date ranges (first day to last day of month)
-      const startDate = customDateRange.start + '-01'; // First day of start month
+      const startDate = customMonthRange.start + '-01'; // First day of start month
       
       // Calculate last day of end month
-      const [endYear, endMonth] = customDateRange.end.split('-');
+      const [endYear, endMonth] = customMonthRange.end.split('-');
       const lastDay = new Date(parseInt(endYear), parseInt(endMonth), 0).getDate();
-      const endDate = `${customDateRange.end}-${String(lastDay).padStart(2, '0')}`;
+      const endDate = `${customMonthRange.end}-${String(lastDay).padStart(2, '0')}`;
       
-      // Update customDateRange with full dates for API
+      // Update customDateRange with full dates for API (keep month values in customMonthRange)
       setCustomDateRange({ start: startDate, end: endDate });
       setTimeframe('custom');
       setShowCustomDate(false);
-      
-      // Fetch data with new date range
-      setTimeout(() => fetchData(), 0); // Allow state to update before fetch
+      fetchData();
     }
   };
 
@@ -392,8 +391,8 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Start Month</label>
                     <input
                       type="month"
-                      value={customDateRange.start}
-                      onChange={(e) => setCustomDateRange({ ...customDateRange, start: e.target.value })}
+                      value={customMonthRange.start}
+                      onChange={(e) => setCustomMonthRange({ ...customMonthRange, start: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -401,8 +400,8 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                     <label className="block text-sm font-medium text-gray-700 mb-2">End Month</label>
                     <input
                       type="month"
-                      value={customDateRange.end}
-                      onChange={(e) => setCustomDateRange({ ...customDateRange, end: e.target.value })}
+                      value={customMonthRange.end}
+                      onChange={(e) => setCustomMonthRange({ ...customMonthRange, end: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
