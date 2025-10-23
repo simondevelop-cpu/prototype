@@ -259,19 +259,45 @@ function detectBank(text: string): string {
 
 /**
  * Detect account type (chequing, savings, credit card)
+ * 
+ * Priority order is important:
+ * 1. Check for explicit "statement" or "account" keywords with account type
+ * 2. Check for chequing/savings patterns (more specific)
+ * 3. Check for credit card patterns (less specific, as "credit" can appear in other contexts)
  */
 function detectAccountType(text: string): string {
-  if (ACCOUNT_TYPE_PATTERNS.credit.test(text)) return 'Credit Card';
+  // First, check for explicit account type mentions near "statement" or "account"
+  // This helps avoid false positives from words like "Available credit" on chequing statements
+  const statementMatch = text.match(/(che(c)?king|ch(e|è)ques|compte-ch(e|è)ques|savings?|[ée]pargne|credit\s*card|carte\s*cr[ée]dit|visa|mastercard).*?(statement|account)/i);
+  if (statementMatch) {
+    const accountWord = statementMatch[1].toLowerCase();
+    if (/credit|visa|mastercard/i.test(accountWord)) return 'Credit Card';
+    if (/saving|épargne/i.test(accountWord)) return 'Savings';
+    if (/che(c)?king|chèques/i.test(accountWord)) return 'Checking';
+  }
+  
+  // Check for columnar format indicators (strong signal for chequing/savings)
+  if (/Withdrawals\s*\(\$\)|Deposits\s*\(\$\)/i.test(text)) return 'Checking';
+  
+  // Now check the broader patterns
   if (ACCOUNT_TYPE_PATTERNS.savings.test(text)) return 'Savings';
   if (ACCOUNT_TYPE_PATTERNS.chequing.test(text)) return 'Checking';
+  
+  // Credit card check last, as "credit" is a common word in banking statements
+  if (ACCOUNT_TYPE_PATTERNS.credit.test(text)) return 'Credit Card';
+  
   return 'Checking';
 }
 
 /**
  * Parse RBC transactions
  * 
- * RBC Credit Card Format: TRANSACTION_DATE  POSTING_DATE  DESCRIPTION  $AMOUNT
- * Example: AUG 19  AUG 21  SOBEYS #776 ENFIELD SOUTH NS    $65.33
+ * RBC Credit Card Format (can be multi-line):
+ * Line 1: AUG 19AUG 21SOBEYS #776 DARTMOUTH NS
+ * Line 2: 74529005231920451563403
+ * 
+ * OR sometimes with amounts on the same line:
+ * AUG 19  AUG 21  SOBEYS #776 ENFIELD SOUTH NS    $65.33
  * 
  * RBC Chequing Format (columnar):
  * Date        Description                              Withdrawals($)  Deposits($)  Balance($)
@@ -286,8 +312,8 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
   const hasColumnarFormat = /Withdrawals\s*\(\$\)|Deposits\s*\(\$\)/i.test(text);
   
   if (!hasColumnarFormat) {
-    // Credit card format - use generic parser
-    return parseGenericTransactions(text, accountType);
+    // Credit card format - try to parse using special RBC credit card logic
+    return parseRBCCreditCardTransactions(text, accountType);
   }
   
   // Chequing account - columnar format
@@ -352,6 +378,135 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     transactions.push(createTransaction(date, description, amount, accountType));
   }
   
+  return transactions;
+}
+
+/**
+ * Parse RBC Credit Card transactions
+ * 
+ * RBC credit card PDFs can have amounts in the table but extracted separately from the description.
+ * We need to parse line-by-line and look for transactions with amounts either:
+ * 1. On the same line (e.g., "SEP 09SEP 09AUTOMATIC PAYMENT -THANK YOU-$1,372.30")
+ * 2. With the amount in a column extracted to the right side or end of the line
+ * 
+ * Example from your PDF:
+ * ACTIVITY DESCRIPTIONAMOUNT ($)
+ * AUG 19AUG 21SOBEYS #776 DARTMOUTH NS
+ * 
+ * The amount might be at the far right after many spaces, or on the next line.
+ */
+function parseRBCCreditCardTransactions(text: string, accountType: string): Transaction[] {
+  const transactions: Transaction[] = [];
+  const lines = text.split('\n');
+  
+  console.log('[PDF Parser] parseRBCCreditCardTransactions called');
+  console.log(`[PDF Parser] Total lines: ${lines.length}`);
+  
+  // Look for the ACTIVITY section
+  let inActivitySection = false;
+  let parsedCount = 0;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Start parsing when we hit the ACTIVITY section
+    if (/ACTIVITY\s+DESCRIPTION/i.test(line)) {
+      inActivitySection = true;
+      console.log(`[PDF Parser] Found ACTIVITY section at line ${i}`);
+      continue;
+    }
+    
+    // Stop when we hit TOTAL or end of activity section
+    if (inActivitySection && /TOTAL\s+ACCOUNT\s+BALANCE|^Time to Pay/i.test(line)) {
+      console.log(`[PDF Parser] End of activity section at line ${i}`);
+      break;
+    }
+    
+    if (!inActivitySection) continue;
+    
+    // Skip short lines, headers, page numbers
+    if (line.length < 15) continue;
+    if (/^(RBC|date|trans|activity|description|amount|page|\d+of\d+)/i.test(line)) continue;
+    
+    // RBC Credit Card pattern: Two dates (TRANSACTION_DATE POSTING_DATE) followed by description
+    // Dates like: AUG 19, SEP 04, etc. (3-letter month + 1-2 digit day, may have spaces)
+    const dualDatePattern = /^([A-Z]{3}\s*\d{1,2})([A-Z]{3}\s*\d{1,2})/;
+    const dateMatch = line.match(dualDatePattern);
+    
+    if (!dateMatch) continue;
+    
+    const transDateStr = dateMatch[1];
+    const postDateStr = dateMatch[2];
+    
+    // Parse the transaction date
+    const transDate = parseDateFlexible(transDateStr) || parseDateFlexible(postDateStr);
+    if (!transDate) {
+      console.log(`[PDF Parser] Failed to parse dates: ${transDateStr} / ${postDateStr}`);
+      continue;
+    }
+    
+    // Remove the two dates from the line to get the rest
+    const afterDates = line.substring(dateMatch[0].length).trim();
+    
+    // Look for amount with $ sign anywhere in the remaining text
+    const amountMatch = afterDates.match(/\$\s*(-?[\d,]+\.\d{2})/);
+    
+    let description = '';
+    let amount = 0;
+    
+    if (amountMatch && amountMatch.index !== undefined) {
+      // Amount found on same line
+      // Description is everything before the amount
+      description = afterDates.substring(0, amountMatch.index).trim();
+      amount = parseFloat(amountMatch[1].replace(/,/g, ''));
+      
+      if (parsedCount < 5) {
+        console.log(`[PDF Parser] Found transaction with inline amount: ${transDate} | ${description} | $${amount}`);
+      }
+    } else {
+      // Amount not on same line - description is the whole remaining text
+      // Remove any trailing reference numbers (10+ digits)
+      description = afterDates.replace(/\d{10,}$/, '').trim();
+      
+      // Try to find amount on the next line (sometimes PDF extraction puts it there)
+      if (i + 1 < lines.length) {
+        const nextLine = lines[i + 1].trim();
+        const nextAmountMatch = nextLine.match(/^\$?\s*(-?[\d,]+\.\d{2})/);
+        
+        if (nextAmountMatch) {
+          amount = parseFloat(nextAmountMatch[1].replace(/,/g, ''));
+          i++; // Skip the next line since we used it
+          
+          if (parsedCount < 5) {
+            console.log(`[PDF Parser] Found transaction with amount on next line: ${transDate} | ${description} | $${amount}`);
+          }
+        }
+      }
+    }
+    
+    // Skip if we couldn't find a valid amount or description
+    if (amount === 0 || !description || description.length < 3) {
+      if (parsedCount < 10) {
+        console.log(`[PDF Parser] Skipping line - no valid amount or description: ${line.substring(0, 80)}`);
+      }
+      continue;
+    }
+    
+    // For credit cards:
+    // - Payments are shown as "AUTOMATIC PAYMENT -THANK YOU-$1,372.30" with positive amount (incoming)
+    // - Regular purchases are expenses (negative)
+    const isPayment = description.toLowerCase().includes('payment') || description.toLowerCase().includes('credit');
+    const finalAmount = isPayment ? Math.abs(amount) : -Math.abs(amount);
+    
+    transactions.push(createTransaction(transDate, description, finalAmount, accountType));
+    parsedCount++;
+    
+    if (parsedCount <= 5) {
+      console.log(`[PDF Parser] Parsed RBC CC transaction #${parsedCount}: ${transDate} | ${description.substring(0, 40)} | ${finalAmount}`);
+    }
+  }
+  
+  console.log(`[PDF Parser] Parsed ${transactions.length} RBC credit card transactions`);
   return transactions;
 }
 
