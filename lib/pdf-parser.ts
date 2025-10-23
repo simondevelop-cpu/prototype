@@ -404,9 +404,9 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     
     // Extract amounts carefully
     // Problem: "QMCXE91,475.00" gets matched as "91,475.00" (wrong!)
-    // Solution: Only match amounts that are NOT preceded by digits
+    // Solution: Only match amounts preceded by whitespace or start of string
     let amounts: number[] = [];
-    const allAmountPattern = /(?<!\d)(\d{1,3}(?:,\d{3})*\.\d{2})/g;
+    const allAmountPattern = /(?:^|\s)(\d{1,3}(?:,\d{3})*\.\d{2})/g;
     let match;
     
     while ((match = allAmountPattern.exec(remainder)) !== null) {
