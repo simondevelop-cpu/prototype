@@ -180,7 +180,12 @@ export default function StatementReviewModal({
       }
       
       if (!accountName) {
-        setAccountName(parsedStatements[0].accountType || 'Credit Card');
+        const statement = parsedStatements[0];
+        const bank = statement.bank || 'Unknown Bank';
+        const type = statement.accountType || 'Credit Card';
+        // Format: "[Bank] - [Account Type]" (e.g., "RBC - Chequing", "TD - Credit Card")
+        const accountTypeShort = type === 'Credit Card' ? 'Credit' : type;
+        setAccountName(`${bank} - ${accountTypeShort}`);
       }
     }
   }, [isOpen, parsedStatements, excludedTransactions.size, accountName]);

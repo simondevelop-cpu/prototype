@@ -58,13 +58,14 @@ interface ParseResult {
 
 /**
  * Bank detection patterns
+ * Order matters - check most specific patterns first
  */
 const BANK_PATTERNS = {
-  rbc: /royal bank|rbc|royal|banque royale/i,
+  cibc: /cibc|canadian imperial bank/i, // Check CIBC first (more specific)
+  rbc: /royal bank|rbc royal|banque royale/i, // More specific RBC pattern
   td: /td canada trust|toronto-dominion|td bank/i,
   scotiabank: /scotiabank|bank of nova scotia/i,
   bmo: /bank of montreal|bmo|banque de montr[ée]al/i,
-  cibc: /canadian imperial bank|cibc/i,
   tangerine: /tangerine|ing direct/i,
 };
 
@@ -248,11 +249,12 @@ function parseTDCreditCardTransactions(text: string): Transaction[] {
  * Detect which bank issued the statement
  */
 function detectBank(text: string): string {
+  // Check CIBC first - more specific pattern to avoid false positives
+  if (BANK_PATTERNS.cibc.test(text)) return 'CIBC';
   if (BANK_PATTERNS.rbc.test(text)) return 'RBC';
   if (BANK_PATTERNS.td.test(text)) return 'TD';
   if (BANK_PATTERNS.scotiabank.test(text)) return 'Scotiabank';
   if (BANK_PATTERNS.bmo.test(text)) return 'BMO';
-  if (BANK_PATTERNS.cibc.test(text)) return 'CIBC';
   if (BANK_PATTERNS.tangerine.test(text)) return 'Tangerine';
   return 'Unknown';
 }
@@ -573,26 +575,47 @@ function parseCIBCTransactions(text: string, accountType: string): Transaction[]
 /**
  * Parse CIBC Credit Card transactions
  * Format: TransDate PostDate Description Amount
- * Example: Jun 11    Jun 13   PHARMAPRIX #3558  MONTREAL  QC    13.63
+ * Example: Jun 11 Jun 13 PHARMAPRIX #3558 MONTREAL QC 13.63
+ * 
+ * CIBC credit card PDFs often have transactions section with headers like:
+ * "Transactions from June 13 to July 12, 2025"
+ * or "Your payments"
+ * or "Your new charges and credits"
  */
 function parseCIBCCreditCardTransactions(text: string, accountType: string): Transaction[] {
   const transactions: Transaction[] = [];
   const lines = text.split('\n');
   
   console.log('[PDF Parser] Using CIBC credit card parser');
+  console.log('[PDF Parser] Sample lines:');
+  
+  // Show first 20 lines for debugging
+  for (let i = 0; i < Math.min(20, lines.length); i++) {
+    if (lines[i].trim().length > 5) {
+      console.log(`[PDF Parser] Line ${i}: ${lines[i].trim().substring(0, 80)}`);
+    }
+  }
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
-    // Skip empty lines, headers, and metadata
+    // Skip empty lines and headers
     if (!line || line.length < 10) continue;
-    if (/^(trans|post|date|description|amount|page|statement|account)/i.test(line)) continue;
     
     // CIBC credit card pattern: Two dates at start, then description, then amount at end
-    // Dates can be: "Jun 11" or "Jun  1" (with extra space for single digits)
-    // Pattern: MONTH DAY  MONTH DAY  DESCRIPTION  AMOUNT
-    const pattern = /^([A-Z][a-z]{2}\s+\d{1,2})\s+([A-Z][a-z]{2}\s+\d{1,2})\s+(.+?)\s+([\d,]+\.\d{2})$/;
-    const match = line.match(pattern);
+    // Dates format: "Jun 11" or "Jun  1" (month abbreviation + day)
+    // May or may not have much spacing between fields
+    // Try multiple patterns:
+    
+    // Pattern 1: Standard format with clear spacing
+    let pattern = /^([A-Z][a-z]{2}\s+\d{1,2})\s+([A-Z][a-z]{2}\s+\d{1,2})\s+(.+?)\s+([\d,]+\.\d{2})$/;
+    let match = line.match(pattern);
+    
+    // Pattern 2: Compact format (less spacing)
+    if (!match) {
+      pattern = /^([A-Z][a-z]{2}\d{1,2})([A-Z][a-z]{2}\d{1,2})(.+?)([\d,]+\.\d{2})$/;
+      match = line.match(pattern);
+    }
     
     if (!match) continue;
     
@@ -600,10 +623,7 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
     
     // Parse transaction date
     const transDate = parseDateFlexible(transDateStr);
-    if (!transDate) {
-      console.log(`[PDF Parser] Failed to parse CIBC date: ${transDateStr}`);
-      continue;
-    }
+    if (!transDate) continue;
     
     const amount = parseFloat(amountStr.replace(/,/g, ''));
     
@@ -632,19 +652,28 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
 /**
  * Parse CIBC Chequing/Savings transactions
  * Format: Date  Description  Withdrawals($)  Deposits($)  Balance($)
+ * Example: Aug 6    DEPOSIT                                   3,940.24     3,936.24
  */
 function parseCIBCChequingTransactions(text: string, accountType: string): Transaction[] {
   const transactions: Transaction[] = [];
   const lines = text.split('\n');
   
   console.log('[PDF Parser] Using CIBC chequing/savings parser');
+  console.log('[PDF Parser] Sample lines:');
+  
+  // Show first 30 lines for debugging
+  for (let i = 0; i < Math.min(30, lines.length); i++) {
+    if (lines[i].trim().length > 5) {
+      console.log(`[PDF Parser] Line ${i}: ${lines[i].trim().substring(0, 100)}`);
+    }
+  }
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
     // Skip empty lines and headers
     if (!line || line.length < 10) continue;
-    if (/^(date|description|withdrawals|deposits|balance|opening|closing)/i.test(line)) continue;
+    if (/^(date|description|withdrawals|deposits|balance|opening|closing|account|transaction|contact)/i.test(line)) continue;
     
     // Look for lines starting with a date
     // Format: "Aug 6" or "Aug  1" (may have extra space)
@@ -658,12 +687,18 @@ function parseCIBCChequingTransactions(text: string, accountType: string): Trans
     const date = parseDateFlexible(dateStr);
     if (!date) continue;
     
-    // Extract all amounts from the line
+    console.log(`[PDF Parser] Found date line: ${dateStr} | Remainder: ${remainder.substring(0, 80)}`);
+    
+    // Extract all amounts from the line (with or without $ or -)
     const amountPattern = /(-?\$?\s*[\d,]+\.\d{2})/g;
     const amounts: number[] = [];
     let amountMatch;
     while ((amountMatch = amountPattern.exec(remainder)) !== null) {
-      amounts.push(parseFloat(amountMatch[1].replace(/[$,\s]/g, '')));
+      const cleaned = amountMatch[1].replace(/[$,\s-]/g, '');
+      const value = parseFloat(cleaned);
+      // Check if original had minus sign
+      const isNegative = amountMatch[1].includes('-');
+      amounts.push(isNegative ? -value : value);
     }
     
     // Remove amounts to get description
@@ -672,33 +707,46 @@ function parseCIBCChequingTransactions(text: string, accountType: string): Trans
       .replace(/\s{2,}/g, ' ')
       .trim();
     
-    if (!description || amounts.length === 0) continue;
+    console.log(`[PDF Parser] Description: ${description} | Amounts: ${amounts.join(', ')}`);
+    
+    if (!description || amounts.length === 0) {
+      console.log(`[PDF Parser] Skipping - no description or amounts`);
+      continue;
+    }
     
     // Determine transaction amount
-    // Last amount is usually balance, second-to-last is the transaction
+    // Format varies:
+    // - Withdrawals: might have amount in Withdrawals column
+    // - Deposits: might have amount in Deposits column
+    // - Last amount is usually balance
     let amount = 0;
     
     if (amounts.length >= 2) {
+      // Second-to-last is likely the transaction amount
       amount = amounts[amounts.length - 2];
       
       // Check if this is a deposit (positive) or withdrawal (negative)
-      const isDeposit = /deposit|credit|interest|refund|transfer.*in|autodeposit/i.test(description);
+      const isDeposit = /deposit|credit\s+memo|interest|refund|transfer.*in|autodeposit/i.test(description);
       
-      if (!isDeposit && amount > 0) {
+      if (isDeposit && amount < 0) {
+        amount = Math.abs(amount); // Deposits are positive
+      } else if (!isDeposit && amount > 0) {
         amount = -amount; // Withdrawals are negative
       }
     } else if (amounts.length === 1) {
       // Only one amount - might be opening/closing balance, skip
+      console.log(`[PDF Parser] Skipping - only one amount (balance)`);
       continue;
     }
     
-    if (amount === 0) continue;
+    if (amount === 0) {
+      console.log(`[PDF Parser] Skipping - amount is 0`);
+      continue;
+    }
     
     transactions.push(createTransaction(date, description, amount, accountType));
     
-    if (transactions.length <= 5) {
-      console.log(`[PDF Parser] CIBC Chequing #${transactions.length}: ${date} | ${description.substring(0, 40)} | ${amount}`);
-    }
+    console.log(`[PDF Parser] CIBC Chequing #${transactions.length}: ${date} | ${description.substring(0, 40)} | ${amount}`);
   }
   
   console.log(`[PDF Parser] Parsed ${transactions.length} CIBC chequing transactions`);
