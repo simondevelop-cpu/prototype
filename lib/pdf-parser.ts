@@ -395,27 +395,37 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     
     // Extract all amounts (withdrawal, deposit, balance)
     // CAREFUL: Reference codes can be embedded like "QMCXE1,475.00" (no space!)
-    // We need amounts that are SEPARATED from text
     let amounts: number[] = [];
     
-    // Split by whitespace to get tokens
+    // Strategy: Try token-based first, then fallback to pattern matching
+    // 1. Token-based (most reliable when amounts are space-separated)
     const tokens = remainder.split(/\s+/);
     
     for (const token of tokens) {
-      // Check if this token is ONLY an amount (possibly with $ or -)
       const amountMatch = token.match(/^-?\$?(\d{1,3}(?:,\d{3})*\.\d{2})$/);
       if (amountMatch) {
         amounts.push(parseFloat(amountMatch[1].replace(/,/g, '')));
       }
     }
     
+    // 2. If no amounts found via tokens, try pattern matching with boundaries
+    // This handles cases where PDF extraction doesn't preserve spaces perfectly
+    if (amounts.length === 0) {
+      // Look for amounts that are NOT immediately preceded by letters
+      // Use negative lookbehind: (?<![A-Z])
+      const boundaryPattern = /(?<![A-Z0-9])(\d{1,3}(?:,\d{3})*\.\d{2})/g;
+      let match;
+      while ((match = boundaryPattern.exec(remainder)) !== null) {
+        amounts.push(parseFloat(match[1].replace(/,/g, '')));
+      }
+    }
+    
     // If no amounts on this line, check the next line
     if (amounts.length === 0 && i + 1 < lines.length) {
       const nextLine = lines[i + 1].trim();
-      // Only use next line if it starts with amounts (not a date)
       if (nextLine && !/^\d{1,2}\s+\w{3}/.test(nextLine)) {
+        // Try tokens first
         const nextTokens = nextLine.split(/\s+/);
-        
         for (const token of nextTokens) {
           const amountMatch = token.match(/^-?\$?(\d{1,3}(?:,\d{3})*\.\d{2})$/);
           if (amountMatch) {
@@ -423,10 +433,18 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
           }
         }
         
-        // Append next line to remainder for description extraction
+        // Fallback to pattern
+        if (amounts.length === 0) {
+          const boundaryPattern = /(?<![A-Z0-9])(\d{1,3}(?:,\d{3})*\.\d{2})/g;
+          let match;
+          while ((match = boundaryPattern.exec(nextLine)) !== null) {
+            amounts.push(parseFloat(match[1].replace(/,/g, '')));
+          }
+        }
+        
         if (amounts.length > 0) {
           remainder += ' ' + nextLine;
-          i++; // Skip the next line since we've consumed it
+          i++;
         }
       }
     }
@@ -678,7 +696,7 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
   }
   
   for (let i = transactionStartIndex; i < lines.length; i++) {
-    const line = lines[i].trim();
+    let line = lines[i].trim();
     
     // Skip empty lines and stop at summary sections
     if (!line || line.length < 10) continue;
@@ -688,10 +706,31 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
     }
     
     // CIBC credit card pattern: Two dates at start, then description, then CATEGORY, then amount at end
-    // Format: "Jun 12Jun 13LE VAISSELIER BROMONT QCProfessional and Financial Services235.00"
-    // OR: "Jun 12 Jun 13 MERCHANT NAME LOCATION Category Name 123.45"
+    // Format 1: "Jun 12Jun 13LE VAISSELIER BROMONT QCProfessional and Financial Services235.00"
+    // Format 2: Dates on separate lines:
+    //   Line 1: "Jun 15"
+    //   Line 2: "Jun 16"  
+    //   Line 3: "FIDO Mobile ******7596   888-481-3436 ONPersonal and Household Expenses4.51"
     
-    // Pattern 1: Compact dates (no space) + description + category + amount
+    // Check if this line is just a date (transaction might be split across lines)
+    const justDatePattern = /^([A-Z][a-z]{2}\s*\d{1,2})$/;
+    const justDateMatch = line.match(justDatePattern);
+    
+    if (justDateMatch && i + 2 < lines.length) {
+      // This might be a split transaction - try to combine next 2 lines
+      const nextLine1 = lines[i + 1].trim();
+      const nextLine2 = lines[i + 2].trim();
+      
+      // Check if next line is also just a date
+      const nextDateMatch = nextLine1.match(justDatePattern);
+      if (nextDateMatch) {
+        // Combine: date1 + date2 + description line
+        line = justDateMatch[1] + nextDateMatch[1] + nextLine2;
+        i += 2; // Skip the next 2 lines
+      }
+    }
+    
+    // Pattern: Compact dates (no space) + description + category + amount
     let pattern = /^([A-Z][a-z]{2}\s*\d{1,2})([A-Z][a-z]{2}\s*\d{1,2})(.+?)([\d,]+\.\d{2})$/;
     let match = line.match(pattern);
     

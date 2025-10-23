@@ -199,14 +199,14 @@ export default function StatementReviewModal({
         }
         
         // Format: "[Name]'s [Bank] [Account Type]" (e.g., "Jonathan's RBC Credit Card", "Elise's TD Chequing Account")
-        // If no name detected, use: "[Bank] [Account Type]"
+        // If no name detected, use placeholder: "[First Name]'s [Bank] [Account Type]"
         if (holderName) {
           const newName = `${holderName}'s ${bank} ${accountTypeDisplay}`;
           console.log('[Review Modal] With name:', newName);
           setAccountName(newName);
         } else {
-          const newName = `${bank} ${accountTypeDisplay}`;
-          console.log('[Review Modal] Without name:', newName);
+          const newName = `[First Name]'s ${bank} ${accountTypeDisplay}`;
+          console.log('[Review Modal] Without name (using placeholder):', newName);
           setAccountName(newName);
         }
       }
