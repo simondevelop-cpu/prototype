@@ -186,6 +186,8 @@ export default function StatementReviewModal({
         const type = statement.accountType || 'Credit Card';
         const holderName = statement.accountHolderName;
         
+        console.log('[Review Modal] Setting account name:', { bank, type, holderName });
+        
         // Format account type for display
         let accountTypeDisplay = type;
         if (type === 'Credit Card') {
@@ -199,9 +201,13 @@ export default function StatementReviewModal({
         // Format: "[Name]'s [Bank] [Account Type]" (e.g., "Jonathan's RBC Credit Card", "Elise's TD Chequing Account")
         // If no name detected, use: "[Bank] [Account Type]"
         if (holderName) {
-          setAccountName(`${holderName}'s ${bank} ${accountTypeDisplay}`);
+          const newName = `${holderName}'s ${bank} ${accountTypeDisplay}`;
+          console.log('[Review Modal] With name:', newName);
+          setAccountName(newName);
         } else {
-          setAccountName(`${bank} ${accountTypeDisplay}`);
+          const newName = `${bank} ${accountTypeDisplay}`;
+          console.log('[Review Modal] Without name:', newName);
+          setAccountName(newName);
         }
       }
     }

@@ -394,53 +394,34 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     let remainder = line.substring(dateMatch[0].length).trim();
     
     // Extract all amounts (withdrawal, deposit, balance)
-    // Match amounts with proper boundaries to avoid false positives in reference codes
-    // BUT: Must work for both "1,475.00" AND "31.00"
+    // CAREFUL: Reference codes can be embedded like "QMCXE1,475.00" (no space!)
+    // We need amounts that are SEPARATED from text
     let amounts: number[] = [];
-    let match;
     
-    // Try ALL amount patterns (with and without commas)
-    const amountPattern = /(\d{1,3}(?:,\d{3})*\.\d{2})/g;
-    const potentialAmounts: Array<{value: number, index: number, text: string}> = [];
+    // Split by whitespace to get tokens
+    const tokens = remainder.split(/\s+/);
     
-    while ((match = amountPattern.exec(remainder)) !== null) {
-      const text = match[1];
-      const value = parseFloat(text.replace(/,/g, ''));
-      const index = match.index;
-      
-      // Check if this amount is preceded by alphanumeric (likely part of reference code)
-      const charBefore = index > 0 ? remainder[index - 1] : ' ';
-      const isEmbedded = /[A-Z0-9]/.test(charBefore);
-      
-      // Skip if embedded in reference code (like "QMCXE91,475.00")
-      if (!isEmbedded) {
-        potentialAmounts.push({value, index, text});
+    for (const token of tokens) {
+      // Check if this token is ONLY an amount (possibly with $ or -)
+      const amountMatch = token.match(/^-?\$?(\d{1,3}(?:,\d{3})*\.\d{2})$/);
+      if (amountMatch) {
+        amounts.push(parseFloat(amountMatch[1].replace(/,/g, '')));
       }
     }
-    
-    amounts = potentialAmounts.map(a => a.value);
     
     // If no amounts on this line, check the next line
     if (amounts.length === 0 && i + 1 < lines.length) {
       const nextLine = lines[i + 1].trim();
       // Only use next line if it starts with amounts (not a date)
       if (nextLine && !/^\d{1,2}\s+\w{3}/.test(nextLine)) {
-        const nextPotentialAmounts: Array<{value: number, index: number, text: string}> = [];
-        let nextMatch;
+        const nextTokens = nextLine.split(/\s+/);
         
-        while ((nextMatch = amountPattern.exec(nextLine)) !== null) {
-          const text = nextMatch[1];
-          const value = parseFloat(text.replace(/,/g, ''));
-          const index = nextMatch.index;
-          const charBefore = index > 0 ? nextLine[index - 1] : ' ';
-          const isEmbedded = /[A-Z0-9]/.test(charBefore);
-          
-          if (!isEmbedded) {
-            nextPotentialAmounts.push({value, index, text});
+        for (const token of nextTokens) {
+          const amountMatch = token.match(/^-?\$?(\d{1,3}(?:,\d{3})*\.\d{2})$/);
+          if (amountMatch) {
+            amounts.push(parseFloat(amountMatch[1].replace(/,/g, '')));
           }
         }
-        
-        amounts = nextPotentialAmounts.map(a => a.value);
         
         // Append next line to remainder for description extraction
         if (amounts.length > 0) {
