@@ -18,6 +18,7 @@ interface ParsedStatement {
   filename: string;
   bank: string;
   accountType: string;
+  accountHolderName?: string;
   categorized: {
     duplicates: Transaction[];
     other: Transaction[];
@@ -183,9 +184,25 @@ export default function StatementReviewModal({
         const statement = parsedStatements[0];
         const bank = statement.bank || 'Unknown Bank';
         const type = statement.accountType || 'Credit Card';
-        // Format: "[Bank] - [Account Type]" (e.g., "RBC - Chequing", "TD - Credit Card")
-        const accountTypeShort = type === 'Credit Card' ? 'Credit' : type;
-        setAccountName(`${bank} - ${accountTypeShort}`);
+        const holderName = statement.accountHolderName;
+        
+        // Format account type for display
+        let accountTypeDisplay = type;
+        if (type === 'Credit Card') {
+          accountTypeDisplay = 'Credit Card';
+        } else if (type === 'Checking') {
+          accountTypeDisplay = 'Chequing Account';
+        } else if (type === 'Savings') {
+          accountTypeDisplay = 'Savings Account';
+        }
+        
+        // Format: "[Name]'s [Bank] [Account Type]" (e.g., "Jonathan's RBC Credit Card", "Elise's TD Chequing Account")
+        // If no name detected, use: "[Bank] [Account Type]"
+        if (holderName) {
+          setAccountName(`${holderName}'s ${bank} ${accountTypeDisplay}`);
+        } else {
+          setAccountName(`${bank} ${accountTypeDisplay}`);
+        }
       }
     }
   }, [isOpen, parsedStatements, excludedTransactions.size, accountName]);

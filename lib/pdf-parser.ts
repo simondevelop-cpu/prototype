@@ -50,6 +50,7 @@ interface Transaction {
 interface ParseResult {
   bank: string;
   accountType: string;
+  accountHolderName?: string;
   transactions: Transaction[];
   transactionsImported: number;
   newTransactions: Transaction[];
@@ -106,6 +107,12 @@ export async function parseBankStatement(
   // Detect account type
   const accountType = detectAccountType(text);
   console.log(`[PDF Parser] Detected account type: ${accountType}`);
+  
+  // Extract account holder name
+  const accountHolderName = extractAccountHolderName(text);
+  if (accountHolderName) {
+    console.log(`[PDF Parser] Detected account holder: ${accountHolderName}`);
+  }
 
   // Parse transactions based on bank and account type
   let transactions: Transaction[] = [];
@@ -150,6 +157,7 @@ export async function parseBankStatement(
   return {
     bank,
     accountType,
+    accountHolderName,
     transactions,
     transactionsImported: inserted,
     newTransactions,
@@ -260,6 +268,35 @@ function detectBank(text: string): string {
 }
 
 /**
+ * Extract account holder's first name from statement
+ * Common patterns:
+ * - "MR JOHN SMITH" or "MS JANE DOE"
+ * - "MISS ELISE" or "MR. JONATHAN"
+ * - Name usually appears near top of statement
+ */
+function extractAccountHolderName(text: string): string | undefined {
+  const lines = text.split('\n').slice(0, 30); // Check first 30 lines
+  
+  for (const line of lines) {
+    // Pattern 1: MR/MS/MISS/MRS followed by name(s)
+    const titlePattern = /(?:MR\.?|MS\.?|MISS|MRS\.?)\s+([A-Z][a-z]+)(?:\s+[A-Z][a-z]+)?/;
+    const match = line.match(titlePattern);
+    if (match) {
+      return match[1]; // Return first name
+    }
+    
+    // Pattern 2: All caps name (2-15 chars) on its own line
+    const namePattern = /^([A-Z][a-z]{2,14})$/;
+    const nameMatch = line.trim().match(namePattern);
+    if (nameMatch && !['MISS', 'CIBC', 'ROYAL', 'BANK', 'STATEMENT', 'ACCOUNT'].includes(nameMatch[1])) {
+      return nameMatch[1];
+    }
+  }
+  
+  return undefined;
+}
+
+/**
  * Detect account type (chequing, savings, credit card)
  * 
  * Priority order is important:
@@ -334,14 +371,6 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
   
   // Chequing account - columnar format
   console.log('[PDF Parser] Using RBC chequing parser');
-  console.log('[PDF Parser] Sample lines:');
-  
-  // Show first 30 lines for debugging
-  for (let i = 0; i < Math.min(30, lines.length); i++) {
-    if (lines[i].trim().length > 5) {
-      console.log(`[PDF Parser] Line ${i}: ${lines[i].trim().substring(0, 100)}`);
-    }
-  }
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -360,28 +389,39 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     
     // Extract description and amounts
     // Format: DATE  DESCRIPTION  [WITHDRAWAL]  [DEPOSIT]  BALANCE
-    // Remove the date from the start
+    // NOTE: Sometimes amounts are on the NEXT line!
     let remainder = line.substring(dateMatch[0].length).trim();
-    
-    console.log(`[PDF Parser] Found date line: ${dateStr} | Remainder: ${remainder.substring(0, 80)}`);
     
     // Extract all amounts (withdrawal, deposit, balance)
     const amountPattern = /(\d{1,3}(?:,\d{3})*\.\d{2})/g;
-    const amounts: number[] = [];
+    let amounts: number[] = [];
     let match;
     while ((match = amountPattern.exec(remainder)) !== null) {
       amounts.push(parseFloat(match[1].replace(/,/g, '')));
     }
     
+    // If no amounts on this line, check the next line
+    if (amounts.length === 0 && i + 1 < lines.length) {
+      const nextLine = lines[i + 1].trim();
+      // Only use next line if it starts with amounts (not a date)
+      if (nextLine && !/^\d{1,2}\s+\w{3}/.test(nextLine)) {
+        const nextAmountPattern = /(\d{1,3}(?:,\d{3})*\.\d{2})/g;
+        let nextMatch;
+        while ((nextMatch = nextAmountPattern.exec(nextLine)) !== null) {
+          amounts.push(parseFloat(nextMatch[1].replace(/,/g, '')));
+        }
+        // Append next line to remainder for description extraction
+        if (amounts.length > 0) {
+          remainder += ' ' + nextLine;
+          i++; // Skip the next line since we've consumed it
+        }
+      }
+    }
+    
     // Remove amounts from description
     const description = remainder.replace(amountPattern, '').trim();
     
-    console.log(`[PDF Parser] Description: ${description} | Amounts: ${amounts.join(', ')}`);
-    
-    if (!description || amounts.length === 0) {
-      console.log(`[PDF Parser] Skipping - no description or amounts`);
-      continue;
-    }
+    if (!description || amounts.length === 0) continue;
     
     // Determine transaction amount
     // If there are 3 amounts: [withdrawal, deposit, balance] or [description with number, withdrawal/deposit, balance]
@@ -393,26 +433,19 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
       const transactionAmount = amounts[amounts.length - 2];
       
       // Check if this is a withdrawal (negative) or deposit (positive)
-      // Look for the amount in context to determine which column it's in
-      const beforeLastAmount = remainder.substring(0, remainder.lastIndexOf(amounts[amounts.length - 2].toLocaleString()));
-      
       // Simple heuristic: if the description suggests income/deposit, make it positive
-      const isDeposit = /deposit|transfer.*autodeposit|dividend|interest|refund/i.test(description);
+      const isDeposit = /deposit|autodeposit|dividend|interest|refund/i.test(description);
       
       amount = isDeposit ? transactionAmount : -transactionAmount;
     } else if (amounts.length === 1) {
       // Only one amount - could be withdrawal or deposit
-      const isDeposit = /deposit|transfer.*autodeposit|dividend|interest|refund/i.test(description);
+      const isDeposit = /deposit|autodeposit|dividend|interest|refund/i.test(description);
       amount = isDeposit ? amounts[0] : -amounts[0];
     }
     
-    if (amount === 0) {
-      console.log(`[PDF Parser] Skipping - amount is 0`);
-      continue;
-    }
+    if (amount === 0) continue;
     
     transactions.push(createTransaction(date, description, amount, accountType));
-    console.log(`[PDF Parser] RBC Chequing #${transactions.length}: ${date} | ${description.substring(0, 40)} | ${amount}`);
   }
   
   console.log(`[PDF Parser] Parsed ${transactions.length} RBC chequing transactions`);
@@ -611,10 +644,10 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
   console.log('[PDF Parser] Using CIBC credit card parser');
   console.log('[PDF Parser] Sample lines:');
   
-  // Show first 20 lines for debugging
-  for (let i = 0; i < Math.min(20, lines.length); i++) {
+  // Show first 50 lines for debugging to find transaction section
+  for (let i = 0; i < Math.min(50, lines.length); i++) {
     if (lines[i].trim().length > 5) {
-      console.log(`[PDF Parser] Line ${i}: ${lines[i].trim().substring(0, 80)}`);
+      console.log(`[PDF Parser] Line ${i}: ${lines[i].trim().substring(0, 100)}`);
     }
   }
   
@@ -683,8 +716,8 @@ function parseCIBCChequingTransactions(text: string, accountType: string): Trans
   console.log('[PDF Parser] Using CIBC chequing/savings parser');
   console.log('[PDF Parser] Sample lines:');
   
-  // Show first 30 lines for debugging
-  for (let i = 0; i < Math.min(30, lines.length); i++) {
+  // Show first 50 lines for debugging to find transaction section
+  for (let i = 0; i < Math.min(50, lines.length); i++) {
     if (lines[i].trim().length > 5) {
       console.log(`[PDF Parser] Line ${i}: ${lines[i].trim().substring(0, 100)}`);
     }
