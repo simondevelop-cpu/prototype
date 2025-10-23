@@ -398,142 +398,105 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
 /**
  * Parse RBC Credit Card transactions
  * 
- * RBC credit card statements have a very tricky layout:
- * - The ACTIVITY section appears TWICE (once on page 1, once on page 2+)
- * - Amounts may be in a column on the right with lots of spacing
- * - OR amounts may be on the next line after each transaction
- * - OR the PDF may extract them in completely unpredictable ways
+ * RBC credit card PDFs extract in a completely non-linear way:
+ * - Text without spaces: "AUG19AUG21SOBEYS#776DARTMOUTHNS"
+ * - Amounts scattered throughout, not adjacent to descriptions
+ * - Multiple ACTIVITY sections (page 1, page 2+)
  * 
- * Since we can't rely on positional matching, we need to:
- * 1. Look for amounts on the SAME line (after description, possibly with many spaces)
- * 2. Look for amounts on the NEXT line (PDF may put each column on separate lines)
- * 3. As a last resort, skip transactions without amounts (user can investigate)
+ * The ONLY reliable pattern is: DATE1 DATE2 DESCRIPTION...
+ * 
+ * Since we CAN'T find amounts adjacent to transactions, we need to:
+ * Parse the entire text as ONE BLOCK and look for the full pattern including amount
  */
 function parseRBCCreditCardTransactions(text: string, accountType: string): Transaction[] {
   const transactions: Transaction[] = [];
-  const lines = text.split('\n');
   
   console.log('[PDF Parser] parseRBCCreditCardTransactions called');
-  console.log(`[PDF Parser] Total lines: ${lines.length}`);
+  console.log(`[PDF Parser] Text length: ${text.length} characters`);
   
-  let inActivitySection = false;
-  let parsedCount = 0;
+  // Find all ACTIVITY sections and extract them
+  const activitySections: string[] = [];
+  const lines = text.split('\n');
+  let currentSection = '';
+  let inActivity = false;
   
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Start parsing when we hit the ACTIVITY section
+  for (const line of lines) {
     if (/ACTIVITY\s+DESCRIPTION/i.test(line)) {
-      inActivitySection = true;
-      console.log(`[PDF Parser] Found ACTIVITY section at line ${i}`);
+      if (currentSection) {
+        activitySections.push(currentSection);
+      }
+      currentSection = '';
+      inActivity = true;
       continue;
     }
     
-    // Stop when we hit TOTAL or end markers
-    if (inActivitySection && /TOTAL\s+ACCOUNT\s+BALANCE|^Time to Pay|^Interest Rate Chart/i.test(line)) {
-      console.log(`[PDF Parser] End of activity section at line ${i}`);
-      inActivitySection = false;
-      continue; // Don't break - there might be another ACTIVITY section
-    }
-    
-    if (!inActivitySection) continue;
-    
-    // Skip short lines, headers, page numbers
-    if (line.length < 15) continue;
-    if (/^(RBC|date|trans|activity|description|amount|page|\d+of\d+)/i.test(line)) continue;
-    
-    // RBC Credit Card pattern: Two dates followed by description
-    const dualDatePattern = /^([A-Z]{3}\s*\d{1,2})([A-Z]{3}\s*\d{1,2})(.+)$/;
-    const dateMatch = line.match(dualDatePattern);
-    
-    if (!dateMatch) continue;
-    
-    const transDateStr = dateMatch[1];
-    const postDateStr = dateMatch[2];
-    let afterDates = dateMatch[3].trim();
-    
-    const transDate = parseDateFlexible(transDateStr) || parseDateFlexible(postDateStr);
-    if (!transDate) continue;
-    
-    let description = '';
-    let amount = 0;
-    
-    // Strategy 1: Amount on same line - try WITH $ sign first
-    // The amount might be far to the right with lots of spaces
-    let sameLineMatch = afterDates.match(/^(.+?)\s+\$\s*(-?[\d,]+\.\d{2})/);
-    if (sameLineMatch) {
-      description = sameLineMatch[1].trim();
-      amount = parseFloat(sameLineMatch[2].replace(/,/g, ''));
-      
-      if (parsedCount < 5) {
-        console.log(`[PDF Parser] Found inline amount with $: ${transDate} | ${description.substring(0, 40)} | $${amount}`);
+    if (inActivity && /TOTAL\s+ACCOUNT\s+BALANCE|Time to Pay|Interest Rate Chart/i.test(line)) {
+      if (currentSection) {
+        activitySections.push(currentSection);
       }
-    } else {
-      // Strategy 1b: Try without $ sign (some PDFs don't have it)
-      // Look for amount pattern at the END of the line
-      sameLineMatch = afterDates.match(/^(.+?)\s+(-?[\d,]+\.\d{2})$/);
-      if (sameLineMatch) {
-        // Make sure the number part is not just a reference ID
-        const potentialDesc = sameLineMatch[1].trim();
-        const potentialAmount = sameLineMatch[2];
-        
-        // Reference numbers are typically 10+ digits with no decimal
-        // Amounts are typically < 10 digits total and always have .XX
-        if (potentialDesc.length >= 3 && !potentialDesc.match(/\d{8,}$/)) {
-          description = potentialDesc;
-          amount = parseFloat(potentialAmount.replace(/,/g, ''));
-          
-          if (parsedCount < 5) {
-            console.log(`[PDF Parser] Found inline amount without $: ${transDate} | ${description.substring(0, 40)} | ${amount}`);
-          }
-        }
-      }
-      
-      // Strategy 2: Check next line for amount
-      if (amount === 0) {
-        // Remove reference numbers (10+ digits at end)
-        description = afterDates.replace(/\d{10,}$/, '').trim();
-        
-        if (i + 1 < lines.length) {
-          const nextLine = lines[i + 1].trim();
-          
-          // Check if next line is JUST an amount (with or without $)
-          const nextLineAmountMatch = nextLine.match(/^\$?\s*(-?[\d,]+\.\d{2})$/);
-          if (nextLineAmountMatch) {
-            amount = parseFloat(nextLineAmountMatch[1].replace(/,/g, ''));
-            i++; // Skip next line since we consumed it
-            
-            if (parsedCount < 5) {
-              console.log(`[PDF Parser] Found amount on next line: ${transDate} | ${description.substring(0, 40)} | $${amount}`);
-            }
-          }
-        }
-      }
-    }
-    
-    // Skip if we didn't find an amount or description
-    if (amount === 0 || !description || description.length < 3) {
-      if (parsedCount < 10) {
-        console.log(`[PDF Parser] Skipping - no amount or description: ${line.substring(0, 80)}`);
-      }
+      currentSection = '';
+      inActivity = false;
       continue;
     }
     
-    // For credit cards:
-    // - Payments shown as "AUTOMATIC PAYMENT" with positive or negative amount
-    // - Regular purchases are expenses (negative)
-    const isPayment = description.toLowerCase().includes('payment') || description.toLowerCase().includes('credit');
-    const finalAmount = isPayment ? Math.abs(amount) : -Math.abs(amount);
-    
-    transactions.push(createTransaction(transDate, description, finalAmount, accountType));
-    parsedCount++;
-    
-    if (parsedCount <= 5) {
-      console.log(`[PDF Parser] Parsed RBC CC transaction #${parsedCount}: ${transDate} | ${description.substring(0, 40)} | ${finalAmount}`);
+    if (inActivity) {
+      currentSection += line + '\n';
     }
   }
   
-  console.log(`[PDF Parser] Parsed ${transactions.length} RBC credit card transactions`);
+  if (currentSection) {
+    activitySections.push(currentSection);
+  }
+  
+  console.log(`[PDF Parser] Found ${activitySections.length} ACTIVITY sections`);
+  
+  // Process each section
+  for (let sectionIdx = 0; sectionIdx < activitySections.length; sectionIdx++) {
+    const sectionText = activitySections[sectionIdx];
+    
+    console.log(`[PDF Parser] Processing section ${sectionIdx + 1}, length: ${sectionText.length}`);
+    
+    // Try to match the compact RBC format with regex on the ENTIRE section
+    // Pattern: DATE1 DATE2 DESCRIPTION (anything) $ or -$ AMOUNT
+    // The description can span multiple "words" with no spaces
+    // Amount can be anywhere after the dates, with or without spaces before the $
+    const pattern = /([A-Z]{3}\d{1,2})([A-Z]{3}\d{1,2})([A-Z0-9\s#\/'&\-\.\*]+?)(?:[\s\-]*)\$\s*(-?[\d,]+\.\d{2})/g;
+    
+    let match;
+    let count = 0;
+    
+    while ((match = pattern.exec(sectionText)) !== null && count < 100) {
+      const [fullMatch, transDateStr, postDateStr, descRaw, amountStr] = match;
+      
+      const transDate = parseDateFlexible(transDateStr);
+      if (!transDate) continue;
+      
+      // Clean description
+      const description = descRaw
+        .replace(/\d{10,}/g, '') // Remove reference numbers
+        .replace(/\s{2,}/g, ' ') // Collapse spaces
+        .trim();
+      
+      if (description.length < 3) continue;
+      
+      const amount = parseFloat(amountStr.replace(/,/g, ''));
+      
+      // For credit cards: payments are positive (or negative with -), purchases are negative
+      const isPayment = description.toLowerCase().includes('payment') || description.toLowerCase().includes('credit');
+      const finalAmount = (amountStr.startsWith('-') || isPayment) ? Math.abs(amount) : -Math.abs(amount);
+      
+      transactions.push(createTransaction(transDate, description, finalAmount, accountType));
+      count++;
+      
+      if (count <= 5) {
+        console.log(`[PDF Parser] Match #${count}: ${transDate} | ${description.substring(0, 40)} | ${finalAmount}`);
+      }
+    }
+    
+    console.log(`[PDF Parser] Extracted ${count} transactions from section ${sectionIdx + 1}`);
+  }
+  
+  console.log(`[PDF Parser] Parsed ${transactions.length} RBC credit card transactions total`);
   return transactions;
 }
 
