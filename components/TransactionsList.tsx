@@ -368,7 +368,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
 
       {/* Filters */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="lg:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">Search Everything</label>
             <input
@@ -397,121 +397,27 @@ export default function TransactionsList({ transactions, loading, token, onRefre
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category
-              {initialCategoryFilter && selectedCategory === initialCategoryFilter && (
-                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                  From dashboard
-                </span>
-              )}
-            </label>
-            <div className="flex gap-2">
-              <select
-                value={selectedCategory}
-                onChange={(e) => {
-                  setSelectedCategory(e.target.value);
-                  if (e.target.value === 'All categories' && onClearCategoryFilter) {
-                    onClearCategoryFilter();
-                  }
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-              {initialCategoryFilter && selectedCategory === initialCategoryFilter && (
-                <button
-                  onClick={() => {
-                    setSelectedCategory('All categories');
-                    if (onClearCategoryFilter) {
-                      onClearCategoryFilter();
-                    }
-                  }}
-                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Clear category filter"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Account</label>
-            <select
-              value={selectedAccount}
-              onChange={(e) => setSelectedAccount(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {accounts.map(acc => (
-                <option key={acc} value={acc}>{acc}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Cashflow Type
-              {initialCashflowFilter && selectedCashflow === initialCashflowFilter && (
-                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                  From dashboard
-                </span>
-              )}
-            </label>
-            <div className="flex gap-2">
-              <select
-                value={selectedCashflow}
-                onChange={(e) => {
-                  setSelectedCashflow(e.target.value);
-                  if (e.target.value === 'All cashflows' && onClearCashflowFilter) {
-                    onClearCashflowFilter();
-                  }
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                {cashflows.map(cf => (
-                  <option key={cf} value={cf}>{cf}</option>
-                ))}
-              </select>
-              {initialCashflowFilter && selectedCashflow === initialCashflowFilter && (
-                <button
-                  onClick={() => {
-                    setSelectedCashflow('All cashflows');
-                    if (onClearCashflowFilter) {
-                      onClearCashflowFilter();
-                    }
-                  }}
-                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Clear cashflow filter"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="md:col-span-2 flex items-end">
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setStartDate('');
-                setEndDate('');
-                setSelectedCategory('All categories');
-                setSelectedAccount('All accounts');
-                setSelectedCashflow('All cashflows');
-                if (onClearCategoryFilter) {
-                  onClearCategoryFilter();
-                }
-                if (onClearCashflowFilter) {
-                  onClearCashflowFilter();
-                }
-              }}
-              className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-            >
-              Clear All Filters
-            </button>
-          </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setStartDate('');
+              setEndDate('');
+              setSelectedCategory('All categories');
+              setSelectedAccount('All accounts');
+              setSelectedCashflow('All cashflows');
+              if (onClearCategoryFilter) {
+                onClearCategoryFilter();
+              }
+              if (onClearCashflowFilter) {
+                onClearCashflowFilter();
+              }
+            }}
+            className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+          >
+            Clear All Filters
+          </button>
         </div>
       </div>
 
@@ -552,14 +458,59 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Description
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cashflow
+                <th className="px-6 py-3 text-left">
+                  <select
+                    value={selectedCashflow}
+                    onChange={(e) => {
+                      setSelectedCashflow(e.target.value);
+                      if (e.target.value === 'All cashflows' && onClearCashflowFilter) {
+                        onClearCashflowFilter();
+                      }
+                    }}
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
+                    title={initialCashflowFilter && selectedCashflow === initialCashflowFilter ? "Filter from dashboard - click to change" : "Filter by cashflow type"}
+                  >
+                    <option value="All cashflows">CASHFLOW ▾</option>
+                    {cashflows.filter(cf => cf !== 'All cashflows').map(cf => (
+                      <option key={cf} value={cf}>{cf.toUpperCase()}</option>
+                    ))}
+                  </select>
+                  {initialCashflowFilter && selectedCashflow === initialCashflowFilter && (
+                    <span className="ml-1 text-blue-600" title="From dashboard">●</span>
+                  )}
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Account
+                <th className="px-6 py-3 text-left">
+                  <select
+                    value={selectedAccount}
+                    onChange={(e) => setSelectedAccount(e.target.value)}
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
+                  >
+                    <option value="All accounts">ACCOUNT ▾</option>
+                    {accounts.filter(acc => acc !== 'All accounts').map(acc => (
+                      <option key={acc} value={acc}>{acc.toUpperCase()}</option>
+                    ))}
+                  </select>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Category
+                <th className="px-6 py-3 text-left">
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => {
+                      setSelectedCategory(e.target.value);
+                      if (e.target.value === 'All categories' && onClearCategoryFilter) {
+                        onClearCategoryFilter();
+                      }
+                    }}
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
+                    title={initialCategoryFilter && selectedCategory === initialCategoryFilter ? "Filter from dashboard - click to change" : "Filter by category"}
+                  >
+                    <option value="All categories">CATEGORY ▾</option>
+                    {categories.filter(cat => cat !== 'All categories').map(cat => (
+                      <option key={cat} value={cat}>{cat.toUpperCase()}</option>
+                    ))}
+                  </select>
+                  {initialCategoryFilter && selectedCategory === initialCategoryFilter && (
+                    <span className="ml-1 text-blue-600" title="From dashboard">●</span>
+                  )}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Label
