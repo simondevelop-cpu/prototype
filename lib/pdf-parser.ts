@@ -465,15 +465,15 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     }
     
     // Determine transaction amount
-    // RBC format: Multiple amounts may be extracted (embedded codes like "QMCXE91,475.00")
-    // Strategy: LARGEST amount = balance (ignore), SECOND LARGEST = transaction amount
+    // RBC format: DATE DESCRIPTION WITHDRAWAL DEPOSIT BALANCE
+    // When extracted left-to-right: amounts = [transaction, balance] OR [withdrawal, deposit, balance]
+    // Strategy: LAST amount = balance (rightmost column), SECOND-TO-LAST = transaction
     let amount = 0;
     
     if (amounts.length >= 2) {
-      // Sort amounts in descending order
-      const sortedAmounts = [...amounts].sort((a, b) => b - a);
-      const balance = sortedAmounts[0]; // Largest = balance
-      const transactionAmount = sortedAmounts[1]; // Second largest = transaction
+      // Last amount is balance (rightmost), second-to-last is transaction
+      const transactionAmount = amounts[amounts.length - 2];
+      const balance = amounts[amounts.length - 1];
       
       // Determine if deposit (positive) or withdrawal (negative)
       const isDeposit = /deposit|autodeposit|dividend|interest|refund/i.test(description);
@@ -481,7 +481,7 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
       amount = isDeposit ? transactionAmount : -transactionAmount;
       
       if (debugCount <= 10) {
-        console.log(`[PDF Parser] RBC Amounts sorted: [${sortedAmounts.join(', ')}], using 2nd largest: ${transactionAmount}, isDeposit=${isDeposit}, final=${amount}`);
+        console.log(`[PDF Parser] RBC Amounts (L-R): [${amounts.join(', ')}], using 2nd-to-last: ${transactionAmount}, balance: ${balance}, isDeposit=${isDeposit}, final=${amount}`);
       }
     } else if (amounts.length === 1) {
       // Only one amount - treat as transaction (balance not shown)
@@ -585,7 +585,7 @@ function parseRBCCreditCardTransactions(text: string, accountType: string): Tran
     let match;
     let count = 0;
     
-    while ((match = pattern.exec(sectionText)) !== null && count < 100) {
+    while ((match = pattern.exec(sectionText)) !== null && count < 500) {
       const [fullMatch, transDateStr, postDateStr, descRaw, amountStr] = match;
       
       const transDate = parseDateFlexible(transDateStr);
