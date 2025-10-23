@@ -404,14 +404,32 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     
     // Extract ALL amounts from remainder
     // The PDF has NO spaces, so amounts are stuck together: "QMCXE91,475.0023,514.24"
-    // Strategy: Extract all amounts, then use LARGEST as balance, SECOND LARGEST as transaction
+    // Problem: "QMCXE91,475.00" gets parsed as 91475 but should be 1475
+    // Solution: Match amounts, but check the character BEFORE the match
     let amounts: number[] = [];
     const allAmountPattern = /(\d{1,3}(?:,\d{3})*\.\d{2})/g;
     let match;
     
     while ((match = allAmountPattern.exec(remainder)) !== null) {
-      const amount = parseFloat(match[1].replace(/,/g, ''));
-      amounts.push(amount);
+      const matchedAmount = match[1];
+      const matchIndex = match.index;
+      const charBefore = matchIndex > 0 ? remainder[matchIndex - 1] : '';
+      
+      // If preceded by a letter/digit, this might be "E91,475.00" where we want "1,475.00"
+      // Check if the matched amount starts with 2 digits followed by comma (e.g. "91,")
+      // This pattern indicates the first digit is likely part of a reference code
+      if (/[A-Z]/i.test(charBefore) && /^\d\d,/.test(matchedAmount)) {
+        // Remove the first digit and re-parse: "91,475.00" -> "1,475.00"
+        const corrected = matchedAmount.substring(1); // Remove first char (the '9')
+        const amount = parseFloat(corrected.replace(/,/g, ''));
+        amounts.push(amount);
+        if (debugCount <= 10) {
+          console.log(`[PDF Parser] RBC Corrected amount: "${matchedAmount}" -> "${corrected}" = ${amount}`);
+        }
+      } else {
+        const amount = parseFloat(matchedAmount.replace(/,/g, ''));
+        amounts.push(amount);
+      }
     }
     
     // If no amounts on this line, check the next line
