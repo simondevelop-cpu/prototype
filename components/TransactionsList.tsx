@@ -19,9 +19,10 @@ interface TransactionsListProps {
 
 export default function TransactionsList({ transactions, loading, token, onRefresh, initialCategoryFilter, onClearCategoryFilter, initialCashflowFilter, onClearCashflowFilter }: TransactionsListProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(initialCategoryFilter || 'All categories');
-  const [selectedAccount, setSelectedAccount] = useState('All accounts');
-  const [selectedCashflow, setSelectedCashflow] = useState(initialCashflowFilter || 'All cashflows');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(initialCategoryFilter ? [initialCategoryFilter] : []);
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+  const [selectedCashflows, setSelectedCashflows] = useState<string[]>(initialCashflowFilter ? [initialCashflowFilter] : []);
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
@@ -33,11 +34,11 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
 
   // Apply initial filters when they change
-  if (initialCategoryFilter && selectedCategory !== initialCategoryFilter) {
-    setSelectedCategory(initialCategoryFilter);
+  if (initialCategoryFilter && !selectedCategories.includes(initialCategoryFilter)) {
+    setSelectedCategories([initialCategoryFilter]);
   }
-  if (initialCashflowFilter && selectedCashflow !== initialCashflowFilter) {
-    setSelectedCashflow(initialCashflowFilter);
+  if (initialCashflowFilter && !selectedCashflows.includes(initialCashflowFilter)) {
+    setSelectedCashflows([initialCashflowFilter]);
   }
 
   if (loading) {
@@ -58,18 +59,20 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       tx.amount?.toString().includes(searchTerm) ||
       Math.abs(tx.amount)?.toFixed(2).includes(searchTerm);
     
-    const matchesCategory = selectedCategory === 'All categories' || tx.category === selectedCategory;
-    const matchesAccount = selectedAccount === 'All accounts' || tx.account === selectedAccount;
-    const matchesCashflow = selectedCashflow === 'All cashflows' || tx.cashflow === selectedCashflow;
+    const matchesCategory = selectedCategories.length === 0 || selectedCategories.includes(tx.category);
+    const matchesAccount = selectedAccounts.length === 0 || selectedAccounts.includes(tx.account);
+    const matchesCashflow = selectedCashflows.length === 0 || selectedCashflows.includes(tx.cashflow);
+    const matchesLabel = selectedLabels.length === 0 || selectedLabels.includes(tx.label);
     const matchesDateRange = (!startDate || tx.date >= startDate) && (!endDate || tx.date <= endDate);
     
-    return matchesSearch && matchesCategory && matchesAccount && matchesCashflow && matchesDateRange;
+    return matchesSearch && matchesCategory && matchesAccount && matchesCashflow && matchesLabel && matchesDateRange;
   });
 
-  // Get unique categories, accounts, and cashflows
-  const categories = ['All categories', ...Array.from(new Set(transactions.map(tx => tx.category).filter(Boolean)))];
-  const accounts = ['All accounts', ...Array.from(new Set(transactions.map(tx => tx.account).filter(Boolean)))];
-  const cashflows = ['All cashflows', ...Array.from(new Set(transactions.map(tx => tx.cashflow).filter(Boolean)))];
+  // Get unique values for each filter
+  const categories = Array.from(new Set(transactions.map(tx => tx.category).filter(Boolean))).sort();
+  const accounts = Array.from(new Set(transactions.map(tx => tx.account).filter(Boolean))).sort();
+  const cashflows = Array.from(new Set(transactions.map(tx => tx.cashflow).filter(Boolean))).sort();
+  const labels = Array.from(new Set(transactions.map(tx => tx.label).filter(Boolean))).sort();
 
   // Helper to create unique ID for each transaction
   const getTxId = (tx: any) => tx.id?.toString() || `${tx.date}_${tx.description}_${tx.amount}`;
@@ -404,9 +407,10 @@ export default function TransactionsList({ transactions, loading, token, onRefre
               setSearchTerm('');
               setStartDate('');
               setEndDate('');
-              setSelectedCategory('All categories');
-              setSelectedAccount('All accounts');
-              setSelectedCashflow('All cashflows');
+              setSelectedCategories([]);
+              setSelectedAccounts([]);
+              setSelectedCashflows([]);
+              setSelectedLabels([]);
               if (onClearCategoryFilter) {
                 onClearCategoryFilter();
               }
