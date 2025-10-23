@@ -195,6 +195,22 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     setActiveTab('transactions');
   };
 
+  const handleCustomButtonClick = () => {
+    // Always populate with current date range when opening
+    if (!showCustomDate && summary.length > 0) {
+      const dates = summary.map(s => s.month);
+      const earliest = dates[0];
+      const latest = dates[dates.length - 1];
+      
+      if (earliest && latest) {
+        const earliestMonth = earliest.substring(0, 7); // Get YYYY-MM
+        const latestMonth = latest.substring(0, 7);
+        setCustomMonthRange({ start: earliestMonth, end: latestMonth });
+      }
+    }
+    setShowCustomDate(!showCustomDate);
+  };
+
   const handleCustomDateApply = () => {
     if (customMonthRange.start && customMonthRange.end) {
       // Convert YYYY-MM format to full date ranges (first day to last day of month)
@@ -371,7 +387,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                 ))}
               </div>
               <button
-                onClick={() => setShowCustomDate(!showCustomDate)}
+                onClick={handleCustomButtonClick}
                 className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
                   timeframe === 'custom'
                     ? 'bg-blue-600 text-white border-blue-600'
