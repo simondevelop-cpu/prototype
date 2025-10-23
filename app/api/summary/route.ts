@@ -46,7 +46,8 @@ export async function GET(request: NextRequest) {
       // Calculate date range based on current date (not latest transaction)
       // This ensures the view always shows the most recent N months up to today
       endDate = dayjs().endOf('month');
-      startDate = endDate.subtract(months - 1, 'month').startOf('month');
+      // Start from N-1 months ago (e.g., for 3 months: current month - 2 months)
+      startDate = dayjs().subtract(months - 1, 'month').startOf('month');
     }
 
     // Query transactions
