@@ -40,6 +40,21 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     }
   }, [selectedMonth, selectedCashflow, timeframe]);
 
+  // Update customMonthRange whenever summary data changes (for preset timeframes)
+  useEffect(() => {
+    if (timeframe !== 'custom' && summary.length > 0) {
+      const dates = summary.map(s => s.month);
+      const earliest = dates[0];
+      const latest = dates[dates.length - 1];
+      
+      if (earliest && latest) {
+        const earliestMonth = earliest.substring(0, 7); // Get YYYY-MM
+        const latestMonth = latest.substring(0, 7);
+        setCustomMonthRange({ start: earliestMonth, end: latestMonth });
+      }
+    }
+  }, [summary, timeframe]);
+
   // Fetch all transactions when switching to transactions tab
   useEffect(() => {
     if (activeTab === 'transactions' && !hasLoadedTransactions) {

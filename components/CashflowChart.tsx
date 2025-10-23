@@ -2,6 +2,9 @@
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
 
 interface CashflowChartProps {
   data: any[];
@@ -11,9 +14,9 @@ interface CashflowChartProps {
 export default function CashflowChart({ data, onBarClick }: CashflowChartProps) {
   // Transform data for Recharts
   const chartData = data.map((month) => ({
-    month: dayjs(month.month).format('MMM'),
-    monthKey: dayjs(month.month).format('YYYY-MM'),
-    fullMonth: dayjs(month.month).format('MMMM YYYY'),
+    month: dayjs.utc(month.month).format('MMM'),
+    monthKey: dayjs.utc(month.month).format('YYYY-MM'),
+    fullMonth: dayjs.utc(month.month).format('MMMM YYYY'),
     income: month.income || 0,
     expense: Math.abs(month.expense || 0), // Make positive for display
     other: month.other || 0,
