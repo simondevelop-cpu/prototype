@@ -505,12 +505,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left relative" ref={cashflowDropdownRef}>
                   <button
                     onClick={() => setShowCashflowDropdown(!showCashflowDropdown)}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 flex items-center gap-1"
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
                   >
                     CASHFLOW {selectedCashflows.length > 0 && `(${selectedCashflows.length})`} ▾
-                    {initialCashflowFilter && selectedCashflows.includes(initialCashflowFilter) && (
-                      <span className="text-blue-600" title="From dashboard">●</span>
-                    )}
                   </button>
                   {showCashflowDropdown && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[200px] max-h-[300px] overflow-y-auto">
@@ -538,7 +535,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left relative" ref={accountDropdownRef}>
                   <button
                     onClick={() => setShowAccountDropdown(!showAccountDropdown)}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 flex items-center gap-1"
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
                   >
                     ACCOUNT {selectedAccounts.length > 0 && `(${selectedAccounts.length})`} ▾
                   </button>
@@ -563,12 +560,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left relative" ref={categoryDropdownRef}>
                   <button
                     onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 flex items-center gap-1"
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
                   >
                     CATEGORY {selectedCategories.length > 0 && `(${selectedCategories.length})`} ▾
-                    {initialCategoryFilter && selectedCategories.includes(initialCategoryFilter) && (
-                      <span className="text-blue-600" title="From dashboard">●</span>
-                    )}
                   </button>
                   {showCategoryDropdown && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[200px] max-h-[300px] overflow-y-auto">
@@ -596,7 +590,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left relative" ref={labelDropdownRef}>
                   <button
                     onClick={() => setShowLabelDropdown(!showLabelDropdown)}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 flex items-center gap-1"
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
                   >
                     LABEL {selectedLabels.length > 0 && `(${selectedLabels.length})`} ▾
                   </button>
