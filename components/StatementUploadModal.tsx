@@ -207,39 +207,32 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
                 </svg>
                 CIBC
               </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-orange-700">National Bank (soon)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-orange-700">Amex (soon)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-orange-700">BMO (soon)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-orange-700">Scotia (soon)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-orange-700">Desjardins (soon)</span>
-              </div>
             </div>
-            <p className="mt-3 text-xs text-blue-600">
-              Coming later: Tangerine, Simplii, PC Financial, Koho, Wealthsimple, Neo
+            <p className="mt-3 text-xs text-gray-600">
+              <span className="font-semibold">Coming:</span>{' '}
+              <span className="text-blue-600">Text-based PDF statements e.g. TD Chequing (next)</span>
+              <span className="text-gray-400 mx-1">•</span>
+              <span className="text-blue-600">National Bank (next)</span>
+              <span className="text-gray-400 mx-1">•</span>
+              <span className="text-blue-600">Amex (next)</span>
+              <span className="text-gray-400 mx-1">•</span>
+              <span className="text-blue-600">BMO (next)</span>
+              <span className="text-gray-400 mx-1">•</span>
+              <span className="text-red-600">Scotia (soon)</span>
+              <span className="text-gray-400 mx-1">•</span>
+              <span className="text-red-600">Desjardins (soon)</span>
+              <span className="text-gray-400 mx-1">•</span>
+              <span className="text-red-600">Tangerine (soon)</span>
+              <span className="text-gray-400 mx-1">•</span>
+              <span className="text-red-600">Simplii (soon)</span>
+              <span className="text-gray-400 mx-1">•</span>
+              <span className="text-red-600">PC Financial (soon)</span>
+              <span className="text-gray-400 mx-1">•</span>
+              <span className="text-red-600">Koho (soon)</span>
+              <span className="text-gray-400 mx-1">•</span>
+              <span className="text-red-600">Wealthsimple (soon)</span>
+              <span className="text-gray-400 mx-1">•</span>
+              <span className="text-red-600">Neo (soon)</span>
             </p>
           </div>
 
