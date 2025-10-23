@@ -333,6 +333,16 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
   }
   
   // Chequing account - columnar format
+  console.log('[PDF Parser] Using RBC chequing parser');
+  console.log('[PDF Parser] Sample lines:');
+  
+  // Show first 30 lines for debugging
+  for (let i = 0; i < Math.min(30, lines.length); i++) {
+    if (lines[i].trim().length > 5) {
+      console.log(`[PDF Parser] Line ${i}: ${lines[i].trim().substring(0, 100)}`);
+    }
+  }
+  
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
@@ -353,6 +363,8 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     // Remove the date from the start
     let remainder = line.substring(dateMatch[0].length).trim();
     
+    console.log(`[PDF Parser] Found date line: ${dateStr} | Remainder: ${remainder.substring(0, 80)}`);
+    
     // Extract all amounts (withdrawal, deposit, balance)
     const amountPattern = /(\d{1,3}(?:,\d{3})*\.\d{2})/g;
     const amounts: number[] = [];
@@ -364,7 +376,12 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     // Remove amounts from description
     const description = remainder.replace(amountPattern, '').trim();
     
-    if (!description || amounts.length === 0) continue;
+    console.log(`[PDF Parser] Description: ${description} | Amounts: ${amounts.join(', ')}`);
+    
+    if (!description || amounts.length === 0) {
+      console.log(`[PDF Parser] Skipping - no description or amounts`);
+      continue;
+    }
     
     // Determine transaction amount
     // If there are 3 amounts: [withdrawal, deposit, balance] or [description with number, withdrawal/deposit, balance]
@@ -389,11 +406,16 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
       amount = isDeposit ? amounts[0] : -amounts[0];
     }
     
-    if (amount === 0) continue;
+    if (amount === 0) {
+      console.log(`[PDF Parser] Skipping - amount is 0`);
+      continue;
+    }
     
     transactions.push(createTransaction(date, description, amount, accountType));
+    console.log(`[PDF Parser] RBC Chequing #${transactions.length}: ${date} | ${description.substring(0, 40)} | ${amount}`);
   }
   
+  console.log(`[PDF Parser] Parsed ${transactions.length} RBC chequing transactions`);
   return transactions;
 }
 
