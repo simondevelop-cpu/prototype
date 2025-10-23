@@ -1176,20 +1176,21 @@ function parseDateFlexible(dateStr: string): string | null {
     if (parsed.isValid()) {
       // If year is missing, assume current year or previous year if month is in future
       if (!cleanDate.match(/\d{4}/)) {
-        const currentYear = dayjs().year();
-        const currentMonth = dayjs().month();
+        const nowUtc = dayjs.utc(); // Use UTC for current date comparison too
+        const currentYear = nowUtc.year();
+        const currentMonth = nowUtc.month();
         const parsedMonth = parsed.month();
         
         // If parsed month is greater than current month, it's probably from last year
         const year = parsedMonth > currentMonth + 2 ? currentYear - 1 : currentYear;
         // Format as YYYY-MM-DD string directly (no timezone conversion)
         const finalDate = `${year}-${String(parsedMonth + 1).padStart(2, '0')}-${String(parsed.date()).padStart(2, '0')}`;
-        console.log(`[PDF Parser] Parsed date '${originalDate}' → '${cleanDate}' → '${finalDate}' using format '${format}'`);
+        console.log(`[PDF Parser] Parsed date '${originalDate}' → '${cleanDate}' → '${finalDate}' using format '${format}' (month=${parsedMonth + 1}, day=${parsed.date()})`);
         return finalDate;
       }
       // Format as YYYY-MM-DD string directly (no timezone conversion)
       const finalDate = `${parsed.year()}-${String(parsed.month() + 1).padStart(2, '0')}-${String(parsed.date()).padStart(2, '0')}`;
-      console.log(`[PDF Parser] Parsed date '${originalDate}' → '${finalDate}' using format '${format}'`);
+      console.log(`[PDF Parser] Parsed date '${originalDate}' → '${finalDate}' using format '${format}' (month=${parsed.month() + 1}, day=${parsed.date()})`);
       return finalDate;
     }
   }
