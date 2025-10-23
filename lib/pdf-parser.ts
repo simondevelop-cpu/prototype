@@ -288,7 +288,8 @@ function extractAccountHolderName(text: string): string | undefined {
     // Pattern 2: All caps name (2-15 chars) on its own line
     const namePattern = /^([A-Z][a-z]{2,14})$/;
     const nameMatch = line.trim().match(namePattern);
-    if (nameMatch && !['MISS', 'CIBC', 'ROYAL', 'BANK', 'STATEMENT', 'ACCOUNT'].includes(nameMatch[1])) {
+    const excludedWords = ['MISS', 'CIBC', 'ROYAL', 'BANK', 'STATEMENT', 'ACCOUNT', 'Deposits', 'Withdrawals', 'Balance', 'Opening', 'Closing', 'Contact', 'Summary'];
+    if (nameMatch && !excludedWords.includes(nameMatch[1])) {
       return nameMatch[1];
     }
   }
@@ -393,11 +394,21 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     let remainder = line.substring(dateMatch[0].length).trim();
     
     // Extract all amounts (withdrawal, deposit, balance)
-    const amountPattern = /(\d{1,3}(?:,\d{3})*\.\d{2})/g;
+    // IMPORTANT: Amounts must have comma separators OR be at end of string to avoid false positives
+    // This prevents matching reference codes like "QMCXE91,475.00" as "91,475.00"
+    const amountPattern = /(?:^|\s)(\d{1,3}(?:,\d{3})+\.\d{2})(?:\s|$)/g;
     let amounts: number[] = [];
     let match;
     while ((match = amountPattern.exec(remainder)) !== null) {
       amounts.push(parseFloat(match[1].replace(/,/g, '')));
+    }
+    
+    // Also try simple pattern for amounts without commas (like 31.00)
+    if (amounts.length === 0) {
+      const simplePattern = /(?:^|\s)(\d{1,3}\.\d{2})(?:\s|$)/g;
+      while ((match = simplePattern.exec(remainder)) !== null) {
+        amounts.push(parseFloat(match[1]));
+      }
     }
     
     // If no amounts on this line, check the next line
@@ -405,10 +416,17 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
       const nextLine = lines[i + 1].trim();
       // Only use next line if it starts with amounts (not a date)
       if (nextLine && !/^\d{1,2}\s+\w{3}/.test(nextLine)) {
-        const nextAmountPattern = /(\d{1,3}(?:,\d{3})*\.\d{2})/g;
+        // Try pattern with commas first
         let nextMatch;
-        while ((nextMatch = nextAmountPattern.exec(nextLine)) !== null) {
+        while ((nextMatch = amountPattern.exec(nextLine)) !== null) {
           amounts.push(parseFloat(nextMatch[1].replace(/,/g, '')));
+        }
+        // Try simple pattern if no comma amounts found
+        if (amounts.length === 0) {
+          const simplePattern = /(?:^|\s)(\d{1,3}\.\d{2})(?:\s|$)/g;
+          while ((nextMatch = simplePattern.exec(nextLine)) !== null) {
+            amounts.push(parseFloat(nextMatch[1]));
+          }
         }
         // Append next line to remainder for description extraction
         if (amounts.length > 0) {
@@ -418,8 +436,8 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
       }
     }
     
-    // Remove amounts from description
-    const description = remainder.replace(amountPattern, '').trim();
+    // Remove amounts from description (use broader pattern for removal)
+    const description = remainder.replace(/\d{1,3}(?:,\d{3})*\.\d{2}/g, '').trim();
     
     if (!description || amounts.length === 0) continue;
     
@@ -642,31 +660,47 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
   const lines = text.split('\n');
   
   console.log('[PDF Parser] Using CIBC credit card parser');
-  console.log('[PDF Parser] Sample lines:');
+  console.log(`[PDF Parser] Total lines: ${lines.length}`);
   
-  // Show first 50 lines for debugging to find transaction section
-  for (let i = 0; i < Math.min(50, lines.length); i++) {
+  // Find where transactions actually start
+  // CIBC statements often say "Transactions begin on page 2"
+  let transactionStartIndex = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    // Look for transaction headers or "Your new charges"
+    if (/transaction\s+date|posting\s+date|your\s+new\s+charges|purchases\s+and\s+cash/i.test(line)) {
+      transactionStartIndex = i + 1;
+      console.log(`[PDF Parser] Found transaction section at line ${i}: ${line.substring(0, 60)}`);
+      break;
+    }
+  }
+  
+  console.log(`[PDF Parser] Sample transaction lines (starting from ${transactionStartIndex}):`);
+  for (let i = transactionStartIndex; i < Math.min(transactionStartIndex + 20, lines.length); i++) {
     if (lines[i].trim().length > 5) {
       console.log(`[PDF Parser] Line ${i}: ${lines[i].trim().substring(0, 100)}`);
     }
   }
   
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = transactionStartIndex; i < lines.length; i++) {
     const line = lines[i].trim();
     
-    // Skip empty lines and headers
+    // Skip empty lines and stop at summary sections
     if (!line || line.length < 10) continue;
+    if (/total\s+purchases|total\s+payments|interest\s+charges|new\s+balance/i.test(line)) {
+      console.log(`[PDF Parser] Stopping at summary section: ${line.substring(0, 60)}`);
+      break;
+    }
     
     // CIBC credit card pattern: Two dates at start, then description, then amount at end
     // Dates format: "Jun 11" or "Jun  1" (month abbreviation + day)
-    // May or may not have much spacing between fields
     // Try multiple patterns:
     
-    // Pattern 1: Standard format with clear spacing
+    // Pattern 1: Standard format with spacing
     let pattern = /^([A-Z][a-z]{2}\s+\d{1,2})\s+([A-Z][a-z]{2}\s+\d{1,2})\s+(.+?)\s+([\d,]+\.\d{2})$/;
     let match = line.match(pattern);
     
-    // Pattern 2: Compact format (less spacing)
+    // Pattern 2: Compact format
     if (!match) {
       pattern = /^([A-Z][a-z]{2}\d{1,2})([A-Z][a-z]{2}\d{1,2})(.+?)([\d,]+\.\d{2})$/;
       match = line.match(pattern);
@@ -714,14 +748,6 @@ function parseCIBCChequingTransactions(text: string, accountType: string): Trans
   const lines = text.split('\n');
   
   console.log('[PDF Parser] Using CIBC chequing/savings parser');
-  console.log('[PDF Parser] Sample lines:');
-  
-  // Show first 50 lines for debugging to find transaction section
-  for (let i = 0; i < Math.min(50, lines.length); i++) {
-    if (lines[i].trim().length > 5) {
-      console.log(`[PDF Parser] Line ${i}: ${lines[i].trim().substring(0, 100)}`);
-    }
-  }
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -731,8 +757,8 @@ function parseCIBCChequingTransactions(text: string, accountType: string): Trans
     if (/^(date|description|withdrawals|deposits|balance|opening|closing|account|transaction|contact)/i.test(line)) continue;
     
     // Look for lines starting with a date
-    // Format: "Aug 6" or "Aug  1" (may have extra space)
-    const datePattern = /^([A-Z][a-z]{2}\s+\d{1,2})\s+(.+)$/;
+    // Format: "Aug 6" or "Aug  1" or "Aug 6DEPOSIT" (no space!)
+    const datePattern = /^([A-Z][a-z]{2}\s+\d{1,2})(.*)$/;
     const match = line.match(datePattern);
     
     if (!match) continue;
@@ -742,66 +768,81 @@ function parseCIBCChequingTransactions(text: string, accountType: string): Trans
     const date = parseDateFlexible(dateStr);
     if (!date) continue;
     
-    console.log(`[PDF Parser] Found date line: ${dateStr} | Remainder: ${remainder.substring(0, 80)}`);
+    // CIBC transactions can span multiple lines:
+    // Line 1: Aug 6DEPOSIT
+    // Line 2: Business Devel. Bank of Canada
+    // Line 3: 3,940.243,936.24
     
-    // Extract all amounts from the line (with or without $ or -)
-    const amountPattern = /(-?\$?\s*[\d,]+\.\d{2})/g;
-    const amounts: number[] = [];
-    let amountMatch;
-    while ((amountMatch = amountPattern.exec(remainder)) !== null) {
-      const cleaned = amountMatch[1].replace(/[$,\s-]/g, '');
-      const value = parseFloat(cleaned);
-      // Check if original had minus sign
-      const isNegative = amountMatch[1].includes('-');
-      amounts.push(isNegative ? -value : value);
+    // Collect all lines until we hit another date or amounts
+    let fullDescription = remainder.trim();
+    let amounts: number[] = [];
+    let linesConsumed = 0;
+    
+    // Look ahead to find amounts and additional description lines
+    for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+      const nextLine = lines[j].trim();
+      
+      // Stop if we hit another date
+      if (/^[A-Z][a-z]{2}\s+\d{1,2}/.test(nextLine)) break;
+      
+      // Stop at summary lines
+      if (/closing\s+balance|page\s+\d+\s+of/i.test(nextLine)) break;
+      
+      // Check if this line has amounts
+      const amountPattern = /(-?\$?\s*[\d,]+\.\d{2})/g;
+      let amountMatch;
+      let lineHasAmounts = false;
+      while ((amountMatch = amountPattern.exec(nextLine)) !== null) {
+        const cleaned = amountMatch[1].replace(/[$,\s]/g, '').replace(/^-/, '');
+        const value = parseFloat(cleaned);
+        const isNegative = amountMatch[1].includes('-');
+        amounts.push(isNegative ? -value : value);
+        lineHasAmounts = true;
+      }
+      
+      // If line has amounts, we're done collecting
+      if (lineHasAmounts) {
+        linesConsumed = j - i;
+        break;
+      }
+      
+      // Otherwise, it's part of the description
+      if (nextLine.length > 0 && nextLine.length < 80) {
+        fullDescription += ' ' + nextLine;
+      }
     }
     
-    // Remove amounts to get description
-    const description = remainder
-      .replace(amountPattern, '')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
+    // Skip ahead past consumed lines
+    i += linesConsumed;
     
-    console.log(`[PDF Parser] Description: ${description} | Amounts: ${amounts.join(', ')}`);
+    // Remove amounts from description
+    fullDescription = fullDescription.replace(/\d{1,3}(?:,\d{3})*\.\d{2}/g, '').replace(/\s{2,}/g, ' ').trim();
     
-    if (!description || amounts.length === 0) {
-      console.log(`[PDF Parser] Skipping - no description or amounts`);
-      continue;
-    }
+    if (!fullDescription || amounts.length === 0) continue;
     
     // Determine transaction amount
-    // Format varies:
-    // - Withdrawals: might have amount in Withdrawals column
-    // - Deposits: might have amount in Deposits column
-    // - Last amount is usually balance
+    // Last amount is balance, second-to-last is transaction
     let amount = 0;
     
     if (amounts.length >= 2) {
-      // Second-to-last is likely the transaction amount
       amount = amounts[amounts.length - 2];
       
       // Check if this is a deposit (positive) or withdrawal (negative)
-      const isDeposit = /deposit|credit\s+memo|interest|refund|transfer.*in|autodeposit/i.test(description);
+      const isDeposit = /deposit|credit\s+memo|interest|refund|transfer.*in|autodeposit/i.test(fullDescription);
       
       if (isDeposit && amount < 0) {
-        amount = Math.abs(amount); // Deposits are positive
+        amount = Math.abs(amount);
       } else if (!isDeposit && amount > 0) {
-        amount = -amount; // Withdrawals are negative
+        amount = -amount;
       }
     } else if (amounts.length === 1) {
-      // Only one amount - might be opening/closing balance, skip
-      console.log(`[PDF Parser] Skipping - only one amount (balance)`);
+      // Only one amount - likely opening/closing balance
       continue;
     }
     
-    if (amount === 0) {
-      console.log(`[PDF Parser] Skipping - amount is 0`);
-      continue;
-    }
+    if (amount === 0) continue;
     
-    transactions.push(createTransaction(date, description, amount, accountType));
-    
-    console.log(`[PDF Parser] CIBC Chequing #${transactions.length}: ${date} | ${description.substring(0, 40)} | ${amount}`);
+    transactions.push(createTransaction(date, fullDescription, amount, accountType));
   }
   
   console.log(`[PDF Parser] Parsed ${transactions.length} CIBC chequing transactions`);
