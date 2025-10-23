@@ -261,17 +261,31 @@ function detectBank(text: string): string {
  * Detect account type (chequing, savings, credit card)
  * 
  * Priority order is important:
- * 1. Check for explicit "statement" or "account" keywords with account type
- * 2. Check for chequing/savings patterns (more specific)
- * 3. Check for credit card patterns (less specific, as "credit" can appear in other contexts)
+ * 1. Check for strong credit card indicators (Visa/Mastercard, compact date formats)
+ * 2. Check for explicit "statement" or "account" keywords with account type
+ * 3. Check for columnar format (chequing/savings)
+ * 4. Check for broader patterns
  */
 function detectAccountType(text: string): string {
-  // First, check for explicit account type mentions near "statement" or "account"
+  // Strong credit card indicators - check first
+  // TD/RBC credit cards often have compact format: AUG12AUG13$18.39MERCHANT (no spaces)
+  if (/VISA|MASTERCARD|INFINITE|REWARDS|AVION|CASH\s*BACK/i.test(text)) {
+    // Confirm with compact date format pattern (strong signal for credit cards)
+    if (/[A-Z]{3}\d{1,2}[A-Z]{3}\d{1,2}\$[\d,]+\.\d{2}/i.test(text)) {
+      return 'Credit Card';
+    }
+    // Or check for traditional credit card statement layout
+    if (/PREVIOUS\s*(ACCOUNT\s*)?BALANCE|MINIMUM\s*PAYMENT|CREDIT\s*LIMIT/i.test(text)) {
+      return 'Credit Card';
+    }
+  }
+  
+  // Check for explicit account type mentions near "statement" or "account"
   // This helps avoid false positives from words like "Available credit" on chequing statements
-  const statementMatch = text.match(/(che(c)?king|ch(e|è)ques|compte-ch(e|è)ques|savings?|[ée]pargne|credit\s*card|carte\s*cr[ée]dit|visa|mastercard).*?(statement|account)/i);
+  const statementMatch = text.match(/(che(c)?king|ch(e|è)ques|compte-ch(e|è)ques|savings?|[ée]pargne|credit\s*card|carte\s*cr[ée]dit).*?(statement|account)/i);
   if (statementMatch) {
     const accountWord = statementMatch[1].toLowerCase();
-    if (/credit|visa|mastercard/i.test(accountWord)) return 'Credit Card';
+    if (/credit/i.test(accountWord)) return 'Credit Card';
     if (/saving|épargne/i.test(accountWord)) return 'Savings';
     if (/che(c)?king|chèques/i.test(accountWord)) return 'Checking';
   }
