@@ -896,26 +896,45 @@ function parseCIBCChequingTransactions(text: string, accountType: string): Trans
     }
     
     // Determine transaction amount
-    // Last amount is balance, second-to-last is transaction
+    // CIBC format: withdrawal/deposit amount, then balance
+    // Special case: SERVICE CHARGE might show [0, 6.95] where 0 is in withdrawal column, 6.95 is the fee
     let amount = 0;
     
     if (amounts.length >= 2) {
+      // Use second-to-last amount as transaction
       amount = amounts[amounts.length - 2];
       
       // Check if this is a deposit (positive) or withdrawal (negative)
       const isDeposit = /deposit|credit\s+memo|interest|refund|transfer.*in|autodeposit/i.test(fullDescription);
+      const isWithdrawal = /service\s+charge|fee|nsf|charge|withdrawal/i.test(fullDescription);
       
-      if (isDeposit && amount < 0) {
-        amount = Math.abs(amount);
-      } else if (!isDeposit && amount > 0) {
-        amount = -amount;
+      // Special case: If amount is 0 and this is a fee/charge, use the last amount as the fee
+      if (amount === 0 && isWithdrawal && amounts.length >= 2) {
+        // For SERVICE CHARGE with [0, 6.95], the 6.95 is actually the fee, not balance
+        // This happens when the fee is shown in a separate column
+        amount = -amounts[amounts.length - 1];
+      } else {
+        // Normal case: apply sign based on transaction type
+        if (isDeposit && amount < 0) {
+          amount = Math.abs(amount);
+        } else if (isWithdrawal && amount > 0) {
+          amount = -amount;
+        } else if (!isDeposit && amount > 0) {
+          amount = -amount;
+        }
       }
     } else if (amounts.length === 1) {
-      // Only one amount - likely opening/closing balance
-      continue;
+      // Only one amount - could be a fee/charge
+      const isWithdrawal = /service\s+charge|fee|nsf|charge|withdrawal/i.test(fullDescription);
+      amount = isWithdrawal ? -Math.abs(amounts[0]) : amounts[0];
     }
     
-    if (amount === 0) continue;
+    if (amount === 0) {
+      if (transactions.length < 10) {
+        console.log(`[PDF Parser] CIBC Chq SKIP: Amount is zero after processing (amounts were: [${amounts.join(', ')}])`);
+      }
+      continue;
+    }
     
     transactions.push(createTransaction(date, fullDescription, amount, accountType));
     
