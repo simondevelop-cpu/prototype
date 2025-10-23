@@ -698,9 +698,10 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
   for (let i = transactionStartIndex; i < lines.length; i++) {
     let line = lines[i].trim();
     
-    // Skip empty lines and stop at summary sections
+    // Skip empty lines and stop at ACTUAL summary sections (not just mentions of "interest")
     if (!line || line.length < 10) continue;
-    if (/total\s+purchases|total\s+payments|interest\s+charges|new\s+balance/i.test(line)) {
+    // Only stop if line STARTS with summary keywords (not just contains them)
+    if (/^(total\s+purchases|total\s+payments|total\s+new\s+charges|interest\s+charged|your\s+payments)/i.test(line)) {
       console.log(`[PDF Parser] Stopping at summary section: ${line.substring(0, 60)}`);
       break;
     }
@@ -781,6 +782,7 @@ function parseCIBCChequingTransactions(text: string, accountType: string): Trans
   const lines = text.split('\n');
   
   console.log('[PDF Parser] Using CIBC chequing/savings parser');
+  console.log(`[PDF Parser] Total lines in CIBC chequing: ${lines.length}`);
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -876,6 +878,10 @@ function parseCIBCChequingTransactions(text: string, accountType: string): Trans
     if (amount === 0) continue;
     
     transactions.push(createTransaction(date, fullDescription, amount, accountType));
+    
+    if (transactions.length <= 10) {
+      console.log(`[PDF Parser] CIBC Chq #${transactions.length}: ${date} | ${fullDescription.substring(0, 40)} | ${amount}`);
+    }
   }
   
   console.log(`[PDF Parser] Parsed ${transactions.length} CIBC chequing transactions`);
