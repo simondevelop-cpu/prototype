@@ -15,8 +15,10 @@
 import { getPool } from '@/lib/db';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
+import utc from 'dayjs/plugin/utc';
 
 dayjs.extend(customParseFormat);
+dayjs.extend(utc);
 
 // PDF parsing library - dynamically imported for server-side only
 let pdfParse: any = null;
