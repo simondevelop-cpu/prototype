@@ -402,53 +402,23 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
       console.log(`[PDF Parser] RBC Line ${i}: Date=${dateStr}, Remainder="${remainder.substring(0, 80)}"`);
     }
     
-    // Extract all amounts (withdrawal, deposit, balance)
-    // CAREFUL: Reference codes can be embedded like "QMCXE1,475.00" (no space!)
+    // Extract ALL amounts using simple global regex
+    // Don't try to be smart about embedded amounts - just get them all
+    // Then use the LAST TWO (transaction amount + balance)
     let amounts: number[] = [];
+    const allAmountPattern = /(\d{1,3}(?:,\d{3})*\.\d{2})/g;
+    let match;
     
-    // Strategy: Try token-based first, then fallback to pattern matching
-    // 1. Token-based (most reliable when amounts are space-separated)
-    const tokens = remainder.split(/\s+/);
-    
-    for (const token of tokens) {
-      const amountMatch = token.match(/^-?\$?(\d{1,3}(?:,\d{3})*\.\d{2})$/);
-      if (amountMatch) {
-        amounts.push(parseFloat(amountMatch[1].replace(/,/g, '')));
-      }
-    }
-    
-    // 2. If no amounts found via tokens, try pattern matching with boundaries
-    // This handles cases where PDF extraction doesn't preserve spaces perfectly
-    if (amounts.length === 0) {
-      // Look for amounts that are NOT immediately preceded by letters
-      // Use negative lookbehind: (?<![A-Z])
-      const boundaryPattern = /(?<![A-Z0-9])(\d{1,3}(?:,\d{3})*\.\d{2})/g;
-      let match;
-      while ((match = boundaryPattern.exec(remainder)) !== null) {
-        amounts.push(parseFloat(match[1].replace(/,/g, '')));
-      }
+    while ((match = allAmountPattern.exec(remainder)) !== null) {
+      amounts.push(parseFloat(match[1].replace(/,/g, '')));
     }
     
     // If no amounts on this line, check the next line
     if (amounts.length === 0 && i + 1 < lines.length) {
       const nextLine = lines[i + 1].trim();
       if (nextLine && !/^\d{1,2}\s+\w{3}/.test(nextLine)) {
-        // Try tokens first
-        const nextTokens = nextLine.split(/\s+/);
-        for (const token of nextTokens) {
-          const amountMatch = token.match(/^-?\$?(\d{1,3}(?:,\d{3})*\.\d{2})$/);
-          if (amountMatch) {
-            amounts.push(parseFloat(amountMatch[1].replace(/,/g, '')));
-          }
-        }
-        
-        // Fallback to pattern
-        if (amounts.length === 0) {
-          const boundaryPattern = /(?<![A-Z0-9])(\d{1,3}(?:,\d{3})*\.\d{2})/g;
-          let match;
-          while ((match = boundaryPattern.exec(nextLine)) !== null) {
-            amounts.push(parseFloat(match[1].replace(/,/g, '')));
-          }
+        while ((match = allAmountPattern.exec(nextLine)) !== null) {
+          amounts.push(parseFloat(match[1].replace(/,/g, '')));
         }
         
         if (amounts.length > 0) {
@@ -474,23 +444,32 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     }
     
     // Determine transaction amount
-    // If there are 3 amounts: [withdrawal, deposit, balance] or [description with number, withdrawal/deposit, balance]
-    // If there are 2 amounts: [withdrawal OR deposit, balance]
+    // RBC format: May have multiple amounts embedded in description + transaction amount + balance
+    // Strategy: ALWAYS use last 2 amounts (if available)
+    // - amounts[length-1] = balance (ignore)
+    // - amounts[length-2] = transaction amount (use this)
     let amount = 0;
     
     if (amounts.length >= 2) {
-      // Last amount is always the balance, second-to-last is the transaction
+      // Use second-to-last amount (last is balance)
       const transactionAmount = amounts[amounts.length - 2];
       
-      // Check if this is a withdrawal (negative) or deposit (positive)
-      // Simple heuristic: if the description suggests income/deposit, make it positive
+      // Determine if deposit (positive) or withdrawal (negative)
       const isDeposit = /deposit|autodeposit|dividend|interest|refund/i.test(description);
       
       amount = isDeposit ? transactionAmount : -transactionAmount;
+      
+      if (debugCount <= 10) {
+        console.log(`[PDF Parser] RBC Using amount [${amounts.length-2}] of ${amounts.length}: ${transactionAmount}, isDeposit=${isDeposit}, final=${amount}`);
+      }
     } else if (amounts.length === 1) {
-      // Only one amount - could be withdrawal or deposit
+      // Only one amount - unusual, but try to use it
       const isDeposit = /deposit|autodeposit|dividend|interest|refund/i.test(description);
       amount = isDeposit ? amounts[0] : -amounts[0];
+      
+      if (debugCount <= 10) {
+        console.log(`[PDF Parser] RBC Only 1 amount, using it: ${amount}`);
+      }
     }
     
     if (amount === 0) continue;
@@ -754,7 +733,12 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
       const nextDateMatch = nextLine1.match(justDatePattern);
       if (nextDateMatch) {
         // Combine: date1 + date2 + description line
-        line = justDateMatch[1] + nextDateMatch[1] + nextLine2;
+        const combined = justDateMatch[1] + nextDateMatch[1] + nextLine2;
+        if (transactions.length < 10) {
+          console.log(`[PDF Parser] Combining split transaction at line ${i}: "${line}" + "${nextLine1}" + "${nextLine2.substring(0, 40)}"`);
+          console.log(`[PDF Parser] Result: "${combined.substring(0, 100)}"`);
+        }
+        line = combined;
         i += 2; // Skip the next 2 lines
       }
     }
