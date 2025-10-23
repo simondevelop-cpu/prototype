@@ -455,6 +455,7 @@ function parseRBCCreditCardTransactions(text: string, accountType: string): Tran
     const sectionText = activitySections[sectionIdx];
     
     console.log(`[PDF Parser] Processing section ${sectionIdx + 1}, length: ${sectionText.length}`);
+    console.log(`[PDF Parser] Section preview: ${sectionText.substring(0, 200)}`);
     
     // Try to match the compact RBC format with regex on the ENTIRE section
     // Pattern: DATE1 DATE2 DESCRIPTION (anything) $ or -$ AMOUNT
@@ -491,6 +492,13 @@ function parseRBCCreditCardTransactions(text: string, accountType: string): Tran
       if (count <= 5) {
         console.log(`[PDF Parser] Match #${count}: ${transDate} | ${description.substring(0, 40)} | ${finalAmount}`);
       }
+    }
+    
+    if (count === 0 && sectionIdx < 2) {
+      // Debug: show why no matches
+      const hasDate = /[A-Z]{3}\d{1,2}/g.test(sectionText);
+      const hasDollar = /\$/.test(sectionText);
+      console.log(`[PDF Parser] DEBUG: hasDate=${hasDate}, hasDollar=${hasDollar}`);
     }
     
     console.log(`[PDF Parser] Extracted ${count} transactions from section ${sectionIdx + 1}`);
