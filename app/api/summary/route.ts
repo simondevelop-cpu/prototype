@@ -44,17 +44,21 @@ export async function GET(request: NextRequest) {
       endDate = dayjs(endParam).endOf('month');
     } else {
       // Calculate date range based on latest transaction
+      // This ensures the view shows the most recent N months that have data
       const latestResult = await pool.query(
         'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
         [userId]
       );
 
       if (latestResult.rows[0]?.latest) {
+        // End at the last month with transactions
         endDate = dayjs(latestResult.rows[0].latest).endOf('month');
-        startDate = endDate.subtract(months - 1, 'month').startOf('month');
+        // Start N-1 months before that
+        startDate = dayjs(latestResult.rows[0].latest).subtract(months - 1, 'month').startOf('month');
       } else {
+        // Fallback to current date if no transactions
         endDate = dayjs().endOf('month');
-        startDate = endDate.subtract(months - 1, 'month').startOf('month');
+        startDate = dayjs().subtract(months - 1, 'month').startOf('month');
       }
     }
 

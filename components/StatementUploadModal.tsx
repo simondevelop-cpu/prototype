@@ -68,17 +68,14 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
   const handleUpload = async () => {
     if (files.length === 0) return;
     
-    console.log('[Upload] Starting parse of', files.length, 'files');
     setUploading(true);
     const formData = new FormData();
     
     files.forEach(file => {
-      console.log('[Upload] Adding file:', file.name, file.type, file.size, 'bytes');
       formData.append('statements', file);
     });
-
+    
     try {
-      console.log('[Upload] Sending request to /api/statements/parse');
       const response = await fetch('/api/statements/parse', {
         method: 'POST',
         headers: {
@@ -87,9 +84,7 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
         body: formData,
       });
 
-      console.log('[Upload] Response status:', response.status);
       const result = await response.json();
-      console.log('[Upload] Response data:', result);
       
       if (response.ok) {
         // Filter successful parses
@@ -108,7 +103,6 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
         setParsedStatements(successfulParses);
         setShowReviewModal(true);
       } else {
-        console.error('[Upload] Parse failed:', result);
         alert(`Parse failed: ${result.error || 'Unknown error'}`);
       }
     } catch (error: any) {
@@ -162,7 +156,7 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
       
       {/* Upload Modal */}
       {!showReviewModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -205,7 +199,28 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
                 <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                Scotiabank
+                CIBC
+              </div>
+            </div>
+            <h3 className="text-sm font-semibold text-blue-900 mt-4 mb-2">Coming Next</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm text-blue-700">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Text-based PDFs
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                National Bank
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Amex
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -213,17 +228,56 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
                 </svg>
                 BMO
               </div>
+            </div>
+            <h3 className="text-sm font-semibold text-gray-700 mt-4 mb-2">Coming Soon</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm text-gray-600">
               <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                CIBC
+                Scotia
               </div>
               <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Desjardins
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Tangerine
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Simplii
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                PC Financial
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Koho
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Wealthsimple
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Neo
               </div>
             </div>
           </div>

@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react';
 import CashflowChart from './CashflowChart';
 import TransactionsList from './TransactionsList';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
 
 interface DashboardProps {
   user: any;
@@ -12,8 +16,9 @@ interface DashboardProps {
 
 export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [timeframe, setTimeframe] = useState('6m');
+  const [timeframe, setTimeframe] = useState('3m');
   const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
+  const [customMonthRange, setCustomMonthRange] = useState({ start: '', end: '' }); // Store YYYY-MM for month picker
   const [showCustomDate, setShowCustomDate] = useState(false);
   const [summary, setSummary] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]); // For dashboard breakdown/chart
@@ -27,6 +32,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [cashflowFilter, setCashflowFilter] = useState<string | null>(null);
+  const [dateRangeFilter, setDateRangeFilter] = useState<{ start: string; end: string } | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -37,6 +43,21 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
       fetchCategories();
     }
   }, [selectedMonth, selectedCashflow, timeframe]);
+
+  // Update customMonthRange whenever summary data changes (for preset timeframes)
+  useEffect(() => {
+    if (timeframe !== 'custom' && summary.length > 0) {
+      const dates = summary.map(s => s.month);
+      const earliest = dates[0];
+      const latest = dates[dates.length - 1];
+      
+      if (earliest && latest) {
+        const earliestMonth = earliest.substring(0, 7); // Get YYYY-MM
+        const latestMonth = latest.substring(0, 7);
+        setCustomMonthRange({ start: earliestMonth, end: latestMonth });
+      }
+    }
+  }, [summary, timeframe]);
 
   // Fetch all transactions when switching to transactions tab
   useEffect(() => {
@@ -170,11 +191,57 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     if (selectedCashflow) {
       setCashflowFilter(selectedCashflow);
     }
+    // Set date range filter based on current dashboard view
+    if (timeframe === 'custom' && customDateRange.start && customDateRange.end) {
+      setDateRangeFilter({ start: customDateRange.start, end: customDateRange.end });
+    } else {
+      // For preset timeframes, calculate the date range from summary data
+      if (summary.length > 0) {
+        const dates = summary.map(s => s.month);
+        const earliest = dates[0];
+        const latest = dates[dates.length - 1];
+        if (earliest && latest) {
+          const earliestMonth = earliest.substring(0, 7);
+          const latestMonth = latest.substring(0, 7);
+          const startDate = earliestMonth + '-01';
+          const [endYear, endMonth] = latestMonth.split('-');
+          const lastDay = new Date(parseInt(endYear), parseInt(endMonth), 0).getDate();
+          const endDate = `${latestMonth}-${String(lastDay).padStart(2, '0')}`;
+          setDateRangeFilter({ start: startDate, end: endDate });
+        }
+      }
+    }
     setActiveTab('transactions');
   };
 
+  const handleCustomButtonClick = () => {
+    // Always populate with current date range when opening
+    if (!showCustomDate && summary.length > 0) {
+      const dates = summary.map(s => s.month);
+      const earliest = dates[0];
+      const latest = dates[dates.length - 1];
+      
+      if (earliest && latest) {
+        const earliestMonth = earliest.substring(0, 7); // Get YYYY-MM
+        const latestMonth = latest.substring(0, 7);
+        setCustomMonthRange({ start: earliestMonth, end: latestMonth });
+      }
+    }
+    setShowCustomDate(!showCustomDate);
+  };
+
   const handleCustomDateApply = () => {
-    if (customDateRange.start && customDateRange.end) {
+    if (customMonthRange.start && customMonthRange.end) {
+      // Convert YYYY-MM format to full date ranges (first day to last day of month)
+      const startDate = customMonthRange.start + '-01'; // First day of start month
+      
+      // Calculate last day of end month
+      const [endYear, endMonth] = customMonthRange.end.split('-');
+      const lastDay = new Date(parseInt(endYear), parseInt(endMonth), 0).getDate();
+      const endDate = `${customMonthRange.end}-${String(lastDay).padStart(2, '0')}`;
+      
+      // Update customDateRange with full dates for API (keep month values in customMonthRange)
+      setCustomDateRange({ start: startDate, end: endDate });
       setTimeframe('custom');
       setShowCustomDate(false);
       fetchData();
@@ -197,6 +264,14 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
 
   // Calculate date range display
   const getDateRangeDisplay = () => {
+    // For custom timeframe, use the selected date range directly
+    if (timeframe === 'custom' && customDateRange.start && customDateRange.end) {
+      const start = dayjs.utc(customDateRange.start).format('MMM D, YYYY');
+      const end = dayjs.utc(customDateRange.end).format('MMM D, YYYY');
+      return `${start} - ${end}`;
+    }
+    
+    // For preset timeframes, calculate from summary data
     if (summary.length === 0) return '';
     const dates = summary.map(s => s.month);
     const earliest = dates[0];
@@ -209,20 +284,12 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     const earliestMonth = earliest.substring(0, 7); // Get YYYY-MM
     const latestMonth = latest.substring(0, 7);
     
-    // Show full date with day for first and last of month range
-    const startDate = new Date(earliestMonth + '-01'); // First day of earliest month
-    const latestDate = new Date(latestMonth + '-01');
+    // Show full date with day for first and last of month range using UTC
+    const startDate = dayjs.utc(earliestMonth + '-01');
+    const endDate = dayjs.utc(latestMonth + '-01').endOf('month');
     
-    // Validate dates
-    if (isNaN(startDate.getTime()) || isNaN(latestDate.getTime())) {
-      return '';
-    }
-    
-    const lastDay = new Date(latestDate.getFullYear(), latestDate.getMonth() + 1, 0).getDate(); // Last day of latest month
-    const endDate = new Date(latestDate.getFullYear(), latestDate.getMonth(), lastDay);
-    
-    const start = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const end = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const start = startDate.format('MMM D, YYYY');
+    const end = endDate.format('MMM D, YYYY');
     return `${start} - ${end}`;
   };
 
@@ -339,7 +406,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                 ))}
               </div>
               <button
-                onClick={() => setShowCustomDate(!showCustomDate)}
+                onClick={handleCustomButtonClick}
                 className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
                   timeframe === 'custom'
                     ? 'bg-blue-600 text-white border-blue-600'
@@ -356,20 +423,20 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Custom Date Range</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Month</label>
                     <input
-                      type="date"
-                      value={customDateRange.start}
-                      onChange={(e) => setCustomDateRange({ ...customDateRange, start: e.target.value })}
+                      type="month"
+                      value={customMonthRange.start}
+                      onChange={(e) => setCustomMonthRange({ ...customMonthRange, start: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">End Month</label>
                     <input
-                      type="date"
-                      value={customDateRange.end}
-                      onChange={(e) => setCustomDateRange({ ...customDateRange, end: e.target.value })}
+                      type="month"
+                      value={customMonthRange.end}
+                      onChange={(e) => setCustomMonthRange({ ...customMonthRange, end: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -486,7 +553,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   </h2>
                   <span className="text-sm text-gray-600">
                     {selectedMonth 
-                      ? new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                      ? dayjs.utc(selectedMonth + '-01').format('MMMM YYYY')
                       : getDateRangeDisplay()
                     }
                   </span>
@@ -543,7 +610,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   <p className="text-sm text-gray-600 mt-1">
                     {filteredTransactionsForBreakdown.length} {filteredTransactionsForBreakdown.length === 1 ? 'transaction' : 'transactions'}
                     {selectedMonth 
-                      ? ` in ${new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
+                      ? ` in ${dayjs.utc(selectedMonth + '-01').format('MMMM YYYY')}`
                       : ` (${getDateRangeDisplay()})`
                     }
                   </p>
@@ -591,6 +658,8 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
             onClearCategoryFilter={() => setCategoryFilter(null)}
             initialCashflowFilter={cashflowFilter}
             onClearCashflowFilter={() => setCashflowFilter(null)}
+            initialDateRange={dateRangeFilter}
+            onClearDateRange={() => setDateRangeFilter(null)}
           />
         )}
 

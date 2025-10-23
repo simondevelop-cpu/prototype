@@ -18,6 +18,7 @@ interface ParsedStatement {
   filename: string;
   bank: string;
   accountType: string;
+  accountHolderName?: string;
   categorized: {
     duplicates: Transaction[];
     other: Transaction[];
@@ -180,7 +181,43 @@ export default function StatementReviewModal({
       }
       
       if (!accountName) {
-        setAccountName(parsedStatements[0].accountType || 'Credit Card');
+        // Handle multiple statements
+        if (parsedStatements.length > 1) {
+          // Multiple statements - create a combined name listing all banks and account types
+          const accountDescriptions = parsedStatements.map(stmt => {
+            const bank = stmt.bank || 'Unknown';
+            const type = stmt.accountType || 'Account';
+            // Simplified account type
+            let shortType = type;
+            if (type === 'Credit Card') shortType = 'Credit';
+            else if (type === 'Checking') shortType = 'Chequing';
+            else if (type === 'Savings') shortType = 'Savings';
+            
+            return `${bank} ${shortType}`;
+          }).join(', ');
+          
+          const newName = `Multiple Accounts (${accountDescriptions})`;
+          setAccountName(newName);
+        } else {
+          // Single statement - use bank and account type
+          const statement = parsedStatements[0];
+          const bank = statement.bank || 'Unknown Bank';
+          const type = statement.accountType || 'Credit Card';
+          
+          // Format account type for display
+          let accountTypeDisplay = type;
+          if (type === 'Credit Card') {
+            accountTypeDisplay = 'Credit Card';
+          } else if (type === 'Checking') {
+            accountTypeDisplay = 'Chequing Account';
+          } else if (type === 'Savings') {
+            accountTypeDisplay = 'Savings Account';
+          }
+          
+          // Simple format: "[Bank] [Account Type]" (e.g., "RBC Credit Card", "CIBC Chequing Account")
+          const newName = `${bank} ${accountTypeDisplay}`;
+          setAccountName(newName);
+        }
       }
     }
   }, [isOpen, parsedStatements, excludedTransactions.size, accountName]);
@@ -724,7 +761,7 @@ export default function StatementReviewModal({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
         <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
           {/* Header */}
           <div className="p-6 border-b border-gray-200">
@@ -792,7 +829,7 @@ export default function StatementReviewModal({
 
       {/* Edit Modal (simplified inline editor) */}
       {editingTransaction && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Edit Transaction</h3>
             

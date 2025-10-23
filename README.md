@@ -24,6 +24,13 @@ A modern, AI-ready personal finance management application built for Canadians. 
   - ✅ Edit existing transactions inline
   - ✅ Delete transactions with confirmation
   - ✅ Bulk update multiple transactions at once
+  - ✨ **Upload PDF bank statements** (NEW!)
+- **PDF Statement Upload** 🆕
+  - Drag & drop PDF statements
+  - Supports TD, RBC, CIBC, National Bank, Amex
+  - Multi-step review flow with duplicate detection
+  - Smart categorization into expenses, income, and other (transfers)
+  - Edit account names and verify totals before import
 - **Powerful Filtering & Search**
   - Universal search across description, amount, category, label
   - Filter by date range, category, account, cashflow type
@@ -254,12 +261,27 @@ CREATE TABLE transactions (
   - User training/correction loop
   - Canadian-specific merchant database
 
-- [ ] **PDF Bank Statement Parser**
-  - Upload PDF statements
-  - OCR text extraction
-  - Intelligent transaction parsing
-  - Support for major Canadian banks (RBC, TD, Scotia, BMO, CIBC)
-  - CSV import as fallback
+- [x] **PDF Bank Statement Parser** ✨ NEW!
+  - Upload PDF statements via drag & drop
+  - Multi-step review flow with duplicate detection
+  - Smart categorization (expenses, income, other/transfers)
+  - **Supported banks:**
+    - ✅ TD (Credit Card, Chequing, Savings)
+    - ✅ RBC (Credit Card, Chequing, Savings)
+    - ✅ CIBC (Credit Card, Chequing)
+    - ✅ BMO (Credit Card, Chequing)
+  - **Coming soon:**
+    - 🚧 National Bank
+    - 🚧 American Express
+    - 🚧 Scotiabank
+    - 🚧 Desjardins
+  - **Next generation support:**
+    - 📅 Tangerine
+    - 📅 Simplii Financial
+    - 📅 PC Financial
+    - 📅 Koho
+    - 📅 Wealthsimple
+    - 📅 Neo Financial
 
 - [ ] **Automated Insights Engine**
   - Spending pattern analysis
@@ -315,8 +337,9 @@ CREATE TABLE transactions (
 
 - Settings page is placeholder (coming soon modal)
 - Insights tab is placeholder (coming soon)
+- Budget tab is placeholder (coming soon)
 - No mobile app yet (responsive web only)
-- Manual transaction entry only (no bank import yet)
+- PDF statement parsing is beta (supported banks: TD, RBC, CIBC, BMO)
 - Single currency support (CAD)
 
 ---

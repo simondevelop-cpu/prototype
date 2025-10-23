@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import TransactionModal from './TransactionModal';
 import BulkRecategorizeModal from './BulkRecategorizeModal';
 import StatementUploadModal from './StatementUploadModal';
+
+dayjs.extend(utc);
 
 interface TransactionsListProps {
   transactions: any[];
@@ -15,15 +18,18 @@ interface TransactionsListProps {
   onClearCategoryFilter?: () => void;
   initialCashflowFilter?: string | null;
   onClearCashflowFilter?: () => void;
+  initialDateRange?: { start: string; end: string } | null;
+  onClearDateRange?: () => void;
 }
 
-export default function TransactionsList({ transactions, loading, token, onRefresh, initialCategoryFilter, onClearCategoryFilter, initialCashflowFilter, onClearCashflowFilter }: TransactionsListProps) {
+export default function TransactionsList({ transactions, loading, token, onRefresh, initialCategoryFilter, onClearCategoryFilter, initialCashflowFilter, onClearCashflowFilter, initialDateRange, onClearDateRange }: TransactionsListProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(initialCategoryFilter || 'All categories');
-  const [selectedAccount, setSelectedAccount] = useState('All accounts');
-  const [selectedCashflow, setSelectedCashflow] = useState(initialCashflowFilter || 'All cashflows');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(initialCategoryFilter ? [initialCategoryFilter] : []);
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+  const [selectedCashflows, setSelectedCashflows] = useState<string[]>(initialCashflowFilter ? [initialCashflowFilter] : []);
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
+  const [startDate, setStartDate] = useState(initialDateRange?.start || '');
+  const [endDate, setEndDate] = useState(initialDateRange?.end || '');
   const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
   
   // Modal states
@@ -31,13 +37,44 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
+  
+  // Dropdown visibility states
+  const [showCashflowDropdown, setShowCashflowDropdown] = useState(false);
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showLabelDropdown, setShowLabelDropdown] = useState(false);
+  
+  const cashflowDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
+  const accountDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
+  const categoryDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
+  const labelDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
+  
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (cashflowDropdownRef.current && !cashflowDropdownRef.current.contains(event.target as Node)) {
+        setShowCashflowDropdown(false);
+      }
+      if (accountDropdownRef.current && !accountDropdownRef.current.contains(event.target as Node)) {
+        setShowAccountDropdown(false);
+      }
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+        setShowCategoryDropdown(false);
+      }
+      if (labelDropdownRef.current && !labelDropdownRef.current.contains(event.target as Node)) {
+        setShowLabelDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Apply initial filters when they change
-  if (initialCategoryFilter && selectedCategory !== initialCategoryFilter) {
-    setSelectedCategory(initialCategoryFilter);
+  if (initialCategoryFilter && !selectedCategories.includes(initialCategoryFilter)) {
+    setSelectedCategories([initialCategoryFilter]);
   }
-  if (initialCashflowFilter && selectedCashflow !== initialCashflowFilter) {
-    setSelectedCashflow(initialCashflowFilter);
+  if (initialCashflowFilter && !selectedCashflows.includes(initialCashflowFilter)) {
+    setSelectedCashflows([initialCashflowFilter]);
   }
 
   if (loading) {
@@ -58,18 +95,29 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       tx.amount?.toString().includes(searchTerm) ||
       Math.abs(tx.amount)?.toFixed(2).includes(searchTerm);
     
-    const matchesCategory = selectedCategory === 'All categories' || tx.category === selectedCategory;
-    const matchesAccount = selectedAccount === 'All accounts' || tx.account === selectedAccount;
-    const matchesCashflow = selectedCashflow === 'All cashflows' || tx.cashflow === selectedCashflow;
+    const matchesCategory = selectedCategories.length === 0 || selectedCategories.includes(tx.category);
+    const matchesAccount = selectedAccounts.length === 0 || selectedAccounts.includes(tx.account);
+    const matchesCashflow = selectedCashflows.length === 0 || selectedCashflows.includes(tx.cashflow);
+    const matchesLabel = selectedLabels.length === 0 || selectedLabels.includes(tx.label);
     const matchesDateRange = (!startDate || tx.date >= startDate) && (!endDate || tx.date <= endDate);
     
-    return matchesSearch && matchesCategory && matchesAccount && matchesCashflow && matchesDateRange;
+    return matchesSearch && matchesCategory && matchesAccount && matchesCashflow && matchesLabel && matchesDateRange;
   });
 
-  // Get unique categories, accounts, and cashflows
-  const categories = ['All categories', ...Array.from(new Set(transactions.map(tx => tx.category).filter(Boolean)))];
-  const accounts = ['All accounts', ...Array.from(new Set(transactions.map(tx => tx.account).filter(Boolean)))];
-  const cashflows = ['All cashflows', ...Array.from(new Set(transactions.map(tx => tx.cashflow).filter(Boolean)))];
+  // Get unique values for each filter
+  const categories = Array.from(new Set(transactions.map(tx => tx.category).filter(Boolean))).sort();
+  const accounts = Array.from(new Set(transactions.map(tx => tx.account).filter(Boolean))).sort();
+  const cashflows = Array.from(new Set(transactions.map(tx => tx.cashflow).filter(Boolean))).sort();
+  const labels = Array.from(new Set(transactions.map(tx => tx.label).filter(Boolean))).sort();
+  
+  // Multi-select toggle handlers
+  const toggleFilter = (value: string, selected: string[], setSelected: (vals: string[]) => void) => {
+    if (selected.includes(value)) {
+      setSelected(selected.filter(v => v !== value));
+    } else {
+      setSelected([...selected, value]);
+    }
+  };
 
   // Helper to create unique ID for each transaction
   const getTxId = (tx: any) => tx.id?.toString() || `${tx.date}_${tx.description}_${tx.amount}`;
@@ -368,7 +416,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
 
       {/* Filters */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="lg:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">Search Everything</label>
             <input
@@ -397,121 +445,31 @@ export default function TransactionsList({ transactions, loading, token, onRefre
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category
-              {initialCategoryFilter && selectedCategory === initialCategoryFilter && (
-                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                  From dashboard
-                </span>
-              )}
-            </label>
-            <div className="flex gap-2">
-              <select
-                value={selectedCategory}
-                onChange={(e) => {
-                  setSelectedCategory(e.target.value);
-                  if (e.target.value === 'All categories' && onClearCategoryFilter) {
-                    onClearCategoryFilter();
-                  }
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-              {initialCategoryFilter && selectedCategory === initialCategoryFilter && (
-                <button
-                  onClick={() => {
-                    setSelectedCategory('All categories');
-                    if (onClearCategoryFilter) {
-                      onClearCategoryFilter();
-                    }
-                  }}
-                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Clear category filter"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Account</label>
-            <select
-              value={selectedAccount}
-              onChange={(e) => setSelectedAccount(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {accounts.map(acc => (
-                <option key={acc} value={acc}>{acc}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Cashflow Type
-              {initialCashflowFilter && selectedCashflow === initialCashflowFilter && (
-                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                  From dashboard
-                </span>
-              )}
-            </label>
-            <div className="flex gap-2">
-              <select
-                value={selectedCashflow}
-                onChange={(e) => {
-                  setSelectedCashflow(e.target.value);
-                  if (e.target.value === 'All cashflows' && onClearCashflowFilter) {
-                    onClearCashflowFilter();
-                  }
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                {cashflows.map(cf => (
-                  <option key={cf} value={cf}>{cf}</option>
-                ))}
-              </select>
-              {initialCashflowFilter && selectedCashflow === initialCashflowFilter && (
-                <button
-                  onClick={() => {
-                    setSelectedCashflow('All cashflows');
-                    if (onClearCashflowFilter) {
-                      onClearCashflowFilter();
-                    }
-                  }}
-                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Clear cashflow filter"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="md:col-span-2 flex items-end">
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setStartDate('');
-                setEndDate('');
-                setSelectedCategory('All categories');
-                setSelectedAccount('All accounts');
-                setSelectedCashflow('All cashflows');
-                if (onClearCategoryFilter) {
-                  onClearCategoryFilter();
-                }
-                if (onClearCashflowFilter) {
-                  onClearCashflowFilter();
-                }
-              }}
-              className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-            >
-              Clear All Filters
-            </button>
-          </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setStartDate('');
+              setEndDate('');
+              setSelectedCategories([]);
+              setSelectedAccounts([]);
+              setSelectedCashflows([]);
+              setSelectedLabels([]);
+              if (onClearCategoryFilter) {
+                onClearCategoryFilter();
+              }
+              if (onClearCashflowFilter) {
+                onClearCashflowFilter();
+              }
+              if (onClearDateRange) {
+                onClearDateRange();
+              }
+            }}
+            className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+          >
+            Clear All Filters
+          </button>
         </div>
       </div>
 
@@ -552,17 +510,187 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Description
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cashflow
+                <th className="px-6 py-3 text-left relative" ref={cashflowDropdownRef}>
+                  <button
+                    onClick={() => setShowCashflowDropdown(!showCashflowDropdown)}
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
+                  >
+                    CASHFLOW {selectedCashflows.length > 0 && `(${selectedCashflows.length})`} ▾
+                  </button>
+                  {showCashflowDropdown && (
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
+                      <div className="p-2">
+                        <div className="flex gap-2 px-3 py-2 border-b border-gray-200 mb-2">
+                          <button
+                            onClick={() => setSelectedCashflows(cashflows)}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Select All
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            onClick={() => {
+                              setSelectedCashflows([]);
+                              if (onClearCashflowFilter) onClearCashflowFilter();
+                            }}
+                            className="text-xs text-gray-600 hover:text-gray-800 font-medium"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                        {cashflows.map(cf => (
+                          <label key={cf} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedCashflows.includes(cf)}
+                              onChange={() => {
+                                toggleFilter(cf, selectedCashflows, setSelectedCashflows);
+                                if (selectedCashflows.includes(cf) && cf === initialCashflowFilter && onClearCashflowFilter) {
+                                  onClearCashflowFilter();
+                                }
+                              }}
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-2"
+                            />
+                            <span className="text-sm">{cf}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Account
+                <th className="px-6 py-3 text-left relative" ref={accountDropdownRef}>
+                  <button
+                    onClick={() => setShowAccountDropdown(!showAccountDropdown)}
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
+                  >
+                    ACCOUNT {selectedAccounts.length > 0 && `(${selectedAccounts.length})`} ▾
+                  </button>
+                  {showAccountDropdown && (
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
+                      <div className="p-2">
+                        <div className="flex gap-2 px-3 py-2 border-b border-gray-200 mb-2">
+                          <button
+                            onClick={() => setSelectedAccounts(accounts)}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Select All
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            onClick={() => setSelectedAccounts([])}
+                            className="text-xs text-gray-600 hover:text-gray-800 font-medium"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                        {accounts.map(acc => (
+                          <label key={acc} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedAccounts.includes(acc)}
+                              onChange={() => toggleFilter(acc, selectedAccounts, setSelectedAccounts)}
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-2"
+                            />
+                            <span className="text-sm">{acc}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Category
+                <th className="px-6 py-3 text-left relative" ref={categoryDropdownRef}>
+                  <button
+                    onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
+                  >
+                    CATEGORY {selectedCategories.length > 0 && `(${selectedCategories.length})`} ▾
+                  </button>
+                  {showCategoryDropdown && (
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
+                      <div className="p-2">
+                        <div className="flex gap-2 px-3 py-2 border-b border-gray-200 mb-2">
+                          <button
+                            onClick={() => setSelectedCategories(categories)}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Select All
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            onClick={() => {
+                              setSelectedCategories([]);
+                              if (onClearCategoryFilter) onClearCategoryFilter();
+                            }}
+                            className="text-xs text-gray-600 hover:text-gray-800 font-medium"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                        {categories.map(cat => (
+                          <label key={cat} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedCategories.includes(cat)}
+                              onChange={() => {
+                                toggleFilter(cat, selectedCategories, setSelectedCategories);
+                                if (selectedCategories.includes(cat) && cat === initialCategoryFilter && onClearCategoryFilter) {
+                                  onClearCategoryFilter();
+                                }
+                              }}
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-2"
+                            />
+                            <span className="text-sm">{cat}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Label
+                <th className="px-6 py-3 text-left relative" ref={labelDropdownRef}>
+                  <button
+                    onClick={() => setShowLabelDropdown(!showLabelDropdown)}
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
+                  >
+                    LABEL {selectedLabels.length > 0 && `(${selectedLabels.length})`} ▾
+                  </button>
+                  {showLabelDropdown && (
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
+                      <div className="p-2">
+                        {labels.length > 0 ? (
+                          <>
+                            <div className="flex gap-2 px-3 py-2 border-b border-gray-200 mb-2">
+                              <button
+                                onClick={() => setSelectedLabels(labels)}
+                                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                              >
+                                Select All
+                              </button>
+                              <span className="text-gray-300">|</span>
+                              <button
+                                onClick={() => setSelectedLabels([])}
+                                className="text-xs text-gray-600 hover:text-gray-800 font-medium"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                            {labels.map(label => (
+                              <label key={label} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer rounded">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedLabels.includes(label)}
+                                  onChange={() => toggleFilter(label, selectedLabels, setSelectedLabels)}
+                                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-2"
+                                />
+                                <span className="text-sm">{label}</span>
+                              </label>
+                            ))}
+                          </>
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-gray-500">No labels available</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Amount
@@ -587,7 +715,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {dayjs(tx.date).format('MMM D, YYYY')}
+                      {dayjs.utc(tx.date).format('MMM D, YYYY')}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       <div className="font-medium">{tx.description}</div>
@@ -635,6 +763,12 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                   </tr>
                 );
               })}
+              {/* Add empty rows to ensure dropdowns have space when there are few transactions */}
+              {Array.from({ length: Math.max(0, 10 - filteredTransactions.length) }).map((_, idx) => (
+                <tr key={`empty-${idx}`} className="h-16">
+                  <td colSpan={9} className="border-0">&nbsp;</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
