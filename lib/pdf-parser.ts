@@ -394,40 +394,54 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     let remainder = line.substring(dateMatch[0].length).trim();
     
     // Extract all amounts (withdrawal, deposit, balance)
-    // IMPORTANT: Amounts must have comma separators OR be at end of string to avoid false positives
-    // This prevents matching reference codes like "QMCXE91,475.00" as "91,475.00"
-    const amountPattern = /(?:^|\s)(\d{1,3}(?:,\d{3})+\.\d{2})(?:\s|$)/g;
+    // Match amounts with proper boundaries to avoid false positives in reference codes
+    // BUT: Must work for both "1,475.00" AND "31.00"
     let amounts: number[] = [];
     let match;
-    while ((match = amountPattern.exec(remainder)) !== null) {
-      amounts.push(parseFloat(match[1].replace(/,/g, '')));
-    }
     
-    // Also try simple pattern for amounts without commas (like 31.00)
-    if (amounts.length === 0) {
-      const simplePattern = /(?:^|\s)(\d{1,3}\.\d{2})(?:\s|$)/g;
-      while ((match = simplePattern.exec(remainder)) !== null) {
-        amounts.push(parseFloat(match[1]));
+    // Try ALL amount patterns (with and without commas)
+    const amountPattern = /(\d{1,3}(?:,\d{3})*\.\d{2})/g;
+    const potentialAmounts: Array<{value: number, index: number, text: string}> = [];
+    
+    while ((match = amountPattern.exec(remainder)) !== null) {
+      const text = match[1];
+      const value = parseFloat(text.replace(/,/g, ''));
+      const index = match.index;
+      
+      // Check if this amount is preceded by alphanumeric (likely part of reference code)
+      const charBefore = index > 0 ? remainder[index - 1] : ' ';
+      const isEmbedded = /[A-Z0-9]/.test(charBefore);
+      
+      // Skip if embedded in reference code (like "QMCXE91,475.00")
+      if (!isEmbedded) {
+        potentialAmounts.push({value, index, text});
       }
     }
+    
+    amounts = potentialAmounts.map(a => a.value);
     
     // If no amounts on this line, check the next line
     if (amounts.length === 0 && i + 1 < lines.length) {
       const nextLine = lines[i + 1].trim();
       // Only use next line if it starts with amounts (not a date)
       if (nextLine && !/^\d{1,2}\s+\w{3}/.test(nextLine)) {
-        // Try pattern with commas first
+        const nextPotentialAmounts: Array<{value: number, index: number, text: string}> = [];
         let nextMatch;
+        
         while ((nextMatch = amountPattern.exec(nextLine)) !== null) {
-          amounts.push(parseFloat(nextMatch[1].replace(/,/g, '')));
-        }
-        // Try simple pattern if no comma amounts found
-        if (amounts.length === 0) {
-          const simplePattern = /(?:^|\s)(\d{1,3}\.\d{2})(?:\s|$)/g;
-          while ((nextMatch = simplePattern.exec(nextLine)) !== null) {
-            amounts.push(parseFloat(nextMatch[1]));
+          const text = nextMatch[1];
+          const value = parseFloat(text.replace(/,/g, ''));
+          const index = nextMatch.index;
+          const charBefore = index > 0 ? nextLine[index - 1] : ' ';
+          const isEmbedded = /[A-Z0-9]/.test(charBefore);
+          
+          if (!isEmbedded) {
+            nextPotentialAmounts.push({value, index, text});
           }
         }
+        
+        amounts = nextPotentialAmounts.map(a => a.value);
+        
         // Append next line to remainder for description extraction
         if (amounts.length > 0) {
           remainder += ' ' + nextLine;
@@ -692,23 +706,18 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
       break;
     }
     
-    // CIBC credit card pattern: Two dates at start, then description, then amount at end
-    // Dates format: "Jun 11" or "Jun  1" (month abbreviation + day)
-    // Try multiple patterns:
+    // CIBC credit card pattern: Two dates at start, then description, then CATEGORY, then amount at end
+    // Format: "Jun 12Jun 13LE VAISSELIER BROMONT QCProfessional and Financial Services235.00"
+    // OR: "Jun 12 Jun 13 MERCHANT NAME LOCATION Category Name 123.45"
     
-    // Pattern 1: Standard format with spacing
-    let pattern = /^([A-Z][a-z]{2}\s+\d{1,2})\s+([A-Z][a-z]{2}\s+\d{1,2})\s+(.+?)\s+([\d,]+\.\d{2})$/;
+    // Pattern 1: Compact dates (no space) + description + category + amount
+    let pattern = /^([A-Z][a-z]{2}\s*\d{1,2})([A-Z][a-z]{2}\s*\d{1,2})(.+?)([\d,]+\.\d{2})$/;
     let match = line.match(pattern);
-    
-    // Pattern 2: Compact format
-    if (!match) {
-      pattern = /^([A-Z][a-z]{2}\d{1,2})([A-Z][a-z]{2}\d{1,2})(.+?)([\d,]+\.\d{2})$/;
-      match = line.match(pattern);
-    }
     
     if (!match) continue;
     
-    const [fullMatch, transDateStr, postDateStr, description, amountStr] = match;
+    // Extract parts
+    const [fullMatch, transDateStr, postDateStr, middlePart, amountStr] = match;
     
     // Parse transaction date
     const transDate = parseDateFlexible(transDateStr);
@@ -716,10 +725,14 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
     
     const amount = parseFloat(amountStr.replace(/,/g, ''));
     
-    // Clean description
-    const cleanDesc = description
-      .replace(/\s{2,}/g, ' ') // Collapse spaces
-      .trim();
+    // The middlePart contains: DESCRIPTION + CATEGORY
+    // Category is usually at the end before the amount (e.g., "Professional and Financial Services")
+    // We want to keep the description, remove the category
+    let cleanDesc = middlePart;
+    
+    // Try to remove common category patterns from the end
+    cleanDesc = cleanDesc.replace(/(?:Professional and Financial Services|Personal and Household Expenses|Health and Education|Travel and Entertainment|Grocery and Dining|Gas and Transportation)$/i, '');
+    cleanDesc = cleanDesc.replace(/\s{2,}/g, ' ').trim();
     
     if (cleanDesc.length < 3) continue;
     
