@@ -457,11 +457,16 @@ function parseRBCCreditCardTransactions(text: string, accountType: string): Tran
     console.log(`[PDF Parser] Processing section ${sectionIdx + 1}, length: ${sectionText.length}`);
     console.log(`[PDF Parser] Section preview: ${sectionText.substring(0, 200)}`);
     
-    // Try to match the compact RBC format with regex on the ENTIRE section
-    // Pattern: DATE1 DATE2 DESCRIPTION (anything) $ or -$ AMOUNT
-    // The description can span multiple "words" with no spaces
-    // Amount can be anywhere after the dates, with or without spaces before the $
-    const pattern = /([A-Z]{3}\d{1,2})([A-Z]{3}\d{1,2})([A-Z0-9\s#\/'&\-\.\*]+?)(?:[\s\-]*)\$\s*(-?[\d,]+\.\d{2})/g;
+    // RBC credit card format has transactions on MULTIPLE LINES:
+    // Line 1: AUG 19AUG 21SOBEYS #776 DARTMOUTH NS (dates may have spaces)
+    // Line 2: 74529005231920451563403 (reference number)
+    // Line 3: $65.33 (amount)
+    //
+    // Strategy: Use multiline regex with non-greedy matching
+    // Match: DATE1 DATE2 DESCRIPTION (newlines allowed) $AMOUNT
+    
+    // Pattern with spaces in dates and multiline matching
+    const pattern = /([A-Z]{3}\s*\d{1,2})([A-Z]{3}\s*\d{1,2})([A-Z0-9\s#\/'&\-\.\*\n]+?)\$\s*(-?[\d,]+\.\d{2})/g;
     
     let match;
     let count = 0;
@@ -472,10 +477,11 @@ function parseRBCCreditCardTransactions(text: string, accountType: string): Tran
       const transDate = parseDateFlexible(transDateStr);
       if (!transDate) continue;
       
-      // Clean description
+      // Clean description - remove reference numbers and newlines
       const description = descRaw
-        .replace(/\d{10,}/g, '') // Remove reference numbers
-        .replace(/\s{2,}/g, ' ') // Collapse spaces
+        .replace(/\n/g, ' ') // Replace newlines with spaces
+        .replace(/\d{10,}/g, '') // Remove long reference numbers
+        .replace(/\s{2,}/g, ' ') // Collapse multiple spaces
         .trim();
       
       if (description.length < 3) continue;
@@ -492,13 +498,6 @@ function parseRBCCreditCardTransactions(text: string, accountType: string): Tran
       if (count <= 5) {
         console.log(`[PDF Parser] Match #${count}: ${transDate} | ${description.substring(0, 40)} | ${finalAmount}`);
       }
-    }
-    
-    if (count === 0 && sectionIdx < 2) {
-      // Debug: show why no matches
-      const hasDate = /[A-Z]{3}\d{1,2}/g.test(sectionText);
-      const hasDollar = /\$/.test(sectionText);
-      console.log(`[PDF Parser] DEBUG: hasDate=${hasDate}, hasDollar=${hasDollar}`);
     }
     
     console.log(`[PDF Parser] Extracted ${count} transactions from section ${sectionIdx + 1}`);
