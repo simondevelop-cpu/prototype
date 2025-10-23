@@ -39,10 +39,10 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showLabelDropdown, setShowLabelDropdown] = useState(false);
   
-  const cashflowDropdownRef = useRef<HTMLDivElement>(null);
-  const accountDropdownRef = useRef<HTMLDivElement>(null);
-  const categoryDropdownRef = useRef<HTMLDivElement>(null);
-  const labelDropdownRef = useRef<HTMLDivElement>(null);
+  const cashflowDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
+  const accountDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
+  const categoryDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
+  const labelDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
   
   // Close dropdowns when clicking outside
   useEffect(() => {
