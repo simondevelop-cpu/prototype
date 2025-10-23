@@ -269,47 +269,13 @@ function detectAccountType(text: string): string {
 
 /**
  * Parse RBC transactions
- * Format: Date | Description | Withdrawals | Deposits | Balance
+ * RBC Credit Card Format: TRANSACTION_DATE  POSTING_DATE  DESCRIPTION  $AMOUNT
+ * Example: AUG 19  AUG 21  SOBEYS #776 ENFIELD SOUTH NS    $65.33
+ * 
+ * Uses the generic parser which handles dual-date formats
  */
 function parseRBCTransactions(text: string, accountType: string): Transaction[] {
-  const transactions: Transaction[] = [];
-  const lines = text.split('\n');
-
-  // RBC date format: MM/DD/YYYY or MMM DD
-  const datePattern = /(\d{2}\/\d{2}\/\d{4}|\w{3}\s+\d{1,2})/;
-  const amountPattern = /[\$\s]*([\d,]+\.\d{2})/g;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Skip headers and empty lines
-    if (!line || line.length < 10) continue;
-    if (/^(date|transaction|balance|statement)/i.test(line)) continue;
-
-    const dateMatch = line.match(datePattern);
-    if (!dateMatch) continue;
-
-    const date = parseDateFlexible(dateMatch[1]);
-    if (!date) continue;
-
-    // Extract amounts
-    const amounts = Array.from(line.matchAll(amountPattern), m => parseFloat(m[1].replace(/,/g, '')));
-    
-    // Extract description (text between date and first amount)
-    const descStart = line.indexOf(dateMatch[0]) + dateMatch[0].length;
-    const firstAmountIdx = line.search(amountPattern);
-    const description = line.substring(descStart, firstAmountIdx > 0 ? firstAmountIdx : undefined).trim();
-
-    if (!description || amounts.length === 0) continue;
-
-    // Determine if debit or credit
-    const isDebit = amounts.length >= 2 && amounts[0] > 0;
-    const amount = isDebit ? -amounts[0] : (amounts[0] || 0);
-
-    transactions.push(createTransaction(date, description, amount, accountType));
-  }
-
-  return transactions;
+  return parseGenericTransactions(text, accountType);
 }
 
 /**
