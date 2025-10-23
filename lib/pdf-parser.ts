@@ -384,16 +384,20 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
 /**
  * Parse RBC Credit Card transactions
  * 
- * RBC credit card PDFs can have amounts in the table but extracted separately from the description.
- * We need to parse line-by-line and look for transactions with amounts either:
- * 1. On the same line (e.g., "SEP 09SEP 09AUTOMATIC PAYMENT -THANK YOU-$1,372.30")
- * 2. With the amount in a column extracted to the right side or end of the line
+ * RBC credit card PDFs have a table layout where amounts are in a separate column.
+ * The PDF extraction often separates them into different parts of the text.
+ * 
+ * Strategy:
+ * 1. Find all transactions (dual-date + description pattern)
+ * 2. Find all amounts in the ACTIVITY section
+ * 3. Match them up in order (assuming PDF extraction preserves order)
  * 
  * Example from your PDF:
  * ACTIVITY DESCRIPTIONAMOUNT ($)
  * AUG 19AUG 21SOBEYS #776 DARTMOUTH NS
+ * 74529005231920451563403 <- reference number, not amount
  * 
- * The amount might be at the far right after many spaces, or on the next line.
+ * Amounts may be extracted to a completely different part of the text or page.
  */
 function parseRBCCreditCardTransactions(text: string, accountType: string): Transaction[] {
   const transactions: Transaction[] = [];
@@ -402,9 +406,11 @@ function parseRBCCreditCardTransactions(text: string, accountType: string): Tran
   console.log('[PDF Parser] parseRBCCreditCardTransactions called');
   console.log(`[PDF Parser] Total lines: ${lines.length}`);
   
-  // Look for the ACTIVITY section
+  // Step 1: Find the ACTIVITY section and collect all transaction lines
+  const transactionLines: Array<{line: string, lineNum: number, transDate: string, postDate: string, description: string}> = [];
   let inActivitySection = false;
-  let parsedCount = 0;
+  let activityStartLine = -1;
+  let activityEndLine = -1;
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -412,12 +418,14 @@ function parseRBCCreditCardTransactions(text: string, accountType: string): Tran
     // Start parsing when we hit the ACTIVITY section
     if (/ACTIVITY\s+DESCRIPTION/i.test(line)) {
       inActivitySection = true;
+      activityStartLine = i;
       console.log(`[PDF Parser] Found ACTIVITY section at line ${i}`);
       continue;
     }
     
     // Stop when we hit TOTAL or end of activity section
     if (inActivitySection && /TOTAL\s+ACCOUNT\s+BALANCE|^Time to Pay/i.test(line)) {
+      activityEndLine = i;
       console.log(`[PDF Parser] End of activity section at line ${i}`);
       break;
     }
@@ -429,80 +437,86 @@ function parseRBCCreditCardTransactions(text: string, accountType: string): Tran
     if (/^(RBC|date|trans|activity|description|amount|page|\d+of\d+)/i.test(line)) continue;
     
     // RBC Credit Card pattern: Two dates (TRANSACTION_DATE POSTING_DATE) followed by description
-    // Dates like: AUG 19, SEP 04, etc. (3-letter month + 1-2 digit day, may have spaces)
-    const dualDatePattern = /^([A-Z]{3}\s*\d{1,2})([A-Z]{3}\s*\d{1,2})/;
+    const dualDatePattern = /^([A-Z]{3}\s*\d{1,2})([A-Z]{3}\s*\d{1,2})(.+)$/;
     const dateMatch = line.match(dualDatePattern);
     
     if (!dateMatch) continue;
     
     const transDateStr = dateMatch[1];
     const postDateStr = dateMatch[2];
+    let descRaw = dateMatch[3].trim();
     
-    // Parse the transaction date
-    const transDate = parseDateFlexible(transDateStr) || parseDateFlexible(postDateStr);
-    if (!transDate) {
-      console.log(`[PDF Parser] Failed to parse dates: ${transDateStr} / ${postDateStr}`);
-      continue;
-    }
-    
-    // Remove the two dates from the line to get the rest
-    const afterDates = line.substring(dateMatch[0].length).trim();
-    
-    // Look for amount with $ sign anywhere in the remaining text
-    const amountMatch = afterDates.match(/\$\s*(-?[\d,]+\.\d{2})/);
-    
-    let description = '';
-    let amount = 0;
-    
-    if (amountMatch && amountMatch.index !== undefined) {
-      // Amount found on same line
-      // Description is everything before the amount
-      description = afterDates.substring(0, amountMatch.index).trim();
-      amount = parseFloat(amountMatch[1].replace(/,/g, ''));
+    // Check if amount is on this line (with $ sign)
+    const inlineAmountMatch = descRaw.match(/^(.+?)\$\s*(-?[\d,]+\.\d{2})/);
+    if (inlineAmountMatch) {
+      // Amount on same line - process immediately
+      const description = inlineAmountMatch[1].trim();
+      const amount = parseFloat(inlineAmountMatch[2].replace(/,/g, ''));
+      const transDate = parseDateFlexible(transDateStr) || parseDateFlexible(postDateStr);
       
-      if (parsedCount < 5) {
-        console.log(`[PDF Parser] Found transaction with inline amount: ${transDate} | ${description} | $${amount}`);
+      if (transDate && description && description.length >= 3) {
+        const isPayment = description.toLowerCase().includes('payment') || description.toLowerCase().includes('credit');
+        const finalAmount = isPayment ? Math.abs(amount) : -Math.abs(amount);
+        transactions.push(createTransaction(transDate, description, finalAmount, accountType));
+        console.log(`[PDF Parser] Inline amount: ${transDate} | ${description.substring(0, 40)} | ${finalAmount}`);
       }
     } else {
-      // Amount not on same line - description is the whole remaining text
-      // Remove any trailing reference numbers (10+ digits)
-      description = afterDates.replace(/\d{10,}$/, '').trim();
+      // No amount on line - save for later matching
+      // Remove reference numbers (10+ digits at end)
+      descRaw = descRaw.replace(/\d{10,}$/, '').trim();
       
-      // Try to find amount on the next line (sometimes PDF extraction puts it there)
-      if (i + 1 < lines.length) {
-        const nextLine = lines[i + 1].trim();
-        const nextAmountMatch = nextLine.match(/^\$?\s*(-?[\d,]+\.\d{2})/);
-        
-        if (nextAmountMatch) {
-          amount = parseFloat(nextAmountMatch[1].replace(/,/g, ''));
-          i++; // Skip the next line since we used it
-          
-          if (parsedCount < 5) {
-            console.log(`[PDF Parser] Found transaction with amount on next line: ${transDate} | ${description} | $${amount}`);
-          }
-        }
+      if (descRaw.length >= 3) {
+        transactionLines.push({
+          line,
+          lineNum: i,
+          transDate: transDateStr,
+          postDate: postDateStr,
+          description: descRaw
+        });
       }
     }
+  }
+  
+  console.log(`[PDF Parser] Found ${transactionLines.length} transactions without inline amounts`);
+  console.log(`[PDF Parser] Found ${transactions.length} transactions with inline amounts`);
+  
+  // Step 2: If we have transactions without amounts, try to find amounts elsewhere
+  if (transactionLines.length > 0 && activityStartLine >= 0 && activityEndLine >= 0) {
+    // Extract the entire activity section as one block of text
+    const activityText = lines.slice(activityStartLine, activityEndLine).join('\n');
     
-    // Skip if we couldn't find a valid amount or description
-    if (amount === 0 || !description || description.length < 3) {
-      if (parsedCount < 10) {
-        console.log(`[PDF Parser] Skipping line - no valid amount or description: ${line.substring(0, 80)}`);
-      }
-      continue;
+    // Find all dollar amounts in the activity section
+    const amountPattern = /\$\s*(\d{1,3}(?:,\d{3})*\.\d{2})/g;
+    const amounts: number[] = [];
+    let match;
+    while ((match = amountPattern.exec(activityText)) !== null) {
+      amounts.push(parseFloat(match[1].replace(/,/g, '')));
     }
     
-    // For credit cards:
-    // - Payments are shown as "AUTOMATIC PAYMENT -THANK YOU-$1,372.30" with positive amount (incoming)
-    // - Regular purchases are expenses (negative)
-    const isPayment = description.toLowerCase().includes('payment') || description.toLowerCase().includes('credit');
-    const finalAmount = isPayment ? Math.abs(amount) : -Math.abs(amount);
+    console.log(`[PDF Parser] Found ${amounts.length} dollar amounts in activity section`);
     
-    transactions.push(createTransaction(transDate, description, finalAmount, accountType));
-    parsedCount++;
-    
-    if (parsedCount <= 5) {
-      console.log(`[PDF Parser] Parsed RBC CC transaction #${parsedCount}: ${transDate} | ${description.substring(0, 40)} | ${finalAmount}`);
+    // Match transactions to amounts in order
+    // Skip the first amount if it's the "PREVIOUS ACCOUNT BALANCE"
+    let amountIndex = 0;
+    for (let i = 0; i < transactionLines.length && amountIndex < amounts.length; i++) {
+      const txn = transactionLines[i];
+      const amount = amounts[amountIndex];
+      amountIndex++;
+      
+      const transDate = parseDateFlexible(txn.transDate) || parseDateFlexible(txn.postDate);
+      if (!transDate) {
+        console.log(`[PDF Parser] Failed to parse date for: ${txn.description}`);
+        continue;
+      }
+      
+      const isPayment = txn.description.toLowerCase().includes('payment') || txn.description.toLowerCase().includes('credit');
+      const finalAmount = isPayment ? Math.abs(amount) : -Math.abs(amount);
+      
+      transactions.push(createTransaction(transDate, txn.description, finalAmount, accountType));
+      
+      if (transactions.length <= 5) {
+        console.log(`[PDF Parser] Matched transaction #${transactions.length}: ${transDate} | ${txn.description.substring(0, 40)} | ${finalAmount}`);
+      }
     }
   }
   
@@ -729,6 +743,8 @@ function parseDateFlexible(dateStr: string): string | null {
     'MMM DD, YYYY',  // Aug 12, 2025
     'MMM DD',        // Aug 12 (no year) or JUL 02
     'MMM D',         // Aug 1 (no year)
+    'D MMM',         // 8 Aug, 11 Aug (day first, common in international formats)
+    'DD MMM',        // 08 Aug
     'MM/DD/YYYY',    // 08/12/2025
     'MM/DD/YY',      // 08/12/25
     'MM/DD',         // 08/12 (no year)
