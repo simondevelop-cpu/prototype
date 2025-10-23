@@ -884,7 +884,16 @@ function parseCIBCChequingTransactions(text: string, accountType: string): Trans
     // Remove amounts from description
     fullDescription = fullDescription.replace(/\d{1,3}(?:,\d{3})*\.\d{2}/g, '').replace(/\s{2,}/g, ' ').trim();
     
-    if (!fullDescription || amounts.length === 0) continue;
+    if (transactions.length < 10) {
+      console.log(`[PDF Parser] CIBC Chq Line ${i}: Date=${dateStr}, Desc="${fullDescription.substring(0, 50)}", Amounts=[${amounts.join(', ')}], LinesConsumed=${linesConsumed}`);
+    }
+    
+    if (!fullDescription || amounts.length === 0) {
+      if (transactions.length < 10) {
+        console.log(`[PDF Parser] CIBC Chq SKIP: No description or no amounts`);
+      }
+      continue;
+    }
     
     // Determine transaction amount
     // Last amount is balance, second-to-last is transaction
@@ -1197,6 +1206,11 @@ function createTransaction(
     cashflow = 'expense';
   } else {
     cashflow = 'other';
+  }
+  
+  // Debug classification for RBC/CIBC transactions
+  if (accountType.toLowerCase().includes('checking') || accountType.toLowerCase().includes('chequing')) {
+    console.log(`[PDF Parser] 💰 Cashflow: "${cleanDescription.substring(0, 50)}" | amt=${amount} | isTransfer=${isTransfer} | type=${cashflow}`);
   }
 
   // Auto-categorize based on merchant/description
