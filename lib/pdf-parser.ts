@@ -1171,7 +1171,8 @@ function parseDateFlexible(dateStr: string): string | null {
   ];
 
   for (const format of formats) {
-    const parsed = dayjs(cleanDate, format, true); // strict parsing
+    // Parse in UTC mode to avoid timezone shifting
+    const parsed = dayjs.utc(cleanDate, format, true); // strict parsing in UTC
     if (parsed.isValid()) {
       // If year is missing, assume current year or previous year if month is in future
       if (!cleanDate.match(/\d{4}/)) {
