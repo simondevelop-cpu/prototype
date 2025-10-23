@@ -402,11 +402,11 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
       console.log(`[PDF Parser] RBC Line ${i}: Date=${dateStr}, Remainder="${remainder.substring(0, 80)}"`);
     }
     
-    // Extract ALL amounts using simple global regex
-    // Don't try to be smart about embedded amounts - just get them all
-    // Then use the LAST TWO (transaction amount + balance)
+    // Extract amounts carefully
+    // Problem: "QMCXE91,475.00" gets matched as "91,475.00" (wrong!)
+    // Solution: Only match amounts that are NOT preceded by digits
     let amounts: number[] = [];
-    const allAmountPattern = /(\d{1,3}(?:,\d{3})*\.\d{2})/g;
+    const allAmountPattern = /(?<!\d)(\d{1,3}(?:,\d{3})*\.\d{2})/g;
     let match;
     
     while ((match = allAmountPattern.exec(remainder)) !== null) {
@@ -750,8 +750,8 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
     
     if (!match) {
       // Log lines that look like they might be transactions but don't match
-      if (/^[A-Z][a-z]{2}\s*\d{1,2}/.test(line) && transactions.length < 5) {
-        console.log(`[PDF Parser] Skipped line ${i} (no match): ${line.substring(0, 100)}`);
+      if (/^[A-Z][a-z]{2}\s*\d{1,2}/.test(line) && transactions.length < 25) {
+        console.log(`[PDF Parser] SKIPPED line ${i} (no regex match): ${line.substring(0, 120)}`);
       }
       continue;
     }
