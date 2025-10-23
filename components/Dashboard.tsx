@@ -12,7 +12,7 @@ interface DashboardProps {
 
 export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [timeframe, setTimeframe] = useState('6m');
+  const [timeframe, setTimeframe] = useState('3m');
   const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
   const [showCustomDate, setShowCustomDate] = useState(false);
   const [summary, setSummary] = useState<any[]>([]);

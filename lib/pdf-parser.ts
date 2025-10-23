@@ -904,11 +904,8 @@ function parseCIBCChequingTransactions(text: string, accountType: string): Trans
       }
     }
     
-    // Skip ahead past consumed lines, but not past the last line we checked
-    // This allows us to catch multiple transactions with the same date
-    if (linesConsumed > 0) {
-      i += linesConsumed - 1; // -1 because the loop will increment i
-    }
+    // Skip ahead past consumed lines
+    i += linesConsumed;
     
     // Remove amounts from description
     fullDescription = fullDescription.replace(/\d{1,3}(?:,\d{3})*\.\d{2}/g, '').replace(/\s{2,}/g, ' ').trim();
