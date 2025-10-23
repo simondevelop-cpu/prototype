@@ -402,15 +402,16 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
       console.log(`[PDF Parser] RBC Line ${i}: Date=${dateStr}, Remainder="${remainder.substring(0, 80)}"`);
     }
     
-    // Extract amounts carefully
-    // Problem: "QMCXE91,475.00" gets matched as "91,475.00" (wrong!)
-    // Solution: Only match amounts preceded by whitespace or start of string
+    // Extract ALL amounts from remainder
+    // The PDF has NO spaces, so amounts are stuck together: "QMCXE91,475.0023,514.24"
+    // Strategy: Extract all amounts, then use LARGEST as balance, SECOND LARGEST as transaction
     let amounts: number[] = [];
-    const allAmountPattern = /(?:^|\s)(\d{1,3}(?:,\d{3})*\.\d{2})/g;
+    const allAmountPattern = /(\d{1,3}(?:,\d{3})*\.\d{2})/g;
     let match;
     
     while ((match = allAmountPattern.exec(remainder)) !== null) {
-      amounts.push(parseFloat(match[1].replace(/,/g, '')));
+      const amount = parseFloat(match[1].replace(/,/g, ''));
+      amounts.push(amount);
     }
     
     // If no amounts on this line, check the next line
@@ -444,15 +445,15 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     }
     
     // Determine transaction amount
-    // RBC format: May have multiple amounts embedded in description + transaction amount + balance
-    // Strategy: ALWAYS use last 2 amounts (if available)
-    // - amounts[length-1] = balance (ignore)
-    // - amounts[length-2] = transaction amount (use this)
+    // RBC format: Multiple amounts may be extracted (embedded codes like "QMCXE91,475.00")
+    // Strategy: LARGEST amount = balance (ignore), SECOND LARGEST = transaction amount
     let amount = 0;
     
     if (amounts.length >= 2) {
-      // Use second-to-last amount (last is balance)
-      const transactionAmount = amounts[amounts.length - 2];
+      // Sort amounts in descending order
+      const sortedAmounts = [...amounts].sort((a, b) => b - a);
+      const balance = sortedAmounts[0]; // Largest = balance
+      const transactionAmount = sortedAmounts[1]; // Second largest = transaction
       
       // Determine if deposit (positive) or withdrawal (negative)
       const isDeposit = /deposit|autodeposit|dividend|interest|refund/i.test(description);
@@ -460,10 +461,10 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
       amount = isDeposit ? transactionAmount : -transactionAmount;
       
       if (debugCount <= 10) {
-        console.log(`[PDF Parser] RBC Using amount [${amounts.length-2}] of ${amounts.length}: ${transactionAmount}, isDeposit=${isDeposit}, final=${amount}`);
+        console.log(`[PDF Parser] RBC Amounts sorted: [${sortedAmounts.join(', ')}], using 2nd largest: ${transactionAmount}, isDeposit=${isDeposit}, final=${amount}`);
       }
     } else if (amounts.length === 1) {
-      // Only one amount - unusual, but try to use it
+      // Only one amount - treat as transaction (balance not shown)
       const isDeposit = /deposit|autodeposit|dividend|interest|refund/i.test(description);
       amount = isDeposit ? amounts[0] : -amounts[0];
       
@@ -729,17 +730,24 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
       const nextLine1 = lines[i + 1].trim();
       const nextLine2 = lines[i + 2].trim();
       
+      if (transactions.length < 5) {
+        console.log(`[PDF Parser] CIBC CC Line ${i} is just date: "${line}", checking next 2 lines...`);
+        console.log(`[PDF Parser] CIBC CC Next line 1: "${nextLine1}"`);
+        console.log(`[PDF Parser] CIBC CC Next line 2: "${nextLine2.substring(0, 60)}"`);
+      }
+      
       // Check if next line is also just a date
       const nextDateMatch = nextLine1.match(justDatePattern);
       if (nextDateMatch) {
         // Combine: date1 + date2 + description line
         const combined = justDateMatch[1] + nextDateMatch[1] + nextLine2;
-        if (transactions.length < 10) {
-          console.log(`[PDF Parser] Combining split transaction at line ${i}: "${line}" + "${nextLine1}" + "${nextLine2.substring(0, 40)}"`);
-          console.log(`[PDF Parser] Result: "${combined.substring(0, 100)}"`);
+        if (transactions.length < 5) {
+          console.log(`[PDF Parser] ✓ Combining split: "${combined.substring(0, 100)}"`);
         }
         line = combined;
         i += 2; // Skip the next 2 lines
+      } else if (transactions.length < 5) {
+        console.log(`[PDF Parser] ✗ Next line is NOT just a date, skipping combine`);
       }
     }
     
