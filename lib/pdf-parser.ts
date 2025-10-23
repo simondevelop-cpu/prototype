@@ -724,8 +724,9 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
   for (let i = transactionStartIndex; i < lines.length; i++) {
     let line = lines[i].trim();
     
-    // Skip empty lines and stop at ACTUAL summary sections (not just mentions of "interest")
-    if (!line || line.length < 10) continue;
+    // Skip empty lines but NOT short lines (could be split date lines like "Jun 15")
+    if (!line) continue;
+    
     // Only stop if line STARTS with summary keywords (not just contains them)
     if (/^(total\s+purchases|total\s+payments|total\s+new\s+charges|interest\s+charged|your\s+payments)/i.test(line)) {
       console.log(`[PDF Parser] Stopping at summary section: ${line.substring(0, 60)}`);
@@ -742,6 +743,9 @@ function parseCIBCCreditCardTransactions(text: string, accountType: string): Tra
     // Check if this line is just a date (transaction might be split across lines)
     const justDatePattern = /^([A-Z][a-z]{2}\s*\d{1,2})$/;
     const justDateMatch = line.match(justDatePattern);
+    
+    // Skip short non-date lines (probably headers or junk)
+    if (!justDateMatch && line.length < 10) continue;
     
     if (justDateMatch && i + 2 < lines.length) {
       // This might be a split transaction - try to combine next 2 lines
