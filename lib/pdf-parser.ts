@@ -372,6 +372,9 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
   
   // Chequing account - columnar format
   console.log('[PDF Parser] Using RBC chequing parser');
+  console.log(`[PDF Parser] Total lines: ${lines.length}`);
+  
+  let debugCount = 0;
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -388,10 +391,16 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     const date = parseDateFlexible(dateStr);
     if (!date) continue;
     
+    debugCount++;
+    
     // Extract description and amounts
     // Format: DATE  DESCRIPTION  [WITHDRAWAL]  [DEPOSIT]  BALANCE
     // NOTE: Sometimes amounts are on the NEXT line!
     let remainder = line.substring(dateMatch[0].length).trim();
+    
+    if (debugCount <= 10) {
+      console.log(`[PDF Parser] RBC Line ${i}: Date=${dateStr}, Remainder="${remainder.substring(0, 80)}"`);
+    }
     
     // Extract all amounts (withdrawal, deposit, balance)
     // CAREFUL: Reference codes can be embedded like "QMCXE1,475.00" (no space!)
@@ -452,7 +461,17 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     // Remove amounts from description (use broader pattern for removal)
     const description = remainder.replace(/\d{1,3}(?:,\d{3})*\.\d{2}/g, '').trim();
     
-    if (!description || amounts.length === 0) continue;
+    if (debugCount <= 10) {
+      console.log(`[PDF Parser] RBC Amounts found: [${amounts.join(', ')}]`);
+      console.log(`[PDF Parser] RBC Description: "${description}"`);
+    }
+    
+    if (!description || amounts.length === 0) {
+      if (debugCount <= 10) {
+        console.log(`[PDF Parser] RBC Skipping: no description or no amounts`);
+      }
+      continue;
+    }
     
     // Determine transaction amount
     // If there are 3 amounts: [withdrawal, deposit, balance] or [description with number, withdrawal/deposit, balance]
@@ -477,9 +496,16 @@ function parseRBCTransactions(text: string, accountType: string): Transaction[] 
     if (amount === 0) continue;
     
     transactions.push(createTransaction(date, description, amount, accountType));
+    
+    if (transactions.length <= 10) {
+      console.log(`[PDF Parser] RBC Chq #${transactions.length}: ${date} | ${description.substring(0, 40)} | AMOUNT=${amount}`);
+    }
   }
   
-  console.log(`[PDF Parser] Parsed ${transactions.length} RBC chequing transactions`);
+  console.log(`[PDF Parser] ===== RBC Chequing Summary =====`);
+  console.log(`[PDF Parser] Date lines found: ${debugCount}`);
+  console.log(`[PDF Parser] Transactions parsed: ${transactions.length}`);
+  console.log(`[PDF Parser] ====================================`);
   return transactions;
 }
 
