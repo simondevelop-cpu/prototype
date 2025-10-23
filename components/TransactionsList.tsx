@@ -513,8 +513,26 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                     CASHFLOW {selectedCashflows.length > 0 && `(${selectedCashflows.length})`} ▾
                   </button>
                   {showCashflowDropdown && (
-                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[200px] max-h-[300px] overflow-y-auto">
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
                       <div className="p-2">
+                        <div className="flex gap-2 px-3 py-2 border-b border-gray-200 mb-2">
+                          <button
+                            onClick={() => setSelectedCashflows(cashflows)}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Select All
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            onClick={() => {
+                              setSelectedCashflows([]);
+                              if (onClearCashflowFilter) onClearCashflowFilter();
+                            }}
+                            className="text-xs text-gray-600 hover:text-gray-800 font-medium"
+                          >
+                            Clear
+                          </button>
+                        </div>
                         {cashflows.map(cf => (
                           <label key={cf} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer rounded">
                             <input
@@ -543,8 +561,23 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                     ACCOUNT {selectedAccounts.length > 0 && `(${selectedAccounts.length})`} ▾
                   </button>
                   {showAccountDropdown && (
-                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[200px] max-h-[300px] overflow-y-auto">
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
                       <div className="p-2">
+                        <div className="flex gap-2 px-3 py-2 border-b border-gray-200 mb-2">
+                          <button
+                            onClick={() => setSelectedAccounts(accounts)}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Select All
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            onClick={() => setSelectedAccounts([])}
+                            className="text-xs text-gray-600 hover:text-gray-800 font-medium"
+                          >
+                            Clear
+                          </button>
+                        </div>
                         {accounts.map(acc => (
                           <label key={acc} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer rounded">
                             <input
@@ -568,8 +601,26 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                     CATEGORY {selectedCategories.length > 0 && `(${selectedCategories.length})`} ▾
                   </button>
                   {showCategoryDropdown && (
-                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[200px] max-h-[300px] overflow-y-auto">
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
                       <div className="p-2">
+                        <div className="flex gap-2 px-3 py-2 border-b border-gray-200 mb-2">
+                          <button
+                            onClick={() => setSelectedCategories(categories)}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Select All
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            onClick={() => {
+                              setSelectedCategories([]);
+                              if (onClearCategoryFilter) onClearCategoryFilter();
+                            }}
+                            className="text-xs text-gray-600 hover:text-gray-800 font-medium"
+                          >
+                            Clear
+                          </button>
+                        </div>
                         {categories.map(cat => (
                           <label key={cat} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer rounded">
                             <input
@@ -598,19 +649,38 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                     LABEL {selectedLabels.length > 0 && `(${selectedLabels.length})`} ▾
                   </button>
                   {showLabelDropdown && (
-                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[200px] max-h-[300px] overflow-y-auto">
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
                       <div className="p-2">
-                        {labels.length > 0 ? labels.map(label => (
-                          <label key={label} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer rounded">
-                            <input
-                              type="checkbox"
-                              checked={selectedLabels.includes(label)}
-                              onChange={() => toggleFilter(label, selectedLabels, setSelectedLabels)}
-                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-2"
-                            />
-                            <span className="text-sm">{label}</span>
-                          </label>
-                        )) : (
+                        {labels.length > 0 ? (
+                          <>
+                            <div className="flex gap-2 px-3 py-2 border-b border-gray-200 mb-2">
+                              <button
+                                onClick={() => setSelectedLabels(labels)}
+                                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                              >
+                                Select All
+                              </button>
+                              <span className="text-gray-300">|</span>
+                              <button
+                                onClick={() => setSelectedLabels([])}
+                                className="text-xs text-gray-600 hover:text-gray-800 font-medium"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                            {labels.map(label => (
+                              <label key={label} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer rounded">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedLabels.includes(label)}
+                                  onChange={() => toggleFilter(label, selectedLabels, setSelectedLabels)}
+                                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-2"
+                                />
+                                <span className="text-sm">{label}</span>
+                              </label>
+                            ))}
+                          </>
+                        ) : (
                           <div className="px-3 py-2 text-sm text-gray-500">No labels available</div>
                         )}
                       </div>
