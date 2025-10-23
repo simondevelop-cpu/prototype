@@ -200,13 +200,12 @@ export default function StatementReviewModal({
           console.log('[Review Modal] Multiple statements:', newName);
           setAccountName(newName);
         } else {
-          // Single statement - use name if available
+          // Single statement - use bank and account type
           const statement = parsedStatements[0];
           const bank = statement.bank || 'Unknown Bank';
           const type = statement.accountType || 'Credit Card';
-          const holderName = statement.accountHolderName;
           
-          console.log('[Review Modal] Setting account name:', { bank, type, holderName });
+          console.log('[Review Modal] Setting account name:', { bank, type });
           
           // Format account type for display
           let accountTypeDisplay = type;
@@ -218,17 +217,10 @@ export default function StatementReviewModal({
             accountTypeDisplay = 'Savings Account';
           }
           
-          // Format: "[Name]'s [Bank] [Account Type]" (e.g., "Jonathan's RBC Credit Card", "Elise's TD Chequing Account")
-          // If no name detected, use placeholder: "[First Name]'s [Bank] [Account Type]"
-          if (holderName) {
-            const newName = `${holderName}'s ${bank} ${accountTypeDisplay}`;
-            console.log('[Review Modal] With name:', newName);
-            setAccountName(newName);
-          } else {
-            const newName = `[First Name]'s ${bank} ${accountTypeDisplay}`;
-            console.log('[Review Modal] Without name (using placeholder):', newName);
-            setAccountName(newName);
-          }
+          // Simple format: "[Bank] [Account Type]" (e.g., "RBC Credit Card", "CIBC Chequing Account")
+          const newName = `${bank} ${accountTypeDisplay}`;
+          console.log('[Review Modal] Account name:', newName);
+          setAccountName(newName);
         }
       }
     }
