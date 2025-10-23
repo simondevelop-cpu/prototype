@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react';
 import CashflowChart from './CashflowChart';
 import TransactionsList from './TransactionsList';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
 
 interface DashboardProps {
   user: any;
@@ -562,7 +566,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   </h2>
                   <span className="text-sm text-gray-600">
                     {selectedMonth 
-                      ? new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                      ? dayjs.utc(selectedMonth + '-01').format('MMMM YYYY')
                       : getDateRangeDisplay()
                     }
                   </span>
@@ -619,7 +623,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   <p className="text-sm text-gray-600 mt-1">
                     {filteredTransactionsForBreakdown.length} {filteredTransactionsForBreakdown.length === 1 ? 'transaction' : 'transactions'}
                     {selectedMonth 
-                      ? ` in ${new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
+                      ? ` in ${dayjs.utc(selectedMonth + '-01').format('MMMM YYYY')}`
                       : ` (${getDateRangeDisplay()})`
                     }
                   </p>
