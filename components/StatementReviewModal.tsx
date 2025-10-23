@@ -181,33 +181,54 @@ export default function StatementReviewModal({
       }
       
       if (!accountName) {
-        const statement = parsedStatements[0];
-        const bank = statement.bank || 'Unknown Bank';
-        const type = statement.accountType || 'Credit Card';
-        const holderName = statement.accountHolderName;
-        
-        console.log('[Review Modal] Setting account name:', { bank, type, holderName });
-        
-        // Format account type for display
-        let accountTypeDisplay = type;
-        if (type === 'Credit Card') {
-          accountTypeDisplay = 'Credit Card';
-        } else if (type === 'Checking') {
-          accountTypeDisplay = 'Chequing Account';
-        } else if (type === 'Savings') {
-          accountTypeDisplay = 'Savings Account';
-        }
-        
-        // Format: "[Name]'s [Bank] [Account Type]" (e.g., "Jonathan's RBC Credit Card", "Elise's TD Chequing Account")
-        // If no name detected, use placeholder: "[First Name]'s [Bank] [Account Type]"
-        if (holderName) {
-          const newName = `${holderName}'s ${bank} ${accountTypeDisplay}`;
-          console.log('[Review Modal] With name:', newName);
+        // Handle multiple statements
+        if (parsedStatements.length > 1) {
+          // Multiple statements - create a combined name listing all banks and account types
+          const accountDescriptions = parsedStatements.map(stmt => {
+            const bank = stmt.bank || 'Unknown';
+            const type = stmt.accountType || 'Account';
+            // Simplified account type
+            let shortType = type;
+            if (type === 'Credit Card') shortType = 'Credit';
+            else if (type === 'Checking') shortType = 'Chequing';
+            else if (type === 'Savings') shortType = 'Savings';
+            
+            return `${bank} ${shortType}`;
+          }).join(', ');
+          
+          const newName = `Multiple Accounts (${accountDescriptions})`;
+          console.log('[Review Modal] Multiple statements:', newName);
           setAccountName(newName);
         } else {
-          const newName = `[First Name]'s ${bank} ${accountTypeDisplay}`;
-          console.log('[Review Modal] Without name (using placeholder):', newName);
-          setAccountName(newName);
+          // Single statement - use name if available
+          const statement = parsedStatements[0];
+          const bank = statement.bank || 'Unknown Bank';
+          const type = statement.accountType || 'Credit Card';
+          const holderName = statement.accountHolderName;
+          
+          console.log('[Review Modal] Setting account name:', { bank, type, holderName });
+          
+          // Format account type for display
+          let accountTypeDisplay = type;
+          if (type === 'Credit Card') {
+            accountTypeDisplay = 'Credit Card';
+          } else if (type === 'Checking') {
+            accountTypeDisplay = 'Chequing Account';
+          } else if (type === 'Savings') {
+            accountTypeDisplay = 'Savings Account';
+          }
+          
+          // Format: "[Name]'s [Bank] [Account Type]" (e.g., "Jonathan's RBC Credit Card", "Elise's TD Chequing Account")
+          // If no name detected, use placeholder: "[First Name]'s [Bank] [Account Type]"
+          if (holderName) {
+            const newName = `${holderName}'s ${bank} ${accountTypeDisplay}`;
+            console.log('[Review Modal] With name:', newName);
+            setAccountName(newName);
+          } else {
+            const newName = `[First Name]'s ${bank} ${accountTypeDisplay}`;
+            console.log('[Review Modal] Without name (using placeholder):', newName);
+            setAccountName(newName);
+          }
         }
       }
     }

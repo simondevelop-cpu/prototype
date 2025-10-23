@@ -278,11 +278,13 @@ function extractAccountHolderName(text: string): string | undefined {
   const lines = text.split('\n').slice(0, 30); // Check first 30 lines
   
   for (const line of lines) {
-    // Pattern 1: MR/MS/MISS/MRS followed by name(s)
-    const titlePattern = /(?:MR\.?|MS\.?|MISS|MRS\.?)\s+([A-Z][a-z]+)(?:\s+[A-Z][a-z]+)?/;
+    // Pattern 1: MR/MS/MISS/MRS followed by name(s) - handle both Title Case and ALL CAPS
+    const titlePattern = /(?:MR\.?|MS\.?|MISS|MRS\.?)\s+([A-Z][A-Za-z]+)(?:\s+[A-Z][A-Za-z]+)?/;
     const match = line.match(titlePattern);
     if (match) {
-      return match[1]; // Return first name
+      // Extract first name and convert to title case
+      const firstName = match[1];
+      return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
     }
     
     // Pattern 2: All caps name (2-15 chars) on its own line
