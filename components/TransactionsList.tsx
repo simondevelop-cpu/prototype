@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import dayjs from 'dayjs';
 import TransactionModal from './TransactionModal';
 import BulkRecategorizeModal from './BulkRecategorizeModal';
@@ -32,6 +32,37 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
+  
+  // Dropdown visibility states
+  const [showCashflowDropdown, setShowCashflowDropdown] = useState(false);
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showLabelDropdown, setShowLabelDropdown] = useState(false);
+  
+  const cashflowDropdownRef = useRef<HTMLDivElement>(null);
+  const accountDropdownRef = useRef<HTMLDivElement>(null);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+  const labelDropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (cashflowDropdownRef.current && !cashflowDropdownRef.current.contains(event.target as Node)) {
+        setShowCashflowDropdown(false);
+      }
+      if (accountDropdownRef.current && !accountDropdownRef.current.contains(event.target as Node)) {
+        setShowAccountDropdown(false);
+      }
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+        setShowCategoryDropdown(false);
+      }
+      if (labelDropdownRef.current && !labelDropdownRef.current.contains(event.target as Node)) {
+        setShowLabelDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Apply initial filters when they change
   if (initialCategoryFilter && !selectedCategories.includes(initialCategoryFilter)) {
@@ -73,6 +104,15 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const accounts = Array.from(new Set(transactions.map(tx => tx.account).filter(Boolean))).sort();
   const cashflows = Array.from(new Set(transactions.map(tx => tx.cashflow).filter(Boolean))).sort();
   const labels = Array.from(new Set(transactions.map(tx => tx.label).filter(Boolean))).sort();
+  
+  // Multi-select toggle handlers
+  const toggleFilter = (value: string, selected: string[], setSelected: (vals: string[]) => void) => {
+    if (selected.includes(value)) {
+      setSelected(selected.filter(v => v !== value));
+    } else {
+      setSelected([...selected, value]);
+    }
+  };
 
   // Helper to create unique ID for each transaction
   const getTxId = (tx: any) => tx.id?.toString() || `${tx.date}_${tx.description}_${tx.amount}`;
@@ -462,62 +502,123 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Description
                 </th>
-                <th className="px-6 py-3 text-left">
-                  <select
-                    value={selectedCashflow}
-                    onChange={(e) => {
-                      setSelectedCashflow(e.target.value);
-                      if (e.target.value === 'All cashflows' && onClearCashflowFilter) {
-                        onClearCashflowFilter();
-                      }
-                    }}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
-                    title={initialCashflowFilter && selectedCashflow === initialCashflowFilter ? "Filter from dashboard - click to change" : "Filter by cashflow type"}
+                <th className="px-6 py-3 text-left relative" ref={cashflowDropdownRef}>
+                  <button
+                    onClick={() => setShowCashflowDropdown(!showCashflowDropdown)}
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 flex items-center gap-1"
                   >
-                    <option value="All cashflows">CASHFLOW ▾</option>
-                    {cashflows.filter(cf => cf !== 'All cashflows').map(cf => (
-                      <option key={cf} value={cf}>{cf.toUpperCase()}</option>
-                    ))}
-                  </select>
-                  {initialCashflowFilter && selectedCashflow === initialCashflowFilter && (
-                    <span className="ml-1 text-blue-600" title="From dashboard">●</span>
+                    CASHFLOW {selectedCashflows.length > 0 && `(${selectedCashflows.length})`} ▾
+                    {initialCashflowFilter && selectedCashflows.includes(initialCashflowFilter) && (
+                      <span className="text-blue-600" title="From dashboard">●</span>
+                    )}
+                  </button>
+                  {showCashflowDropdown && (
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[200px] max-h-[300px] overflow-y-auto">
+                      <div className="p-2">
+                        {cashflows.map(cf => (
+                          <label key={cf} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedCashflows.includes(cf)}
+                              onChange={() => {
+                                toggleFilter(cf, selectedCashflows, setSelectedCashflows);
+                                if (selectedCashflows.includes(cf) && cf === initialCashflowFilter && onClearCashflowFilter) {
+                                  onClearCashflowFilter();
+                                }
+                              }}
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-2"
+                            />
+                            <span className="text-sm">{cf}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </th>
-                <th className="px-6 py-3 text-left">
-                  <select
-                    value={selectedAccount}
-                    onChange={(e) => setSelectedAccount(e.target.value)}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
+                <th className="px-6 py-3 text-left relative" ref={accountDropdownRef}>
+                  <button
+                    onClick={() => setShowAccountDropdown(!showAccountDropdown)}
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 flex items-center gap-1"
                   >
-                    <option value="All accounts">ACCOUNT ▾</option>
-                    {accounts.filter(acc => acc !== 'All accounts').map(acc => (
-                      <option key={acc} value={acc}>{acc.toUpperCase()}</option>
-                    ))}
-                  </select>
-                </th>
-                <th className="px-6 py-3 text-left">
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => {
-                      setSelectedCategory(e.target.value);
-                      if (e.target.value === 'All categories' && onClearCategoryFilter) {
-                        onClearCategoryFilter();
-                      }
-                    }}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
-                    title={initialCategoryFilter && selectedCategory === initialCategoryFilter ? "Filter from dashboard - click to change" : "Filter by category"}
-                  >
-                    <option value="All categories">CATEGORY ▾</option>
-                    {categories.filter(cat => cat !== 'All categories').map(cat => (
-                      <option key={cat} value={cat}>{cat.toUpperCase()}</option>
-                    ))}
-                  </select>
-                  {initialCategoryFilter && selectedCategory === initialCategoryFilter && (
-                    <span className="ml-1 text-blue-600" title="From dashboard">●</span>
+                    ACCOUNT {selectedAccounts.length > 0 && `(${selectedAccounts.length})`} ▾
+                  </button>
+                  {showAccountDropdown && (
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[200px] max-h-[300px] overflow-y-auto">
+                      <div className="p-2">
+                        {accounts.map(acc => (
+                          <label key={acc} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedAccounts.includes(acc)}
+                              onChange={() => toggleFilter(acc, selectedAccounts, setSelectedAccounts)}
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-2"
+                            />
+                            <span className="text-sm">{acc}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Label
+                <th className="px-6 py-3 text-left relative" ref={categoryDropdownRef}>
+                  <button
+                    onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 flex items-center gap-1"
+                  >
+                    CATEGORY {selectedCategories.length > 0 && `(${selectedCategories.length})`} ▾
+                    {initialCategoryFilter && selectedCategories.includes(initialCategoryFilter) && (
+                      <span className="text-blue-600" title="From dashboard">●</span>
+                    )}
+                  </button>
+                  {showCategoryDropdown && (
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[200px] max-h-[300px] overflow-y-auto">
+                      <div className="p-2">
+                        {categories.map(cat => (
+                          <label key={cat} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedCategories.includes(cat)}
+                              onChange={() => {
+                                toggleFilter(cat, selectedCategories, setSelectedCategories);
+                                if (selectedCategories.includes(cat) && cat === initialCategoryFilter && onClearCategoryFilter) {
+                                  onClearCategoryFilter();
+                                }
+                              }}
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-2"
+                            />
+                            <span className="text-sm">{cat}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </th>
+                <th className="px-6 py-3 text-left relative" ref={labelDropdownRef}>
+                  <button
+                    onClick={() => setShowLabelDropdown(!showLabelDropdown)}
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 flex items-center gap-1"
+                  >
+                    LABEL {selectedLabels.length > 0 && `(${selectedLabels.length})`} ▾
+                  </button>
+                  {showLabelDropdown && (
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[200px] max-h-[300px] overflow-y-auto">
+                      <div className="p-2">
+                        {labels.length > 0 ? labels.map(label => (
+                          <label key={label} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedLabels.includes(label)}
+                              onChange={() => toggleFilter(label, selectedLabels, setSelectedLabels)}
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 mr-2"
+                            />
+                            <span className="text-sm">{label}</span>
+                          </label>
+                        )) : (
+                          <div className="px-3 py-2 text-sm text-gray-500">No labels available</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Amount
