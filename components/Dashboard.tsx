@@ -266,14 +266,9 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const getDateRangeDisplay = () => {
     // For custom timeframe, use the selected date range directly
     if (timeframe === 'custom' && customDateRange.start && customDateRange.end) {
-      const startDate = new Date(customDateRange.start);
-      const endDate = new Date(customDateRange.end);
-      
-      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-        const start = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const end = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        return `${start} - ${end}`;
-      }
+      const start = dayjs.utc(customDateRange.start).format('MMM D, YYYY');
+      const end = dayjs.utc(customDateRange.end).format('MMM D, YYYY');
+      return `${start} - ${end}`;
     }
     
     // For preset timeframes, calculate from summary data
@@ -289,20 +284,12 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     const earliestMonth = earliest.substring(0, 7); // Get YYYY-MM
     const latestMonth = latest.substring(0, 7);
     
-    // Show full date with day for first and last of month range
-    const startDate = new Date(earliestMonth + '-01'); // First day of earliest month
-    const latestDate = new Date(latestMonth + '-01');
+    // Show full date with day for first and last of month range using UTC
+    const startDate = dayjs.utc(earliestMonth + '-01');
+    const endDate = dayjs.utc(latestMonth + '-01').endOf('month');
     
-    // Validate dates
-    if (isNaN(startDate.getTime()) || isNaN(latestDate.getTime())) {
-      return '';
-    }
-    
-    const lastDay = new Date(latestDate.getFullYear(), latestDate.getMonth() + 1, 0).getDate(); // Last day of latest month
-    const endDate = new Date(latestDate.getFullYear(), latestDate.getMonth(), lastDay);
-    
-    const start = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const end = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const start = startDate.format('MMM D, YYYY');
+    const end = endDate.format('MMM D, YYYY');
     return `${start} - ${end}`;
   };
 
