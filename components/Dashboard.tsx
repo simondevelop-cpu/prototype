@@ -245,6 +245,19 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
 
   // Calculate date range display
   const getDateRangeDisplay = () => {
+    // For custom timeframe, use the selected date range directly
+    if (timeframe === 'custom' && customDateRange.start && customDateRange.end) {
+      const startDate = new Date(customDateRange.start);
+      const endDate = new Date(customDateRange.end);
+      
+      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+        const start = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const end = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return `${start} - ${end}`;
+      }
+    }
+    
+    // For preset timeframes, calculate from summary data
     if (summary.length === 0) return '';
     const dates = summary.map(s => s.month);
     const earliest = dates[0];
