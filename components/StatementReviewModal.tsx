@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
+import CategorizationSummaryModal from './CategorizationSummaryModal';
+import { categorizeBatch, refreshCategorizationPatterns, LearnedPattern } from '@/lib/categorization-engine';
 
 interface Transaction {
   date: string;
@@ -12,6 +14,7 @@ interface Transaction {
   category: string;
   account: string;
   label: string;
+  confidence?: number; // Optional: confidence score from categorization engine
 }
 
 interface ParsedStatement {
@@ -58,6 +61,12 @@ export default function StatementReviewModal({
   
   // Editing state
   const [editingTransaction, setEditingTransaction] = useState<{ key: string; tx: Transaction } | null>(null);
+  
+  // Categorization modal state
+  const [showCategorizationModal, setShowCategorizationModal] = useState(false);
+  const [hideReviewModal, setHideReviewModal] = useState(false); // Hide review modal when categorization modal is open
+  const [learnedPatterns, setLearnedPatterns] = useState<LearnedPattern[]>([]);
+  const [categorizationApplied, setCategorizationApplied] = useState(false);
 
   // Generate unique key for transaction
   const getTxKey = (tx: Transaction) => `${tx.date}_${tx.merchant}_${tx.amount}`;
@@ -94,6 +103,77 @@ export default function StatementReviewModal({
     setEditingTransaction(null);
   };
 
+  // Fetch learned patterns when modal opens
+  useEffect(() => {
+    if (isOpen && !categorizationApplied) {
+      fetchLearnedPatterns();
+    }
+  }, [isOpen, categorizationApplied]);
+
+  const fetchLearnedPatterns = async () => {
+    try {
+      const response = await fetch('/api/categorization/learn', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setLearnedPatterns(data.patterns || []);
+      }
+    } catch (error) {
+      console.error('Error fetching learned patterns:', error);
+    }
+  };
+
+  // Handle categorization check button
+  const handleCheckCategorization = async () => {
+    // Get all expense transactions to categorize
+    const expenseTransactions = getTransactionsToImport().filter(tx => tx.cashflow === 'expense');
+    
+    // CRITICAL: Refresh patterns from database BEFORE categorizing
+    await refreshCategorizationPatterns();
+    
+    // Categorize them using the engine
+    const categorized = categorizeBatch(
+      expenseTransactions.map(tx => ({
+        description: tx.description,
+        amount: tx.amount,
+      })),
+      learnedPatterns
+    );
+    
+    // Update transactions with categorization results
+    const newEdited = new Map(editedTransactions);
+    expenseTransactions.forEach((tx, index) => {
+      const key = getTxKey(tx);
+      newEdited.set(key, {
+        ...tx,
+        category: categorized[index].category,
+        label: categorized[index].label,
+        confidence: categorized[index].confidence,
+      });
+    });
+    
+    setEditedTransactions(newEdited);
+    setCategorizationApplied(true);
+    setHideReviewModal(true); // Hide review modal
+    setShowCategorizationModal(true);
+  };
+
+  // Update transactions with new categorizations
+  const handleUpdateCategorizationsFromModal = (updatedTransactions: Transaction[]) => {
+    const newEdited = new Map(editedTransactions);
+    
+    for (const tx of updatedTransactions) {
+      const key = getTxKey(tx);
+      newEdited.set(key, tx);
+    }
+    
+    setEditedTransactions(newEdited);
+    setCategorizationApplied(true);
+  };
+
   // Get all transactions that will be imported
   const getTransactionsToImport = (): Transaction[] => {
     const toImport: Transaction[] = [];
@@ -128,6 +208,43 @@ export default function StatementReviewModal({
     if (transactionsToImport.length === 0) {
       alert('No transactions selected for import');
       return;
+    }
+
+    // Auto-categorize all expense transactions if not already categorized
+    if (!categorizationApplied) {
+      const expenseTransactions = transactionsToImport.filter(tx => tx.cashflow === 'expense');
+      
+      if (expenseTransactions.length > 0) {
+        console.log('[Import] Auto-categorizing', expenseTransactions.length, 'expense transactions...');
+        
+        // CRITICAL: Refresh patterns from database BEFORE categorizing
+        await refreshCategorizationPatterns();
+        
+        const categorized = categorizeBatch(
+          expenseTransactions.map(tx => ({
+            description: tx.description,
+            amount: tx.amount,
+          })),
+          learnedPatterns
+        );
+        
+        // Update transactions with categorization results
+        const newEdited = new Map(editedTransactions);
+        expenseTransactions.forEach((tx, index) => {
+          const key = getTxKey(tx);
+          const existing = newEdited.get(key) || tx;
+          newEdited.set(key, {
+            ...existing,
+            category: categorized[index].category,
+            label: categorized[index].label,
+          });
+        });
+        
+        setEditedTransactions(newEdited);
+        setCategorizationApplied(true);
+        
+        console.log('[Import] Auto-categorization complete!');
+      }
     }
 
     // Apply custom account name to all transactions
@@ -505,7 +622,7 @@ export default function StatementReviewModal({
                           <span className="text-2xl mr-3">🔄</span>
                           <div>
                             <p className="text-sm font-medium text-gray-900">Other</p>
-                            <p className="text-xs text-gray-500">Transfers, payments</p>
+                            <p className="text-xs text-gray-500">Excluded from income / expenses (e.g. account transfers)</p>
                           </div>
                         </div>
                       </td>
@@ -547,12 +664,6 @@ export default function StatementReviewModal({
               </div>
             </div>
 
-            {/* Info Box */}
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>💡 Tip:</strong> You can confirm the upload immediately, or click "Investigate" on any row to review and edit individual transactions.
-              </p>
-            </div>
           </div>
         );
       }
@@ -761,6 +872,7 @@ export default function StatementReviewModal({
 
   return (
     <>
+      {!hideReviewModal && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
         <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
           {/* Header */}
@@ -804,28 +916,39 @@ export default function StatementReviewModal({
               {currentStep === 'summary' ? 'Cancel' : '← Back to Summary'}
             </button>
 
-            <button
-              onClick={handleImport}
-              disabled={importing || getTransactionsToImport().length === 0}
-              className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
-              {importing ? (
-                <>
-                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Importing...
-                </>
-              ) : (
-                <>
-                  ✓ Confirm & Import {getTransactionsToImport().length} Transactions
-                </>
+            <div className="flex gap-3">
+              {currentStep === 'summary' && (
+                <button
+                  onClick={handleCheckCategorization}
+                  disabled={importing}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  Check Auto-Categorisation
+                </button>
               )}
-            </button>
+              
+              <button
+                onClick={handleImport}
+                disabled={importing || getTransactionsToImport().length === 0}
+                className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50"
+              >
+                {importing ? (
+                  <>
+                    <svg className="animate-spin w-5 h-5 inline mr-2" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Importing...
+                  </>
+                ) : (
+                  `Import ${getTransactionsToImport().length} Transactions`
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
+      )}
 
       {/* Edit Modal (simplified inline editor) */}
       {editingTransaction && (
@@ -897,6 +1020,23 @@ export default function StatementReviewModal({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Categorization Summary Modal */}
+      {showCategorizationModal && (
+        <CategorizationSummaryModal
+          isOpen={showCategorizationModal}
+          onClose={() => {
+            setShowCategorizationModal(false);
+            setHideReviewModal(false); // Show review modal again
+          }}
+          transactions={getTransactionsToImport().filter(tx => tx.cashflow === 'expense')}
+          onUpdateTransactions={handleUpdateCategorizationsFromModal}
+          onBack={() => {
+            setShowCategorizationModal(false);
+            setHideReviewModal(false); // Show review modal again
+          }}
+        />
       )}
     </>
   );

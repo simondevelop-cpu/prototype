@@ -36,8 +36,15 @@ export default function TransactionModal({
     if (isOpen) {
       if (transaction) {
         // Editing existing transaction
+        // Format date to YYYY-MM-DD for input[type="date"]
+        let formattedDate = transaction.date;
+        if (formattedDate) {
+          // Handle both "YYYY-MM-DD" and "YYYY-MM-DDTHH:MM:SS" formats
+          formattedDate = formattedDate.split('T')[0];
+        }
+        
         setFormData({
-          date: transaction.date,
+          date: formattedDate || '',
           description: transaction.description || '',
           amount: Math.abs(transaction.amount).toString(),
           cashflow: transaction.cashflow || 'expense',
@@ -199,19 +206,16 @@ export default function TransactionModal({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Category
               </label>
-              <input
-                type="text"
-                list="categories-list"
+              <select
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="e.g., Groceries"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <datalist id="categories-list">
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+              >
+                <option value="">Select a category...</option>
                 {categories.map((cat) => (
-                  <option key={cat} value={cat} />
+                  <option key={cat} value={cat}>{cat}</option>
                 ))}
-              </datalist>
+              </select>
             </div>
 
             {/* Account */}

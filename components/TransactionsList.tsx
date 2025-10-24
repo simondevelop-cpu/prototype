@@ -6,6 +6,7 @@ import utc from 'dayjs/plugin/utc';
 import TransactionModal from './TransactionModal';
 import BulkRecategorizeModal from './BulkRecategorizeModal';
 import StatementUploadModal from './StatementUploadModal';
+import { CATEGORIES } from '@/lib/categorization-engine';
 
 dayjs.extend(utc);
 
@@ -105,7 +106,11 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   });
 
   // Get unique values for each filter
-  const categories = Array.from(new Set(transactions.map(tx => tx.category).filter(Boolean))).sort();
+  // Include all predefined categories plus any custom ones from transactions
+  const allPredefinedCategories = Object.keys(CATEGORIES);
+  const transactionCategories = Array.from(new Set(transactions.map(tx => tx.category).filter(Boolean)));
+  const categories = Array.from(new Set([...allPredefinedCategories, ...transactionCategories, 'Uncategorised'])).sort();
+  
   const accounts = Array.from(new Set(transactions.map(tx => tx.account).filter(Boolean))).sort();
   const cashflows = Array.from(new Set(transactions.map(tx => tx.cashflow).filter(Boolean))).sort();
   const labels = Array.from(new Set(transactions.map(tx => tx.label).filter(Boolean))).sort();
@@ -192,6 +197,13 @@ export default function TransactionsList({ transactions, loading, token, onRefre
 
   const handleUpdateTransaction = async (transactionData: any) => {
     try {
+      // Check if category or label changed (for learning)
+      const originalTx = editingTransaction;
+      const categoryChanged = originalTx && (
+        originalTx.category !== transactionData.category ||
+        originalTx.label !== transactionData.label
+      );
+
       const response = await fetch('/api/transactions/update', {
         method: 'PUT',
         headers: {
@@ -204,6 +216,34 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Failed to update transaction');
+      }
+
+      // If category changed, save to learning database
+      if (categoryChanged && originalTx.description) {
+        try {
+          const learnResponse = await fetch('/api/categorization/learn', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              description: originalTx.description,
+              originalCategory: originalTx.category,
+              originalLabel: originalTx.label,
+              correctedCategory: transactionData.category,
+              correctedLabel: transactionData.label,
+            }),
+          });
+          
+          if (!learnResponse.ok) {
+            const learnResult = await learnResponse.json();
+            console.error('[Recategorization] Failed to save pattern:', learnResult);
+          }
+        } catch (learnError) {
+          // Don't fail the update if learning fails
+          console.error('[Recategorization] Error saving categorization learning:', learnError);
+        }
       }
 
       setEditingTransaction(null);

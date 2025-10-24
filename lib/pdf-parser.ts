@@ -1298,8 +1298,8 @@ function createTransaction(
     console.log(`[PDF Parser] 💰 Cashflow: "${cleanDescription.substring(0, 50)}" | amt=${amount} | isTransfer=${isTransfer} | type=${cashflow}`);
   }
 
-  // Auto-categorize based on merchant/description
-  const category = categorizeTransaction(cleanDescription, merchant);
+  // Don't categorize during parsing - let the proper categorization engine handle it
+  const category = 'Uncategorised';
 
   return {
     date,
@@ -1311,42 +1311,6 @@ function createTransaction(
     account: accountType,
     label: category === 'Uncategorised' ? 'Needs Review' : 'Imported',
   };
-}
-
-/**
- * Simple auto-categorization based on keywords
- */
-function categorizeTransaction(description: string, merchant: string): string {
-  const text = `${description} ${merchant}`.toLowerCase();
-
-  // Income
-  if (/salary|payroll|deposit|transfer in|direct deposit/i.test(text)) return 'Employment';
-
-  // Housing
-  if (/rent|mortgage|property tax/i.test(text)) return 'Housing';
-
-  // Utilities
-  if (/hydro|electric|gas|water|internet|phone|telus|rogers|bell|fido/i.test(text)) return 'Utilities';
-
-  // Groceries
-  if (/loblaws|sobeys|metro|safeway|superstore|no frills|food basics|walmart grocery/i.test(text)) return 'Groceries';
-
-  // Dining
-  if (/restaurant|cafe|coffee|tim hortons|starbucks|mcdonald|burger|pizza|sushi/i.test(text)) return 'Dining';
-
-  // Transportation
-  if (/gas|petro|esso|shell|uber|lyft|taxi|transit|presto|parking/i.test(text)) return 'Transportation';
-
-  // Shopping
-  if (/amazon|walmart|costco|best buy|canadian tire|home depot/i.test(text)) return 'Shopping';
-
-  // Entertainment
-  if (/netflix|spotify|apple music|movie|theatre|cinema/i.test(text)) return 'Entertainment';
-
-  // Healthcare
-  if (/pharmacy|shoppers|rexall|medical|doctor|dentist|hospital/i.test(text)) return 'Healthcare';
-
-  return 'Uncategorised';
 }
 
 /**
@@ -1395,8 +1359,6 @@ async function insertTransactionsWithDuplicateCheck(
     duplicateTransactions,
   };
 }
-
-// Keep the old function for backwards compatibility but mark as deprecated
 async function insertTransactions(transactions: Transaction[], userId: string): Promise<number> {
   const result = await insertTransactionsWithDuplicateCheck(transactions, userId);
   

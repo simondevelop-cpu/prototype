@@ -1,3 +1,4 @@
+// Force rebuild: 2025-10-24
 const express = require('express');
 const path = require('path');
 const multer = require('multer');
@@ -154,15 +155,414 @@ async function ensureSchema() {
     );
   `);
 
+  // Categorization learning table for user corrections
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS categorization_learning (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      description_pattern TEXT NOT NULL,
+      original_category TEXT,
+      original_label TEXT,
+      corrected_category TEXT NOT NULL,
+      corrected_label TEXT NOT NULL,
+      frequency INTEGER DEFAULT 1,
+      last_used TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Admin tables for categorization engine management
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_merchants (
+      id SERIAL PRIMARY KEY,
+      merchant_pattern TEXT NOT NULL UNIQUE,
+      alternate_patterns TEXT[], -- Array of alternate merchant names/spellings
+      category TEXT NOT NULL,
+      label TEXT NOT NULL,
+      is_active BOOLEAN DEFAULT TRUE,
+      notes TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_keywords (
+      id SERIAL PRIMARY KEY,
+      keyword TEXT NOT NULL,
+      category TEXT NOT NULL,
+      label TEXT NOT NULL,
+      is_active BOOLEAN DEFAULT TRUE,
+      notes TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(keyword, category)
+    );
+  `);
+
   // Indexes for performance
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
     CREATE INDEX IF NOT EXISTS idx_transactions_cashflow ON transactions(cashflow);
     CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category);
+    CREATE INDEX IF NOT EXISTS idx_categorization_user_id ON categorization_learning(user_id);
+    CREATE INDEX IF NOT EXISTS idx_categorization_pattern ON categorization_learning(description_pattern);
+    CREATE INDEX IF NOT EXISTS idx_admin_merchants_pattern ON admin_merchants(merchant_pattern);
+    CREATE INDEX IF NOT EXISTS idx_admin_keywords_keyword ON admin_keywords(keyword);
+    CREATE INDEX IF NOT EXISTS idx_admin_merchants_active ON admin_merchants(is_active);
+    CREATE INDEX IF NOT EXISTS idx_admin_keywords_active ON admin_keywords(is_active);
   `);
   
   console.log('[DB] Schema created successfully');
+  
+  // Seed admin keywords and merchants
+  await seedAdminPatterns();
+}
+
+/**
+ * Seed initial admin categorization patterns (keywords and merchants)
+ * 
+ * PURPOSE: This function provides the initial set of categorization patterns
+ * for new deployments. It only runs ONCE on first deployment when tables are empty.
+ * 
+ * AFTER SEEDING: All categorization patterns are managed through the admin dashboard at /admin
+ * - Admins can add, edit, and delete keywords/merchants
+ * - The categorization engine ONLY uses patterns from admin_keywords and admin_merchants tables
+ * - No hardcoded fallback patterns exist in the code
+ * 
+ * NOTE: This function is safe to keep - it checks if data exists first and skips if already seeded.
+ */
+async function seedAdminPatterns() {
+  if (disableDb || !pool) return;
+  
+  try {
+    // Check if patterns already exist
+    const existingKeywords = await pool.query('SELECT COUNT(*) as count FROM admin_keywords');
+    const existingMerchants = await pool.query('SELECT COUNT(*) as count FROM admin_merchants');
+    
+    if (parseInt(existingKeywords.rows[0].count) > 0 || parseInt(existingMerchants.rows[0].count) > 0) {
+      console.log('[DB] Admin patterns already seeded - skipping');
+      return;
+    }
+    
+    console.log('[DB] Seeding initial admin patterns (first-time deployment)...');
+    
+    // Insert keywords (streamlined, short, powerful terms)
+    const keywords = [
+      // Housing
+      ['RENT', 'Housing', 'Rent'],
+      ['LOYER', 'Housing', 'Rent'],
+      ['MORTGAGE', 'Housing', 'Home'],
+      ['HYPOTHEQUE', 'Housing', 'Home'],
+      ['VET', 'Housing', 'Pets'],
+      ['DAYCARE', 'Housing', 'Daycare'],
+      ['GARDERIE', 'Housing', 'Daycare'],
+      
+      // Bills
+      ['HYDRO', 'Bills', 'Gas & Electricity'],
+      ['ELECTRIC', 'Bills', 'Gas & Electricity'],
+      ['UTIL', 'Bills', 'Gas & Electricity'],
+      ['BILLPAY', 'Bills', 'Other bills'],
+      ['PREAUTHORIZED', 'Bills', 'Other bills'],
+      ['AUTOPAY', 'Bills', 'Other bills'],
+      ['INSUR', 'Bills', 'Home insurance'],
+      ['ASSURANCE', 'Bills', 'Home insurance'],
+      ['SERVICE CHARGE', 'Bills', 'Bank and other fees'],
+      ['BANK FEE', 'Bills', 'Bank and other fees'],
+      
+      // Food
+      ['GROCER', 'Food', 'Groceries'],
+      ['SUPER', 'Food', 'Groceries'],
+      ['DEPANNEUR', 'Food', 'Groceries'],
+      ['COFFEE', 'Food', 'Coffee'],
+      ['CAFE', 'Food', 'Coffee'],
+      ['BURGER', 'Food', 'Eating Out'],
+      ['PIZZA', 'Food', 'Eating Out'],
+      ['RESTAURANT', 'Food', 'Eating Out'],
+      ['RESTO', 'Food', 'Eating Out'],
+      ['BAR', 'Food', 'Eating Out'],
+      ['PUB', 'Food', 'Eating Out'],
+      ['SUSHI', 'Food', 'Eating Out'],
+      ['THAI', 'Food', 'Eating Out'],
+      
+      // Travel
+      ['HOTEL', 'Travel', 'Travel'],
+      ['FLIGHT', 'Travel', 'Travel'],
+      
+      // Health
+      ['PHARM', 'Health', 'Health'],
+      ['DRUG', 'Health', 'Health'],
+      ['MEDIC', 'Health', 'Health'],
+      ['CLINIC', 'Health', 'Health'],
+      ['CLINIQUE', 'Health', 'Health'],
+      ['DOCTOR', 'Health', 'Health'],
+      ['DENT', 'Health', 'Health'],
+      ['HOSPITAL', 'Health', 'Health'],
+      ['HOPITAL', 'Health', 'Health'],
+      
+      // Transport
+      ['TAXI', 'Transport', 'Transport'],
+      ['TRANSIT', 'Transport', 'Transport'],
+      ['BUS', 'Transport', 'Transport'],
+      ['OPUS', 'Transport', 'Transport'],
+      ['GAS', 'Transport', 'Car'],
+      ['FUEL', 'Transport', 'Car'],
+      ['PARKING', 'Transport', 'Transport'],
+      ['STATIONNEMENT', 'Transport', 'Transport'],
+      
+      // Education
+      ['TUITION', 'Education', 'Education'],
+      ['SCHOOL', 'Education', 'Education'],
+      ['ECOLE', 'Education', 'Education'],
+      ['UNIVERSITY', 'Education', 'Education'],
+      ['COLLEGE', 'Education', 'Education'],
+      ['TEXTBOOK', 'Education', 'Education'],
+      
+      // Personal
+      ['CINEMA', 'Personal', 'Entertainment'],
+      ['MOVIE', 'Personal', 'Entertainment'],
+      ['THEATRE', 'Personal', 'Entertainment'],
+      ['CONCERT', 'Personal', 'Entertainment'],
+      ['SPORT', 'Personal', 'Sport & Hobbies'],
+      ['GYM', 'Personal', 'Gym membership'],
+      ['YOGA', 'Personal', 'Sport & Hobbies'],
+      
+      // Shopping
+      ['GIFT CARD', 'Shopping', 'Shopping'],
+      ['CARTE CADEAU', 'Shopping', 'Shopping'],
+      
+      // Work
+      ['OFFICE', 'Work', 'Work'],
+      ['BUREAU', 'Work', 'Work'],
+      ['CONFERENCE', 'Work', 'Work'],
+    ];
+    
+    for (const [keyword, category, label] of keywords) {
+      await pool.query(
+        'INSERT INTO admin_keywords (keyword, category, label, is_active) VALUES ($1, $2, $3, true) ON CONFLICT DO NOTHING',
+        [keyword, category, label]
+      );
+    }
+    
+    console.log(`[DB] Seeded ${keywords.length} keywords`);
+    
+    // Insert merchants (ALL specific store/chain names)
+    const merchants = [
+      // Groceries
+      ['LOBLAWS', 'Food', 'Groceries'],
+      ['SUPERSTORE', 'Food', 'Groceries'],
+      ['NO FRILLS', 'Food', 'Groceries'],
+      ['NOFRILLS', 'Food', 'Groceries'],
+      ['METRO', 'Food', 'Groceries'],
+      ['SOBEYS', 'Food', 'Groceries'],
+      ['IGA', 'Food', 'Groceries'],
+      ['SAFEWAY', 'Food', 'Groceries'],
+      ['WALMART', 'Food', 'Groceries'],
+      ['COSTCO', 'Food', 'Groceries'],
+      ['FOODBASICS', 'Food', 'Groceries'],
+      ['FRESHCO', 'Food', 'Groceries'],
+      ['MAXI', 'Food', 'Groceries'],
+      ['PROVIGO', 'Food', 'Groceries'],
+      ['SUPER C', 'Food', 'Groceries'],
+      ['SAVE-ON-FOODS', 'Food', 'Groceries'],
+      ['THRIFTY FOODS', 'Food', 'Groceries'],
+      ['WHOLE FOODS', 'Food', 'Groceries'],
+      ['FARMBOY', 'Food', 'Groceries'],
+      ['FARM BOY', 'Food', 'Groceries'],
+      ['CO-OP', 'Food', 'Groceries'],
+      ['COOP', 'Food', 'Groceries'],
+      
+      // Coffee & Fast Food
+      ['TIM', 'Food', 'Coffee'],
+      ['TIMS', 'Food', 'Coffee'],
+      ['STARBUCK', 'Food', 'Coffee'],
+      ['SECOND CUP', 'Food', 'Coffee'],
+      ['VAN HOUTTE', 'Food', 'Coffee'],
+      ['BRIDGEHEAD', 'Food', 'Coffee'],
+      ['MCDONALD', 'Food', 'Eating Out'],
+      ['BURGER KING', 'Food', 'Eating Out'],
+      ['WENDYS', 'Food', 'Eating Out'],
+      ['A&W', 'Food', 'Eating Out'],
+      ['HARVEY', 'Food', 'Eating Out'],
+      ['FIVE GUYS', 'Food', 'Eating Out'],
+      ['SUBWAY', 'Food', 'Eating Out'],
+      ['QUIZNOS', 'Food', 'Eating Out'],
+      ['MR SUB', 'Food', 'Eating Out'],
+      ['POPEYES', 'Food', 'Eating Out'],
+      ['KFC', 'Food', 'Eating Out'],
+      ['TACO BELL', 'Food', 'Eating Out'],
+      ['CHIPOTLE', 'Food', 'Eating Out'],
+      ['QUESADA', 'Food', 'Eating Out'],
+      ['FRESHII', 'Food', 'Eating Out'],
+      ['PANERA', 'Food', 'Eating Out'],
+      ['CORA', 'Food', 'Eating Out'],
+      
+      // Pizza
+      ['PIZZA HUT', 'Food', 'Eating Out'],
+      ['DOMINOS', 'Food', 'Eating Out'],
+      ['PIZZA PIZZA', 'Food', 'Eating Out'],
+      ['PAPA JOHNS', 'Food', 'Eating Out'],
+      ['LITTLE CAESARS', 'Food', 'Eating Out'],
+      ['BOSTON PIZZA', 'Food', 'Eating Out'],
+      
+      // Casual Dining
+      ['SWISS CHALET', 'Food', 'Eating Out'],
+      ['MONTANA', 'Food', 'Eating Out'],
+      ['KELSEY', 'Food', 'Eating Out'],
+      ['MILESTONES', 'Food', 'Eating Out'],
+      ['EARLS', 'Food', 'Eating Out'],
+      ['MOXIES', 'Food', 'Eating Out'],
+      ['THE KEG', 'Food', 'Eating Out'],
+      ['CACTUS CLUB', 'Food', 'Eating Out'],
+      ['JOEY', 'Food', 'Eating Out'],
+      ['ST-HUBERT', 'Food', 'Eating Out'],
+      
+      // Delivery
+      ['UBER EATS', 'Food', 'Eating Out'],
+      ['DOORDASH', 'Food', 'Eating Out'],
+      ['SKIP', 'Food', 'Eating Out'],
+      
+      // Transport
+      ['PRESTO', 'Transport', 'Transport'],
+      ['TTC', 'Transport', 'Transport'],
+      ['STM', 'Transport', 'Transport'],
+      ['TRANSLINK', 'Transport', 'Transport'],
+      ['GO TRANSIT', 'Transport', 'Transport'],
+      ['OC TRANSPO', 'Transport', 'Transport'],
+      ['BIXI', 'Transport', 'Transport'],
+      ['VIA RAIL', 'Travel', 'Travel'],
+      ['UBER', 'Transport', 'Transport'],
+      ['LYFT', 'Transport', 'Transport'],
+      
+      // Gas Stations
+      ['PETRO-CANADA', 'Transport', 'Car'],
+      ['PETRO CANADA', 'Transport', 'Car'],
+      ['SHELL', 'Transport', 'Car'],
+      ['ESSO', 'Transport', 'Car'],
+      ['CANADIAN TIRE GAS', 'Transport', 'Car'],
+      ['HUSKY', 'Transport', 'Car'],
+      ['ULTRAMAR', 'Transport', 'Car'],
+      ['IRVING', 'Transport', 'Car'],
+      
+      // Telecom
+      ['ROGERS', 'Bills', 'Phone'],
+      ['BELL', 'Bills', 'Phone'],
+      ['TELUS', 'Bills', 'Phone'],
+      ['FIDO', 'Bills', 'Phone'],
+      ['KOODO', 'Bills', 'Phone'],
+      ['VIRGIN MOBILE', 'Bills', 'Phone'],
+      ['FREEDOM', 'Bills', 'Phone'],
+      ['VIDEOTRON', 'Bills', 'Internet'],
+      ['SHAW', 'Bills', 'Internet'],
+      ['COGECO', 'Bills', 'Internet'],
+      
+      // Utilities
+      ['HYDRO ONE', 'Bills', 'Gas & Electricity'],
+      ['HYDRO OTTAWA', 'Bills', 'Gas & Electricity'],
+      ['HYDRO QUEBEC', 'Bills', 'Gas & Electricity'],
+      ['TORONTO HYDRO', 'Bills', 'Gas & Electricity'],
+      ['BC HYDRO', 'Bills', 'Gas & Electricity'],
+      ['FORTISBC', 'Bills', 'Gas & Electricity'],
+      ['FORTIS', 'Bills', 'Gas & Electricity'],
+      ['ENBRIDGE', 'Bills', 'Gas & Electricity'],
+      ['EPCOR', 'Bills', 'Gas & Electricity'],
+      ['ATCO', 'Bills', 'Gas & Electricity'],
+      
+      // Subscriptions
+      ['NETFLIX', 'Subscriptions', 'Subscriptions'],
+      ['SPOTIFY', 'Subscriptions', 'Subscriptions'],
+      ['APPLE.COM', 'Subscriptions', 'Subscriptions'],
+      ['APPLE MUSIC', 'Subscriptions', 'Subscriptions'],
+      ['APPLE TV', 'Subscriptions', 'Subscriptions'],
+      ['AMAZON PRIME', 'Subscriptions', 'Subscriptions'],
+      ['DISNEY', 'Subscriptions', 'Subscriptions'],
+      ['HBO', 'Subscriptions', 'Subscriptions'],
+      ['YOUTUBE PREMIUM', 'Subscriptions', 'Subscriptions'],
+      ['CRAVE', 'Subscriptions', 'Subscriptions'],
+      ['DAZN', 'Subscriptions', 'Subscriptions'],
+      ['MICROSOFT 365', 'Subscriptions', 'Subscriptions'],
+      ['ADOBE', 'Subscriptions', 'Subscriptions'],
+      ['DROPBOX', 'Subscriptions', 'Subscriptions'],
+      ['GOOGLE ONE', 'Subscriptions', 'Subscriptions'],
+      ['ICLOUD', 'Subscriptions', 'Subscriptions'],
+      ['ZOOM', 'Subscriptions', 'Subscriptions'],
+      ['PATREON', 'Subscriptions', 'Subscriptions'],
+      
+      // Gyms
+      ['GOODLIFE', 'Personal', 'Gym membership'],
+      ['PLANET FITNESS', 'Personal', 'Gym membership'],
+      ['FIT4LESS', 'Personal', 'Gym membership'],
+      ['ANYTIME FITNESS', 'Personal', 'Gym membership'],
+      
+      // Shopping
+      ['AMAZON', 'Shopping', 'Shopping'],
+      ['AMZN', 'Shopping', 'Shopping'],
+      ['EBAY', 'Shopping', 'Shopping'],
+      ['ETSY', 'Shopping', 'Shopping'],
+      ['CANADIAN TIRE', 'Shopping', 'Shopping'],
+      ['HOME DEPOT', 'Shopping', 'Shopping'],
+      ['LOWES', 'Shopping', 'Shopping'],
+      ['RONA', 'Shopping', 'Shopping'],
+      ['IKEA', 'Shopping', 'Shopping'],
+      ['STRUCTUBE', 'Shopping', 'Shopping'],
+      ['THE BRICK', 'Shopping', 'Shopping'],
+      ['BEST BUY', 'Shopping', 'Shopping'],
+      ['STAPLES', 'Shopping', 'Shopping'],
+      ['DOLLARAMA', 'Shopping', 'Shopping'],
+      ['DOLLAR TREE', 'Shopping', 'Shopping'],
+      ['INDIGO', 'Shopping', 'Shopping'],
+      ['CHAPTERS', 'Shopping', 'Shopping'],
+      ['MICHAELS', 'Shopping', 'Shopping'],
+      ['BULK BARN', 'Shopping', 'Shopping'],
+      
+      // Clothing
+      ['WINNERS', 'Shopping', 'Clothes'],
+      ['MARSHALLS', 'Shopping', 'Clothes'],
+      ['H&M', 'Shopping', 'Clothes'],
+      ['ZARA', 'Shopping', 'Clothes'],
+      ['UNIQLO', 'Shopping', 'Clothes'],
+      ['OLD NAVY', 'Shopping', 'Clothes'],
+      ['GAP', 'Shopping', 'Clothes'],
+      ['SPORTCHEK', 'Shopping', 'Clothes'],
+      ['LULULEMON', 'Shopping', 'Clothes'],
+      ['ROOTS', 'Shopping', 'Clothes'],
+      ['ARITZIA', 'Shopping', 'Clothes'],
+      ['SIMONS', 'Shopping', 'Clothes'],
+      ['THE BAY', 'Shopping', 'Clothes'],
+      ['NIKE', 'Shopping', 'Clothes'],
+      ['ADIDAS', 'Shopping', 'Clothes'],
+      ['ALDO', 'Shopping', 'Clothes'],
+      
+      // Pharmacy & Beauty
+      ['SHOPPERS', 'Shopping', 'Beauty'],
+      ['PHARMAPRIX', 'Shopping', 'Beauty'],
+      ['SEPHORA', 'Shopping', 'Beauty'],
+      ['JEAN COUTU', 'Shopping', 'Beauty'],
+      ['REXALL', 'Shopping', 'Beauty'],
+      ['LONDON DRUGS', 'Shopping', 'Beauty'],
+      
+      // Airlines & Hotels
+      ['AIR CANADA', 'Travel', 'Travel'],
+      ['WESTJET', 'Travel', 'Travel'],
+      ['AIRBNB', 'Travel', 'Travel'],
+      ['BOOKING', 'Travel', 'Travel'],
+      ['EXPEDIA', 'Travel', 'Travel'],
+    ];
+    
+    for (const [pattern, category, label] of merchants) {
+      await pool.query(
+        'INSERT INTO admin_merchants (merchant_pattern, alternate_patterns, category, label, is_active) VALUES ($1, $2, $3, $4, true) ON CONFLICT DO NOTHING',
+        [pattern, [], category, label]
+      );
+    }
+    
+    console.log(`[DB] Seeded ${merchants.length} merchants`);
+    console.log(`[DB] Total admin patterns: ${keywords.length + merchants.length}`);
+    
+  } catch (error) {
+    console.error('[DB] Failed to seed admin patterns:', error.message);
+  }
 }
 
 async function seedDemoUser() {

@@ -49,6 +49,26 @@ A modern, AI-ready personal finance management application built for Canadians. 
 - Demo account with 12 months of realistic Canadian transaction data
 - Multi-user support with data isolation
 
+### 🛠️ **Admin Dashboard** 🆕
+- **Secure Admin Login** - Separate admin authentication at `/admin/login`
+- **Category Engine Management**
+  - **Patterns Tab** - Manage keywords and merchants for auto-categorization
+    - View/edit/delete keywords and merchants
+    - Inline editing (double-click cells to edit)
+    - Multi-select filtering by category and label
+    - Bulk delete operations
+    - Add alternate merchant patterns (e.g., "TIMHORT" for "TIM HORTONS")
+  - **Recategorization Log** - Track user recategorizations
+    - See what patterns users are creating
+    - Monitor categorization frequency and accuracy
+    - Mark recategorizations as reviewed
+- **Accounts Tab** - View all registered users and their activity
+- **Analytics, Insights, Inbox** - Placeholder tabs for future features
+- **Auto-Categorization Engine Display** - Shows the 3-tier logic:
+  1. User History (highest priority)
+  2. Merchant Matching
+  3. Keyword Search (first match)
+
 ### 🎨 **Modern UI/UX**
 - Built with Next.js 14 and React
 - Styled with Tailwind CSS
@@ -157,6 +177,101 @@ prototype/
 
 ---
 
+## 🤖 Auto-Categorization Engine
+
+Canadian Insights features a powerful, database-driven categorization engine that automatically classifies your transactions. The system uses a three-tier priority approach to ensure accuracy while learning from your preferences.
+
+### How It Works
+
+The categorization engine processes transactions in this **priority order**:
+
+#### 1️⃣ **User History** (Highest Priority)
+- Your past recategorizations are stored and checked first
+- If you've corrected a transaction before, that pattern is remembered
+- **Confidence: 95-100%** (boosted by frequency)
+- Example: If you recategorized "UBER EATS" from Transport to Food, all future "UBER EATS" transactions automatically go to Food
+
+#### 2️⃣ **Merchant Matching**
+- 200+ pre-loaded Canadian merchants (Tim Hortons, Loblaws, Rogers, etc.)
+- Supports **alternate patterns** for merchant name variations
+  - Example: "TIM HORTONS" also matches "TIMHORT", "TIM HORT", "HORTONS"
+- **Confidence: 90%**
+- **Space-insensitive matching** catches descriptions like "TIMHORTONS" (no space)
+
+#### 3️⃣ **Keyword Search** (First Match Wins)
+- 70+ curated keywords for Canadian spending patterns
+- Searches by **category priority order**:
+  ```
+  Housing → Bills → Subscriptions → Food → Travel → 
+  Health → Transport → Education → Personal → Shopping → Work
+  ```
+- **First match wins** - fast and predictable
+- **Confidence: 85%**
+- Example: "HYDRO" keyword matches before generic "ELECTRIC" due to category priority
+
+### Category Priority Order
+
+The engine searches categories in this specific order to avoid misclassification:
+
+1. **Housing** - Rent, mortgage, pets, daycare
+2. **Bills** - Utilities, phone, internet, insurance
+3. **Subscriptions** - Netflix, Spotify, streaming services
+4. **Food** - Groceries, restaurants, coffee
+5. **Travel** - Hotels, flights, bookings
+6. **Health** - Pharmacy, medical, dental
+7. **Transport** - Transit, taxis, gas, parking
+8. **Education** - Tuition, textbooks, courses
+9. **Personal** - Entertainment, gym, hobbies
+10. **Shopping** - Retail, clothes, electronics
+11. **Work** - Office supplies, conferences
+
+### Admin Dashboard
+
+Admins can manage the categorization system at `/admin`:
+
+- **Keywords Tab** - Add/edit/delete generic keywords
+- **Merchants Tab** - Manage merchant patterns with alternate spellings
+- **Bulk Operations** - Select and delete multiple items at once
+- **Inline Editing** - Double-click cells to edit quickly
+- **Column Filters** - Filter by category or label
+- **Live Updates** - Changes take effect immediately for new uploads
+
+**Admin Login:**
+- Email: `admin@canadianinsights.ca`
+- Password: `categorisationandinsightsengine`
+- Token expires: 1 day
+
+### Example Categorizations
+
+| Transaction Description | Match Type | Category | Label | Why? |
+|------------------------|------------|----------|-------|------|
+| `UBER EATS` (user corrected before) | User History | Food | Eating Out | User's past correction |
+| `TIMHORT 123 MAIN ST` | Merchant (alternate) | Food | Coffee | "TIMHORT" is alternate for "TIM HORTONS" |
+| `HYDRO OTTAWA PAYMENT` | Keyword | Bills | Gas & Electricity | "HYDRO" keyword in Bills category |
+| `AMAZON.CA PURCHASE` | Merchant | Shopping | Shopping | "AMAZON" is known merchant |
+| `RENT PAYMENT TO LANDLORD` | Keyword | Housing | Rent | "RENT" keyword (highest priority category) |
+
+### Adding New Patterns
+
+To improve categorization:
+
+1. **Log in to Admin** at `/admin`
+2. **Keywords Tab**:
+   - Click "➕ Add Keyword"
+   - Enter keyword (e.g., "COSTCO")
+   - Select category and label
+   - Save
+3. **Merchants Tab**:
+   - Click "➕ Add Merchant"
+   - Enter primary merchant name (e.g., "TIM HORTONS")
+   - Add alternate patterns: `TIMHORT, TIM HORT, HORTONS`
+   - Select category and label
+   - Save
+
+All changes apply immediately to future transaction uploads.
+
+---
+
 ## 🔧 Tech Stack
 
 ### **Frontend**
@@ -210,6 +325,52 @@ CREATE TABLE transactions (
 );
 ```
 
+### **categorization_learning** table
+```sql
+CREATE TABLE categorization_learning (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  description_pattern TEXT NOT NULL,
+  original_category VARCHAR(255),
+  corrected_category VARCHAR(255) NOT NULL,
+  corrected_label VARCHAR(255),
+  frequency INTEGER DEFAULT 1,
+  last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, description_pattern)
+);
+```
+
+### **admin_keywords** table (Categorization Engine)
+```sql
+CREATE TABLE admin_keywords (
+  id SERIAL PRIMARY KEY,
+  keyword TEXT NOT NULL,
+  category TEXT NOT NULL,
+  label TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(keyword, category)
+);
+```
+
+### **admin_merchants** table (Categorization Engine)
+```sql
+CREATE TABLE admin_merchants (
+  id SERIAL PRIMARY KEY,
+  merchant_pattern TEXT NOT NULL UNIQUE,
+  alternate_patterns TEXT[], -- Array of alternate spellings
+  category TEXT NOT NULL,
+  label TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+```
+
 ---
 
 ## 🔑 API Endpoints
@@ -235,6 +396,20 @@ CREATE TABLE transactions (
 | `/api/summary` | GET | Monthly income/expense summary for charts |
 | `/api/categories` | GET | Category breakdown for selected period |
 
+### Admin (Categorization Engine Management)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/admin/login` | POST | Admin login (returns JWT) |
+| `/api/admin/keywords` | GET | Get all keywords |
+| `/api/admin/keywords` | POST | Create new keyword |
+| `/api/admin/keywords/[id]` | PUT | Update keyword by ID |
+| `/api/admin/keywords/[id]` | DELETE | Delete keyword by ID |
+| `/api/admin/merchants` | GET | Get all merchants |
+| `/api/admin/merchants` | POST | Create new merchant (with alternate_patterns) |
+| `/api/admin/merchants/[id]` | PUT | Update merchant by ID |
+| `/api/admin/merchants/[id]` | DELETE | Delete merchant by ID |
+| `/api/admin/view-keywords` | GET | Get keywords + merchants (for admin dashboard) |
+
 ---
 
 ## 🎯 Roadmap & Next Steps
@@ -255,11 +430,17 @@ CREATE TABLE transactions (
   - Notification preferences
 
 ### 🤖 Phase 2: AI & Automation (Q2 2025)
-- [ ] **Smart Categorization Engine**
-  - Machine learning for auto-categorization
-  - Pattern recognition for merchants
-  - User training/correction loop
-  - Canadian-specific merchant database
+- [x] **Smart Categorization Engine** ✨ LIVE!
+  - **Database-driven categorization** with admin management dashboard
+  - **Three-tier matching logic** (in priority order):
+    1. **User History** - Your past corrections always take priority
+    2. **Merchant Matching** - 200+ Canadian merchants with alternate spellings (e.g., "TIMHORT" → "TIM HORTONS")
+    3. **Keyword Search** - Smart keyword matching by category priority (Housing → Bills → Subscriptions → Food → etc.)
+  - **Admin Dashboard** at `/admin` for managing keywords and merchants
+  - **Alternate Patterns** - Handle merchant name variations automatically
+  - **Space-insensitive matching** - Catches descriptions with missing spaces
+  - **First-match approach** - Fast, predictable categorization
+  - **Live updates** - Changes to keywords/merchants affect future uploads immediately
 
 - [x] **PDF Bank Statement Parser** ✨ NEW!
   - Upload PDF statements via drag & drop
@@ -339,8 +520,9 @@ CREATE TABLE transactions (
 - Insights tab is placeholder (coming soon)
 - Budget tab is placeholder (coming soon)
 - No mobile app yet (responsive web only)
-- PDF statement parsing is beta (supported banks: TD, RBC, CIBC, BMO)
+- PDF statement parsing is beta (supported banks: TD, RBC, CIBC, National Bank, Amex)
 - Single currency support (CAD)
+- Admin dashboard placeholders: Inbox, Analytics, Insights Engine (Category Engine is fully functional)
 
 ---
 
@@ -377,5 +559,10 @@ For questions, issues, or feature requests, please open an issue on GitHub.
 **Demo Account Credentials:**
 - Email: demo@example.com
 - Password: demo123
+
+**Admin Dashboard Access:**
+- Visit: `/admin/login`
+- Email: admin@canadianinsights.ca
+- Password: categorisationandinsightsengine
 
 **Happy tracking!** 🎉💸
