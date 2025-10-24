@@ -47,38 +47,34 @@ export default function CategorizationSummaryModal({
   // Priority categories to always show
   const priorityCategories = ['Housing', 'Bills', 'Food', 'Transport', 'Uncategorised'];
   
-  // Calculate summary by category (expenses only)
-  const allCategorySummary = Object.keys(CATEGORIES).map(categoryName => {
-    const categoryTransactions = localTransactions.filter(
-      tx => tx.cashflow === 'expense' && tx.category === categoryName
-    );
-    const total = categoryTransactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
-    return {
-      category: categoryName,
-      count: categoryTransactions.length,
-      total,
-      transactions: categoryTransactions,
-    };
-  }).filter(cat => cat.count > 0); // Only show categories with transactions
-  
-  // Add Uncategorised if there are any
-  const uncategorizedTransactions = localTransactions.filter(
-    tx => tx.cashflow === 'expense' && (tx.category === 'Uncategorised' || !tx.category)
-  );
-  if (uncategorizedTransactions.length > 0) {
-    allCategorySummary.push({
+  // Calculate summary by category (expenses only) - INCLUDE ALL CATEGORIES
+  const allCategorySummary = [
+    ...Object.keys(CATEGORIES).map(categoryName => {
+      const categoryTransactions = localTransactions.filter(
+        tx => tx.cashflow === 'expense' && tx.category === categoryName
+      );
+      const total = categoryTransactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+      return {
+        category: categoryName,
+        count: categoryTransactions.length,
+        total,
+        transactions: categoryTransactions,
+      };
+    }),
+    // Always include Uncategorised
+    {
       category: 'Uncategorised',
-      count: uncategorizedTransactions.length,
-      total: uncategorizedTransactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0),
-      transactions: uncategorizedTransactions,
-    });
-  }
+      count: localTransactions.filter(tx => tx.cashflow === 'expense' && (tx.category === 'Uncategorised' || !tx.category)).length,
+      total: localTransactions.filter(tx => tx.cashflow === 'expense' && (tx.category === 'Uncategorised' || !tx.category)).reduce((sum, tx) => sum + Math.abs(tx.amount), 0),
+      transactions: localTransactions.filter(tx => tx.cashflow === 'expense' && (tx.category === 'Uncategorised' || !tx.category)),
+    }
+  ];
   
   // Split into priority and other categories
   const prioritySummary = allCategorySummary.filter(cat => priorityCategories.includes(cat.category));
   const otherSummary = allCategorySummary.filter(cat => !priorityCategories.includes(cat.category));
   
-  // Determine what to display
+  // Determine what to display (show all if expanded, or just priority)
   const categorySummary = showAllCategories ? allCategorySummary : prioritySummary;
 
   // Calculate average confidence
@@ -222,7 +218,7 @@ export default function CategorizationSummaryModal({
               )}
             </div>
           ) : (
-            /* Category Detail View */
+            /* Category Detail View - Table Format */
             <div>
               <button
                 onClick={() => setCurrentView('summary')}
@@ -231,43 +227,51 @@ export default function CategorizationSummaryModal({
                 ← Back to Summary
               </button>
 
-              <div className="space-y-3">
-                {localTransactions
-                  .map((tx, index) => ({ tx, index }))
-                  .filter(({ tx }) => tx.cashflow === 'expense' && (tx.category === currentView || (currentView === 'Uncategorised' && !tx.category)))
-                  .map(({ tx, index }) => {
-                    // Determine confidence badge color
-                    const confidence = tx.confidence || 0;
-                    let badgeColor = 'bg-gray-100 text-gray-700';
-                    if (confidence >= 90) badgeColor = 'bg-green-100 text-green-700';
-                    else if (confidence >= 70) badgeColor = 'bg-blue-100 text-blue-700';
-                    else if (confidence >= 50) badgeColor = 'bg-yellow-100 text-yellow-700';
-                    else if (confidence > 0) badgeColor = 'bg-orange-100 text-orange-700';
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Description
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Amount
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Category
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Label
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {localTransactions
+                      .map((tx, index) => ({ tx, index }))
+                      .filter(({ tx }) => tx.cashflow === 'expense' && (tx.category === currentView || (currentView === 'Uncategorised' && (!tx.category || tx.category === 'Uncategorised'))))
+                      .map(({ tx, index }) => {
+                        // Determine confidence badge color
+                        const confidence = tx.confidence || 0;
+                        let badgeColor = 'bg-gray-100 text-gray-700';
+                        if (confidence >= 90) badgeColor = 'bg-green-100 text-green-700';
+                        else if (confidence >= 70) badgeColor = 'bg-blue-100 text-blue-700';
+                        else if (confidence >= 50) badgeColor = 'bg-yellow-100 text-yellow-700';
+                        else if (confidence > 0) badgeColor = 'bg-orange-100 text-orange-700';
 
-                    return (
-                      <div
-                        key={index}
-                        className="border border-gray-200 rounded-lg p-4 bg-white hover:bg-gray-50"
-                      >
-                        <div className="flex justify-between items-start gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-gray-900">{tx.description}</div>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-sm text-gray-600">
-                                ${Math.abs(tx.amount).toFixed(2)}
-                              </span>
+                        return (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              <div className="font-medium">{tx.description}</div>
                               {tx.confidence !== undefined && tx.confidence > 0 && (
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeColor}`}>
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeColor} inline-block mt-1`}>
                                   {tx.confidence}% confidence
                                 </span>
                               )}
-                            </div>
-                          </div>
-                          <div className="ml-4 flex flex-col gap-2 min-w-[180px]">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Category
-                              </label>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                              ${Math.abs(tx.amount).toFixed(2)}
+                            </td>
+                            <td className="px-4 py-3">
                               <select
                                 value={tx.category || 'Uncategorised'}
                                 onChange={(e) => {
@@ -282,11 +286,8 @@ export default function CategorizationSummaryModal({
                                 ))}
                                 <option value="Uncategorised">Uncategorised</option>
                               </select>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Label
-                              </label>
+                            </td>
+                            <td className="px-4 py-3">
                               <select
                                 value={tx.label}
                                 onChange={(e) => updateTransaction(index, tx.category, e.target.value)}
@@ -296,12 +297,12 @@ export default function CategorizationSummaryModal({
                                   <option key={label} value={label}>{label}</option>
                                 ))}
                               </select>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

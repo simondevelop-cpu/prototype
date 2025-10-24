@@ -357,12 +357,15 @@ interface KeywordPattern {
 
 const KEYWORD_PATTERNS: KeywordPattern[] = [
   // === BILL PAYMENTS === (High priority)
-  { keywords: ['BILL PAYMENT', 'PAIEMENT DE FACTURE', 'BILLPAY'], score: 15, category: 'Bills', label: 'Other bills' },
-  { keywords: ['PRE-AUTHORIZED PAYMENT', 'PREAUTHORIZED', 'PRE AUTHORIZED', 'PAIEMENT PREAUTORI'], score: 15, category: 'Bills', label: 'Other bills' },
-  { keywords: ['UTILITY', 'UTILITIES', 'SERVICES PUBLICS'], score: 12, category: 'Bills', label: 'Other bills' },
-  { keywords: ['WATER', 'WATER BILL', 'EAU'], score: 12, category: 'Bills', label: 'Other bills' },
-  { keywords: ['GAS BILL', 'GAZ NATUREL'], score: 12, category: 'Bills', label: 'Gas & Electricity' },
-  { keywords: ['ELECTRIC BILL', 'ELECTRICITY', 'ELECTRICITE'], score: 12, category: 'Bills', label: 'Gas & Electricity' },
+  { keywords: ['BILL PAYMENT', 'PAIEMENT DE FACTURE', 'BILLPAY', 'BILL PAY'], score: 15, category: 'Bills', label: 'Other bills' },
+  { keywords: ['PRE-AUTHORIZED PAYMENT', 'PREAUTHORIZED', 'PRE AUTHORIZED', 'PAIEMENT PREAUTORI', 'PREAUTH'], score: 15, category: 'Bills', label: 'Other bills' },
+  { keywords: ['AUTOMATIC PAYMENT', 'AUTO PAYMENT', 'AUTOPAY', 'RECURRING PAYMENT'], score: 14, category: 'Bills', label: 'Other bills' },
+  { keywords: ['UTILITY', 'UTILITIES', 'SERVICES PUBLICS', 'UTIL'], score: 12, category: 'Bills', label: 'Other bills' },
+  { keywords: ['WATER', 'WATER BILL', 'EAU', 'WATERWORKS'], score: 12, category: 'Bills', label: 'Other bills' },
+  { keywords: ['GAS BILL', 'GAZ NATUREL', 'NATURAL GAS', 'GAS COMPANY'], score: 12, category: 'Bills', label: 'Gas & Electricity' },
+  { keywords: ['ELECTRIC BILL', 'ELECTRICITY', 'ELECTRICITE', 'POWER BILL', 'HYDRO'], score: 12, category: 'Bills', label: 'Gas & Electricity' },
+  { keywords: ['INTERNET BILL', 'CABLE', 'CABLE BILL'], score: 12, category: 'Bills', label: 'Internet' },
+  { keywords: ['PHONE BILL', 'MOBILE BILL', 'WIRELESS BILL'], score: 12, category: 'Bills', label: 'Phone' },
   
   // Housing
   { keywords: ['RENT', 'LOYER', 'LANDLORD', 'PROPRIETAIRE'], score: 10, category: 'Housing', label: 'Rent' },
@@ -371,10 +374,14 @@ const KEYWORD_PATTERNS: KeywordPattern[] = [
   { keywords: ['VET', 'VETERINARY', 'VETERINAIRE', 'PET CARE'], score: 10, category: 'Housing', label: 'Pets' },
   { keywords: ['DAYCARE', 'GARDERIE', 'CHILD CARE', 'GARDE ENFANT'], score: 12, category: 'Housing', label: 'Daycare' },
   
-  // Transport
-  { keywords: ['GAS STATION', 'FUEL', 'ESSENCE', 'CARBURANT'], score: 8, category: 'Transport', label: 'Car' },
-  { keywords: ['AUTO', 'MECHANIC', 'MECANICIEN', 'CAR WASH', 'OIL CHANGE'], score: 10, category: 'Transport', label: 'Car' },
-  { keywords: ['TRANSIT', 'BUS', 'METRO', 'TRAIN'], score: 8, category: 'Transport', label: 'Transport' },
+  // Transport (expanded)
+  { keywords: ['GAS STATION', 'FUEL', 'ESSENCE', 'CARBURANT', 'GASOLINE', 'DIESEL'], score: 8, category: 'Transport', label: 'Car' },
+  { keywords: ['AUTO', 'MECHANIC', 'MECANICIEN', 'CAR WASH', 'OIL CHANGE', 'AUTO REPAIR', 'GARAGE'], score: 10, category: 'Transport', label: 'Car' },
+  { keywords: ['CAR PARTS', 'AUTO PARTS', 'PIECES AUTO'], score: 10, category: 'Transport', label: 'Car' },
+  { keywords: ['TIRE', 'TIRES', 'PNEU', 'PNEUS'], score: 10, category: 'Transport', label: 'Car' },
+  { keywords: ['TRANSIT', 'BUS', 'METRO', 'TRAIN', 'SUBWAY'], score: 8, category: 'Transport', label: 'Transport' },
+  { keywords: ['PUBLIC TRANSPORT', 'TRANSPORT EN COMMUN', 'TRANSIT PASS'], score: 10, category: 'Transport', label: 'Transport' },
+  { keywords: ['RIDESHARE', 'RIDE SHARE', 'COVOITURAGE'], score: 10, category: 'Transport', label: 'Transport' },
   
   // Bills - Insurance
   { keywords: ['INSURANCE', 'ASSURANCE'], score: 10, category: 'Bills', label: 'Home insurance' },
@@ -389,12 +396,15 @@ const KEYWORD_PATTERNS: KeywordPattern[] = [
   { keywords: ['SERVICE CHARGE', 'BANK FEE', 'ACCOUNT FEE', 'FRAIS BANCAIRE'], score: 12, category: 'Bills', label: 'Bank and other fees' },
   { keywords: ['NSF FEE', 'OVERDRAFT', 'DECOUVERTE'], score: 12, category: 'Bills', label: 'Bank and other fees' },
   
-  // Food - Groceries
-  { keywords: ['GROCERY', 'GROCERIES', 'SUPERMARKET', 'EPICERIE', 'ALIMENTATION'], score: 8, category: 'Food', label: 'Groceries' },
-  { keywords: ['MARKET', 'MARCHE', 'FOOD STORE'], score: 6, category: 'Food', label: 'Groceries' },
-  { keywords: ['BUTCHER', 'BOUCHER', 'MEAT SHOP'], score: 10, category: 'Food', label: 'Groceries' },
-  { keywords: ['PRODUCE', 'FRUIT', 'VEGETABLE', 'LEGUME'], score: 8, category: 'Food', label: 'Groceries' },
-  { keywords: ['ORGANIC', 'BIOLOGIQUE', 'HEALTH FOOD'], score: 8, category: 'Food', label: 'Groceries' },
+  // Food - Groceries (expanded with common patterns)
+  { keywords: ['GROCERY', 'GROCERIES', 'SUPERMARKET', 'EPICERIE', 'ALIMENTATION', 'GROCER'], score: 8, category: 'Food', label: 'Groceries' },
+  { keywords: ['MARKET', 'MARCHE', 'FOOD STORE', 'FOOD MART'], score: 6, category: 'Food', label: 'Groceries' },
+  { keywords: ['BUTCHER', 'BOUCHER', 'MEAT SHOP', 'BUTCHERY'], score: 10, category: 'Food', label: 'Groceries' },
+  { keywords: ['PRODUCE', 'FRUIT', 'VEGETABLE', 'LEGUME', 'VEGGIE'], score: 8, category: 'Food', label: 'Groceries' },
+  { keywords: ['ORGANIC', 'BIOLOGIQUE', 'HEALTH FOOD', 'NATURAL FOOD'], score: 8, category: 'Food', label: 'Groceries' },
+  { keywords: ['CONVENIENCE STORE', 'DEPANNEUR', 'CORNER STORE', '7-ELEVEN', '7 ELEVEN', 'CIRCLE K'], score: 10, category: 'Food', label: 'Groceries' },
+  { keywords: ['DELI', 'DELICATESSEN', 'CHARCUTERIE'], score: 8, category: 'Food', label: 'Groceries' },
+  { keywords: ['BAKERY SHOP', 'BREAD', 'PAIN'], score: 8, category: 'Food', label: 'Groceries' },
   
   // Food - Restaurants & Dining
   { keywords: ['BAR', 'PUB', 'GRILL', 'BISTRO', 'BRASSERIE'], score: 8, category: 'Food', label: 'Eating Out' },
@@ -430,16 +440,23 @@ const KEYWORD_PATTERNS: KeywordPattern[] = [
   { keywords: ['GAMING', 'PLAYSTATION', 'XBOX', 'NINTENDO', 'STEAM'], score: 10, category: 'Personal', label: 'Entertainment' },
   { keywords: ['BOOK', 'LIVRE', 'MAGAZINE', 'NEWSPAPER'], score: 8, category: 'Personal', label: 'Entertainment' },
   
-  // Shopping Keywords
-  { keywords: ['ONLINE SHOPPING', 'E-COMMERCE', 'WEB STORE'], score: 8, category: 'Shopping', label: 'Shopping' },
-  { keywords: ['DEPARTMENT STORE', 'MAGASIN', 'RETAIL'], score: 6, category: 'Shopping', label: 'Shopping' },
-  { keywords: ['ELECTRONICS', 'ELECTRONIQUE', 'TECH STORE'], score: 8, category: 'Shopping', label: 'Shopping' },
-  { keywords: ['FURNITURE', 'MEUBLE', 'HOME DECOR'], score: 8, category: 'Shopping', label: 'Shopping' },
-  { keywords: ['HARDWARE', 'QUINCAILLERIE', 'TOOLS', 'OUTILS'], score: 8, category: 'Shopping', label: 'Shopping' },
-  { keywords: ['JEWELRY', 'BIJOUTERIE', 'JEWELLERY'], score: 10, category: 'Shopping', label: 'Shopping' },
-  { keywords: ['TOY', 'JOUET', 'TOY STORE'], score: 10, category: 'Shopping', label: 'Shopping' },
-  { keywords: ['PET STORE', 'ANIMALERIE', 'PET SUPPLY'], score: 10, category: 'Housing', label: 'Pets' },
-  { keywords: ['FLORIST', 'FLEURISTE', 'FLOWERS'], score: 10, category: 'Shopping', label: 'Shopping' },
+  // Shopping Keywords (massively expanded)
+  { keywords: ['ONLINE SHOPPING', 'E-COMMERCE', 'WEB STORE', 'ONLINE STORE'], score: 8, category: 'Shopping', label: 'Shopping' },
+  { keywords: ['DEPARTMENT STORE', 'MAGASIN', 'RETAIL', 'STORE'], score: 5, category: 'Shopping', label: 'Shopping' },
+  { keywords: ['SHOP', 'BOUTIQUE', 'SHOPPING'], score: 5, category: 'Shopping', label: 'Shopping' },
+  { keywords: ['PURCHASE', 'ACHAT', 'BUY', 'BOUGHT'], score: 4, category: 'Shopping', label: 'Shopping' },
+  { keywords: ['ELECTRONICS', 'ELECTRONIQUE', 'TECH STORE', 'COMPUTER STORE'], score: 8, category: 'Shopping', label: 'Shopping' },
+  { keywords: ['FURNITURE', 'MEUBLE', 'HOME DECOR', 'FURNISHING'], score: 8, category: 'Shopping', label: 'Shopping' },
+  { keywords: ['HARDWARE', 'QUINCAILLERIE', 'TOOLS', 'OUTILS', 'HARDWARE STORE'], score: 8, category: 'Shopping', label: 'Shopping' },
+  { keywords: ['JEWELRY', 'BIJOUTERIE', 'JEWELLERY', 'JEWELER'], score: 10, category: 'Shopping', label: 'Shopping' },
+  { keywords: ['TOY', 'JOUET', 'TOY STORE', 'TOYS'], score: 10, category: 'Shopping', label: 'Shopping' },
+  { keywords: ['PET STORE', 'ANIMALERIE', 'PET SUPPLY', 'PET SHOP'], score: 10, category: 'Housing', label: 'Pets' },
+  { keywords: ['FLORIST', 'FLEURISTE', 'FLOWERS', 'FLEUR'], score: 10, category: 'Shopping', label: 'Shopping' },
+  { keywords: ['CLOTHING', 'VETEMENT', 'APPAREL', 'FASHION'], score: 8, category: 'Shopping', label: 'Clothes' },
+  { keywords: ['SHOES', 'CHAUSSURES', 'FOOTWEAR'], score: 8, category: 'Shopping', label: 'Clothes' },
+  { keywords: ['COSMETICS', 'COSMETIQUE', 'MAKEUP', 'MAQUILLAGE'], score: 8, category: 'Shopping', label: 'Beauty' },
+  { keywords: ['BEAUTY', 'BEAUTE', 'SALON', 'SPA PRODUCTS'], score: 8, category: 'Shopping', label: 'Beauty' },
+  { keywords: ['DRUGSTORE', 'DRUG STORE', 'PHARMACY RETAIL'], score: 8, category: 'Shopping', label: 'Beauty' },
   
   // Work
   { keywords: ['OFFICE SUPPLIES', 'FOURNITURES BUREAU'], score: 10, category: 'Work', label: 'Work' },
@@ -573,14 +590,22 @@ export function categorizeTransaction(
     return { category: bestMatch.category, label: bestMatch.label, confidence: 90 + bestMatch.score / 2 };
   }
   
-  // Tier 2: Keyword pattern matching (specificity-based)
+  // Tier 2: Keyword pattern matching (specificity-based with partial matching)
   let bestKeywordMatch: { category: string; label: string; score: number } | null = null;
   
   for (const pattern of KEYWORD_PATTERNS) {
     for (const keyword of pattern.keywords) {
+      // Check for whole word or partial match
       if (cleaned.includes(keyword)) {
         if (!bestKeywordMatch || pattern.score > bestKeywordMatch.score) {
           bestKeywordMatch = { category: pattern.category, label: pattern.label, score: pattern.score };
+        }
+      }
+      // Also check for word boundaries (e.g., "GROCERY" in "GROCERY STORE")
+      else if (cleaned.split(/\s+/).some(word => word.includes(keyword) || keyword.includes(word))) {
+        const partialScore = pattern.score - 2; // Slightly lower score for partial matches
+        if (!bestKeywordMatch || partialScore > bestKeywordMatch.score) {
+          bestKeywordMatch = { category: pattern.category, label: pattern.label, score: partialScore };
         }
       }
     }
@@ -588,7 +613,7 @@ export function categorizeTransaction(
   
   if (bestKeywordMatch) {
     // Medium-high confidence for keyword matches
-    const confidence = 70 + bestKeywordMatch.score;
+    const confidence = Math.min(95, 70 + bestKeywordMatch.score);
     return { category: bestKeywordMatch.category, label: bestKeywordMatch.label, confidence };
   }
   
