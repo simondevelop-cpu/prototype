@@ -38,8 +38,11 @@ export async function POST(req: NextRequest) {
     let userId: number;
 
     try {
-      const payload = jwt.verify(token, JWT_SECRET) as { sub: number };
-      userId = payload.sub;
+      const payload = jwt.verify(token, JWT_SECRET);
+      if (typeof payload === 'string' || !payload.sub) {
+        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      }
+      userId = typeof payload.sub === 'number' ? payload.sub : parseInt(payload.sub, 10);
     } catch {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
