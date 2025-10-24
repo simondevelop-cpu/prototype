@@ -125,7 +125,33 @@ export default function StatementReviewModal({
   };
 
   // Handle categorization check button
-  const handleCheckCategorization = () => {
+  const handleCheckCategorization = async () => {
+    // Get all expense transactions to categorize
+    const expenseTransactions = getTransactionsToImport().filter(tx => tx.cashflow === 'expense');
+    
+    // Categorize them using the engine
+    const categorized = categorizeBatch(
+      expenseTransactions.map(tx => ({
+        description: tx.description,
+        amount: tx.amount,
+      })),
+      learnedPatterns
+    );
+    
+    // Update transactions with categorization results
+    const newEdited = new Map(editedTransactions);
+    expenseTransactions.forEach((tx, index) => {
+      const key = getTxKey(tx);
+      newEdited.set(key, {
+        ...tx,
+        category: categorized[index].category,
+        label: categorized[index].label,
+        confidence: categorized[index].confidence,
+      });
+    });
+    
+    setEditedTransactions(newEdited);
+    setCategorizationApplied(true);
     setShowCategorizationModal(true);
   };
 
