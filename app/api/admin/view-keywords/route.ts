@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         SELECT * FROM admin_merchants 
         WHERE is_active = TRUE
         ${category ? 'AND category = $1' : ''}
-        ORDER BY category, score DESC, merchant_pattern
+        ORDER BY category, merchant_pattern
       `;
       if (category) params.push(category);
     } else {
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
         SELECT * FROM admin_keywords 
         WHERE is_active = TRUE
         ${category ? 'AND category = $1' : ''}
-        ORDER BY category, score DESC, keyword
+        ORDER BY category, keyword
       `;
       if (category) params.push(category);
     }
