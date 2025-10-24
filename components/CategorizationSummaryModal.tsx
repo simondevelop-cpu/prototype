@@ -33,6 +33,8 @@ export default function CategorizationSummaryModal({
   const [localTransactions, setLocalTransactions] = useState<Transaction[]>(transactions);
   const [showExplanation, setShowExplanation] = useState(false);
   const [showAllCategories, setShowAllCategories] = useState(false);
+  const [customCategoryInput, setCustomCategoryInput] = useState<{ [key: number]: string }>({});
+  const [showCustomInput, setShowCustomInput] = useState<{ [key: number]: boolean }>({});
 
   // Reset when modal opens
   useEffect(() => {
@@ -70,12 +72,14 @@ export default function CategorizationSummaryModal({
     }
   ];
   
-  // Split into priority and other categories
-  const prioritySummary = allCategorySummary.filter(cat => priorityCategories.includes(cat.category));
-  const otherSummary = allCategorySummary.filter(cat => !priorityCategories.includes(cat.category));
+  // Split into categories with transactions and without
+  const categoriesWithTransactions = allCategorySummary.filter(cat => cat.count > 0);
+  const categoriesWithoutTransactions = allCategorySummary.filter(cat => cat.count === 0);
   
-  // Determine what to display (show all if expanded, or just priority)
-  const categorySummary = showAllCategories ? allCategorySummary : prioritySummary;
+  // Determine what to display (show all if expanded, or just those with transactions)
+  const categorySummary = showAllCategories 
+    ? [...categoriesWithTransactions, ...categoriesWithoutTransactions]
+    : categoriesWithTransactions;
 
   // Calculate average confidence
   const avgConfidence = localTransactions.length > 0
@@ -203,7 +207,7 @@ export default function CategorizationSummaryModal({
               </div>
 
               {/* Expand/Collapse Button */}
-              {otherSummary.length > 0 && (
+              {categoriesWithoutTransactions.length > 0 && (
                 <div className="mt-4 text-center">
                   <button
                     onClick={() => setShowAllCategories(!showAllCategories)}
@@ -211,7 +215,7 @@ export default function CategorizationSummaryModal({
                   >
                     {showAllCategories 
                       ? '← Show Less Categories' 
-                      : `+ Show ${otherSummary.length} More Categories (${Object.keys(CATEGORIES).filter(c => !priorityCategories.includes(c)).join(', ')})`
+                      : `+ Show ${categoriesWithoutTransactions.length} More Categories`
                     }
                   </button>
                 </div>
@@ -239,9 +243,6 @@ export default function CategorizationSummaryModal({
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Category
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Label
                       </th>
                     </tr>
                   </thead>
@@ -272,31 +273,60 @@ export default function CategorizationSummaryModal({
                               ${Math.abs(tx.amount).toFixed(2)}
                             </td>
                             <td className="px-4 py-3">
-                              <select
-                                value={tx.category || 'Uncategorised'}
-                                onChange={(e) => {
-                                  const newCategory = e.target.value;
-                                  const labels = getLabelsForCategory(newCategory);
-                                  updateTransaction(index, newCategory, labels[0] || '');
-                                }}
-                                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5"
-                              >
-                                {Object.keys(CATEGORIES).map(cat => (
-                                  <option key={cat} value={cat}>{cat}</option>
-                                ))}
-                                <option value="Uncategorised">Uncategorised</option>
-                              </select>
-                            </td>
-                            <td className="px-4 py-3">
-                              <select
-                                value={tx.label}
-                                onChange={(e) => updateTransaction(index, tx.category, e.target.value)}
-                                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5"
-                              >
-                                {getLabelsForCategory(tx.category).map(label => (
-                                  <option key={label} value={label}>{label}</option>
-                                ))}
-                              </select>
+                              {showCustomInput[index] ? (
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={customCategoryInput[index] || ''}
+                                    onChange={(e) => setCustomCategoryInput({ ...customCategoryInput, [index]: e.target.value })}
+                                    placeholder="Enter new category"
+                                    className="flex-1 text-sm border border-gray-300 rounded px-2 py-1.5"
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      if (customCategoryInput[index]?.trim()) {
+                                        const labels = getLabelsForCategory(customCategoryInput[index]);
+                                        updateTransaction(index, customCategoryInput[index].trim(), labels[0] || '');
+                                        setShowCustomInput({ ...showCustomInput, [index]: false });
+                                        setCustomCategoryInput({ ...customCategoryInput, [index]: '' });
+                                      }
+                                    }}
+                                    className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                                  >
+                                    ✓
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setShowCustomInput({ ...showCustomInput, [index]: false });
+                                      setCustomCategoryInput({ ...customCategoryInput, [index]: '' });
+                                    }}
+                                    className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <select
+                                  value={tx.category || 'Uncategorised'}
+                                  onChange={(e) => {
+                                    if (e.target.value === '__ADD_NEW__') {
+                                      setShowCustomInput({ ...showCustomInput, [index]: true });
+                                    } else {
+                                      const newCategory = e.target.value;
+                                      const labels = getLabelsForCategory(newCategory);
+                                      updateTransaction(index, newCategory, labels[0] || '');
+                                    }
+                                  }}
+                                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5"
+                                >
+                                  {Object.keys(CATEGORIES).map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                  ))}
+                                  <option value="Uncategorised">Uncategorised</option>
+                                  <option value="__ADD_NEW__" className="font-semibold text-blue-600">+ Add New Category</option>
+                                </select>
+                              )}
                             </td>
                           </tr>
                         );

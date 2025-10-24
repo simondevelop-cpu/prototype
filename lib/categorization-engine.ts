@@ -623,8 +623,8 @@ export function categorizeTransaction(
     return amountBased;
   }
   
-  // Default: Uncategorised with low confidence
-  return { category: 'Uncategorised', label: 'needs review', confidence: 0 };
+  // Default: Uncategorised with low confidence (ensure all transactions get a category)
+  return { category: 'Uncategorised', label: 'Uncategorised', confidence: 0 };
 }
 
 /**

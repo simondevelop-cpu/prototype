@@ -595,12 +595,6 @@ export default function StatementReviewModal({
               </div>
             </div>
 
-            {/* Info Box */}
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>💡 Tip:</strong> You can confirm the upload immediately, or click "Investigate" on any row to review and edit individual transactions.
-              </p>
-            </div>
           </div>
         );
       }
