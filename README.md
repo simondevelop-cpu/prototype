@@ -49,6 +49,26 @@ A modern, AI-ready personal finance management application built for Canadians. 
 - Demo account with 12 months of realistic Canadian transaction data
 - Multi-user support with data isolation
 
+### 🛠️ **Admin Dashboard** 🆕
+- **Secure Admin Login** - Separate admin authentication at `/admin/login`
+- **Category Engine Management**
+  - **Patterns Tab** - Manage keywords and merchants for auto-categorization
+    - View/edit/delete keywords and merchants
+    - Inline editing (double-click cells to edit)
+    - Multi-select filtering by category and label
+    - Bulk delete operations
+    - Add alternate merchant patterns (e.g., "TIMHORT" for "TIM HORTONS")
+  - **Recategorization Log** - Track user recategorizations
+    - See what patterns users are creating
+    - Monitor categorization frequency and accuracy
+    - Mark recategorizations as reviewed
+- **Accounts Tab** - View all registered users and their activity
+- **Analytics, Insights, Inbox** - Placeholder tabs for future features
+- **Auto-Categorization Engine Display** - Shows the 3-tier logic:
+  1. User History (highest priority)
+  2. Merchant Matching
+  3. Keyword Search (first match)
+
 ### 🎨 **Modern UI/UX**
 - Built with Next.js 14 and React
 - Styled with Tailwind CSS
@@ -500,8 +520,9 @@ CREATE TABLE admin_merchants (
 - Insights tab is placeholder (coming soon)
 - Budget tab is placeholder (coming soon)
 - No mobile app yet (responsive web only)
-- PDF statement parsing is beta (supported banks: TD, RBC, CIBC, BMO)
+- PDF statement parsing is beta (supported banks: TD, RBC, CIBC, National Bank, Amex)
 - Single currency support (CAD)
+- Admin dashboard placeholders: Inbox, Analytics, Insights Engine (Category Engine is fully functional)
 
 ---
 
@@ -538,5 +559,10 @@ For questions, issues, or feature requests, please open an issue on GitHub.
 **Demo Account Credentials:**
 - Email: demo@example.com
 - Password: demo123
+
+**Admin Dashboard Access:**
+- Visit: `/admin/login`
+- Email: admin@canadianinsights.ca
+- Password: categorisationandinsightsengine
 
 **Happy tracking!** 🎉💸
