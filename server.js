@@ -154,12 +154,30 @@ async function ensureSchema() {
     );
   `);
 
+  // Categorization learning table for user corrections
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS categorization_learning (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      description_pattern TEXT NOT NULL,
+      original_category TEXT,
+      original_label TEXT,
+      corrected_category TEXT NOT NULL,
+      corrected_label TEXT NOT NULL,
+      frequency INTEGER DEFAULT 1,
+      last_used TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   // Indexes for performance
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
     CREATE INDEX IF NOT EXISTS idx_transactions_cashflow ON transactions(cashflow);
     CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category);
+    CREATE INDEX IF NOT EXISTS idx_categorization_user_id ON categorization_learning(user_id);
+    CREATE INDEX IF NOT EXISTS idx_categorization_pattern ON categorization_learning(description_pattern);
   `);
   
   console.log('[DB] Schema created successfully');

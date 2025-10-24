@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
+import CategorizationSummaryModal from './CategorizationSummaryModal';
+import { categorizeBatch, LearnedPattern } from '@/lib/categorization-engine';
 
 interface Transaction {
   date: string;
@@ -58,6 +60,11 @@ export default function StatementReviewModal({
   
   // Editing state
   const [editingTransaction, setEditingTransaction] = useState<{ key: string; tx: Transaction } | null>(null);
+  
+  // Categorization modal state
+  const [showCategorizationModal, setShowCategorizationModal] = useState(false);
+  const [learnedPatterns, setLearnedPatterns] = useState<LearnedPattern[]>([]);
+  const [categorizationApplied, setCategorizationApplied] = useState(false);
 
   // Generate unique key for transaction
   const getTxKey = (tx: Transaction) => `${tx.date}_${tx.merchant}_${tx.amount}`;
@@ -92,6 +99,47 @@ export default function StatementReviewModal({
     newEdited.set(key, updatedTx);
     setEditedTransactions(newEdited);
     setEditingTransaction(null);
+  };
+
+  // Fetch learned patterns when modal opens
+  useEffect(() => {
+    if (isOpen && !categorizationApplied) {
+      fetchLearnedPatterns();
+    }
+  }, [isOpen, categorizationApplied]);
+
+  const fetchLearnedPatterns = async () => {
+    try {
+      const response = await fetch('/api/categorization/learn', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setLearnedPatterns(data.patterns || []);
+      }
+    } catch (error) {
+      console.error('Error fetching learned patterns:', error);
+    }
+  };
+
+  // Handle categorization check button
+  const handleCheckCategorization = () => {
+    setShowCategorizationModal(true);
+  };
+
+  // Update transactions with new categorizations
+  const handleUpdateCategorizationsFromModal = (updatedTransactions: Transaction[]) => {
+    const newEdited = new Map(editedTransactions);
+    
+    for (const tx of updatedTransactions) {
+      const key = getTxKey(tx);
+      newEdited.set(key, tx);
+    }
+    
+    setEditedTransactions(newEdited);
+    setCategorizationApplied(true);
   };
 
   // Get all transactions that will be imported
@@ -804,25 +852,37 @@ export default function StatementReviewModal({
               {currentStep === 'summary' ? 'Cancel' : '← Back to Summary'}
             </button>
 
-            <button
-              onClick={handleImport}
-              disabled={importing || getTransactionsToImport().length === 0}
-              className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
-              {importing ? (
-                <>
-                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Importing...
-                </>
-              ) : (
-                <>
-                  ✓ Confirm & Import {getTransactionsToImport().length} Transactions
-                </>
+            <div className="flex gap-3">
+              {currentStep === 'summary' && (
+                <button
+                  onClick={handleCheckCategorization}
+                  disabled={importing}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  🏷️ Check Our Expense Auto-Categorisor
+                </button>
               )}
-            </button>
+              
+              <button
+                onClick={handleImport}
+                disabled={importing || getTransactionsToImport().length === 0}
+                className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {importing ? (
+                  <>
+                    <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    ✓ Confirm & Import {getTransactionsToImport().length} Transactions
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -897,6 +957,16 @@ export default function StatementReviewModal({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Categorization Summary Modal */}
+      {showCategorizationModal && (
+        <CategorizationSummaryModal
+          isOpen={showCategorizationModal}
+          onClose={() => setShowCategorizationModal(false)}
+          transactions={getTransactionsToImport().filter(tx => tx.cashflow === 'expense')}
+          onUpdateTransactions={handleUpdateCategorizationsFromModal}
+        />
       )}
     </>
   );

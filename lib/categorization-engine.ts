@@ -351,15 +351,45 @@ function detectByAmount(amount: number, description: string): { category: string
 }
 
 /**
+ * Learned pattern interface
+ */
+export interface LearnedPattern {
+  description_pattern: string;
+  corrected_category: string;
+  corrected_label: string;
+  frequency: number;
+}
+
+/**
  * Main categorization function with confidence scoring
  * Multi-tier approach for high accuracy
+ * 
+ * @param description Transaction description
+ * @param amount Transaction amount
+ * @param learnedPatterns Optional array of user's learned patterns (prioritized)
  */
 export function categorizeTransaction(
   description: string,
-  amount: number
+  amount: number,
+  learnedPatterns?: LearnedPattern[]
 ): { category: string; label: string; confidence: number } {
   const cleaned = cleanMerchantName(description);
   const absAmount = Math.abs(amount);
+  
+  // Tier 0: User learned patterns (HIGHEST PRIORITY)
+  if (learnedPatterns && learnedPatterns.length > 0) {
+    for (const pattern of learnedPatterns) {
+      if (cleaned.includes(pattern.description_pattern)) {
+        // Very high confidence for learned patterns, boosted by frequency
+        const confidenceBoost = Math.min(pattern.frequency * 2, 10);
+        return {
+          category: pattern.corrected_category,
+          label: pattern.corrected_label,
+          confidence: 95 + confidenceBoost,
+        };
+      }
+    }
+  }
   
   // Special handling for e-Transfers (Canadian-specific intelligence)
   if (cleaned.includes('INTERAC E-TRANSFER') || cleaned.includes('E-TRANSFER') || cleaned.includes('VIREMENT')) {
@@ -418,12 +448,16 @@ export function categorizeTransaction(
 
 /**
  * Batch categorize multiple transactions
+ * 
+ * @param transactions Array of transactions to categorize
+ * @param learnedPatterns Optional array of user's learned patterns
  */
 export function categorizeBatch(
-  transactions: Array<{ description: string; amount: number; id?: string }>
+  transactions: Array<{ description: string; amount: number; id?: string }>,
+  learnedPatterns?: LearnedPattern[]
 ): Array<{ id?: string; description: string; amount: number; category: string; label: string; confidence: number }> {
   return transactions.map(tx => {
-    const result = categorizeTransaction(tx.description, tx.amount);
+    const result = categorizeTransaction(tx.description, tx.amount, learnedPatterns);
     return {
       ...tx,
       ...result,
