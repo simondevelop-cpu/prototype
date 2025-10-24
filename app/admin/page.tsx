@@ -47,10 +47,12 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<any>({});
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
 
   // Check authentication on mount
   useEffect(() => {
@@ -135,6 +137,7 @@ export default function AdminDashboard() {
     
     // Get unique values for filters
     const allCategories = Array.from(new Set(allItems.map(item => item.category))).sort();
+    const allLabels = Array.from(new Set(allItems.map(item => item.label).filter(Boolean))).sort();
     
     // Apply filters
     const filteredItems = allItems.filter((item: any) => {
@@ -152,15 +155,20 @@ export default function AdminDashboard() {
       const matchesCategory = selectedCategories.length === 0 || 
         selectedCategories.includes(item.category);
       
-      return matchesSearch && matchesCategory;
+      // Label filter
+      const matchesLabel = selectedLabels.length === 0 || 
+        selectedLabels.includes(item.label);
+      
+      return matchesSearch && matchesCategory && matchesLabel;
     });
     
     const clearFilters = () => {
       setSearchTerm('');
       setSelectedCategories([]);
+      setSelectedLabels([]);
     };
     
-    const hasActiveFilters = searchTerm !== '' || selectedCategories.length > 0;
+    const hasActiveFilters = searchTerm !== '' || selectedCategories.length > 0 || selectedLabels.length > 0;
 
     return (
       <div className="space-y-6">
@@ -248,6 +256,15 @@ export default function AdminDashboard() {
             </button>
           )}
           
+          {selectedItems.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors whitespace-nowrap font-medium"
+            >
+              Delete Selected ({selectedItems.length})
+            </button>
+          )}
+          
           <button
             onClick={() => setShowAddModal(true)}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap font-medium"
@@ -280,6 +297,20 @@ export default function AdminDashboard() {
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
+                      <th className="px-4 py-3 text-left whitespace-nowrap w-12">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.length === filteredItems.length && filteredItems.length > 0}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedItems(filteredItems.map((item: any) => item.id));
+                            } else {
+                              setSelectedItems([]);
+                            }
+                          }}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                        />
+                      </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                         {viewType === 'keywords' ? 'Keyword' : 'Merchant Pattern'}
                       </th>
@@ -289,7 +320,12 @@ export default function AdminDashboard() {
                         selected={selectedCategories}
                         onChange={setSelectedCategories}
                       />
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Label</th>
+                      <ColumnFilterHeader
+                        label="Label"
+                        options={allLabels}
+                        selected={selectedLabels}
+                        onChange={setSelectedLabels}
+                      />
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Score</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                         {editingItemId ? 'Save' : 'Actions'}
@@ -303,6 +339,20 @@ export default function AdminDashboard() {
                       
                       return (
                         <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-4 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={selectedItems.includes(item.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedItems([...selectedItems, item.id]);
+                                } else {
+                                  setSelectedItems(selectedItems.filter(id => id !== item.id));
+                                }
+                              }}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                            />
+                          </td>
                           <td 
                             className="px-6 py-4 text-sm font-medium text-gray-900 cursor-pointer"
                             onDoubleClick={() => startEditing(item, 'keyword')}
@@ -512,6 +562,33 @@ export default function AdminDashboard() {
       await fetchData();
     } catch (error: any) {
       alert(`Error deleting item: ${error.message}`);
+    }
+  };
+  
+  const handleBulkDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedItems.length} items? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('admin_token');
+      const endpoint = viewType === 'keywords' ? 'keywords' : 'merchants';
+      
+      // Delete all selected items in parallel
+      await Promise.all(
+        selectedItems.map(id =>
+          fetch(`/api/admin/${endpoint}/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+        )
+      );
+      
+      // Clear selection and refresh data
+      setSelectedItems([]);
+      await fetchData();
+    } catch (error: any) {
+      alert(`Error deleting items: ${error.message}`);
     }
   };
 
