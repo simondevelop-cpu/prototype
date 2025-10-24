@@ -228,29 +228,55 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* View Type Toggle */}
+        {/* Sub-Tab Toggle: Patterns vs Recategorization Log */}
         <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
           <button
-            onClick={() => setViewType('keywords')}
+            onClick={() => { setCategorySubTab('patterns'); setViewType('keywords'); }}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              viewType === 'keywords'
+              categorySubTab === 'patterns'
                 ? 'bg-white text-blue-600 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            🔤 Keywords
+            📋 Patterns
           </button>
           <button
-            onClick={() => setViewType('merchants')}
+            onClick={() => setCategorySubTab('recategorization')}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              viewType === 'merchants'
+              categorySubTab === 'recategorization'
                 ? 'bg-white text-blue-600 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            🏪 Merchants
+            🔄 Recategorization Log
           </button>
         </div>
+        
+        {/* View Type Toggle (only shown for Patterns sub-tab) */}
+        {categorySubTab === 'patterns' && (
+          <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
+            <button
+              onClick={() => setViewType('keywords')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                viewType === 'keywords'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              🔤 Keywords
+            </button>
+            <button
+              onClick={() => setViewType('merchants')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                viewType === 'merchants'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              🏪 Merchants
+            </button>
+          </div>
+        )}
 
         {/* Stats */}
         {stats && (
