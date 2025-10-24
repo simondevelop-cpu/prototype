@@ -181,103 +181,8 @@ export default function AdminDashboard() {
 
   // Render Categories Tab
   const renderCategoriesTab = () => {
-    // If viewing recategorization log, render it directly
-    if (viewType === 'recategorization') {
-      return (
-        <div className="space-y-6">
-          {/* Auto-Categorization Logic Explanation */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-5 shadow-sm">
-            <p className="text-sm font-semibold text-gray-900 mb-3">Logic of the current auto-categorisation engine (in priority order):</p>
-            <ol className="space-y-2 text-sm text-gray-700">
-              <li>
-                <span className="font-semibold text-gray-900">1. User history</span> – First check if the user has previously recategorised a similar item
-              </li>
-              <li>
-                <span className="font-semibold text-gray-900">2. Merchant check</span> – A category if the merchant list below (or any of the alternative spellings) show up in the description with or without spaces.
-              </li>
-              <li>
-                <span className="font-semibold text-gray-900">3. Keyword search (first match)</span> – We search by category priority: Housing → Bills → Subscriptions → Food → Travel → Health → Transport → Education → Personal → Shopping → Work. The first matching keyword wins.
-              </li>
-            </ol>
-            <p className="text-sm text-gray-600 mt-3 pt-3 border-t border-blue-200">
-              Manage keywords and merchants below. All changes immediately affect categorization for future uploads.
-            </p>
-          </div>
-
-          {/* Three Sub-Tabs Side by Side */}
-          <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
-            <button
-              onClick={() => setViewType('keywords')}
-              className="px-4 py-2 rounded-md font-medium transition-colors text-gray-600 hover:text-gray-900"
-            >
-              🔤 Keywords
-            </button>
-            <button
-              onClick={() => setViewType('merchants')}
-              className="px-4 py-2 rounded-md font-medium transition-colors text-gray-600 hover:text-gray-900"
-            >
-              🏪 Merchants
-            </button>
-            <button
-              onClick={() => setViewType('recategorization')}
-              className="px-4 py-2 rounded-md font-medium transition-colors bg-white text-blue-600 shadow-sm"
-            >
-              🔄 Recategorization Log
-            </button>
-          </div>
-
-          {/* Recategorization Log Content */}
-          {renderRecategorizationLog()}
-        </div>
-      );
-    }
-    
-    // For keywords/merchants views
-    const currentData = viewType === 'keywords' ? keywords : merchants;
-    
-    // Flatten all items into a single array with category
-    const allItems = Object.entries(currentData).flatMap(([category, items]) =>
-      items.map(item => ({ ...item, category }))
-    );
-    
-    // Get unique values for filters
-    const allCategories = Array.from(new Set(allItems.map(item => item.category))).sort();
-    const allLabels = Array.from(new Set(allItems.map(item => item.label).filter(Boolean))).sort();
-    
-    // Apply filters
-    const filteredItems = allItems.filter((item: any) => {
-      const searchLower = searchTerm.toLowerCase();
-      const keyword = viewType === 'keywords' 
-        ? item.keyword 
-        : item.merchant_pattern;
-      
-      // Search filter
-      const matchesSearch = keyword.toLowerCase().includes(searchLower) ||
-        item.label?.toLowerCase().includes(searchLower) ||
-        item.category.toLowerCase().includes(searchLower);
-      
-      // Category filter
-      const matchesCategory = selectedCategories.length === 0 || 
-        selectedCategories.includes(item.category);
-      
-      // Label filter
-      const matchesLabel = selectedLabels.length === 0 || 
-        selectedLabels.includes(item.label);
-      
-      return matchesSearch && matchesCategory && matchesLabel;
-    });
-    
-    const clearFilters = () => {
-      setSearchTerm('');
-      setSelectedCategories([]);
-      setSelectedLabels([]);
-    };
-    
-    const hasActiveFilters = searchTerm !== '' || selectedCategories.length > 0 || selectedLabels.length > 0;
-
     return (
       <div className="space-y-6">
-        {/* Header & Controls */}
         {/* Auto-Categorization Logic Explanation */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-5 shadow-sm">
           <p className="text-sm font-semibold text-gray-900 mb-3">Logic of the current auto-categorisation engine (in priority order):</p>
@@ -331,8 +236,64 @@ export default function AdminDashboard() {
           </button>
         </div>
 
-        {/* Stats (only for Keywords/Merchants tabs) */}
-        {viewType !== 'recategorization' && stats && (
+        {/* Conditional Content: Recategorization Log or Patterns Table */}
+        {viewType === 'recategorization' ? (
+          renderRecategorizationLog()
+        ) : (
+          renderKeywordsMerchantsContent()
+        )}
+      </div>
+    );
+  };
+
+  // Render Keywords/Merchants Content (separated for type safety)
+  const renderKeywordsMerchantsContent = () => {
+    const currentData = viewType === 'keywords' ? keywords : merchants;
+    
+    // Flatten all items into a single array with category
+    const allItems = Object.entries(currentData).flatMap(([category, items]) =>
+      items.map(item => ({ ...item, category }))
+    );
+    
+    // Get unique values for filters
+    const allCategories = Array.from(new Set(allItems.map(item => item.category))).sort();
+    const allLabels = Array.from(new Set(allItems.map(item => item.label).filter(Boolean))).sort();
+    
+    // Apply filters
+    const filteredItems = allItems.filter((item: any) => {
+      const searchLower = searchTerm.toLowerCase();
+      const keyword = viewType === 'keywords' 
+        ? item.keyword 
+        : item.merchant_pattern;
+      
+      // Search filter
+      const matchesSearch = keyword.toLowerCase().includes(searchLower) ||
+        item.label?.toLowerCase().includes(searchLower) ||
+        item.category.toLowerCase().includes(searchLower);
+      
+      // Category filter
+      const matchesCategory = selectedCategories.length === 0 || 
+        selectedCategories.includes(item.category);
+      
+      // Label filter
+      const matchesLabel = selectedLabels.length === 0 || 
+        selectedLabels.includes(item.label);
+      
+      return matchesSearch && matchesCategory && matchesLabel;
+    });
+    
+    const clearFilters = () => {
+      setSearchTerm('');
+      setSelectedCategories([]);
+      setSelectedLabels([]);
+    };
+    
+    const hasActiveFilters = searchTerm !== '' || selectedCategories.length > 0 || selectedLabels.length > 0;
+
+    return (
+      <div className="space-y-6">
+        {/* Stats */}
+        {stats && (
           <div className="grid grid-cols-4 gap-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="text-2xl font-bold text-blue-900">{stats.total}</div>
