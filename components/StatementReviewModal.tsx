@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
 import CategorizationSummaryModal from './CategorizationSummaryModal';
-import { categorizeBatch, LearnedPattern } from '@/lib/categorization-engine';
+import { categorizeBatch, refreshCategorizationPatterns, LearnedPattern } from '@/lib/categorization-engine';
 
 interface Transaction {
   date: string;
@@ -131,6 +131,9 @@ export default function StatementReviewModal({
     // Get all expense transactions to categorize
     const expenseTransactions = getTransactionsToImport().filter(tx => tx.cashflow === 'expense');
     
+    // CRITICAL: Refresh patterns from database BEFORE categorizing
+    await refreshCategorizationPatterns();
+    
     // Categorize them using the engine
     const categorized = categorizeBatch(
       expenseTransactions.map(tx => ({
@@ -213,6 +216,9 @@ export default function StatementReviewModal({
       
       if (expenseTransactions.length > 0) {
         console.log('[Import] Auto-categorizing', expenseTransactions.length, 'expense transactions...');
+        
+        // CRITICAL: Refresh patterns from database BEFORE categorizing
+        await refreshCategorizationPatterns();
         
         const categorized = categorizeBatch(
           expenseTransactions.map(tx => ({

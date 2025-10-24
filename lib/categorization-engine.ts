@@ -33,47 +33,51 @@ export async function refreshCategorizationPatterns(): Promise<void> {
   }
 
   try {
-    // Fetch keywords from database
-    const keywordsRes = await fetch('/api/admin/keywords');
-    if (keywordsRes.ok) {
-      const keywordsData = await keywordsRes.json();
-      // Group keywords by category+label
-      const keywordMap = new Map<string, string[]>();
-      for (const kw of keywordsData.keywords) {
-        const key = `${kw.category}|${kw.label}`;
-        if (!keywordMap.has(key)) {
-          keywordMap.set(key, []);
-        }
-        keywordMap.get(key)!.push(kw.keyword);
+    // Fetch patterns from PUBLIC endpoint (no auth required)
+    const response = await fetch('/api/categorization/patterns');
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Process keywords - group by category+label
+    const keywordMap = new Map<string, string[]>();
+    for (const kw of data.keywords || []) {
+      const key = `${kw.category}|${kw.label}`;
+      if (!keywordMap.has(key)) {
+        keywordMap.set(key, []);
       }
-      
-      cachedKeywords = Array.from(keywordMap.entries()).map(([key, keywords]) => {
-        const [category, label] = key.split('|');
-        return {
-          keywords,
-          category,
-          label,
-          score: 10, // Not used in new logic
-        };
-      });
+      keywordMap.get(key)!.push(kw.keyword);
     }
+    
+    cachedKeywords = Array.from(keywordMap.entries()).map(([key, keywords]) => {
+      const [category, label] = key.split('|');
+      return {
+        keywords,
+        category,
+        label,
+        score: 10, // Not used in new logic
+      };
+    });
 
-    // Fetch merchants from database
-    const merchantsRes = await fetch('/api/admin/merchants');
-    if (merchantsRes.ok) {
-      const merchantsData = await merchantsRes.json();
-      cachedMerchants = merchantsData.merchants.map((m: any) => ({
-        pattern: m.merchant_pattern,
-        alternatePatterns: m.alternate_patterns || [],
-        category: m.category,
-        label: m.label,
-      }));
-    }
+    // Process merchants
+    cachedMerchants = (data.merchants || []).map((m: any) => ({
+      pattern: m.merchant_pattern,
+      alternatePatterns: m.alternate_patterns || [],
+      category: m.category,
+      label: m.label,
+    }));
 
     lastFetchTime = now;
-    console.log(`[Categorization] Loaded ${cachedKeywords?.length || 0} keyword groups and ${cachedMerchants?.length || 0} merchants from database`);
+    console.log(`[Categorization] ✅ Loaded ${cachedKeywords?.length || 0} keyword groups and ${cachedMerchants?.length || 0} merchants from database`);
+    
+    if (cachedMerchants && cachedMerchants.length > 0) {
+      console.log(`[Categorization] Sample merchants:`, cachedMerchants.slice(0, 3).map(m => m.pattern));
+    }
   } catch (error) {
-    console.warn('[Categorization] Failed to fetch from database:', error);
+    console.error('[Categorization] ❌ Failed to fetch patterns from database:', error);
     cachedKeywords = null;
     cachedMerchants = null;
   }
