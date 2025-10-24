@@ -1089,62 +1089,72 @@ export default function AdminDashboard() {
 
         {/* Next Build Steps */}
         <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-lg p-6 mt-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">🚀 Next Build Steps</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">🚀 Next Build Steps (Prioritized)</h2>
           <div className="space-y-3 text-sm">
             <div className="flex items-start">
               <span className="text-blue-600 font-bold mr-3">1.</span>
               <div>
-                <strong className="text-gray-900">Add Internal Checkers Throughout the App</strong>
-                <p className="text-gray-600 mt-1">Implement validation, error boundaries, and data consistency checks at key points in the application flow.</p>
+                <strong className="text-gray-900">Enhance Categorization Engine</strong>
+                <p className="text-gray-600 mt-1">
+                  • Train on publicly available Canadian transaction datasets<br/>
+                  • Expand parser support to TD, RBC, Scotiabank, BMO, Tangerine<br/>
+                  • Add confidence scoring and pattern detection improvements
+                </p>
               </div>
             </div>
             <div className="flex items-start">
               <span className="text-blue-600 font-bold mr-3">2.</span>
               <div>
-                <strong className="text-gray-900">Build Admin Dashboard for Bug Capture & User Feedback</strong>
-                <p className="text-gray-600 mt-1">Create the Inbox tab functionality to capture user-submitted bugs, feature requests, and feedback directly in the admin panel.</p>
+                <strong className="text-gray-900">Build User Feedback & Analytics Systems</strong>
+                <p className="text-gray-600 mt-1">
+                  • Implement Inbox tab for bug reports and feature requests<br/>
+                  • Build Analytics dashboard with performance metrics<br/>
+                  • Add internal validation and error boundaries
+                </p>
               </div>
             </div>
             <div className="flex items-start">
               <span className="text-blue-600 font-bold mr-3">3.</span>
               <div>
-                <strong className="text-gray-900">Build Insights Dashboard with Better Demo Data</strong>
-                <p className="text-gray-600 mt-1">Enhance the Insights Engine tab with rich demo data showing automated spending insights, trends, and personalized recommendations.</p>
+                <strong className="text-gray-900">Develop Insights Dashboard</strong>
+                <p className="text-gray-600 mt-1">
+                  • Create rich demo data for insights visualization<br/>
+                  • Build automated spending insights and trend analysis<br/>
+                  • Add personalized recommendations engine
+                </p>
               </div>
             </div>
             <div className="flex items-start">
               <span className="text-blue-600 font-bold mr-3">4.</span>
               <div>
-                <strong className="text-gray-900">Set Up Settings Page & Email Authentication</strong>
-                <p className="text-gray-600 mt-1">Implement user settings (profile, preferences) and email verification system for account security.</p>
+                <strong className="text-gray-900">User Settings & Security</strong>
+                <p className="text-gray-600 mt-1">
+                  • Implement settings page (profile, preferences, notifications)<br/>
+                  • Add email verification and authentication<br/>
+                  • Build password reset and 2FA capabilities
+                </p>
               </div>
             </div>
             <div className="flex items-start">
               <span className="text-blue-600 font-bold mr-3">5.</span>
               <div>
-                <strong className="text-gray-900">Analytics Dashboard Implementation</strong>
-                <p className="text-gray-600 mt-1">Build out the Analytics tab with categorization performance metrics, user activity statistics, and system health monitoring.</p>
+                <strong className="text-gray-900">Mobile App Development</strong>
+                <p className="text-gray-600 mt-1">
+                  • Optimize responsive design for mobile browsers<br/>
+                  • Build React Native app for iOS and Android<br/>
+                  • Implement mobile-first features (camera upload, notifications)
+                </p>
               </div>
             </div>
             <div className="flex items-start">
               <span className="text-blue-600 font-bold mr-3">6.</span>
               <div>
-                <strong className="text-gray-900">Set Up Mobile App Support</strong>
-                <p className="text-gray-600 mt-1">Optimize UI/UX for mobile devices and consider building native mobile app for iOS/Android.</p>
-              </div>
-            </div>
-            <div className="flex items-start">
-              <span className="text-blue-600 font-bold mr-3">7.</span>
-              <div>
-                <strong className="text-gray-900">Train Parser Engine for Remaining Banks</strong>
-                <p className="text-gray-600 mt-1">Extend PDF parsing to support TD, RBC, Scotiabank, BMO, Tangerine, and other Canadian banks.</p>
-              </div>
-            </div>
-            <div className="flex items-start">
-              <span className="text-blue-600 font-bold mr-3">8.</span>
-              <div>
-                <strong className="text-gray-900">Deprioritize Budget Tab (Future Phase)</strong>
-                <p className="text-gray-600 mt-1">Budget planning features are lower priority - focus on core categorization and insights first.</p>
+                <strong className="text-gray-900">Future Enhancements</strong>
+                <p className="text-gray-600 mt-1">
+                  • Budget planning and forecasting (deprioritized for now)<br/>
+                  • Tax report generation and export<br/>
+                  • Multi-currency support and investment tracking
+                </p>
               </div>
             </div>
           </div>
