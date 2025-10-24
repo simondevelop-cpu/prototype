@@ -37,6 +37,7 @@ export default function CategorizationSummaryModal({
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [customCategoryInput, setCustomCategoryInput] = useState<{ [key: number]: string }>({});
   const [showCustomInput, setShowCustomInput] = useState<{ [key: number]: boolean }>({});
+  const [viewingIndexes, setViewingIndexes] = useState<number[]>([]); // Track which transaction indexes are being viewed
 
   // Reset when modal opens
   useEffect(() => {
@@ -122,7 +123,7 @@ export default function CategorizationSummaryModal({
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
-                {currentView === 'summary' ? 'Categorisation Summary' : `${currentView} Transactions`}
+                {currentView === 'summary' ? 'Our Auto-Categorisation Engine' : `${currentView} Transactions`}
               </h2>
               <p className="text-sm text-gray-600 mt-1">
                 {currentView === 'summary'
@@ -150,23 +151,18 @@ export default function CategorizationSummaryModal({
                   onClick={() => setShowExplanation(!showExplanation)}
                   className="text-sm text-blue-600 hover:text-blue-800 underline"
                 >
-                  {showExplanation ? 'Hide' : 'How our auto-categorisation engine works'}
+                  {showExplanation ? 'Hide' : 'How it works'}
                 </button>
               </div>
 
               {showExplanation && (
                 <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-gray-700">
-                  <h4 className="font-semibold text-blue-900 mb-2">How It Works</h4>
-                  <p className="mb-3">
-                    We're building a powerful categorization engine designed specifically for Canadian transactions. Here's how it works:
-                  </p>
-                  <ul className="list-disc list-inside space-y-1.5 mb-2">
-                    <li><strong>Smart keyword matching:</strong> We search for keywords like "TIM" (Tim Hortons), "PHARM" (Pharmacy), "GROCER" (Grocery stores) in your transaction descriptions.</li>
-                    <li><strong>Category priority:</strong> We check categories in order (Housing → Bills → Subscriptions → Food → etc.) and assign the first match we find.</li>
-                    <li><strong>Bilingual support:</strong> Works with both English and French transaction descriptions.</li>
-                  </ul>
-                  <p className="text-xs text-gray-600">
-                    We're constantly expanding our keyword database to improve accuracy. If something is miscategorized, just correct it and move on!
+                  <p>
+                    We're building a powerful categorization engine designed specifically for Canadian transactions. 
+                    We prioritise any recategorisation you have made before. Otherwise we look for keywords or merchants, 
+                    in order and assign the first match we find (i.e. Housing → Bills → Subscriptions → Food → etc.). 
+                    We're constantly expanding our keyword database to improve accuracy; and we'll build in confidence 
+                    measures to overcome the bias created from a first-match approach.
                   </p>
                 </div>
               )}
@@ -203,7 +199,18 @@ export default function CategorizationSummaryModal({
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <button
-                            onClick={() => setCurrentView(category)}
+                            onClick={() => {
+                              // Save the indexes of transactions matching this category
+                              const indexes = localTransactions
+                                .map((tx, idx) => ({ tx, idx }))
+                                .filter(({ tx }) => 
+                                  tx.cashflow === 'expense' && 
+                                  (tx.category === category || (category === 'Uncategorised' && (!tx.category || tx.category === 'Uncategorised')))
+                                )
+                                .map(({ idx }) => idx);
+                              setViewingIndexes(indexes);
+                              setCurrentView(category);
+                            }}
                             className="text-blue-600 hover:text-blue-800 underline"
                           >
                             Review →
@@ -258,7 +265,7 @@ export default function CategorizationSummaryModal({
                   <tbody className="bg-white divide-y divide-gray-200">
                     {localTransactions
                       .map((tx, index) => ({ tx, index }))
-                      .filter(({ tx }) => tx.cashflow === 'expense' && (tx.category === currentView || (currentView === 'Uncategorised' && (!tx.category || tx.category === 'Uncategorised'))))
+                      .filter(({ index }) => viewingIndexes.includes(index)) // Use saved indexes instead of live filtering
                       .map(({ tx, index }) => {
                         // Determine confidence badge color
                         const confidence = tx.confidence || 0;

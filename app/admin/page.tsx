@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 type TabName = 'categories' | 'analytics' | 'inbox' | 'approved-accounts';
 
@@ -34,6 +35,9 @@ interface GroupedData {
 }
 
 export default function AdminDashboard() {
+  const router = useRouter();
+  const [authenticated, setAuthenticated] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<TabName>('categories');
   const [viewType, setViewType] = useState<'keywords' | 'merchants'>('keywords');
   const [keywords, setKeywords] = useState<GroupedData>({});
@@ -44,18 +48,52 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
+  // Check authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('admin_token');
+      
+      if (!token) {
+        router.push('/admin/login');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/admin/auth', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          throw new Error('Invalid token');
+        }
+
+        setAuthenticated(true);
+      } catch (error) {
+        localStorage.removeItem('admin_token');
+        router.push('/admin/login');
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
   // Fetch data when viewType changes
   useEffect(() => {
-    if (activeTab === 'categories') {
+    if (activeTab === 'categories' && authenticated) {
       fetchData();
     }
-  }, [viewType, activeTab]);
+  }, [viewType, activeTab, authenticated]);
 
   const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/admin/view-keywords?type=${viewType}`);
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch(`/api/admin/view-keywords?type=${viewType}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (!response.ok) throw new Error('Failed to fetch data');
       
       const data = await response.json();
@@ -279,6 +317,23 @@ export default function AdminDashboard() {
     </div>
   );
 
+  const handleLogout = () => {
+    localStorage.removeItem('admin_token');
+    router.push('/admin/login');
+  };
+
+  // Show loading state while checking authentication
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Verifying access...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -289,9 +344,17 @@ export default function AdminDashboard() {
               <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
               <p className="text-gray-600 mt-1">Manage categorization, analytics, and user accounts</p>
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              System Active
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                System Active
+              </div>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pg from 'pg';
+import jwt from 'jsonwebtoken';
 
 const { Pool } = pg;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // Initialize database connection
 const pool = new Pool({
@@ -11,13 +13,21 @@ const pool = new Pool({
 
 export async function GET(request: NextRequest) {
   try {
-    // Simple auth check - only allow in development or with a secret key
+    // Verify admin authentication
     const authHeader = request.headers.get('authorization');
-    const isDev = process.env.NODE_ENV === 'development';
-    const isAuthorized = isDev || authHeader === `Bearer ${process.env.ADMIN_SECRET}`;
+    const token = authHeader?.replace('Bearer ', '');
 
-    if (!isAuthorized) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized - No token provided' }, { status: 401 });
+    }
+
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      if (decoded.role !== 'admin') {
+        return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
+      }
+    } catch (err) {
+      return NextResponse.json({ error: 'Unauthorized - Invalid token' }, { status: 401 });
     }
 
     // Get query parameter for filtering
