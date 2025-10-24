@@ -213,6 +213,8 @@ export function categorizeTransaction(
   const cleaned = cleanMerchantName(description);
   const cleanedNoSpaces = cleaned.replace(/\s+/g, ''); // Space-insensitive matching
   
+  console.log(`[Categorization] Processing: "${description.substring(0, 40)}" → cleaned: "${cleaned.substring(0, 40)}"`);
+  
   // Step 1: User learned patterns (HIGHEST PRIORITY)
   if (learnedPatterns && learnedPatterns.length > 0) {
     for (const pattern of learnedPatterns) {
@@ -244,6 +246,7 @@ export function categorizeTransaction(
         // Check if keyword matches (with or without spaces)
         if (cleaned.includes(keyword) || cleanedNoSpaces.includes(keywordNoSpaces)) {
           // FIRST MATCH WINS - return immediately
+          console.log(`[Categorization] ✓ MATCH! Keyword "${keyword}" → ${pattern.category}/${pattern.label}`);
           return {
             category: pattern.category,
             label: pattern.label,
@@ -255,6 +258,7 @@ export function categorizeTransaction(
   }
   
   // Step 3: No match found - return Uncategorised
+  console.log(`[Categorization] ✗ NO MATCH - returning Uncategorised`);
   return { category: 'Uncategorised', label: 'Uncategorised', confidence: 0 };
 }
 
