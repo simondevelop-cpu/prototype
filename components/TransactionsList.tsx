@@ -6,6 +6,7 @@ import utc from 'dayjs/plugin/utc';
 import TransactionModal from './TransactionModal';
 import BulkRecategorizeModal from './BulkRecategorizeModal';
 import StatementUploadModal from './StatementUploadModal';
+import { CATEGORIES } from '@/lib/categorization-engine';
 
 dayjs.extend(utc);
 
@@ -105,7 +106,11 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   });
 
   // Get unique values for each filter
-  const categories = Array.from(new Set(transactions.map(tx => tx.category).filter(Boolean))).sort();
+  // Include all predefined categories plus any custom ones from transactions
+  const allPredefinedCategories = Object.keys(CATEGORIES);
+  const transactionCategories = Array.from(new Set(transactions.map(tx => tx.category).filter(Boolean)));
+  const categories = Array.from(new Set([...allPredefinedCategories, ...transactionCategories, 'Uncategorised'])).sort();
+  
   const accounts = Array.from(new Set(transactions.map(tx => tx.account).filter(Boolean))).sort();
   const cashflows = Array.from(new Set(transactions.map(tx => tx.cashflow).filter(Boolean))).sort();
   const labels = Array.from(new Set(transactions.map(tx => tx.label).filter(Boolean))).sort();
@@ -216,7 +221,15 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       // If category changed, save to learning database
       if (categoryChanged && originalTx.description) {
         try {
-          await fetch('/api/categorization/learn', {
+          console.log('[Recategorization] Saving to learning database:', {
+            description: originalTx.description,
+            originalCategory: originalTx.category,
+            originalLabel: originalTx.label,
+            correctedCategory: transactionData.category,
+            correctedLabel: transactionData.label,
+          });
+          
+          const learnResponse = await fetch('/api/categorization/learn', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -230,10 +243,25 @@ export default function TransactionsList({ transactions, loading, token, onRefre
               correctedLabel: transactionData.label,
             }),
           });
+          
+          const learnResult = await learnResponse.json();
+          console.log('[Recategorization] Learning API response:', learnResult);
+          
+          if (!learnResponse.ok) {
+            console.error('[Recategorization] Failed to save:', learnResult);
+          } else {
+            console.log('[Recategorization] ✅ Saved successfully!');
+          }
         } catch (learnError) {
           // Don't fail the update if learning fails
-          console.error('Failed to save categorization learning:', learnError);
+          console.error('[Recategorization] Error saving categorization learning:', learnError);
         }
+      } else {
+        console.log('[Recategorization] No category change detected or no description:', { 
+          categoryChanged, 
+          hasDescription: !!originalTx?.description,
+          originalTx 
+        });
       }
 
       setEditingTransaction(null);
