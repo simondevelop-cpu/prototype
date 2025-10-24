@@ -348,7 +348,7 @@ export default function AdminDashboard() {
         )}
 
         {/* Conditional Content: Patterns vs Recategorization Log */}
-        {categorySubTab === 'recategorization' ? renderRecategorizationLog() : renderPatternsTable()}
+        {categorySubTab === 'recategorization' ? renderRecategorizationLog() : renderPatternsTable(allItems, filteredItems, allCategories, allLabels, hasActiveFilters)}
       </div>
     );
   };
@@ -430,7 +430,7 @@ export default function AdminDashboard() {
   };
 
   // Render Patterns Table (existing Keywords/Merchants UI)
-  const renderPatternsTable = () => {
+  const renderPatternsTable = (allItems: any[], filteredItems: any[], allCategories: string[], allLabels: string[], hasActiveFilters: boolean) => {
     return (
       <>
         {/* Data Display */}
