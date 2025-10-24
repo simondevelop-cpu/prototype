@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "api": "node server.js",
-    "seed-admin": "node scripts/seed-admin-keywords.js"
+    "seed-admin": "node scripts/extract-all-patterns.js"
   },
   "dependencies": {
     "next": "14.2.0",
