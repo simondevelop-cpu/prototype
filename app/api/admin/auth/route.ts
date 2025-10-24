@@ -5,7 +5,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 
 // Admin credentials (in production, these should be in environment variables)
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@canadianinsights.ca';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'password';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'categorisationandinsightsengine';
 
 export async function POST(request: NextRequest) {
   try {
