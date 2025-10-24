@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { invalidatePatternCache } from '@/lib/categorization-engine';
 
 type TabName = 'inbox' | 'categories' | 'insights' | 'analytics' | 'accounts';
 
@@ -733,6 +734,9 @@ export default function AdminDashboard() {
       
       if (!response.ok) throw new Error('Failed to save');
       
+      // Invalidate categorization cache so changes take effect immediately
+      invalidatePatternCache();
+      
       // Clear editing state and refresh
       cancelEdit();
       await fetchData();
@@ -755,6 +759,9 @@ export default function AdminDashboard() {
       });
       
       if (!response.ok) throw new Error('Failed to delete');
+      
+      // Invalidate categorization cache so changes take effect immediately
+      invalidatePatternCache();
       
       // Refresh data
       await fetchData();
@@ -781,6 +788,9 @@ export default function AdminDashboard() {
           })
         )
       );
+      
+      // Invalidate categorization cache so changes take effect immediately
+      invalidatePatternCache();
       
       // Clear selection and refresh data
       setSelectedItems([]);
@@ -973,6 +983,9 @@ function AddEditModal({
         const error = await response.json();
         throw new Error(error.error || 'Failed to save');
       }
+      
+      // Invalidate categorization cache so changes take effect immediately
+      invalidatePatternCache();
       
       onSave();
     } catch (error: any) {

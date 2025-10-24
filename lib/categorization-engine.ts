@@ -12,7 +12,7 @@
 let cachedKeywords: KeywordPattern[] | null = null;
 let cachedMerchants: MerchantPattern[] | null = null;
 let lastFetchTime = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 30 * 1000; // 30 seconds (reduced from 5 minutes for faster updates)
 
 interface MerchantPattern {
   pattern: string;
@@ -23,13 +23,19 @@ interface MerchantPattern {
 
 /**
  * Fetch keyword and merchant patterns from database
+ * @param forceRefresh If true, bypass cache and fetch fresh data
  */
-export async function refreshCategorizationPatterns(): Promise<void> {
+export async function refreshCategorizationPatterns(forceRefresh: boolean = false): Promise<void> {
   const now = Date.now();
   
-  // Use cache if still valid
-  if (cachedKeywords && cachedMerchants && (now - lastFetchTime) < CACHE_TTL) {
+  // Use cache if still valid and not forcing refresh
+  if (!forceRefresh && cachedKeywords && cachedMerchants && (now - lastFetchTime) < CACHE_TTL) {
+    console.log('[Categorization] Using cached patterns');
     return;
+  }
+  
+  if (forceRefresh) {
+    console.log('[Categorization] 🔄 Force refreshing patterns from database...');
   }
 
   try {
@@ -300,6 +306,17 @@ export function categorizeTransaction(
     confidence: 0,
     matchReason: 'No matching pattern found',
   };
+}
+
+/**
+ * Invalidate the pattern cache to force a fresh fetch on next categorization
+ * Call this after updating keywords/merchants in the admin dashboard
+ */
+export function invalidatePatternCache(): void {
+  console.log('[Categorization] 🗑️  Cache invalidated - will fetch fresh patterns on next use');
+  cachedKeywords = null;
+  cachedMerchants = null;
+  lastFetchTime = 0;
 }
 
 /**
