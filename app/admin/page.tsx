@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
-type TabName = 'categories' | 'analytics' | 'inbox' | 'approved-accounts';
+type TabName = 'inbox' | 'categories' | 'insights' | 'analytics' | 'accounts';
 
 interface Keyword {
   id: number;
@@ -38,8 +38,9 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [authenticated, setAuthenticated] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabName>('categories');
+  const [activeTab, setActiveTab] = useState<TabName>('inbox');
   const [viewType, setViewType] = useState<'keywords' | 'merchants'>('keywords');
+  const [categorySubTab, setCategorySubTab] = useState<'patterns' | 'recategorization'>('patterns');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
   const [stats, setStats] = useState<any>(null);
@@ -499,6 +500,85 @@ export default function AdminDashboard() {
     </div>
   );
 
+  // Render Accounts Tab
+  const renderAccountsTab = () => {
+    const [users, setUsers] = useState<any[]>([]);
+    const [accountsLoading, setAccountsLoading] = useState(true);
+
+    useEffect(() => {
+      const fetchUsers = async () => {
+        try {
+          const token = localStorage.getItem('admin_token');
+          const response = await fetch('/api/admin/users', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await response.json();
+          setUsers(data.users || []);
+        } catch (error) {
+          console.error('Error fetching users:', error);
+        } finally {
+          setAccountsLoading(false);
+        }
+      };
+      fetchUsers();
+    }, []);
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Registered Accounts</h2>
+          <p className="text-gray-600 mt-1">View all user registrations and account status</p>
+        </div>
+
+        {accountsLoading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email Address</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Validated Email</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registered</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {users.map((user, index) => (
+                  <tr key={user.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm text-gray-900">{index + 1}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        user.status === 'Active Account' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {user.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{user.email_validated ? 'True' : 'False'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {new Date(user.created_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {users.length === 0 && (
+              <div className="text-center py-12 text-gray-500">
+                No users registered yet
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
     router.push('/admin/login');
@@ -652,6 +732,16 @@ export default function AdminDashboard() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex gap-1">
             <button
+              onClick={() => setActiveTab('inbox')}
+              className={`px-6 py-4 font-medium text-sm transition-colors relative ${
+                activeTab === 'inbox'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              📥 Inbox
+            </button>
+            <button
               onClick={() => setActiveTab('categories')}
               className={`px-6 py-4 font-medium text-sm transition-colors relative ${
                 activeTab === 'categories'
@@ -659,7 +749,17 @@ export default function AdminDashboard() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              🏷️ Categories
+              🏷️ Category Engine
+            </button>
+            <button
+              onClick={() => setActiveTab('insights')}
+              className={`px-6 py-4 font-medium text-sm transition-colors relative ${
+                activeTab === 'insights'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              🔍 Insights Engine
             </button>
             <button
               onClick={() => setActiveTab('analytics')}
@@ -672,24 +772,14 @@ export default function AdminDashboard() {
               📊 Analytics
             </button>
             <button
-              onClick={() => setActiveTab('inbox')}
+              onClick={() => setActiveTab('accounts')}
               className={`px-6 py-4 font-medium text-sm transition-colors relative ${
-                activeTab === 'inbox'
+                activeTab === 'accounts'
                   ? 'text-blue-600 border-b-2 border-blue-600'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              📥 Inbox
-            </button>
-            <button
-              onClick={() => setActiveTab('approved-accounts')}
-              className={`px-6 py-4 font-medium text-sm transition-colors relative ${
-                activeTab === 'approved-accounts'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              ✅ Approved Accounts
+              👥 Accounts
             </button>
           </div>
         </div>
@@ -697,10 +787,11 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {activeTab === 'categories' && renderCategoriesTab()}
-        {activeTab === 'analytics' && renderPlaceholderTab('Analytics', 'View categorization performance, user activity, and system metrics', '📊')}
         {activeTab === 'inbox' && renderPlaceholderTab('Inbox', 'Manage bug reports, feature requests, and user feedback', '📥')}
-        {activeTab === 'approved-accounts' && renderPlaceholderTab('Approved Accounts', 'Manage beta testers and approved user accounts', '✅')}
+        {activeTab === 'categories' && renderCategoriesTab()}
+        {activeTab === 'insights' && renderPlaceholderTab('Insights Engine', 'Automated spending insights and personalized recommendations', '🔍')}
+        {activeTab === 'analytics' && renderPlaceholderTab('Analytics', 'View categorization performance, user activity, and system metrics', '📊')}
+        {activeTab === 'accounts' && renderAccountsTab()}
       </div>
       
       {/* Add Modal */}
