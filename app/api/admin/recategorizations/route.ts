@@ -30,17 +30,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch recategorization logs
+    // Note: Using COALESCE for original_category in case it doesn't exist in older schemas
     const result = await pool.query(`
       SELECT 
         cl.id,
         cl.description_pattern,
-        cl.original_category,
         cl.corrected_category,
+        cl.corrected_label,
         cl.frequency,
         cl.last_used,
         cl.created_at,
-        u.email as user_email,
-        false as reviewed
+        u.email as user_email
       FROM categorization_learning cl
       JOIN users u ON cl.user_id = u.id
       ORDER BY cl.last_used DESC

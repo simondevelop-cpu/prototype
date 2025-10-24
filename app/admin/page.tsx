@@ -425,8 +425,10 @@ export default function AdminDashboard() {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Old Category</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Category</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Label</th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Frequency</th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Last Used</th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Reviewed</th>
             </tr>
           </thead>
@@ -436,10 +438,12 @@ export default function AdminDashboard() {
                 <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.description_pattern}</td>
                 <td className="px-6 py-4 text-sm text-gray-600">{item.user_email}</td>
                 <td className="px-6 py-4 text-sm">
-                  <span className="px-2 py-1 bg-gray-100 rounded text-xs">{item.original_category || 'None'}</span>
-                </td>
-                <td className="px-6 py-4 text-sm">
                   <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">{item.corrected_category}</span>
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">{item.corrected_label}</td>
+                <td className="px-6 py-4 text-center text-sm text-gray-600">{item.frequency}</td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {item.last_used ? new Date(item.last_used).toLocaleDateString() : '-'}
                 </td>
                 <td className="px-6 py-4 text-center">
                   <input
