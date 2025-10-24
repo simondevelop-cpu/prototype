@@ -120,14 +120,27 @@ export async function POST(req: NextRequest) {
         );
       } catch (insertError: any) {
         if (insertError.code === '42703') {
-          // Column doesn't exist - use minimal schema
-          console.log('[Learn API] Using minimal schema (original columns missing)');
-          await pool.query(
-            `INSERT INTO categorization_learning 
-             (user_id, description_pattern, corrected_category, corrected_label)
-             VALUES ($1, $2, $3, $4)`,
-            [userId, pattern, correctedCategory, correctedLabel]
-          );
+          // Column doesn't exist - try old schema with simple column names
+          console.log('[Learn API] Using old schema (corrected_ prefix missing)');
+          try {
+            await pool.query(
+              `INSERT INTO categorization_learning 
+               (user_id, description_pattern, category, label)
+               VALUES ($1, $2, $3, $4)`,
+              [userId, pattern, correctedCategory, correctedLabel]
+            );
+          } catch (fallbackError: any) {
+            console.error('[Learn API] Fallback insert also failed:', fallbackError.message);
+            console.error('[Learn API] Available columns might be different. Checking table schema...');
+            // Try to get table structure for debugging
+            const schemaCheck = await pool.query(`
+              SELECT column_name, data_type 
+              FROM information_schema.columns 
+              WHERE table_name = 'categorization_learning'
+            `);
+            console.log('[Learn API] Table columns:', schemaCheck.rows);
+            throw fallbackError;
+          }
         } else {
           throw insertError;
         }
