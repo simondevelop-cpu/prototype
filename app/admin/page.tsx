@@ -123,9 +123,9 @@ export default function AdminDashboard() {
     }
   }, [activeTab, authenticated]);
 
-  // Fetch recategorizations when Recategorization Log sub-tab is active
+  // Fetch recategorizations when Recategorization Log tab is active
   useEffect(() => {
-    if (activeTab === 'categories' && categorySubTab === 'recategorization' && authenticated) {
+    if (activeTab === 'categories' && viewType === 'recategorization' && authenticated) {
       const fetchRecategorizations = async () => {
         setRecatLoading(true);
         try {
@@ -143,7 +143,7 @@ export default function AdminDashboard() {
       };
       fetchRecategorizations();
     }
-  }, [activeTab, categorySubTab, authenticated]);
+  }, [activeTab, viewType, authenticated]);
 
   const fetchData = async () => {
     setLoading(true);
