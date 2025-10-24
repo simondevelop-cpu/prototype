@@ -3,7 +3,76 @@
  * 
  * Multi-tier categorization system with >90% accuracy for Canadian transactions
  * Features: Specificity-based matching, French language support, regional coverage, e-transfer intelligence
+ * 
+ * Database-driven: Merchants and keywords are stored in admin_merchants and admin_keywords tables
+ * Fallback: Uses hardcoded patterns if database is unavailable
  */
+
+// Cache for database patterns (refreshed periodically)
+let cachedMerchants: MerchantPattern[] | null = null;
+let cachedKeywords: KeywordPattern[] | null = null;
+let lastFetchTime = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Fetch merchant and keyword patterns from database
+ * Falls back to hardcoded patterns if database is unavailable
+ */
+export async function refreshCategorizationPatterns(): Promise<void> {
+  const now = Date.now();
+  
+  // Use cache if still valid
+  if (cachedMerchants && cachedKeywords && (now - lastFetchTime) < CACHE_TTL) {
+    return;
+  }
+
+  try {
+    // Fetch merchants from database
+    const merchantsRes = await fetch('/api/admin/merchants');
+    if (merchantsRes.ok) {
+      const merchantsData = await merchantsRes.json();
+      cachedMerchants = merchantsData.merchants.map((m: any) => ({
+        pattern: m.merchant_pattern,
+        category: m.category,
+        label: m.label,
+        score: m.score,
+      }));
+    }
+
+    // Fetch keywords from database
+    const keywordsRes = await fetch('/api/admin/keywords');
+    if (keywordsRes.ok) {
+      const keywordsData = await keywordsRes.json();
+      // Group keywords by category+label+score
+      const keywordMap = new Map<string, string[]>();
+      for (const kw of keywordsData.keywords) {
+        const key = `${kw.category}|${kw.label}|${kw.score}`;
+        if (!keywordMap.has(key)) {
+          keywordMap.set(key, []);
+        }
+        keywordMap.get(key)!.push(kw.keyword);
+      }
+      
+      cachedKeywords = Array.from(keywordMap.entries()).map(([key, keywords]) => {
+        const [category, label, score] = key.split('|');
+        return {
+          keywords,
+          category,
+          label,
+          score: parseInt(score, 10),
+        };
+      });
+    }
+
+    lastFetchTime = now;
+    console.log(`[Categorization] Loaded ${cachedMerchants?.length || 0} merchants, ${cachedKeywords?.length || 0} keyword groups from database`);
+  } catch (error) {
+    console.warn('[Categorization] Failed to fetch from database, using hardcoded patterns:', error);
+    // Fall back to hardcoded patterns (set to null to use MERCHANT_PATTERNS and KEYWORD_PATTERNS)
+    cachedMerchants = null;
+    cachedKeywords = null;
+  }
+}
 
 // Category mappings
 export const CATEGORIES = {
@@ -575,9 +644,11 @@ export function categorizeTransaction(
   }
   
   // Tier 1: Merchant pattern matching (specificity-based)
+  // Use cached patterns from database, or fall back to hardcoded patterns
+  const merchantPatterns = cachedMerchants || MERCHANT_PATTERNS;
   let bestMatch: { category: string; label: string; score: number } | null = null;
   
-  for (const pattern of MERCHANT_PATTERNS) {
+  for (const pattern of merchantPatterns) {
     if (cleaned.includes(pattern.pattern)) {
       if (!bestMatch || pattern.score > bestMatch.score) {
         bestMatch = { category: pattern.category, label: pattern.label, score: pattern.score };
@@ -591,11 +662,13 @@ export function categorizeTransaction(
   }
   
   // Tier 2: Keyword pattern matching (specificity-based with partial matching)
+  // Use cached patterns from database, or fall back to hardcoded patterns
+  const keywordPatterns = cachedKeywords || KEYWORD_PATTERNS;
   // Create space-insensitive version for better matching
   const cleanedNoSpaces = cleaned.replace(/\s+/g, '');
   let bestKeywordMatch: { category: string; label: string; score: number } | null = null;
   
-  for (const pattern of KEYWORD_PATTERNS) {
+  for (const pattern of keywordPatterns) {
     for (const keyword of pattern.keywords) {
       const keywordNoSpaces = keyword.replace(/\s+/g, '');
       

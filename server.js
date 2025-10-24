@@ -170,6 +170,36 @@ async function ensureSchema() {
     );
   `);
 
+  // Admin tables for categorization engine management
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_merchants (
+      id SERIAL PRIMARY KEY,
+      merchant_pattern TEXT NOT NULL UNIQUE,
+      category TEXT NOT NULL,
+      label TEXT NOT NULL,
+      score INTEGER NOT NULL DEFAULT 10,
+      is_active BOOLEAN DEFAULT TRUE,
+      notes TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_keywords (
+      id SERIAL PRIMARY KEY,
+      keyword TEXT NOT NULL,
+      category TEXT NOT NULL,
+      label TEXT NOT NULL,
+      score INTEGER NOT NULL DEFAULT 8,
+      language TEXT DEFAULT 'en' CHECK (language IN ('en', 'fr', 'both')),
+      is_active BOOLEAN DEFAULT TRUE,
+      notes TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   // Indexes for performance
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
@@ -178,6 +208,10 @@ async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category);
     CREATE INDEX IF NOT EXISTS idx_categorization_user_id ON categorization_learning(user_id);
     CREATE INDEX IF NOT EXISTS idx_categorization_pattern ON categorization_learning(description_pattern);
+    CREATE INDEX IF NOT EXISTS idx_admin_merchants_pattern ON admin_merchants(merchant_pattern);
+    CREATE INDEX IF NOT EXISTS idx_admin_keywords_keyword ON admin_keywords(keyword);
+    CREATE INDEX IF NOT EXISTS idx_admin_merchants_active ON admin_merchants(is_active);
+    CREATE INDEX IF NOT EXISTS idx_admin_keywords_active ON admin_keywords(is_active);
   `);
   
   console.log('[DB] Schema created successfully');
