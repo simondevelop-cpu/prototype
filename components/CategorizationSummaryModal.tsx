@@ -19,6 +19,7 @@ interface CategorizationSummaryModalProps {
   onClose: () => void;
   transactions: Transaction[];
   onUpdateTransactions: (updatedTransactions: Transaction[]) => void;
+  onBack?: () => void; // Optional: custom back handler to return to review modal
 }
 
 type CategoryView = 'summary' | string; // 'summary' or category name
@@ -28,6 +29,7 @@ export default function CategorizationSummaryModal({
   onClose,
   transactions,
   onUpdateTransactions,
+  onBack,
 }: CategorizationSummaryModalProps) {
   const [currentView, setCurrentView] = useState<CategoryView>('summary');
   const [localTransactions, setLocalTransactions] = useState<Transaction[]>(transactions);
@@ -348,7 +350,18 @@ export default function CategorizationSummaryModal({
         {/* Footer */}
         <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-between">
           <button
-            onClick={onClose}
+            onClick={() => {
+              if (currentView !== 'summary') {
+                // If in detail view, go back to summary
+                setCurrentView('summary');
+              } else if (onBack) {
+                // If in summary view and onBack provided, use it
+                onBack();
+              } else {
+                // Otherwise just close
+                onClose();
+              }
+            }}
             className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100"
           >
             Back

@@ -64,6 +64,7 @@ export default function StatementReviewModal({
   
   // Categorization modal state
   const [showCategorizationModal, setShowCategorizationModal] = useState(false);
+  const [hideReviewModal, setHideReviewModal] = useState(false); // Hide review modal when categorization modal is open
   const [learnedPatterns, setLearnedPatterns] = useState<LearnedPattern[]>([]);
   const [categorizationApplied, setCategorizationApplied] = useState(false);
 
@@ -153,6 +154,7 @@ export default function StatementReviewModal({
     
     setEditedTransactions(newEdited);
     setCategorizationApplied(true);
+    setHideReviewModal(true); // Hide review modal
     setShowCategorizationModal(true);
   };
 
@@ -864,6 +866,7 @@ export default function StatementReviewModal({
 
   return (
     <>
+      {!hideReviewModal && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
         <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
           {/* Header */}
@@ -939,6 +942,7 @@ export default function StatementReviewModal({
           </div>
         </div>
       </div>
+      )}
 
       {/* Edit Modal (simplified inline editor) */}
       {editingTransaction && (
@@ -1016,9 +1020,16 @@ export default function StatementReviewModal({
       {showCategorizationModal && (
         <CategorizationSummaryModal
           isOpen={showCategorizationModal}
-          onClose={() => setShowCategorizationModal(false)}
+          onClose={() => {
+            setShowCategorizationModal(false);
+            setHideReviewModal(false); // Show review modal again
+          }}
           transactions={getTransactionsToImport().filter(tx => tx.cashflow === 'expense')}
           onUpdateTransactions={handleUpdateCategorizationsFromModal}
+          onBack={() => {
+            setShowCategorizationModal(false);
+            setHideReviewModal(false); // Show review modal again
+          }}
         />
       )}
     </>
