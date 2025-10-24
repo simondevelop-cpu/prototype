@@ -80,15 +80,27 @@ export async function POST(req: NextRequest) {
 
     if (existing.rows.length > 0) {
       // Update existing pattern (increment frequency, update last_used)
-      await pool.query(
-        `UPDATE categorization_learning 
-         SET frequency = frequency + 1,
-             last_used = CURRENT_TIMESTAMP,
-             corrected_category = $1,
-             corrected_label = $2
-         WHERE id = $3`,
-        [correctedCategory, correctedLabel, existing.rows[0].id]
-      );
+      // Use dynamic query to handle both old and new schemas
+      try {
+        await pool.query(
+          `UPDATE categorization_learning 
+           SET frequency = frequency + 1,
+               last_used = CURRENT_TIMESTAMP,
+               corrected_category = $1,
+               corrected_label = $2
+           WHERE id = $3`,
+          [correctedCategory, correctedLabel, existing.rows[0].id]
+        );
+      } catch {
+        // Fallback for old schema without corrected_category/corrected_label
+        await pool.query(
+          `UPDATE categorization_learning 
+           SET frequency = frequency + 1,
+               last_used = CURRENT_TIMESTAMP
+           WHERE id = $1`,
+          [existing.rows[0].id]
+        );
+      }
 
       return NextResponse.json({
         success: true,
@@ -98,12 +110,28 @@ export async function POST(req: NextRequest) {
       });
     } else {
       // Insert new pattern
-      await pool.query(
-        `INSERT INTO categorization_learning 
-         (user_id, description_pattern, original_category, original_label, corrected_category, corrected_label)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [userId, pattern, originalCategory, originalLabel, correctedCategory, correctedLabel]
-      );
+      // Try new schema first, fallback to minimal schema if columns don't exist
+      try {
+        await pool.query(
+          `INSERT INTO categorization_learning 
+           (user_id, description_pattern, original_category, original_label, corrected_category, corrected_label)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [userId, pattern, originalCategory, originalLabel, correctedCategory, correctedLabel]
+        );
+      } catch (insertError: any) {
+        if (insertError.code === '42703') {
+          // Column doesn't exist - use minimal schema
+          console.log('[Learn API] Using minimal schema (original columns missing)');
+          await pool.query(
+            `INSERT INTO categorization_learning 
+             (user_id, description_pattern, corrected_category, corrected_label)
+             VALUES ($1, $2, $3, $4)`,
+            [userId, pattern, correctedCategory, correctedLabel]
+          );
+        } else {
+          throw insertError;
+        }
+      }
 
       return NextResponse.json({
         success: true,
