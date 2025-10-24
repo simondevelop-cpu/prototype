@@ -591,12 +591,16 @@ export function categorizeTransaction(
   }
   
   // Tier 2: Keyword pattern matching (specificity-based with partial matching)
+  // Create space-insensitive version for better matching
+  const cleanedNoSpaces = cleaned.replace(/\s+/g, '');
   let bestKeywordMatch: { category: string; label: string; score: number } | null = null;
   
   for (const pattern of KEYWORD_PATTERNS) {
     for (const keyword of pattern.keywords) {
-      // Check for whole word or partial match
-      if (cleaned.includes(keyword)) {
+      const keywordNoSpaces = keyword.replace(/\s+/g, '');
+      
+      // Check for whole word or partial match (with and without spaces)
+      if (cleaned.includes(keyword) || cleanedNoSpaces.includes(keywordNoSpaces)) {
         if (!bestKeywordMatch || pattern.score > bestKeywordMatch.score) {
           bestKeywordMatch = { category: pattern.category, label: pattern.label, score: pattern.score };
         }

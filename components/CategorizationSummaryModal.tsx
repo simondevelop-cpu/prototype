@@ -81,10 +81,11 @@ export default function CategorizationSummaryModal({
     ? [...categoriesWithTransactions, ...categoriesWithoutTransactions]
     : categoriesWithTransactions;
 
-  // Calculate average confidence
-  const avgConfidence = localTransactions.length > 0
-    ? Math.round(localTransactions.reduce((sum, tx) => sum + (tx.confidence || 0), 0) / localTransactions.length)
-    : 0;
+  // Calculate categorization stats
+  const totalExpenses = localTransactions.filter(tx => tx.cashflow === 'expense').length;
+  const categorizedCount = localTransactions.filter(tx => 
+    tx.cashflow === 'expense' && tx.category && tx.category !== 'Uncategorised'
+  ).length;
 
   // Update a transaction's category
   const updateTransaction = (index: number, newCategory: string, newLabel: string) => {
@@ -116,7 +117,7 @@ export default function CategorizationSummaryModal({
               </h2>
               <p className="text-sm text-gray-600 mt-1">
                 {currentView === 'summary'
-                  ? `${localTransactions.filter(tx => tx.cashflow === 'expense').length} expenses categorized with ${avgConfidence}% average confidence`
+                  ? `${categorizedCount} of ${totalExpenses} expenses automatically categorized`
                   : 'Review and adjust categories for these transactions'}
               </p>
             </div>
@@ -140,24 +141,24 @@ export default function CategorizationSummaryModal({
                   onClick={() => setShowExplanation(!showExplanation)}
                   className="text-sm text-blue-600 hover:text-blue-800 underline"
                 >
-                  {showExplanation ? 'Hide' : 'How does this work?'}
+                  {showExplanation ? 'Hide' : 'How our auto-categorisation engine works'}
                 </button>
               </div>
 
               {showExplanation && (
                 <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-gray-700">
-                  <h4 className="font-semibold text-blue-900 mb-2">How Auto-Categorisation Works</h4>
-                  <p className="mb-2">
-                    Our categorization engine uses a <strong>multi-tier approach</strong> to automatically categorize your transactions:
+                  <h4 className="font-semibold text-blue-900 mb-2">Our Intelligent Auto-Categorisation Engine</h4>
+                  <p className="mb-3">
+                    We use a <strong>sophisticated multi-tier system</strong> designed specifically for Canadian transactions to automatically categorize your expenses with high accuracy:
                   </p>
-                  <ol className="list-decimal list-inside space-y-1 mb-2">
-                    <li><strong>Your Learned Patterns</strong> (Highest Priority): Prioritizes categories you've previously assigned to similar transactions</li>
-                    <li><strong>Merchant Recognition</strong>: Matches against 250+ Canadian merchants and chains (Tim Hortons, Loblaws, Rogers, etc.)</li>
-                    <li><strong>Keyword Analysis</strong>: Analyzes transaction descriptions using 150+ contextual keywords (English & French)</li>
-                    <li><strong>Pattern Detection</strong>: Uses transaction amount and frequency patterns to infer categories</li>
+                  <ol className="list-decimal list-inside space-y-2 mb-3">
+                    <li><strong>Your Personal Learning System</strong> (Highest Priority): The engine remembers and prioritizes categories you've assigned to similar merchants, ensuring it gets smarter with every correction you make.</li>
+                    <li><strong>Advanced Merchant Recognition</strong>: Our database includes 400+ Canadian merchants, chains, and service providers (Tim Hortons, Loblaws, Rogers, Enbridge, etc.) with intelligent name matching that handles location codes, store numbers, and variations.</li>
+                    <li><strong>Contextual Keyword Analysis</strong>: We analyze transaction descriptions using 300+ contextual keywords in both English and French, with partial matching to catch variations (e.g., "GROCERY" matches "GROCERS", "GROCERY STORE").</li>
+                    <li><strong>Smart Pattern Detection</strong>: The system uses transaction amounts, frequency patterns, and contextual clues to infer categories even for generic descriptions.</li>
                   </ol>
-                  <p className="text-xs text-gray-600">
-                    The system learns from your corrections. Every time you recategorize a transaction, it improves future suggestions for similar transactions.
+                  <p className="text-xs text-gray-600 italic">
+                    💡 <strong>Continuous Improvement:</strong> Every time you recategorize a transaction, the engine learns your preferences and applies them to future uploads automatically. The more you use it, the better it gets!
                   </p>
                 </div>
               )}

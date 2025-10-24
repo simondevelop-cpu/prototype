@@ -553,7 +553,7 @@ export default function StatementReviewModal({
                           <span className="text-2xl mr-3">🔄</span>
                           <div>
                             <p className="text-sm font-medium text-gray-900">Other</p>
-                            <p className="text-xs text-gray-500">Transfers, payments</p>
+                            <p className="text-xs text-gray-500">Excluded from income / expenses (e.g. account transfers)</p>
                           </div>
                         </div>
                       </td>
