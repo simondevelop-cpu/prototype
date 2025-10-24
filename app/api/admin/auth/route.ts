@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
         iat: Math.floor(Date.now() / 1000)
       },
       JWT_SECRET,
-      { expiresIn: '7d' } // Token expires in 7 days
+      { expiresIn: '1d' } // Token expires in 1 day
     );
 
     return NextResponse.json({

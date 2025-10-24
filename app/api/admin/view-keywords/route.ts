@@ -11,6 +11,9 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
 });
 
+// Mark this route as dynamic (uses request headers)
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     // Verify admin authentication
@@ -84,6 +87,21 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error fetching keywords:', error);
+    
+    // Check if table doesn't exist
+    if (error.code === '42P01') {
+      return NextResponse.json(
+        { 
+          error: 'Database tables not initialized',
+          details: 'The admin tables have not been created yet. Please run server.js to initialize the database schema.',
+          grouped: {},
+          stats: { total: 0, byCategory: [] },
+          raw: []
+        },
+        { status: 200 } // Return 200 so frontend doesn't error
+      );
+    }
+    
     return NextResponse.json(
       { error: 'Failed to fetch keywords', details: error.message },
       { status: 500 }

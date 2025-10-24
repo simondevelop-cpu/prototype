@@ -158,11 +158,10 @@ export default function CategorizationSummaryModal({
               {showExplanation && (
                 <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-gray-700">
                   <p>
-                    We're building a powerful categorization engine designed specifically for Canadian transactions. 
-                    We prioritise any recategorisation you have made before. Otherwise we look for keywords or merchants, 
-                    in order and assign the first match we find (i.e. Housing → Bills → Subscriptions → Food → etc.). 
-                    We're constantly expanding our keyword database to improve accuracy; and we'll build in confidence 
-                    measures to overcome the bias created from a first-match approach.
+                    We're building a powerful categorization engine for Canadian transactions. We prioritize your 
+                    recategorizations first. Otherwise, we search for keywords and merchants in category order 
+                    (Housing → Bills → Subscriptions → Food → etc.) and assign the first match. We're constantly 
+                    expanding our database and will add confidence scoring to improve accuracy.
                   </p>
                 </div>
               )}
@@ -267,23 +266,10 @@ export default function CategorizationSummaryModal({
                       .map((tx, index) => ({ tx, index }))
                       .filter(({ index }) => viewingIndexes.includes(index)) // Use saved indexes instead of live filtering
                       .map(({ tx, index }) => {
-                        // Determine confidence badge color
-                        const confidence = tx.confidence || 0;
-                        let badgeColor = 'bg-gray-100 text-gray-700';
-                        if (confidence >= 90) badgeColor = 'bg-green-100 text-green-700';
-                        else if (confidence >= 70) badgeColor = 'bg-blue-100 text-blue-700';
-                        else if (confidence >= 50) badgeColor = 'bg-yellow-100 text-yellow-700';
-                        else if (confidence > 0) badgeColor = 'bg-orange-100 text-orange-700';
-
                         return (
                           <tr key={index} className="hover:bg-gray-50">
                             <td className="px-4 py-3 text-sm text-gray-900">
                               <div className="font-medium">{tx.description}</div>
-                              {tx.confidence !== undefined && tx.confidence > 0 && (
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeColor} inline-block mt-1`}>
-                                  {tx.confidence}% confidence
-                                </span>
-                              )}
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
                               ${Math.abs(tx.amount).toFixed(2)}

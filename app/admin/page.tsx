@@ -97,6 +97,16 @@ export default function AdminDashboard() {
       if (!response.ok) throw new Error('Failed to fetch data');
       
       const data = await response.json();
+      
+      // Handle database not initialized case
+      if (data.error === 'Database tables not initialized') {
+        setError('Database tables not yet initialized. They will be created automatically when you run the server locally or on first deployment.');
+        setKeywords({});
+        setMerchants({});
+        setStats({ total: 0, byCategory: [] });
+        return;
+      }
+      
       if (viewType === 'keywords') {
         setKeywords(data.grouped);
       } else {
