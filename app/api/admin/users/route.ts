@@ -34,20 +34,18 @@ export async function GET(request: NextRequest) {
       SELECT 
         u.id,
         u.email,
-        u.name,
         u.created_at,
         COUNT(t.id) as transaction_count,
         MAX(t.created_at) as last_activity
       FROM users u
       LEFT JOIN transactions t ON u.id = t.user_id
-      GROUP BY u.id, u.email, u.name, u.created_at
+      GROUP BY u.id, u.email, u.created_at
       ORDER BY u.created_at DESC
     `);
 
     const users = result.rows.map(row => ({
       id: row.id,
       email: row.email,
-      name: row.name,
       created_at: row.created_at,
       transaction_count: parseInt(row.transaction_count) || 0,
       last_activity: row.last_activity,
