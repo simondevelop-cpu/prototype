@@ -1049,10 +1049,11 @@ function AddEditModal({
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                rows={2}
-                placeholder="Any additional notes..."
-              />
-            </div>
+                  rows={2}
+                  placeholder="Any additional notes..."
+                />
+              </div>
+            )}
             
             <div className="flex gap-3 pt-4">
               <button
