@@ -204,7 +204,7 @@ export default function AdminDashboard() {
             </div>
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
               <div className="text-2xl font-bold text-orange-900">
-                {Math.round(stats.total / stats.byCategory.length)}
+                {stats.byCategory.length > 0 ? Math.round(stats.total / stats.byCategory.length) : 0}
               </div>
               <div className="text-sm text-orange-700">Avg per Category</div>
             </div>
