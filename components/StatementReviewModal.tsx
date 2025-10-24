@@ -14,6 +14,7 @@ interface Transaction {
   category: string;
   account: string;
   label: string;
+  confidence?: number; // Optional: confidence score from categorization engine
 }
 
 interface ParsedStatement {
