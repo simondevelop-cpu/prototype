@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
         COUNT(t.id) as transaction_count,
         MAX(t.created_at) as last_activity
       FROM users u
-      LEFT JOIN transactions t ON u.user_id = t.user_id
+      LEFT JOIN transactions t ON u.id = t.user_id
       GROUP BY u.id, u.email, u.name, u.created_at
       ORDER BY u.created_at DESC
     `);

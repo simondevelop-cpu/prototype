@@ -37,13 +37,13 @@ export async function GET(request: NextRequest) {
         cl.original_category,
         cl.corrected_category,
         cl.frequency,
-        cl.last_seen,
+        cl.last_used,
         cl.created_at,
         u.email as user_email,
         false as reviewed
       FROM categorization_learning cl
       JOIN users u ON cl.user_id = u.id
-      ORDER BY cl.last_seen DESC
+      ORDER BY cl.last_used DESC
     `);
 
     return NextResponse.json({

@@ -331,8 +331,8 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Stats */}
-        {stats && (
+        {/* Stats (only for Patterns sub-tab) */}
+        {categorySubTab === 'patterns' && stats && (
           <div className="grid grid-cols-4 gap-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="text-2xl font-bold text-blue-900">{stats.total}</div>
@@ -357,41 +357,43 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Search & Filter */}
-        <div className="flex gap-4 items-center">
-          <input
-            type="text"
-            placeholder={`Search ${viewType}...`}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          
-          {hasActiveFilters && (
+        {/* Search & Filter (only for Patterns sub-tab) */}
+        {categorySubTab === 'patterns' && (
+          <div className="flex gap-4 items-center">
+            <input
+              type="text"
+              placeholder={`Search ${viewType}...`}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors whitespace-nowrap"
+              >
+                Clear Filters
+              </button>
+            )}
+            
+            {selectedItems.length > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors whitespace-nowrap font-medium"
+              >
+                Delete Selected ({selectedItems.length})
+              </button>
+            )}
+            
             <button
-              onClick={clearFilters}
-              className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors whitespace-nowrap"
+              onClick={() => setShowAddModal(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap font-medium"
             >
-              Clear Filters
+              + Add {viewType === 'keywords' ? 'Keyword' : 'Merchant'}
             </button>
-          )}
-          
-          {selectedItems.length > 0 && (
-            <button
-              onClick={handleBulkDelete}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors whitespace-nowrap font-medium"
-            >
-              Delete Selected ({selectedItems.length})
-            </button>
-          )}
-          
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap font-medium"
-          >
-            + Add {viewType === 'keywords' ? 'Keyword' : 'Merchant'}
-          </button>
-        </div>
+          </div>
+        )}
 
         {/* Error Display */}
         {error && (
