@@ -47,7 +47,6 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -136,9 +135,6 @@ export default function AdminDashboard() {
     
     // Get unique values for filters
     const allCategories = Array.from(new Set(allItems.map(item => item.category))).sort();
-    const allLanguages = viewType === 'keywords' 
-      ? Array.from(new Set(allItems.map((item: any) => item.language))).sort()
-      : [];
     
     // Apply filters
     const filteredItems = allItems.filter((item: any) => {
@@ -156,21 +152,15 @@ export default function AdminDashboard() {
       const matchesCategory = selectedCategories.length === 0 || 
         selectedCategories.includes(item.category);
       
-      // Language filter (only for keywords)
-      const matchesLanguage = viewType === 'merchants' || 
-        selectedLanguages.length === 0 || 
-        selectedLanguages.includes(item.language);
-      
-      return matchesSearch && matchesCategory && matchesLanguage;
+      return matchesSearch && matchesCategory;
     });
     
     const clearFilters = () => {
       setSearchTerm('');
       setSelectedCategories([]);
-      setSelectedLanguages([]);
     };
     
-    const hasActiveFilters = searchTerm !== '' || selectedCategories.length > 0 || selectedLanguages.length > 0;
+    const hasActiveFilters = searchTerm !== '' || selectedCategories.length > 0;
 
     return (
       <div className="space-y-6">
@@ -299,17 +289,8 @@ export default function AdminDashboard() {
                         selected={selectedCategories}
                         onChange={setSelectedCategories}
                       />
-                      {viewType === 'keywords' && (
-                        <ColumnFilterHeader
-                          label="Language"
-                          options={allLanguages}
-                          selected={selectedLanguages}
-                          onChange={setSelectedLanguages}
-                        />
-                      )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Label</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Score</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Notes</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                         {editingItemId ? 'Save' : 'Actions'}
                       </th>
@@ -357,33 +338,6 @@ export default function AdminDashboard() {
                               <span className="px-2 py-1 bg-gray-100 rounded text-xs font-medium">{item.category}</span>
                             )}
                           </td>
-                          {viewType === 'keywords' && (
-                            <td 
-                              className="px-6 py-4 text-sm text-gray-600 cursor-pointer"
-                              onDoubleClick={() => startEditing(item, 'language')}
-                            >
-                              {isEditing && editingField === 'language' ? (
-                                <select
-                                  value={editFormData.language || item.language}
-                                  onChange={(e) => setEditFormData({ ...editFormData, language: e.target.value })}
-                                  className="w-full px-2 py-1 border border-blue-500 rounded"
-                                  autoFocus
-                                >
-                                  <option value="en">EN</option>
-                                  <option value="fr">FR</option>
-                                  <option value="both">BOTH</option>
-                                </select>
-                              ) : (
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  item.language === 'en' ? 'bg-blue-100 text-blue-700' :
-                                  item.language === 'fr' ? 'bg-purple-100 text-purple-700' :
-                                  'bg-green-100 text-green-700'
-                                }`}>
-                                  {item.language.toUpperCase()}
-                                </span>
-                              )}
-                            </td>
-                          )}
                           <td 
                             className="px-6 py-4 text-sm text-gray-600 cursor-pointer"
                             onDoubleClick={() => startEditing(item, 'label')}
@@ -416,22 +370,6 @@ export default function AdminDashboard() {
                               />
                             ) : (
                               <span className="font-semibold">{item.score}</span>
-                            )}
-                          </td>
-                          <td 
-                            className="px-6 py-4 text-sm text-gray-500 cursor-pointer"
-                            onDoubleClick={() => startEditing(item, 'notes')}
-                          >
-                            {isEditing && editingField === 'notes' ? (
-                              <input
-                                type="text"
-                                value={editFormData.notes || item.notes || ''}
-                                onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
-                                className="w-full px-2 py-1 border border-blue-500 rounded"
-                                autoFocus
-                              />
-                            ) : (
-                              item.notes || '-'
                             )}
                           </td>
                           <td className="px-6 py-4 text-sm text-right">
