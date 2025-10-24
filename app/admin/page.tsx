@@ -199,7 +199,7 @@ export default function AdminDashboard() {
             </li>
           </ol>
           <p className="text-sm text-gray-600 mt-3 pt-3 border-t border-blue-200">
-            Manage keywords and merchants below. All changes immediately affect categorization for future uploads. <span className="font-medium text-gray-700">Note: Matching is case-insensitive and space-insensitive</span> (e.g., "BELL", "bell", "B E LL" all match).
+            Manage keywords and merchants below. All changes immediately affect categorization for future uploads. Matching is case-insensitive and space-insensitive.
           </p>
         </div>
 
