@@ -706,7 +706,7 @@ export default function AdminDashboard() {
               </li>
               <li className="flex items-start">
                 <span className="mr-2">☐</span>
-                <span><strong>Admin Login:</strong> Test with admin@canadianinsights.ca / categorisationandinsightsengine</span>
+                <span><strong>Admin Login:</strong> Test with admin account credentials</span>
               </li>
               <li className="flex items-start">
                 <span className="mr-2">☐</span>
@@ -1129,10 +1129,98 @@ export default function AdminDashboard() {
             <div className="flex items-start">
               <span className="text-blue-600 font-bold mr-3">6.</span>
               <div>
+                <strong className="text-gray-900">Set Up Mobile App Support</strong>
+                <p className="text-gray-600 mt-1">Optimize UI/UX for mobile devices and consider building native mobile app for iOS/Android.</p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              <span className="text-blue-600 font-bold mr-3">7.</span>
+              <div>
+                <strong className="text-gray-900">Train Parser Engine for Remaining Banks</strong>
+                <p className="text-gray-600 mt-1">Extend PDF parsing to support TD, RBC, Scotiabank, BMO, Tangerine, and other Canadian banks.</p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              <span className="text-blue-600 font-bold mr-3">8.</span>
+              <div>
                 <strong className="text-gray-900">Deprioritize Budget Tab (Future Phase)</strong>
                 <p className="text-gray-600 mt-1">Budget planning features are lower priority - focus on core categorization and insights first.</p>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Demo Approach */}
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-6 mt-8">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">🎯 Demo Approach for User Testing (20-min Sessions)</h2>
+          
+          <div className="mb-4">
+            <h3 className="text-base font-semibold text-gray-900 mb-2">Demo Flow (Screen Share):</h3>
+            <ol className="space-y-2 text-sm text-gray-700 ml-4">
+              <li><strong>1. Quick Intro (2 min):</strong> "I'm building an AI-powered expense categorization tool specifically for Canadian bank statements. It automatically categorizes your spending and learns from your corrections."</li>
+              <li><strong>2. Live Upload (3 min):</strong> Upload a real CIBC statement, show the parsing and review modal</li>
+              <li><strong>3. Auto-Categorization (5 min):</strong> Click "Check Auto-Categorization", walk through the summary, show detailed logs in console</li>
+              <li><strong>4. Manual Correction (3 min):</strong> Edit a miscategorized transaction, explain how the engine learns</li>
+              <li><strong>5. Dashboard View (2 min):</strong> Show the transaction list with filters and search</li>
+              <li><strong>6. Questions & Feedback (5 min):</strong> Use the key questions below</li>
+            </ol>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-green-200">
+            <h3 className="text-base font-semibold text-gray-900 mb-2">Key Questions to Ask:</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Current Pain Point:</strong> "How do you currently track your expenses? Do you use any apps or tools?" (Understand their current workflow)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Bank Usage:</strong> "Which Canadian bank(s) do you use? How many accounts do you typically track?" (Understand banking diversity)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Categorization Value:</strong> "Does automatic categorization save you time? Would you trust AI to categorize your expenses?" (Gauge core value prop)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Learning System:</strong> "How important is it that the system learns from your corrections over time?" (Test learning feature value)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>UI/UX Feedback:</strong> "Was the upload process intuitive? Did anything confuse you?" (Direct UX feedback)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Feature Priorities:</strong> "What would you want to see next? Budget tracking? Spending insights? Tax reports?" (Feature validation)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Privacy Concerns:</strong> "Any concerns about uploading bank statements? What would make you feel more comfortable?" (Address security)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Pricing:</strong> "Would you pay for this? If so, how much per month seems fair for automatic categorization and insights?" (Pricing research)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Comparison:</strong> "Have you tried tools like Mint, YNAB, or Wealthsimple? How does this compare?" (Competitive analysis)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Mobile Usage:</strong> "Would you prefer using this on mobile, desktop, or both? When would you typically check your expenses?" (Platform priority)</span>
+              </li>
+            </ul>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-green-200">
+            <h3 className="text-base font-semibold text-gray-900 mb-2">💡 Tips for Effective Demos:</h3>
+            <ul className="space-y-1 text-sm text-gray-600">
+              <li>• Use a real, messy statement (30-50 transactions) to show real-world value</li>
+              <li>• Have the browser console open to show the technical sophistication</li>
+              <li>• Let them see a few categorization mistakes - shows honesty and learning opportunity</li>
+              <li>• Take notes during the demo - users give best feedback when actively using the product</li>
+              <li>• End by asking: "Would you use this? Why or why not?"</li>
+            </ul>
           </div>
         </div>
 
