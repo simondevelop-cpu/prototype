@@ -181,6 +181,58 @@ export default function AdminDashboard() {
 
   // Render Categories Tab
   const renderCategoriesTab = () => {
+    // If viewing recategorization log, render it directly
+    if (viewType === 'recategorization') {
+      return (
+        <div className="space-y-6">
+          {/* Auto-Categorization Logic Explanation */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-5 shadow-sm">
+            <p className="text-sm font-semibold text-gray-900 mb-3">Logic of the current auto-categorisation engine (in priority order):</p>
+            <ol className="space-y-2 text-sm text-gray-700">
+              <li>
+                <span className="font-semibold text-gray-900">1. User history</span> – First check if the user has previously recategorised a similar item
+              </li>
+              <li>
+                <span className="font-semibold text-gray-900">2. Merchant check</span> – A category if the merchant list below (or any of the alternative spellings) show up in the description with or without spaces.
+              </li>
+              <li>
+                <span className="font-semibold text-gray-900">3. Keyword search (first match)</span> – We search by category priority: Housing → Bills → Subscriptions → Food → Travel → Health → Transport → Education → Personal → Shopping → Work. The first matching keyword wins.
+              </li>
+            </ol>
+            <p className="text-sm text-gray-600 mt-3 pt-3 border-t border-blue-200">
+              Manage keywords and merchants below. All changes immediately affect categorization for future uploads.
+            </p>
+          </div>
+
+          {/* Three Sub-Tabs Side by Side */}
+          <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
+            <button
+              onClick={() => setViewType('keywords')}
+              className="px-4 py-2 rounded-md font-medium transition-colors text-gray-600 hover:text-gray-900"
+            >
+              🔤 Keywords
+            </button>
+            <button
+              onClick={() => setViewType('merchants')}
+              className="px-4 py-2 rounded-md font-medium transition-colors text-gray-600 hover:text-gray-900"
+            >
+              🏪 Merchants
+            </button>
+            <button
+              onClick={() => setViewType('recategorization')}
+              className="px-4 py-2 rounded-md font-medium transition-colors bg-white text-blue-600 shadow-sm"
+            >
+              🔄 Recategorization Log
+            </button>
+          </div>
+
+          {/* Recategorization Log Content */}
+          {renderRecategorizationLog()}
+        </div>
+      );
+    }
+    
+    // For keywords/merchants views
     const currentData = viewType === 'keywords' ? keywords : merchants;
     
     // Flatten all items into a single array with category
@@ -231,13 +283,13 @@ export default function AdminDashboard() {
           <p className="text-sm font-semibold text-gray-900 mb-3">Logic of the current auto-categorisation engine (in priority order):</p>
           <ol className="space-y-2 text-sm text-gray-700">
             <li>
-              <span className="font-semibold text-gray-900">1. User history</span> – first check if the user has previously recategorised a similar item
+              <span className="font-semibold text-gray-900">1. User history</span> – First check if the user has previously recategorised a similar item
             </li>
             <li>
               <span className="font-semibold text-gray-900">2. Merchant check</span> – A category if the merchant list below (or any of the alternative spellings) show up in the description with or without spaces.
             </li>
             <li>
-              <span className="font-semibold text-gray-900">3. Keyword Search (First Match)</span> – We search by category priority: Housing → Bills → Subscriptions → Food → Travel → Health → Transport → Education → Personal → Shopping → Work. The first matching keyword wins.
+              <span className="font-semibold text-gray-900">3. Keyword search (first match)</span> – We search by category priority: Housing → Bills → Subscriptions → Food → Travel → Health → Transport → Education → Personal → Shopping → Work. The first matching keyword wins.
             </li>
           </ol>
           <p className="text-sm text-gray-600 mt-3 pt-3 border-t border-blue-200">
@@ -350,8 +402,8 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Conditional Content: Patterns vs Recategorization Log */}
-        {viewType === 'recategorization' ? renderRecategorizationLog() : renderPatternsTable(allItems, filteredItems, allCategories, allLabels, hasActiveFilters)}
+        {/* Patterns Table */}
+        {renderPatternsTable(allItems, filteredItems, allCategories, allLabels, hasActiveFilters)}
       </div>
     );
   };
