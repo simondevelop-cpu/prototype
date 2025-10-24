@@ -12,7 +12,7 @@
 let cachedKeywords: KeywordPattern[] | null = null;
 let cachedMerchants: MerchantPattern[] | null = null;
 let lastFetchTime = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 30 * 1000; // 30 seconds (reduced from 5 minutes for faster updates)
 
 interface MerchantPattern {
   pattern: string;
@@ -23,13 +23,19 @@ interface MerchantPattern {
 
 /**
  * Fetch keyword and merchant patterns from database
+ * @param forceRefresh If true, bypass cache and fetch fresh data
  */
-export async function refreshCategorizationPatterns(): Promise<void> {
+export async function refreshCategorizationPatterns(forceRefresh: boolean = false): Promise<void> {
   const now = Date.now();
   
-  // Use cache if still valid
-  if (cachedKeywords && cachedMerchants && (now - lastFetchTime) < CACHE_TTL) {
+  // Use cache if still valid and not forcing refresh
+  if (!forceRefresh && cachedKeywords && cachedMerchants && (now - lastFetchTime) < CACHE_TTL) {
+    console.log('[Categorization] Using cached patterns');
     return;
+  }
+  
+  if (forceRefresh) {
+    console.log('[Categorization] 🔄 Force refreshing patterns from database...');
   }
 
   try {
@@ -161,42 +167,62 @@ export function categorizeTransaction(
   description: string,
   amount: number,
   learnedPatterns?: LearnedPattern[]
-): { category: string; label: string; confidence: number } {
+): { category: string; label: string; confidence: number; matchReason?: string } {
   const cleaned = cleanMerchantName(description);
   const cleanedNoSpaces = cleaned.replace(/\s+/g, ''); // Space-insensitive matching
   
-  console.log(`[Categorization] Processing: "${description.substring(0, 40)}" → cleaned: "${cleaned.substring(0, 40)}"`);
+  console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+  console.log(`[Categorization] 🔍 Processing transaction:`);
+  console.log(`  Original: "${description}"`);
+  console.log(`  Cleaned:  "${cleaned}"`);
+  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
   
   // Step 1: User learned patterns (HIGHEST PRIORITY)
   if (learnedPatterns && learnedPatterns.length > 0) {
+    console.log(`[Step 1] Checking ${learnedPatterns.length} learned pattern(s)...`);
     for (const pattern of learnedPatterns) {
       const patternNoSpaces = pattern.description_pattern.replace(/\s+/g, '');
       if (cleaned.includes(pattern.description_pattern) || cleanedNoSpaces.includes(patternNoSpaces)) {
         // Very high confidence for learned patterns, boosted by frequency
         const confidenceBoost = Math.min(pattern.frequency * 2, 10);
-        console.log(`[Categorization] ✓ USER HISTORY MATCH! Pattern "${pattern.description_pattern}" → ${pattern.corrected_category}/${pattern.corrected_label}`);
+        const matchReason = `User History: "${pattern.description_pattern}" (used ${pattern.frequency}x)`;
+        console.log(`[Step 1] ✅ USER HISTORY MATCH!`);
+        console.log(`  Pattern: "${pattern.description_pattern}"`);
+        console.log(`  Result:  ${pattern.corrected_category} / ${pattern.corrected_label}`);
+        console.log(`  Frequency: ${pattern.frequency}x`);
+        console.log(`  Confidence: ${95 + confidenceBoost}%`);
         return {
           category: pattern.corrected_category,
           label: pattern.corrected_label,
           confidence: 95 + confidenceBoost,
+          matchReason,
         };
       }
     }
+    console.log(`[Step 1] ❌ No learned pattern match`);
+  } else {
+    console.log(`[Step 1] ⊘ No learned patterns available`);
   }
   
   // Step 2: Check merchant patterns (including alternates)
   const merchantPatterns = cachedMerchants;
   
   if (merchantPatterns && merchantPatterns.length > 0) {
+    console.log(`[Step 2] Checking ${merchantPatterns.length} merchant pattern(s)...`);
     for (const merchant of merchantPatterns) {
       // Check primary merchant pattern
       const merchantNoSpaces = merchant.pattern.replace(/\s+/g, '');
       if (cleaned.includes(merchant.pattern) || cleanedNoSpaces.includes(merchantNoSpaces)) {
-        console.log(`[Categorization] ✓ MERCHANT MATCH! "${merchant.pattern}" → ${merchant.category}/${merchant.label}`);
+        const matchReason = `Merchant: "${merchant.pattern}"`;
+        console.log(`[Step 2] ✅ MERCHANT MATCH!`);
+        console.log(`  Merchant: "${merchant.pattern}"`);
+        console.log(`  Result:   ${merchant.category} / ${merchant.label}`);
+        console.log(`  Confidence: 90%`);
         return {
           category: merchant.category,
           label: merchant.label,
-          confidence: 90, // High confidence for merchant matches
+          confidence: 90,
+          matchReason,
         };
       }
       
@@ -204,15 +230,24 @@ export function categorizeTransaction(
       for (const altPattern of merchant.alternatePatterns) {
         const altNoSpaces = altPattern.replace(/\s+/g, '');
         if (cleaned.includes(altPattern) || cleanedNoSpaces.includes(altNoSpaces)) {
-          console.log(`[Categorization] ✓ MERCHANT ALTERNATE MATCH! "${altPattern}" (→ "${merchant.pattern}") → ${merchant.category}/${merchant.label}`);
+          const matchReason = `Merchant Alternate: "${altPattern}" → "${merchant.pattern}"`;
+          console.log(`[Step 2] ✅ MERCHANT ALTERNATE MATCH!`);
+          console.log(`  Alternate: "${altPattern}"`);
+          console.log(`  Main Merchant: "${merchant.pattern}"`);
+          console.log(`  Result:   ${merchant.category} / ${merchant.label}`);
+          console.log(`  Confidence: 90%`);
           return {
             category: merchant.category,
             label: merchant.label,
             confidence: 90,
+            matchReason,
           };
         }
       }
     }
+    console.log(`[Step 2] ❌ No merchant match`);
+  } else {
+    console.log(`[Step 2] ⊘ No merchant patterns loaded`);
   }
   
   // Step 3: Loop through categories in priority order and check keywords
@@ -220,17 +255,23 @@ export function categorizeTransaction(
   const keywordPatterns = cachedKeywords;
   
   if (!keywordPatterns || keywordPatterns.length === 0) {
-    console.warn('[Categorization] No keyword patterns loaded from database. Returning Uncategorised.');
+    console.warn('[Step 3] ⚠️  No keyword patterns loaded from database. Returning Uncategorised.');
     return {
       category: 'Uncategorised',
       label: 'Uncategorised',
       confidence: 0,
+      matchReason: 'No patterns loaded from database',
     };
   }
   
+  console.log(`[Step 3] Checking keywords by category priority...`);
   for (const categoryName of CATEGORY_PRIORITY) {
     // Get all keyword patterns for this category
     const categoryPatterns = keywordPatterns.filter(p => p.category === categoryName);
+    
+    if (categoryPatterns.length > 0) {
+      console.log(`  Checking ${categoryName}: ${categoryPatterns.length} pattern group(s)`);
+    }
     
     for (const pattern of categoryPatterns) {
       for (const keyword of pattern.keywords) {
@@ -239,20 +280,43 @@ export function categorizeTransaction(
         // Check if keyword matches (with or without spaces)
         if (cleaned.includes(keyword) || cleanedNoSpaces.includes(keywordNoSpaces)) {
           // FIRST MATCH WINS - return immediately
-          console.log(`[Categorization] ✓ MATCH! Keyword "${keyword}" → ${pattern.category}/${pattern.label}`);
+          const matchReason = `Keyword: "${keyword}" (${categoryName} priority)`;
+          console.log(`[Step 3] ✅ KEYWORD MATCH!`);
+          console.log(`  Keyword:  "${keyword}"`);
+          console.log(`  Category: ${categoryName}`);
+          console.log(`  Result:   ${pattern.category} / ${pattern.label}`);
+          console.log(`  Confidence: 85%`);
           return {
             category: pattern.category,
             label: pattern.label,
-            confidence: 85, // Good confidence for keyword matches
+            confidence: 85,
+            matchReason,
           };
         }
       }
     }
   }
   
-  // Step 3: No match found - return Uncategorised
-  console.log(`[Categorization] ✗ NO MATCH - returning Uncategorised`);
-  return { category: 'Uncategorised', label: 'Uncategorised', confidence: 0 };
+  // Step 4: No match found - return Uncategorised
+  console.log(`[Step 4] ❌ NO MATCH FOUND - returning Uncategorised`);
+  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+  return { 
+    category: 'Uncategorised', 
+    label: 'Uncategorised', 
+    confidence: 0,
+    matchReason: 'No matching pattern found',
+  };
+}
+
+/**
+ * Invalidate the pattern cache to force a fresh fetch on next categorization
+ * Call this after updating keywords/merchants in the admin dashboard
+ */
+export function invalidatePatternCache(): void {
+  console.log('[Categorization] 🗑️  Cache invalidated - will fetch fresh patterns on next use');
+  cachedKeywords = null;
+  cachedMerchants = null;
+  lastFetchTime = 0;
 }
 
 /**

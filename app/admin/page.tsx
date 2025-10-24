@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { invalidatePatternCache } from '@/lib/categorization-engine';
 
-type TabName = 'inbox' | 'categories' | 'insights' | 'analytics' | 'accounts';
+type TabName = 'inbox' | 'categories' | 'insights' | 'analytics' | 'accounts' | 'debugging';
 
 interface Keyword {
   id: number;
@@ -39,8 +40,7 @@ export default function AdminDashboard() {
   const [authenticated, setAuthenticated] = useState(false);
   const [checking, setChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<TabName>('inbox');
-  const [viewType, setViewType] = useState<'keywords' | 'merchants'>('keywords');
-  const [categorySubTab, setCategorySubTab] = useState<'patterns' | 'recategorization'>('patterns');
+  const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
   const [stats, setStats] = useState<any>(null);
@@ -124,9 +124,9 @@ export default function AdminDashboard() {
     }
   }, [activeTab, authenticated]);
 
-  // Fetch recategorizations when Recategorization Log sub-tab is active
+  // Fetch recategorizations when Recategorization Log tab is active
   useEffect(() => {
-    if (activeTab === 'categories' && categorySubTab === 'recategorization' && authenticated) {
+    if (activeTab === 'categories' && viewType === 'recategorization' && authenticated) {
       const fetchRecategorizations = async () => {
         setRecatLoading(true);
         try {
@@ -144,7 +144,7 @@ export default function AdminDashboard() {
       };
       fetchRecategorizations();
     }
-  }, [activeTab, categorySubTab, authenticated]);
+  }, [activeTab, viewType, authenticated]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -182,6 +182,73 @@ export default function AdminDashboard() {
 
   // Render Categories Tab
   const renderCategoriesTab = () => {
+    return (
+      <div className="space-y-6">
+        {/* Auto-Categorization Logic Explanation */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-5 shadow-sm">
+          <p className="text-sm font-semibold text-gray-900 mb-3">Logic of the current auto-categorisation engine (in priority order):</p>
+          <ol className="space-y-2 text-sm text-gray-700">
+            <li>
+              <span className="font-semibold text-gray-900">1. User history</span> – First check if the user has previously recategorised a similar item
+            </li>
+            <li>
+              <span className="font-semibold text-gray-900">2. Merchant check</span> – A category if the merchant list below (or any of the alternative spellings) show up in the description with or without spaces.
+            </li>
+            <li>
+              <span className="font-semibold text-gray-900">3. Keyword search (first match)</span> – We search by category priority: Housing → Bills → Subscriptions → Food → Travel → Health → Transport → Education → Personal → Shopping → Work. The first matching keyword wins.
+            </li>
+          </ol>
+          <p className="text-sm text-gray-600 mt-3 pt-3 border-t border-blue-200">
+            Manage keywords and merchants below. All changes immediately affect categorization for future uploads. Matching is case-insensitive and space-insensitive.
+          </p>
+        </div>
+
+        {/* Three Sub-Tabs Side by Side */}
+        <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
+          <button
+            onClick={() => setViewType('keywords')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              viewType === 'keywords'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            🔤 Keywords
+          </button>
+          <button
+            onClick={() => setViewType('merchants')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              viewType === 'merchants'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            🏪 Merchants
+          </button>
+          <button
+            onClick={() => setViewType('recategorization')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              viewType === 'recategorization'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            🔄 Recategorization Log
+          </button>
+        </div>
+
+        {/* Conditional Content: Recategorization Log or Patterns Table */}
+        {viewType === 'recategorization' ? (
+          renderRecategorizationLog()
+        ) : (
+          renderKeywordsMerchantsContent()
+        )}
+      </div>
+    );
+  };
+
+  // Render Keywords/Merchants Content (separated for type safety)
+  const renderKeywordsMerchantsContent = () => {
     const currentData = viewType === 'keywords' ? keywords : merchants;
     
     // Flatten all items into a single array with category
@@ -200,10 +267,10 @@ export default function AdminDashboard() {
         ? item.keyword 
         : item.merchant_pattern;
       
-      // Search filter
-      const matchesSearch = keyword.toLowerCase().includes(searchLower) ||
-        item.label?.toLowerCase().includes(searchLower) ||
-        item.category.toLowerCase().includes(searchLower);
+      // Search filter (with null checks)
+      const matchesSearch = (keyword?.toLowerCase() || '').includes(searchLower) ||
+        (item.label?.toLowerCase() || '').includes(searchLower) ||
+        (item.category?.toLowerCase() || '').includes(searchLower);
       
       // Category filter
       const matchesCategory = selectedCategories.length === 0 || 
@@ -226,113 +293,8 @@ export default function AdminDashboard() {
 
     return (
       <div className="space-y-6">
-        {/* Header & Controls */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Categorization Patterns</h2>
-            <p className="text-gray-600 mt-1">Manage keywords and merchant patterns for auto-categorization</p>
-          </div>
-          <button
-            onClick={fetchData}
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? 'Loading...' : '🔄 Refresh'}
-          </button>
-        </div>
-
-        {/* Auto-Categorization Logic Explanation */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-            🤖 Auto-Categorization Engine
-          </h3>
-          <div className="space-y-3 text-sm text-gray-700">
-            <p className="font-medium text-gray-900">How it works (in priority order):</p>
-            <ol className="space-y-2 ml-4">
-              <li className="flex items-start gap-2">
-                <span className="font-bold text-blue-600 min-w-[1.5rem]">1.</span>
-                <div>
-                  <span className="font-semibold text-gray-900">User History</span>
-                  <span className="text-gray-600"> – Your past recategorizations are checked first and always take priority.</span>
-                </div>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="font-bold text-blue-600 min-w-[1.5rem]">2.</span>
-                <div>
-                  <span className="font-semibold text-gray-900">Merchant Matching</span>
-                  <span className="text-gray-600"> – We match against known Canadian merchants and their alternate spellings (e.g., "TIMHORT" → "TIM HORTONS").</span>
-                </div>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="font-bold text-blue-600 min-w-[1.5rem]">3.</span>
-                <div>
-                  <span className="font-semibold text-gray-900">Keyword Search (First Match)</span>
-                  <span className="text-gray-600"> – We search by category priority: </span>
-                  <span className="font-mono text-xs bg-white px-2 py-0.5 rounded border border-gray-200">
-                    Housing → Bills → Subscriptions → Food → Travel → Health → Transport → Education → Personal → Shopping → Work
-                  </span>
-                  <span className="text-gray-600">. The first matching keyword wins.</span>
-                </div>
-              </li>
-            </ol>
-            <p className="text-xs text-gray-500 italic mt-4 pt-3 border-t border-blue-200">
-              💡 Manage keywords and merchants below. All changes immediately affect categorization for future uploads.
-            </p>
-          </div>
-        </div>
-
-        {/* Sub-Tab Toggle: Patterns vs Recategorization Log */}
-        <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
-          <button
-            onClick={() => { setCategorySubTab('patterns'); setViewType('keywords'); }}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              categorySubTab === 'patterns'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            📋 Patterns
-          </button>
-          <button
-            onClick={() => setCategorySubTab('recategorization')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              categorySubTab === 'recategorization'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            🔄 Recategorization Log
-          </button>
-        </div>
-        
-        {/* View Type Toggle (only shown for Patterns sub-tab) */}
-        {categorySubTab === 'patterns' && (
-          <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
-            <button
-              onClick={() => setViewType('keywords')}
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                viewType === 'keywords'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              🔤 Keywords
-            </button>
-            <button
-              onClick={() => setViewType('merchants')}
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                viewType === 'merchants'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              🏪 Merchants
-            </button>
-          </div>
-        )}
-
-        {/* Stats (only for Patterns sub-tab) */}
-        {categorySubTab === 'patterns' && stats && (
+        {/* Stats */}
+        {stats && (
           <div className="grid grid-cols-4 gap-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="text-2xl font-bold text-blue-900">{stats.total}</div>
@@ -357,8 +319,8 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Search & Filter (only for Patterns sub-tab) */}
-        {categorySubTab === 'patterns' && (
+        {/* Search & Filter (only for Keywords/Merchants tabs) */}
+        {viewType !== 'recategorization' && (
           <div className="flex gap-4 items-center">
             <input
               type="text"
@@ -402,8 +364,8 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Conditional Content: Patterns vs Recategorization Log */}
-        {categorySubTab === 'recategorization' ? renderRecategorizationLog() : renderPatternsTable(allItems, filteredItems, allCategories, allLabels, hasActiveFilters)}
+        {/* Patterns Table */}
+        {renderPatternsTable(allItems, filteredItems, allCategories, allLabels, hasActiveFilters)}
       </div>
     );
   };
@@ -504,6 +466,11 @@ export default function AdminDashboard() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                         {viewType === 'keywords' ? 'Keyword' : 'Merchant Pattern'}
                       </th>
+                      {viewType === 'merchants' && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                          Alternate Patterns
+                        </th>
+                      )}
                       <ColumnFilterHeader
                         label="Category"
                         options={allCategories}
@@ -558,6 +525,13 @@ export default function AdminDashboard() {
                               itemKey
                             )}
                           </td>
+                          {viewType === 'merchants' && (
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {item.alternate_patterns && item.alternate_patterns.length > 0 
+                                ? item.alternate_patterns.join(', ') 
+                                : '-'}
+                            </td>
+                          )}
                           <td 
                             className="px-6 py-4 text-sm text-gray-600 cursor-pointer"
                             onDoubleClick={() => startEditing(item, 'category')}
@@ -707,6 +681,570 @@ export default function AdminDashboard() {
     );
   };
 
+  // Render Debugging Guide Tab
+  const renderDebuggingGuide = () => {
+    return (
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">🐛 Debugging & Testing Guide</h2>
+          <p className="text-gray-600">
+            Comprehensive testing checklist to discover bugs, UX issues, and verify functionality across the entire application.
+          </p>
+        </div>
+
+        {/* Testing Sections */}
+        <div className="grid gap-6">
+          
+          {/* 1. Authentication & Login */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">1️⃣ Authentication & Login Flow</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Demo Login:</strong> Test with demo@canadianinsights.ca / password</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Admin Login:</strong> Test with admin account credentials</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Wrong Password:</strong> Verify error message shows correctly</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Token Expiry:</strong> Wait 1 day and verify auto-logout for admin</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Logout:</strong> Click logout and verify redirect to login page</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 2. Statement Upload & Parsing */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">2️⃣ Statement Upload & PDF Parsing</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Upload CIBC Credit Statement:</strong> Verify parsing works correctly</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Upload CIBC Debit Statement:</strong> Test alternative format</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Upload Wrong File Type:</strong> Verify error handling (e.g., .xlsx, .txt)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Upload Corrupted PDF:</strong> Test error handling</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Large Statement:</strong> Upload 100+ transactions, check performance</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Duplicate Detection:</strong> Upload same statement twice, verify duplicates are filtered</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Account Name:</strong> Verify default account name is set and editable</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 3. Auto-Categorization */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">3️⃣ Auto-Categorization Engine</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Check Auto-Categorization Button:</strong> Click and verify modal opens</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Browser Console Logs:</strong> Open F12 Console, verify detailed categorization logs appear</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Match Reasons:</strong> Check console for which rule triggered (User History/Merchant/Keyword)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Category Summary:</strong> Verify all categories show (even empty ones under "Show More")</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Transaction Count:</strong> Verify "X of Y categorized" matches actual count</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Uncategorised:</strong> Check if any expenses are uncategorised (shouldn't be many)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Category Detail View:</strong> Click category name, verify transactions display in 4-column table</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Edit in Modal:</strong> Double-click transaction, change category, verify change persists</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Back Navigation:</strong> Click Back from detail view → summary → review modal (no stacking)</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 4. Import & Transaction Management */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">4️⃣ Import & Transaction Management</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Import Transactions:</strong> Click "Import X Transactions" and verify they appear in Transactions tab</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Transaction List:</strong> Verify all imported transactions show with correct categories</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Filter by Category:</strong> Select category filter, verify correct filtering</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Filter by Cashflow:</strong> Filter by Income/Expense/Other</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Filter by Account:</strong> Test account filter if multiple accounts exist</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Search:</strong> Search by description, verify results</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Date Range Filter:</strong> Test date filtering</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Clear Filters:</strong> Click "Clear All" and verify all filters reset</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Edit Transaction:</strong> Click edit icon, change category/label/amount, verify save works</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Recategorization Learning:</strong> After editing category, check Admin → Recategorization Log</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Delete Transaction:</strong> Delete a transaction, verify it's removed</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Bulk Select:</strong> Select multiple transactions, test bulk delete</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Add Manual Transaction:</strong> Click "Add Transaction", create one manually, verify it saves</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 5. Admin Dashboard - Category Engine */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">5️⃣ Admin Dashboard - Category Engine</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Keywords Tab:</strong> Verify all keywords display in table</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Merchants Tab:</strong> Verify all merchants display with alternate patterns</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Add Keyword:</strong> Click "+ Add Keyword", create new one, verify it saves</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Add Merchant:</strong> Add merchant with alternate patterns (e.g., "TIM HORTONS" with "TIMHORT")</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Inline Edit:</strong> Double-click keyword/merchant, edit, click Save</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Delete Single:</strong> Delete one keyword/merchant</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Bulk Delete:</strong> Select multiple items, delete them</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Category Filter:</strong> Click category column header, filter by multiple categories</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Label Filter:</strong> Click label column header, filter by labels</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Search:</strong> Search for specific keyword/merchant</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Cache Invalidation:</strong> Add/edit keyword, upload statement immediately, verify new keyword is used</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Case Insensitivity:</strong> Add keyword in lowercase, verify it still matches uppercase transactions</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Tab Switching:</strong> Rapidly click between Keywords/Merchants/Recategorization tabs (no errors)</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 6. Admin Dashboard - Recategorization Log */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">6️⃣ Admin Dashboard - Recategorization Log</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>View Log:</strong> Navigate to Recategorization Log tab</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>User Corrections:</strong> Verify user recategorizations appear here</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Pattern Details:</strong> Check description pattern, user email, old/new category</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Frequency Count:</strong> Verify frequency increments when same pattern is recategorized</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Review Checkbox:</strong> Check "Reviewed" checkbox, verify it persists</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Priority Testing:</strong> Recategorize a transaction, upload statement with same merchant, verify user history takes priority</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 7. Admin Dashboard - Accounts */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">7️⃣ Admin Dashboard - Accounts</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>View Users:</strong> Navigate to Accounts tab, verify all registered users appear</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>User Status:</strong> Check if status shows "Active" for users with transactions</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Email Validation:</strong> Verify "Email Validated" shows False (email auth not implemented yet)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Registration Date:</strong> Check dates are formatted correctly</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 8. Dashboard & Insights */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">8️⃣ Dashboard & Insights (User View)</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Dashboard Totals:</strong> Verify total income/expenses calculate correctly</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Net Cash Flow:</strong> Check net amount is income - expenses</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Category Breakdown:</strong> Verify pie chart/bar chart displays correctly</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Top Categories:</strong> Check top spending categories are accurate</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Recent Transactions:</strong> Verify recent transactions list shows latest items</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Date Range Selector:</strong> Change date range, verify data updates</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Empty State:</strong> Test dashboard with no transactions</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 9. Edge Cases & Error Handling */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">9️⃣ Edge Cases & Error Handling</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>No Network:</strong> Disable internet, try uploading statement, verify error message</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Slow Connection:</strong> Throttle network (Chrome DevTools), test loading states</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Browser Back Button:</strong> Use browser back, verify navigation works correctly</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Page Refresh:</strong> Refresh page mid-action, verify state is preserved (or gracefully reset)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Multiple Tabs:</strong> Open app in 2 tabs, make changes in one, verify sync in other</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Mobile Browser:</strong> Test on mobile (responsive design)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Console Errors:</strong> Open F12 Console, browse entire app, check for errors</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Network Tab:</strong> Check Network tab for failed requests</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 10. Performance & UX */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">🔟 Performance & UX</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Upload Speed:</strong> Time how long it takes to upload and parse a statement</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Loading States:</strong> Verify spinners/loading indicators appear during async operations</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Button States:</strong> Check buttons disable during save/delete operations</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Success Messages:</strong> Verify success toasts/messages appear after actions</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Error Messages:</strong> Check error messages are clear and helpful</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Modal UX:</strong> Verify modals can be closed with ESC key and clicking outside</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Table Pagination:</strong> Test with 1000+ transactions (if pagination exists)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Keyboard Navigation:</strong> Try navigating with Tab key</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Next Build Steps */}
+        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-lg p-6 mt-8">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">🚀 Next Build Steps (Prioritized)</h2>
+          <div className="space-y-3 text-sm">
+            <div className="flex items-start">
+              <span className="text-blue-600 font-bold mr-3">1.</span>
+              <div>
+                <strong className="text-gray-900">Enhance Categorization Engine</strong>
+                <p className="text-gray-600 mt-1">
+                  • Train on publicly available Canadian transaction datasets<br/>
+                  • Expand parser support to TD, RBC, Scotiabank, BMO, Tangerine<br/>
+                  • Add confidence scoring and pattern detection improvements
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              <span className="text-blue-600 font-bold mr-3">2.</span>
+              <div>
+                <strong className="text-gray-900">Build User Feedback & Analytics Systems</strong>
+                <p className="text-gray-600 mt-1">
+                  • Implement Inbox tab for bug reports and feature requests<br/>
+                  • Build Analytics dashboard with performance metrics<br/>
+                  • Add internal validation and error boundaries
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              <span className="text-blue-600 font-bold mr-3">3.</span>
+              <div>
+                <strong className="text-gray-900">Develop Insights Dashboard</strong>
+                <p className="text-gray-600 mt-1">
+                  • Create rich demo data for insights visualization<br/>
+                  • Build automated spending insights and trend analysis<br/>
+                  • Add personalized recommendations engine
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              <span className="text-blue-600 font-bold mr-3">4.</span>
+              <div>
+                <strong className="text-gray-900">User Settings & Security</strong>
+                <p className="text-gray-600 mt-1">
+                  • Implement settings page (profile, preferences, notifications)<br/>
+                  • Add email verification and authentication<br/>
+                  • Build password reset and 2FA capabilities
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              <span className="text-blue-600 font-bold mr-3">5.</span>
+              <div>
+                <strong className="text-gray-900">Mobile App Development</strong>
+                <p className="text-gray-600 mt-1">
+                  • Optimize responsive design for mobile browsers<br/>
+                  • Build React Native app for iOS and Android<br/>
+                  • Implement mobile-first features (camera upload, notifications)
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              <span className="text-blue-600 font-bold mr-3">6.</span>
+              <div>
+                <strong className="text-gray-900">Future Enhancements</strong>
+                <p className="text-gray-600 mt-1">
+                  • Budget planning and forecasting (deprioritized for now)<br/>
+                  • Tax report generation and export<br/>
+                  • Multi-currency support and investment tracking
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Demo Approach */}
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-6 mt-8">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">🎯 Demo Approach for User Testing (20-min Sessions)</h2>
+          
+          <div className="mb-4">
+            <h3 className="text-base font-semibold text-gray-900 mb-2">Demo Flow (Screen Share):</h3>
+            <ol className="space-y-2 text-sm text-gray-700 ml-4">
+              <li><strong>1. Quick Intro (2 min):</strong> "I'm building an AI-powered expense categorization tool specifically for Canadian bank statements. It automatically categorizes your spending and learns from your corrections."</li>
+              <li><strong>2. Live Upload (3 min):</strong> Upload a real CIBC statement, show the parsing and review modal</li>
+              <li><strong>3. Auto-Categorization (5 min):</strong> Click "Check Auto-Categorization", walk through the summary, show detailed logs in console</li>
+              <li><strong>4. Manual Correction (3 min):</strong> Edit a miscategorized transaction, explain how the engine learns</li>
+              <li><strong>5. Dashboard View (2 min):</strong> Show the transaction list with filters and search</li>
+              <li><strong>6. Questions & Feedback (5 min):</strong> Use the key questions below</li>
+            </ol>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-green-200">
+            <h3 className="text-base font-semibold text-gray-900 mb-2">Key Questions to Ask:</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Current Pain Point:</strong> "How do you currently track your expenses? Do you use any apps or tools?" (Understand their current workflow)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Bank Usage:</strong> "Which Canadian bank(s) do you use? How many accounts do you typically track?" (Understand banking diversity)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Categorization Value:</strong> "Does automatic categorization save you time? Would you trust AI to categorize your expenses?" (Gauge core value prop)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Learning System:</strong> "How important is it that the system learns from your corrections over time?" (Test learning feature value)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>UI/UX Feedback:</strong> "Was the upload process intuitive? Did anything confuse you?" (Direct UX feedback)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Feature Priorities:</strong> "What would you want to see next? Budget tracking? Spending insights? Tax reports?" (Feature validation)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Privacy Concerns:</strong> "Any concerns about uploading bank statements? What would make you feel more comfortable?" (Address security)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Pricing:</strong> "Would you pay for this? If so, how much per month seems fair for automatic categorization and insights?" (Pricing research)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Comparison:</strong> "Have you tried tools like Mint, YNAB, or Wealthsimple? How does this compare?" (Competitive analysis)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">❓</span>
+                <span><strong>Mobile Usage:</strong> "Would you prefer using this on mobile, desktop, or both? When would you typically check your expenses?" (Platform priority)</span>
+              </li>
+            </ul>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-green-200">
+            <h3 className="text-base font-semibold text-gray-900 mb-2">💡 Tips for Effective Demos:</h3>
+            <ul className="space-y-1 text-sm text-gray-600">
+              <li>• Use a real, messy statement (30-50 transactions) to show real-world value</li>
+              <li>• Have the browser console open to show the technical sophistication</li>
+              <li>• Let them see a few categorization mistakes - shows honesty and learning opportunity</li>
+              <li>• Take notes during the demo - users give best feedback when actively using the product</li>
+              <li>• End by asking: "Would you use this? Why or why not?"</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Tips */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-sm text-yellow-800">
+            <strong>💡 Pro Tip:</strong> Always have the browser console open (F12 → Console) when testing. 
+            The detailed categorization logs will help you understand exactly what's happening under the hood.
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
     router.push('/admin/login');
@@ -760,6 +1298,9 @@ export default function AdminDashboard() {
       
       if (!response.ok) throw new Error('Failed to save');
       
+      // Invalidate categorization cache so changes take effect immediately
+      invalidatePatternCache();
+      
       // Clear editing state and refresh
       cancelEdit();
       await fetchData();
@@ -782,6 +1323,9 @@ export default function AdminDashboard() {
       });
       
       if (!response.ok) throw new Error('Failed to delete');
+      
+      // Invalidate categorization cache so changes take effect immediately
+      invalidatePatternCache();
       
       // Refresh data
       await fetchData();
@@ -808,6 +1352,9 @@ export default function AdminDashboard() {
           })
         )
       );
+      
+      // Invalidate categorization cache so changes take effect immediately
+      invalidatePatternCache();
       
       // Clear selection and refresh data
       setSelectedItems([]);
@@ -909,6 +1456,16 @@ export default function AdminDashboard() {
             >
               👥 Accounts
             </button>
+            <button
+              onClick={() => setActiveTab('debugging')}
+              className={`px-6 py-4 font-medium text-sm transition-colors relative ${
+                activeTab === 'debugging'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              🐛 Debugging Guide
+            </button>
           </div>
         </div>
       </div>
@@ -920,12 +1477,13 @@ export default function AdminDashboard() {
         {activeTab === 'insights' && renderPlaceholderTab('Insights Engine', 'Automated spending insights and personalized recommendations', '🔍')}
         {activeTab === 'analytics' && renderPlaceholderTab('Analytics', 'View categorization performance, user activity, and system metrics', '📊')}
         {activeTab === 'accounts' && renderAccountsTab()}
+        {activeTab === 'debugging' && renderDebuggingGuide()}
       </div>
       
-      {/* Add Modal */}
-      {showAddModal && (
+      {/* Add Modal - only for keywords and merchants */}
+      {showAddModal && viewType !== 'recategorization' && (
         <AddEditModal
-          viewType={viewType}
+          viewType={viewType as 'keywords' | 'merchants'}
           item={null}
           onClose={() => setShowAddModal(false)}
           onSave={() => {
@@ -975,8 +1533,7 @@ function AddEditModal({
         ? {
             keyword: formData.keyword,
             category: formData.category,
-            label: formData.label,
-            notes: formData.notes
+            label: formData.label
           }
         : {
             merchant_pattern: formData.keyword,
@@ -985,8 +1542,7 @@ function AddEditModal({
               .map(p => p.trim().toUpperCase())
               .filter(p => p.length > 0),
             category: formData.category,
-            label: formData.label,
-            notes: formData.notes
+            label: formData.label
           };
       
       const response = await fetch(url, {
@@ -1002,6 +1558,9 @@ function AddEditModal({
         const error = await response.json();
         throw new Error(error.error || 'Failed to save');
       }
+      
+      // Invalidate categorization cache so changes take effect immediately
+      invalidatePatternCache();
       
       onSave();
     } catch (error: any) {
@@ -1082,16 +1641,18 @@ function AddEditModal({
               </div>
             )}
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                rows={2}
-                placeholder="Any additional notes..."
-              />
-            </div>
+            {viewType === 'keywords' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                  placeholder="Any additional notes..."
+                />
+              </div>
+            )}
             
             <div className="flex gap-3 pt-4">
               <button
@@ -1200,4 +1761,5 @@ function ColumnFilterHeader({
     </th>
   );
 }
+
 
