@@ -227,76 +227,51 @@ export default function AdminDashboard() {
     return (
       <div className="space-y-6">
         {/* Header & Controls */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Categorization Patterns</h2>
-            <p className="text-gray-600 mt-1">Manage keywords and merchant patterns for auto-categorization</p>
-          </div>
-          <button
-            onClick={fetchData}
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? 'Loading...' : '🔄 Refresh'}
-          </button>
-        </div>
-
         {/* Auto-Categorization Logic Explanation */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-            🤖 Auto-Categorization Engine
-          </h3>
-          <div className="space-y-3 text-sm text-gray-700">
-            <p className="font-medium text-gray-900">How it works (in priority order):</p>
-            <ol className="space-y-2 ml-4">
-              <li className="flex items-start gap-2">
-                <span className="font-bold text-blue-600 min-w-[1.5rem]">1.</span>
-                <div>
-                  <span className="font-semibold text-gray-900">User History</span>
-                  <span className="text-gray-600"> – Your past recategorizations are checked first and always take priority.</span>
-                </div>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="font-bold text-blue-600 min-w-[1.5rem]">2.</span>
-                <div>
-                  <span className="font-semibold text-gray-900">Merchant Matching</span>
-                  <span className="text-gray-600"> – We match against known Canadian merchants and their alternate spellings (e.g., "TIMHORT" → "TIM HORTONS").</span>
-                </div>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="font-bold text-blue-600 min-w-[1.5rem]">3.</span>
-                <div>
-                  <span className="font-semibold text-gray-900">Keyword Search (First Match)</span>
-                  <span className="text-gray-600"> – We search by category priority: </span>
-                  <span className="font-mono text-xs bg-white px-2 py-0.5 rounded border border-gray-200">
-                    Housing → Bills → Subscriptions → Food → Travel → Health → Transport → Education → Personal → Shopping → Work
-                  </span>
-                  <span className="text-gray-600">. The first matching keyword wins.</span>
-                </div>
-              </li>
-            </ol>
-            <p className="text-xs text-gray-500 italic mt-4 pt-3 border-t border-blue-200">
-              💡 Manage keywords and merchants below. All changes immediately affect categorization for future uploads.
-            </p>
-          </div>
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-5 shadow-sm">
+          <p className="text-sm font-semibold text-gray-900 mb-3">Logic of the current auto-categorisation engine (in priority order):</p>
+          <ol className="space-y-2 text-sm text-gray-700">
+            <li>
+              <span className="font-semibold text-gray-900">1. User history</span> – first check if the user has previously recategorised a similar item
+            </li>
+            <li>
+              <span className="font-semibold text-gray-900">2. Merchant check</span> – A category if the merchant list below (or any of the alternative spellings) show up in the description with or without spaces.
+            </li>
+            <li>
+              <span className="font-semibold text-gray-900">3. Keyword Search (First Match)</span> – We search by category priority: Housing → Bills → Subscriptions → Food → Travel → Health → Transport → Education → Personal → Shopping → Work. The first matching keyword wins.
+            </li>
+          </ol>
+          <p className="text-sm text-gray-600 mt-3 pt-3 border-t border-blue-200">
+            Manage keywords and merchants below. All changes immediately affect categorization for future uploads.
+          </p>
         </div>
 
-        {/* Sub-Tab Toggle: Patterns vs Recategorization Log */}
+        {/* Three Sub-Tabs Side by Side */}
         <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
           <button
-            onClick={() => { setCategorySubTab('patterns'); setViewType('keywords'); }}
+            onClick={() => setViewType('keywords')}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              categorySubTab === 'patterns'
+              viewType === 'keywords'
                 ? 'bg-white text-blue-600 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            📋 Patterns
+            🔤 Keywords
           </button>
           <button
-            onClick={() => setCategorySubTab('recategorization')}
+            onClick={() => setViewType('merchants')}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              categorySubTab === 'recategorization'
+              viewType === 'merchants'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            🏪 Merchants
+          </button>
+          <button
+            onClick={() => setViewType('recategorization')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              viewType === 'recategorization'
                 ? 'bg-white text-blue-600 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
@@ -304,35 +279,9 @@ export default function AdminDashboard() {
             🔄 Recategorization Log
           </button>
         </div>
-        
-        {/* View Type Toggle (only shown for Patterns sub-tab) */}
-        {categorySubTab === 'patterns' && (
-          <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
-            <button
-              onClick={() => setViewType('keywords')}
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                viewType === 'keywords'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              🔤 Keywords
-            </button>
-            <button
-              onClick={() => setViewType('merchants')}
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                viewType === 'merchants'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              🏪 Merchants
-            </button>
-          </div>
-        )}
 
-        {/* Stats (only for Patterns sub-tab) */}
-        {categorySubTab === 'patterns' && stats && (
+        {/* Stats (only for Keywords/Merchants tabs) */}
+        {viewType !== 'recategorization' && stats && (
           <div className="grid grid-cols-4 gap-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="text-2xl font-bold text-blue-900">{stats.total}</div>
@@ -357,8 +306,8 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Search & Filter (only for Patterns sub-tab) */}
-        {categorySubTab === 'patterns' && (
+        {/* Search & Filter (only for Keywords/Merchants tabs) */}
+        {viewType !== 'recategorization' && (
           <div className="flex gap-4 items-center">
             <input
               type="text"
@@ -403,7 +352,7 @@ export default function AdminDashboard() {
         )}
 
         {/* Conditional Content: Patterns vs Recategorization Log */}
-        {categorySubTab === 'recategorization' ? renderRecategorizationLog() : renderPatternsTable(allItems, filteredItems, allCategories, allLabels, hasActiveFilters)}
+        {viewType === 'recategorization' ? renderRecategorizationLog() : renderPatternsTable(allItems, filteredItems, allCategories, allLabels, hasActiveFilters)}
       </div>
     );
   };
@@ -504,6 +453,11 @@ export default function AdminDashboard() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                         {viewType === 'keywords' ? 'Keyword' : 'Merchant Pattern'}
                       </th>
+                      {viewType === 'merchants' && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                          Alternate Patterns
+                        </th>
+                      )}
                       <ColumnFilterHeader
                         label="Category"
                         options={allCategories}
@@ -558,6 +512,13 @@ export default function AdminDashboard() {
                               itemKey
                             )}
                           </td>
+                          {viewType === 'merchants' && (
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {item.alternate_patterns && item.alternate_patterns.length > 0 
+                                ? item.alternate_patterns.join(', ') 
+                                : '-'}
+                            </td>
+                          )}
                           <td 
                             className="px-6 py-4 text-sm text-gray-600 cursor-pointer"
                             onDoubleClick={() => startEditing(item, 'category')}
@@ -985,8 +946,7 @@ function AddEditModal({
               .map(p => p.trim().toUpperCase())
               .filter(p => p.length > 0),
             category: formData.category,
-            label: formData.label,
-            notes: formData.notes
+            label: formData.label
           };
       
       const response = await fetch(url, {
@@ -1082,12 +1042,13 @@ function AddEditModal({
               </div>
             )}
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            {viewType === 'keywords' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 rows={2}
                 placeholder="Any additional notes..."
               />
@@ -1200,4 +1161,5 @@ function ColumnFilterHeader({
     </th>
   );
 }
+
 
