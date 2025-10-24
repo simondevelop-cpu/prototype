@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 type TabName = 'categories' | 'analytics' | 'inbox' | 'approved-accounts';
@@ -46,10 +46,12 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<Keyword | Merchant | null>(null);
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState<any>({});
 
   // Check authentication on mount
   useEffect(() => {
@@ -126,42 +128,49 @@ export default function AdminDashboard() {
   // Render Categories Tab
   const renderCategoriesTab = () => {
     const currentData = viewType === 'keywords' ? keywords : merchants;
-    const categories = Object.keys(currentData).sort();
     
-    // Filter data based on search and category
-    const filteredCategories = selectedCategory === 'all' 
-      ? categories 
-      : categories.filter(cat => cat === selectedCategory);
+    // Flatten all items into a single array with category
+    const allItems = Object.entries(currentData).flatMap(([category, items]) =>
+      items.map(item => ({ ...item, category }))
+    );
     
-    const filteredData = filteredCategories.reduce((acc: GroupedData, cat: string) => {
-      const items = currentData[cat].filter((item: any) => {
-        const searchLower = searchTerm.toLowerCase();
-        const keyword = viewType === 'keywords' 
-          ? (item as Keyword).keyword 
-          : (item as Merchant).merchant_pattern;
-        
-        // Search filter
-        const matchesSearch = keyword.toLowerCase().includes(searchLower);
-        
-        // Language filter (only for keywords)
-        const matchesLanguage = viewType === 'merchants' || selectedLanguage === 'all' || 
-          (item as Keyword).language === selectedLanguage;
-        
-        return matchesSearch && matchesLanguage;
-      });
-      if (items.length > 0) {
-        acc[cat] = items;
-      }
-      return acc;
-    }, {});
+    // Get unique values for filters
+    const allCategories = Array.from(new Set(allItems.map(item => item.category))).sort();
+    const allLanguages = viewType === 'keywords' 
+      ? Array.from(new Set(allItems.map((item: any) => item.language))).sort()
+      : [];
+    
+    // Apply filters
+    const filteredItems = allItems.filter((item: any) => {
+      const searchLower = searchTerm.toLowerCase();
+      const keyword = viewType === 'keywords' 
+        ? item.keyword 
+        : item.merchant_pattern;
+      
+      // Search filter
+      const matchesSearch = keyword.toLowerCase().includes(searchLower) ||
+        item.label?.toLowerCase().includes(searchLower) ||
+        item.category.toLowerCase().includes(searchLower);
+      
+      // Category filter
+      const matchesCategory = selectedCategories.length === 0 || 
+        selectedCategories.includes(item.category);
+      
+      // Language filter (only for keywords)
+      const matchesLanguage = viewType === 'merchants' || 
+        selectedLanguages.length === 0 || 
+        selectedLanguages.includes(item.language);
+      
+      return matchesSearch && matchesCategory && matchesLanguage;
+    });
     
     const clearFilters = () => {
       setSearchTerm('');
-      setSelectedCategory('all');
-      setSelectedLanguage('all');
+      setSelectedCategories([]);
+      setSelectedLanguages([]);
     };
     
-    const hasActiveFilters = searchTerm !== '' || selectedCategory !== 'all' || selectedLanguage !== 'all';
+    const hasActiveFilters = searchTerm !== '' || selectedCategories.length > 0 || selectedLanguages.length > 0;
 
     return (
       <div className="space-y-6">
@@ -239,31 +248,6 @@ export default function AdminDashboard() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-w-[200px]"
-          >
-            <option value="all">All Categories</option>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat} ({currentData[cat].length})
-              </option>
-            ))}
-          </select>
-          
-          {viewType === 'keywords' && (
-            <select
-              value={selectedLanguage}
-              onChange={(e) => setSelectedLanguage(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-w-[150px]"
-            >
-              <option value="all">All Languages</option>
-              <option value="en">English</option>
-              <option value="fr">French</option>
-              <option value="both">Both</option>
-            </select>
-          )}
           
           {hasActiveFilters && (
             <button
@@ -296,43 +280,100 @@ export default function AdminDashboard() {
             <p className="text-gray-600 mt-4">Loading data...</p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {Object.keys(filteredData).length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            {filteredItems.length === 0 ? (
               <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
                 <p className="text-gray-600">No {viewType} found matching your search.</p>
               </div>
             ) : (
-              Object.entries(filteredData).map(([category, items]) => (
-                <div key={category} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-                    <h3 className="font-semibold text-gray-900 text-lg">
-                      {category} <span className="text-gray-500 text-sm font-normal">({items.length})</span>
-                    </h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            {viewType === 'keywords' ? 'Keyword' : 'Merchant Pattern'}
-                          </th>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                        {viewType === 'keywords' ? 'Keyword' : 'Merchant Pattern'}
+                      </th>
+                      <ColumnFilterHeader
+                        label="Category"
+                        options={allCategories}
+                        selected={selectedCategories}
+                        onChange={setSelectedCategories}
+                      />
+                      {viewType === 'keywords' && (
+                        <ColumnFilterHeader
+                          label="Language"
+                          options={allLanguages}
+                          selected={selectedLanguages}
+                          onChange={setSelectedLanguages}
+                        />
+                      )}
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Label</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Score</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Notes</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                        {editingItemId ? 'Save' : 'Actions'}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredItems.map((item: any) => {
+                      const isEditing = editingItemId === item.id;
+                      const itemKey = viewType === 'keywords' ? item.keyword : item.merchant_pattern;
+                      
+                      return (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td 
+                            className="px-6 py-4 text-sm font-medium text-gray-900 cursor-pointer"
+                            onDoubleClick={() => startEditing(item, 'keyword')}
+                          >
+                            {isEditing && editingField === 'keyword' ? (
+                              <input
+                                type="text"
+                                value={editFormData.keyword || itemKey}
+                                onChange={(e) => setEditFormData({ ...editFormData, keyword: e.target.value.toUpperCase() })}
+                                className="w-full px-2 py-1 border border-blue-500 rounded"
+                                autoFocus
+                              />
+                            ) : (
+                              itemKey
+                            )}
+                          </td>
+                          <td 
+                            className="px-6 py-4 text-sm text-gray-600 cursor-pointer"
+                            onDoubleClick={() => startEditing(item, 'category')}
+                          >
+                            {isEditing && editingField === 'category' ? (
+                              <select
+                                value={editFormData.category || item.category}
+                                onChange={(e) => setEditFormData({ ...editFormData, category: e.target.value })}
+                                className="w-full px-2 py-1 border border-blue-500 rounded"
+                                autoFocus
+                              >
+                                {allCategories.map(cat => (
+                                  <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="px-2 py-1 bg-gray-100 rounded text-xs font-medium">{item.category}</span>
+                            )}
+                          </td>
                           {viewType === 'keywords' && (
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Language</th>
-                          )}
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Label</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Score</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {items.map((item: any) => (
-                          <tr key={item.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                              {viewType === 'keywords' ? item.keyword : item.merchant_pattern}
-                            </td>
-                            {viewType === 'keywords' && (
-                              <td className="px-6 py-4 text-sm text-gray-600">
+                            <td 
+                              className="px-6 py-4 text-sm text-gray-600 cursor-pointer"
+                              onDoubleClick={() => startEditing(item, 'language')}
+                            >
+                              {isEditing && editingField === 'language' ? (
+                                <select
+                                  value={editFormData.language || item.language}
+                                  onChange={(e) => setEditFormData({ ...editFormData, language: e.target.value })}
+                                  className="w-full px-2 py-1 border border-blue-500 rounded"
+                                  autoFocus
+                                >
+                                  <option value="en">EN</option>
+                                  <option value="fr">FR</option>
+                                  <option value="both">BOTH</option>
+                                </select>
+                              ) : (
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                                   item.language === 'en' ? 'bg-blue-100 text-blue-700' :
                                   item.language === 'fr' ? 'bg-purple-100 text-purple-700' :
@@ -340,22 +381,77 @@ export default function AdminDashboard() {
                                 }`}>
                                   {item.language.toUpperCase()}
                                 </span>
-                              </td>
-                            )}
-                            <td className="px-6 py-4 text-sm text-gray-600">{item.label}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">
-                              <span className="font-semibold">{item.score}</span>
+                              )}
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-500">{item.notes || '-'}</td>
-                            <td className="px-6 py-4 text-sm text-right">
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  onClick={() => setEditingItem(item)}
-                                  className="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                  title="Edit"
-                                >
-                                  ✏️
-                                </button>
+                          )}
+                          <td 
+                            className="px-6 py-4 text-sm text-gray-600 cursor-pointer"
+                            onDoubleClick={() => startEditing(item, 'label')}
+                          >
+                            {isEditing && editingField === 'label' ? (
+                              <input
+                                type="text"
+                                value={editFormData.label || item.label || ''}
+                                onChange={(e) => setEditFormData({ ...editFormData, label: e.target.value })}
+                                className="w-full px-2 py-1 border border-blue-500 rounded"
+                                autoFocus
+                              />
+                            ) : (
+                              item.label || '-'
+                            )}
+                          </td>
+                          <td 
+                            className="px-6 py-4 text-sm text-gray-600 cursor-pointer"
+                            onDoubleClick={() => startEditing(item, 'score')}
+                          >
+                            {isEditing && editingField === 'score' ? (
+                              <input
+                                type="number"
+                                min="1"
+                                max="100"
+                                value={editFormData.score || item.score}
+                                onChange={(e) => setEditFormData({ ...editFormData, score: parseInt(e.target.value) })}
+                                className="w-20 px-2 py-1 border border-blue-500 rounded"
+                                autoFocus
+                              />
+                            ) : (
+                              <span className="font-semibold">{item.score}</span>
+                            )}
+                          </td>
+                          <td 
+                            className="px-6 py-4 text-sm text-gray-500 cursor-pointer"
+                            onDoubleClick={() => startEditing(item, 'notes')}
+                          >
+                            {isEditing && editingField === 'notes' ? (
+                              <input
+                                type="text"
+                                value={editFormData.notes || item.notes || ''}
+                                onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                                className="w-full px-2 py-1 border border-blue-500 rounded"
+                                autoFocus
+                              />
+                            ) : (
+                              item.notes || '-'
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right">
+                            <div className="flex justify-end gap-2">
+                              {isEditing ? (
+                                <>
+                                  <button
+                                    onClick={() => saveEdit(item)}
+                                    className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-xs font-medium"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={cancelEdit}
+                                    className="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors text-xs font-medium"
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : (
                                 <button
                                   onClick={() => handleDelete(item.id)}
                                   className="px-3 py-1 text-red-600 hover:bg-red-50 rounded transition-colors"
@@ -363,15 +459,15 @@ export default function AdminDashboard() {
                                 >
                                   🗑️
                                 </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ))
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
@@ -397,6 +493,66 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
     router.push('/admin/login');
+  };
+  
+  const startEditing = (item: any, field: string) => {
+    setEditingItemId(item.id);
+    setEditingField(field);
+    setEditFormData({
+      keyword: viewType === 'keywords' ? item.keyword : item.merchant_pattern,
+      category: item.category,
+      label: item.label,
+      score: item.score,
+      language: item.language,
+      notes: item.notes
+    });
+  };
+  
+  const cancelEdit = () => {
+    setEditingItemId(null);
+    setEditingField(null);
+    setEditFormData({});
+  };
+  
+  const saveEdit = async (item: any) => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const endpoint = viewType === 'keywords' ? 'keywords' : 'merchants';
+      
+      const payload = viewType === 'keywords' 
+        ? {
+            keyword: editFormData.keyword,
+            category: editFormData.category,
+            label: editFormData.label,
+            score: editFormData.score,
+            language: editFormData.language,
+            notes: editFormData.notes
+          }
+        : {
+            merchant_pattern: editFormData.keyword,
+            category: editFormData.category,
+            label: editFormData.label,
+            score: editFormData.score,
+            notes: editFormData.notes
+          };
+      
+      const response = await fetch(`/api/admin/${endpoint}/${item.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) throw new Error('Failed to save');
+      
+      // Clear editing state and refresh
+      cancelEdit();
+      await fetchData();
+    } catch (error: any) {
+      alert(`Error saving: ${error.message}`);
+    }
   };
   
   const handleDelete = async (id: number) => {
@@ -515,18 +671,14 @@ export default function AdminDashboard() {
         {activeTab === 'approved-accounts' && renderPlaceholderTab('Approved Accounts', 'Manage beta testers and approved user accounts', '✅')}
       </div>
       
-      {/* Add/Edit Modal */}
-      {(showAddModal || editingItem) && (
+      {/* Add Modal */}
+      {showAddModal && (
         <AddEditModal
           viewType={viewType}
-          item={editingItem}
-          onClose={() => {
-            setShowAddModal(false);
-            setEditingItem(null);
-          }}
+          item={null}
+          onClose={() => setShowAddModal(false)}
           onSave={() => {
             setShowAddModal(false);
-            setEditingItem(null);
             fetchData();
           }}
         />
@@ -719,6 +871,90 @@ function AddEditModal({
         </div>
       </div>
     </div>
+  );
+}
+
+// Column Filter Header Component
+function ColumnFilterHeader({
+  label,
+  options,
+  selected,
+  onChange
+}: {
+  label: string;
+  options: string[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+  
+  const toggleOption = (option: string) => {
+    if (selected.includes(option)) {
+      onChange(selected.filter(v => v !== option));
+    } else {
+      onChange([...selected, option]);
+    }
+  };
+  
+  const selectAll = () => onChange([]);
+  
+  return (
+    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1 hover:text-gray-700 transition-colors"
+      >
+        {label}
+        <span className={`text-xs transition-transform ${isOpen ? 'rotate-180' : ''}`}>▼</span>
+        {selected.length > 0 && (
+          <span className="ml-1 px-1.5 py-0.5 bg-blue-600 text-white text-[10px] rounded-full">
+            {selected.length}
+          </span>
+        )}
+      </button>
+      
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[200px] max-h-[300px] overflow-y-auto">
+          <div className="p-2 border-b border-gray-200">
+            <button
+              onClick={selectAll}
+              className="w-full text-left px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors"
+            >
+              Select All
+            </button>
+          </div>
+          <div className="p-2 space-y-1">
+            {options.map(option => (
+              <label
+                key={option}
+                className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 rounded cursor-pointer transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.includes(option)}
+                  onChange={() => toggleOption(option)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">{option}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </th>
   );
 }
 
