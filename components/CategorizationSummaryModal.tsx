@@ -86,6 +86,13 @@ export default function CategorizationSummaryModal({
   const categorizedCount = localTransactions.filter(tx => 
     tx.cashflow === 'expense' && tx.category && tx.category !== 'Uncategorised'
   ).length;
+  
+  // Debug: Log all expense categories
+  console.log('[CategorizationSummary] Expense categories:', 
+    localTransactions
+      .filter(tx => tx.cashflow === 'expense')
+      .map(tx => ({ desc: tx.description.substring(0, 30), category: tx.category, label: tx.label }))
+  );
 
   // Update a transaction's category
   const updateTransaction = (index: number, newCategory: string, newLabel: string) => {
@@ -147,18 +154,17 @@ export default function CategorizationSummaryModal({
 
               {showExplanation && (
                 <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-gray-700">
-                  <h4 className="font-semibold text-blue-900 mb-2">Our Intelligent Auto-Categorisation Engine</h4>
+                  <h4 className="font-semibold text-blue-900 mb-2">How It Works</h4>
                   <p className="mb-3">
-                    We use a <strong>sophisticated multi-tier system</strong> designed specifically for Canadian transactions to automatically categorize your expenses with high accuracy:
+                    We're building a powerful categorization engine designed specifically for Canadian transactions. Here's how it works:
                   </p>
-                  <ol className="list-decimal list-inside space-y-2 mb-3">
-                    <li><strong>Your Personal Learning System</strong> (Highest Priority): The engine remembers and prioritizes categories you've assigned to similar merchants, ensuring it gets smarter with every correction you make.</li>
-                    <li><strong>Advanced Merchant Recognition</strong>: Our database includes 400+ Canadian merchants, chains, and service providers (Tim Hortons, Loblaws, Rogers, Enbridge, etc.) with intelligent name matching that handles location codes, store numbers, and variations.</li>
-                    <li><strong>Contextual Keyword Analysis</strong>: We analyze transaction descriptions using 300+ contextual keywords in both English and French, with partial matching to catch variations (e.g., "GROCERY" matches "GROCERS", "GROCERY STORE").</li>
-                    <li><strong>Smart Pattern Detection</strong>: The system uses transaction amounts, frequency patterns, and contextual clues to infer categories even for generic descriptions.</li>
-                  </ol>
-                  <p className="text-xs text-gray-600 italic">
-                    💡 <strong>Continuous Improvement:</strong> Every time you recategorize a transaction, the engine learns your preferences and applies them to future uploads automatically. The more you use it, the better it gets!
+                  <ul className="list-disc list-inside space-y-1.5 mb-2">
+                    <li><strong>Smart keyword matching:</strong> We search for keywords like "TIM" (Tim Hortons), "PHARM" (Pharmacy), "GROCER" (Grocery stores) in your transaction descriptions.</li>
+                    <li><strong>Category priority:</strong> We check categories in order (Housing → Bills → Subscriptions → Food → etc.) and assign the first match we find.</li>
+                    <li><strong>Bilingual support:</strong> Works with both English and French transaction descriptions.</li>
+                  </ul>
+                  <p className="text-xs text-gray-600">
+                    We're constantly expanding our keyword database to improve accuracy. If something is miscategorized, just correct it and move on!
                   </p>
                 </div>
               )}
@@ -345,7 +351,7 @@ export default function CategorizationSummaryModal({
             onClick={onClose}
             className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100"
           >
-            Cancel
+            Back
           </button>
           <button
             onClick={handleConfirm}
