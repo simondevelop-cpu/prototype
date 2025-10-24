@@ -39,8 +39,7 @@ export default function AdminDashboard() {
   const [authenticated, setAuthenticated] = useState(false);
   const [checking, setChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<TabName>('inbox');
-  const [viewType, setViewType] = useState<'keywords' | 'merchants'>('keywords');
-  const [categorySubTab, setCategorySubTab] = useState<'patterns' | 'recategorization'>('patterns');
+  const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
   const [stats, setStats] = useState<any>(null);
