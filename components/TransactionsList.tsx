@@ -192,6 +192,13 @@ export default function TransactionsList({ transactions, loading, token, onRefre
 
   const handleUpdateTransaction = async (transactionData: any) => {
     try {
+      // Check if category or label changed (for learning)
+      const originalTx = editingTransaction;
+      const categoryChanged = originalTx && (
+        originalTx.category !== transactionData.category ||
+        originalTx.label !== transactionData.label
+      );
+
       const response = await fetch('/api/transactions/update', {
         method: 'PUT',
         headers: {
@@ -204,6 +211,29 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Failed to update transaction');
+      }
+
+      // If category changed, save to learning database
+      if (categoryChanged && originalTx.description) {
+        try {
+          await fetch('/api/categorization/learn', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              description: originalTx.description,
+              originalCategory: originalTx.category,
+              originalLabel: originalTx.label,
+              correctedCategory: transactionData.category,
+              correctedLabel: transactionData.label,
+            }),
+          });
+        } catch (learnError) {
+          // Don't fail the update if learning fails
+          console.error('Failed to save categorization learning:', learnError);
+        }
       }
 
       setEditingTransaction(null);

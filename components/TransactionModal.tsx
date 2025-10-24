@@ -36,8 +36,15 @@ export default function TransactionModal({
     if (isOpen) {
       if (transaction) {
         // Editing existing transaction
+        // Format date to YYYY-MM-DD for input[type="date"]
+        let formattedDate = transaction.date;
+        if (formattedDate) {
+          // Handle both "YYYY-MM-DD" and "YYYY-MM-DDTHH:MM:SS" formats
+          formattedDate = formattedDate.split('T')[0];
+        }
+        
         setFormData({
-          date: transaction.date,
+          date: formattedDate || '',
           description: transaction.description || '',
           amount: Math.abs(transaction.amount).toString(),
           cashflow: transaction.cashflow || 'expense',
