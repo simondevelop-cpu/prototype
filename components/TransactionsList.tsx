@@ -221,14 +221,6 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       // If category changed, save to learning database
       if (categoryChanged && originalTx.description) {
         try {
-          console.log('[Recategorization] Saving to learning database:', {
-            description: originalTx.description,
-            originalCategory: originalTx.category,
-            originalLabel: originalTx.label,
-            correctedCategory: transactionData.category,
-            correctedLabel: transactionData.label,
-          });
-          
           const learnResponse = await fetch('/api/categorization/learn', {
             method: 'POST',
             headers: {
@@ -244,24 +236,14 @@ export default function TransactionsList({ transactions, loading, token, onRefre
             }),
           });
           
-          const learnResult = await learnResponse.json();
-          console.log('[Recategorization] Learning API response:', learnResult);
-          
           if (!learnResponse.ok) {
-            console.error('[Recategorization] Failed to save:', learnResult);
-          } else {
-            console.log('[Recategorization] ✅ Saved successfully!');
+            const learnResult = await learnResponse.json();
+            console.error('[Recategorization] Failed to save pattern:', learnResult);
           }
         } catch (learnError) {
           // Don't fail the update if learning fails
           console.error('[Recategorization] Error saving categorization learning:', learnError);
         }
-      } else {
-        console.log('[Recategorization] No category change detected or no description:', { 
-          categoryChanged, 
-          hasDescription: !!originalTx?.description,
-          originalTx 
-        });
       }
 
       setEditingTransaction(null);
