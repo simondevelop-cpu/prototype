@@ -882,10 +882,10 @@ export default function AdminDashboard() {
         {activeTab === 'accounts' && renderAccountsTab()}
       </div>
       
-      {/* Add Modal */}
-      {showAddModal && (
+      {/* Add Modal - only for keywords and merchants */}
+      {showAddModal && viewType !== 'recategorization' && (
         <AddEditModal
-          viewType={viewType}
+          viewType={viewType as 'keywords' | 'merchants'}
           item={null}
           onClose={() => setShowAddModal(false)}
           onSave={() => {
