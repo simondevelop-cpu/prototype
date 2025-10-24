@@ -13,35 +13,34 @@ async function initializeTables() {
   try {
     console.log('[DB Init] Starting database initialization...');
     
-    // Create admin_keywords table
+    // Create admin_keywords table (NEW SCHEMA - no score/language)
     await client.query(`
       CREATE TABLE IF NOT EXISTS admin_keywords (
         id SERIAL PRIMARY KEY,
-        keyword VARCHAR(100) NOT NULL,
-        category VARCHAR(50) NOT NULL,
-        label VARCHAR(100),
-        score INTEGER DEFAULT 10,
-        language VARCHAR(10) DEFAULT 'en',
-        is_active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW(),
+        keyword TEXT NOT NULL,
+        category TEXT NOT NULL,
+        label TEXT NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        notes TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(keyword, category)
       )
     `);
     console.log('[DB Init] ✅ admin_keywords table created');
     
-    // Create admin_merchants table
+    // Create admin_merchants table (NEW SCHEMA - with alternate_patterns, no score)
     await client.query(`
       CREATE TABLE IF NOT EXISTS admin_merchants (
         id SERIAL PRIMARY KEY,
-        merchant_pattern VARCHAR(100) NOT NULL,
-        category VARCHAR(50) NOT NULL,
-        label VARCHAR(100),
-        score INTEGER DEFAULT 15,
-        is_active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW(),
-        UNIQUE(merchant_pattern, category)
+        merchant_pattern TEXT NOT NULL UNIQUE,
+        alternate_patterns TEXT[],
+        category TEXT NOT NULL,
+        label TEXT NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        notes TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       )
     `);
     console.log('[DB Init] ✅ admin_merchants table created');
@@ -167,8 +166,8 @@ async function initializeTables() {
     
     for (const [keyword, category, label, score, language] of keywords) {
       await client.query(
-        'INSERT INTO admin_keywords (keyword, category, label, score, language, is_active) VALUES ($1, $2, $3, $4, $5, true) ON CONFLICT DO NOTHING',
-        [keyword, category, label, score, language]
+        'INSERT INTO admin_keywords (keyword, category, label, is_active) VALUES ($1, $2, $3, true) ON CONFLICT DO NOTHING',
+        [keyword, category, label]
       );
     }
     console.log(`[DB Init] ✅ Seeded ${keywords.length} keywords`);
@@ -378,8 +377,8 @@ async function initializeTables() {
     
     for (const [pattern, category, label, score] of merchants) {
       await client.query(
-        'INSERT INTO admin_merchants (merchant_pattern, category, label, score, is_active) VALUES ($1, $2, $3, $4, true) ON CONFLICT DO NOTHING',
-        [pattern, category, label, score]
+        'INSERT INTO admin_merchants (merchant_pattern, alternate_patterns, category, label, is_active) VALUES ($1, $2, $3, $4, true) ON CONFLICT DO NOTHING',
+        [pattern, [], category, label]
       );
     }
     console.log(`[DB Init] ✅ Seeded ${merchants.length} merchants`);
