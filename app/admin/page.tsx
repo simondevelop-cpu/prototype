@@ -347,6 +347,92 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* Conditional Content: Patterns vs Recategorization Log */}
+        {categorySubTab === 'recategorization' ? renderRecategorizationLog() : renderPatternsTable()}
+      </div>
+    );
+  };
+
+  // Render Recategorization Log
+  const renderRecategorizationLog = () => {
+    const [recategorizations, setRecategorizations] = useState<any[]>([]);
+    const [recatLoading, setRecatLoading] = useState(true);
+    const [reviewed, setReviewed] = useState<{[key: number]: boolean}>({});
+
+    useEffect(() => {
+      const fetchRecategorizations = async () => {
+        try {
+          const token = localStorage.getItem('admin_token');
+          const response = await fetch('/api/admin/recategorizations', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await response.json();
+          setRecategorizations(data.recategorizations || []);
+        } catch (error) {
+          console.error('Error fetching recategorizations:', error);
+        } finally {
+          setRecatLoading(false);
+        }
+      };
+      fetchRecategorizations();
+    }, []);
+
+    const handleReviewToggle = (id: number) => {
+      setReviewed(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    return recatLoading ? (
+      <div className="text-center py-12">
+        <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+      </div>
+    ) : (
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Email</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Old Category</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Category</th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Reviewed</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {recategorizations.map((item) => (
+              <tr key={item.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.description_pattern}</td>
+                <td className="px-6 py-4 text-sm text-gray-600">{item.user_email}</td>
+                <td className="px-6 py-4 text-sm">
+                  <span className="px-2 py-1 bg-gray-100 rounded text-xs">{item.original_category || 'None'}</span>
+                </td>
+                <td className="px-6 py-4 text-sm">
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">{item.corrected_category}</span>
+                </td>
+                <td className="px-6 py-4 text-center">
+                  <input
+                    type="checkbox"
+                    checked={reviewed[item.id] || false}
+                    onChange={() => handleReviewToggle(item.id)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {recategorizations.length === 0 && (
+          <div className="text-center py-12 text-gray-500">
+            No recategorizations found
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render Patterns Table (existing Keywords/Merchants UI)
+  const renderPatternsTable = () => {
+    return (
+      <>
         {/* Data Display */}
         {loading ? (
           <div className="text-center py-12">
@@ -507,7 +593,7 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
-      </div>
+      </>
     );
   };
 
