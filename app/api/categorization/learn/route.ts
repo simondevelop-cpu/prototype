@@ -112,9 +112,19 @@ export async function POST(req: NextRequest) {
         frequency: 1,
       });
     }
-  } catch (error) {
-    console.error('Error learning categorization:', error);
-    return NextResponse.json({ error: 'Failed to store learning' }, { status: 500 });
+  } catch (error: any) {
+    console.error('[Learn API] Error learning categorization:', error);
+    console.error('[Learn API] Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      hint: error.hint,
+    });
+    return NextResponse.json({ 
+      error: 'Failed to store learning',
+      details: error.message,
+      code: error.code 
+    }, { status: 500 });
   }
 }
 
