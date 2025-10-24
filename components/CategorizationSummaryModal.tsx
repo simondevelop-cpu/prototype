@@ -32,6 +32,7 @@ export default function CategorizationSummaryModal({
   const [currentView, setCurrentView] = useState<CategoryView>('summary');
   const [localTransactions, setLocalTransactions] = useState<Transaction[]>(transactions);
   const [showExplanation, setShowExplanation] = useState(false);
+  const [showAllCategories, setShowAllCategories] = useState(false);
 
   // Reset when modal opens
   useEffect(() => {
@@ -43,8 +44,11 @@ export default function CategorizationSummaryModal({
 
   if (!isOpen) return null;
 
+  // Priority categories to always show
+  const priorityCategories = ['Housing', 'Bills', 'Food', 'Transport', 'Uncategorised'];
+  
   // Calculate summary by category (expenses only)
-  const categorySummary = Object.keys(CATEGORIES).map(categoryName => {
+  const allCategorySummary = Object.keys(CATEGORIES).map(categoryName => {
     const categoryTransactions = localTransactions.filter(
       tx => tx.cashflow === 'expense' && tx.category === categoryName
     );
@@ -56,6 +60,26 @@ export default function CategorizationSummaryModal({
       transactions: categoryTransactions,
     };
   }).filter(cat => cat.count > 0); // Only show categories with transactions
+  
+  // Add Uncategorised if there are any
+  const uncategorizedTransactions = localTransactions.filter(
+    tx => tx.cashflow === 'expense' && (tx.category === 'Uncategorised' || !tx.category)
+  );
+  if (uncategorizedTransactions.length > 0) {
+    allCategorySummary.push({
+      category: 'Uncategorised',
+      count: uncategorizedTransactions.length,
+      total: uncategorizedTransactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0),
+      transactions: uncategorizedTransactions,
+    });
+  }
+  
+  // Split into priority and other categories
+  const prioritySummary = allCategorySummary.filter(cat => priorityCategories.includes(cat.category));
+  const otherSummary = allCategorySummary.filter(cat => !priorityCategories.includes(cat.category));
+  
+  // Determine what to display
+  const categorySummary = showAllCategories ? allCategorySummary : prioritySummary;
 
   // Calculate average confidence
   const avgConfidence = localTransactions.length > 0
@@ -181,6 +205,21 @@ export default function CategorizationSummaryModal({
                   </tbody>
                 </table>
               </div>
+
+              {/* Expand/Collapse Button */}
+              {otherSummary.length > 0 && (
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => setShowAllCategories(!showAllCategories)}
+                    className="text-sm text-blue-600 hover:text-blue-800 underline"
+                  >
+                    {showAllCategories 
+                      ? '← Show Less Categories' 
+                      : `+ Show ${otherSummary.length} More Categories (${Object.keys(CATEGORIES).filter(c => !priorityCategories.includes(c)).join(', ')})`
+                    }
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             /* Category Detail View */
@@ -195,51 +234,74 @@ export default function CategorizationSummaryModal({
               <div className="space-y-3">
                 {localTransactions
                   .map((tx, index) => ({ tx, index }))
-                  .filter(({ tx }) => tx.cashflow === 'expense' && tx.category === currentView)
-                  .map(({ tx, index }) => (
-                    <div
-                      key={index}
-                      className="border border-gray-200 rounded-lg p-4 bg-white hover:bg-gray-50"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900">{tx.description}</div>
-                          <div className="text-sm text-gray-600 mt-1">
-                            ${Math.abs(tx.amount).toFixed(2)}
-                            {tx.confidence !== undefined && (
-                              <span className="ml-2 text-xs text-gray-500">
-                                ({tx.confidence}% confidence)
+                  .filter(({ tx }) => tx.cashflow === 'expense' && (tx.category === currentView || (currentView === 'Uncategorised' && !tx.category)))
+                  .map(({ tx, index }) => {
+                    // Determine confidence badge color
+                    const confidence = tx.confidence || 0;
+                    let badgeColor = 'bg-gray-100 text-gray-700';
+                    if (confidence >= 90) badgeColor = 'bg-green-100 text-green-700';
+                    else if (confidence >= 70) badgeColor = 'bg-blue-100 text-blue-700';
+                    else if (confidence >= 50) badgeColor = 'bg-yellow-100 text-yellow-700';
+                    else if (confidence > 0) badgeColor = 'bg-orange-100 text-orange-700';
+
+                    return (
+                      <div
+                        key={index}
+                        className="border border-gray-200 rounded-lg p-4 bg-white hover:bg-gray-50"
+                      >
+                        <div className="flex justify-between items-start gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-gray-900">{tx.description}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-sm text-gray-600">
+                                ${Math.abs(tx.amount).toFixed(2)}
                               </span>
-                            )}
+                              {tx.confidence !== undefined && tx.confidence > 0 && (
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeColor}`}>
+                                  {tx.confidence}% confidence
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="ml-4 flex flex-col gap-2 min-w-[180px]">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Category
+                              </label>
+                              <select
+                                value={tx.category || 'Uncategorised'}
+                                onChange={(e) => {
+                                  const newCategory = e.target.value;
+                                  const labels = getLabelsForCategory(newCategory);
+                                  updateTransaction(index, newCategory, labels[0] || '');
+                                }}
+                                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5"
+                              >
+                                {Object.keys(CATEGORIES).map(cat => (
+                                  <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                                <option value="Uncategorised">Uncategorised</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Label
+                              </label>
+                              <select
+                                value={tx.label}
+                                onChange={(e) => updateTransaction(index, tx.category, e.target.value)}
+                                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5"
+                              >
+                                {getLabelsForCategory(tx.category).map(label => (
+                                  <option key={label} value={label}>{label}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                         </div>
-                        <div className="ml-4 flex flex-col gap-2">
-                          <select
-                            value={tx.category}
-                            onChange={(e) => {
-                              const newCategory = e.target.value;
-                              const labels = getLabelsForCategory(newCategory);
-                              updateTransaction(index, newCategory, labels[0] || '');
-                            }}
-                            className="text-sm border border-gray-300 rounded px-2 py-1"
-                          >
-                            {Object.keys(CATEGORIES).map(cat => (
-                              <option key={cat} value={cat}>{cat}</option>
-                            ))}
-                          </select>
-                          <select
-                            value={tx.label}
-                            onChange={(e) => updateTransaction(index, tx.category, e.target.value)}
-                            className="text-sm border border-gray-300 rounded px-2 py-1"
-                          >
-                            {getLabelsForCategory(tx.category).map(label => (
-                              <option key={label} value={label}>{label}</option>
-                            ))}
-                          </select>
-                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             </div>
           )}
