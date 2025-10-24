@@ -54,6 +54,15 @@ export default function AdminDashboard() {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<any>({});
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  
+  // State for Accounts tab
+  const [users, setUsers] = useState<any[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+  
+  // State for Recategorization Log tab
+  const [recategorizations, setRecategorizations] = useState<any[]>([]);
+  const [recatLoading, setRecatLoading] = useState(false);
+  const [reviewed, setReviewed] = useState<{[key: number]: boolean}>({});
 
   // Check authentication on mount
   useEffect(() => {
@@ -92,6 +101,50 @@ export default function AdminDashboard() {
       fetchData();
     }
   }, [viewType, activeTab, authenticated]);
+
+  // Fetch users when Accounts tab is active
+  useEffect(() => {
+    if (activeTab === 'accounts' && authenticated) {
+      const fetchUsers = async () => {
+        setAccountsLoading(true);
+        try {
+          const token = localStorage.getItem('admin_token');
+          const response = await fetch('/api/admin/users', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await response.json();
+          setUsers(data.users || []);
+        } catch (error) {
+          console.error('Error fetching users:', error);
+        } finally {
+          setAccountsLoading(false);
+        }
+      };
+      fetchUsers();
+    }
+  }, [activeTab, authenticated]);
+
+  // Fetch recategorizations when Recategorization Log sub-tab is active
+  useEffect(() => {
+    if (activeTab === 'categories' && categorySubTab === 'recategorization' && authenticated) {
+      const fetchRecategorizations = async () => {
+        setRecatLoading(true);
+        try {
+          const token = localStorage.getItem('admin_token');
+          const response = await fetch('/api/admin/recategorizations', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await response.json();
+          setRecategorizations(data.recategorizations || []);
+        } catch (error) {
+          console.error('Error fetching recategorizations:', error);
+        } finally {
+          setRecatLoading(false);
+        }
+      };
+      fetchRecategorizations();
+    }
+  }, [activeTab, categorySubTab, authenticated]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -355,28 +408,6 @@ export default function AdminDashboard() {
 
   // Render Recategorization Log
   const renderRecategorizationLog = () => {
-    const [recategorizations, setRecategorizations] = useState<any[]>([]);
-    const [recatLoading, setRecatLoading] = useState(true);
-    const [reviewed, setReviewed] = useState<{[key: number]: boolean}>({});
-
-    useEffect(() => {
-      const fetchRecategorizations = async () => {
-        try {
-          const token = localStorage.getItem('admin_token');
-          const response = await fetch('/api/admin/recategorizations', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const data = await response.json();
-          setRecategorizations(data.recategorizations || []);
-        } catch (error) {
-          console.error('Error fetching recategorizations:', error);
-        } finally {
-          setRecatLoading(false);
-        }
-      };
-      fetchRecategorizations();
-    }, []);
-
     const handleReviewToggle = (id: number) => {
       setReviewed(prev => ({ ...prev, [id]: !prev[id] }));
     };
@@ -614,27 +645,6 @@ export default function AdminDashboard() {
 
   // Render Accounts Tab
   const renderAccountsTab = () => {
-    const [users, setUsers] = useState<any[]>([]);
-    const [accountsLoading, setAccountsLoading] = useState(true);
-
-    useEffect(() => {
-      const fetchUsers = async () => {
-        try {
-          const token = localStorage.getItem('admin_token');
-          const response = await fetch('/api/admin/users', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const data = await response.json();
-          setUsers(data.users || []);
-        } catch (error) {
-          console.error('Error fetching users:', error);
-        } finally {
-          setAccountsLoading(false);
-        }
-      };
-      fetchUsers();
-    }, []);
-
     return (
       <div className="space-y-6">
         <div>
