@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { invalidatePatternCache } from '@/lib/categorization-engine';
 
-type TabName = 'inbox' | 'categories' | 'insights' | 'analytics' | 'accounts';
+type TabName = 'inbox' | 'categories' | 'insights' | 'analytics' | 'accounts' | 'debugging';
 
 interface Keyword {
   id: number;
@@ -681,6 +681,472 @@ export default function AdminDashboard() {
     );
   };
 
+  // Render Debugging Guide Tab
+  const renderDebuggingGuide = () => {
+    return (
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">🐛 Debugging & Testing Guide</h2>
+          <p className="text-gray-600">
+            Comprehensive testing checklist to discover bugs, UX issues, and verify functionality across the entire application.
+          </p>
+        </div>
+
+        {/* Testing Sections */}
+        <div className="grid gap-6">
+          
+          {/* 1. Authentication & Login */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">1️⃣ Authentication & Login Flow</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Demo Login:</strong> Test with demo@canadianinsights.ca / password</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Admin Login:</strong> Test with admin@canadianinsights.ca / categorisationandinsightsengine</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Wrong Password:</strong> Verify error message shows correctly</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Token Expiry:</strong> Wait 1 day and verify auto-logout for admin</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Logout:</strong> Click logout and verify redirect to login page</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 2. Statement Upload & Parsing */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">2️⃣ Statement Upload & PDF Parsing</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Upload CIBC Credit Statement:</strong> Verify parsing works correctly</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Upload CIBC Debit Statement:</strong> Test alternative format</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Upload Wrong File Type:</strong> Verify error handling (e.g., .xlsx, .txt)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Upload Corrupted PDF:</strong> Test error handling</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Large Statement:</strong> Upload 100+ transactions, check performance</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Duplicate Detection:</strong> Upload same statement twice, verify duplicates are filtered</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Account Name:</strong> Verify default account name is set and editable</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 3. Auto-Categorization */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">3️⃣ Auto-Categorization Engine</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Check Auto-Categorization Button:</strong> Click and verify modal opens</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Browser Console Logs:</strong> Open F12 Console, verify detailed categorization logs appear</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Match Reasons:</strong> Check console for which rule triggered (User History/Merchant/Keyword)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Category Summary:</strong> Verify all categories show (even empty ones under "Show More")</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Transaction Count:</strong> Verify "X of Y categorized" matches actual count</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Uncategorised:</strong> Check if any expenses are uncategorised (shouldn't be many)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Category Detail View:</strong> Click category name, verify transactions display in 4-column table</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Edit in Modal:</strong> Double-click transaction, change category, verify change persists</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Back Navigation:</strong> Click Back from detail view → summary → review modal (no stacking)</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 4. Import & Transaction Management */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">4️⃣ Import & Transaction Management</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Import Transactions:</strong> Click "Import X Transactions" and verify they appear in Transactions tab</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Transaction List:</strong> Verify all imported transactions show with correct categories</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Filter by Category:</strong> Select category filter, verify correct filtering</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Filter by Cashflow:</strong> Filter by Income/Expense/Other</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Filter by Account:</strong> Test account filter if multiple accounts exist</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Search:</strong> Search by description, verify results</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Date Range Filter:</strong> Test date filtering</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Clear Filters:</strong> Click "Clear All" and verify all filters reset</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Edit Transaction:</strong> Click edit icon, change category/label/amount, verify save works</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Recategorization Learning:</strong> After editing category, check Admin → Recategorization Log</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Delete Transaction:</strong> Delete a transaction, verify it's removed</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Bulk Select:</strong> Select multiple transactions, test bulk delete</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Add Manual Transaction:</strong> Click "Add Transaction", create one manually, verify it saves</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 5. Admin Dashboard - Category Engine */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">5️⃣ Admin Dashboard - Category Engine</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Keywords Tab:</strong> Verify all keywords display in table</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Merchants Tab:</strong> Verify all merchants display with alternate patterns</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Add Keyword:</strong> Click "+ Add Keyword", create new one, verify it saves</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Add Merchant:</strong> Add merchant with alternate patterns (e.g., "TIM HORTONS" with "TIMHORT")</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Inline Edit:</strong> Double-click keyword/merchant, edit, click Save</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Delete Single:</strong> Delete one keyword/merchant</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Bulk Delete:</strong> Select multiple items, delete them</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Category Filter:</strong> Click category column header, filter by multiple categories</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Label Filter:</strong> Click label column header, filter by labels</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Search:</strong> Search for specific keyword/merchant</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Cache Invalidation:</strong> Add/edit keyword, upload statement immediately, verify new keyword is used</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Case Insensitivity:</strong> Add keyword in lowercase, verify it still matches uppercase transactions</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Tab Switching:</strong> Rapidly click between Keywords/Merchants/Recategorization tabs (no errors)</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 6. Admin Dashboard - Recategorization Log */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">6️⃣ Admin Dashboard - Recategorization Log</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>View Log:</strong> Navigate to Recategorization Log tab</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>User Corrections:</strong> Verify user recategorizations appear here</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Pattern Details:</strong> Check description pattern, user email, old/new category</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Frequency Count:</strong> Verify frequency increments when same pattern is recategorized</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Review Checkbox:</strong> Check "Reviewed" checkbox, verify it persists</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Priority Testing:</strong> Recategorize a transaction, upload statement with same merchant, verify user history takes priority</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 7. Admin Dashboard - Accounts */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">7️⃣ Admin Dashboard - Accounts</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>View Users:</strong> Navigate to Accounts tab, verify all registered users appear</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>User Status:</strong> Check if status shows "Active" for users with transactions</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Email Validation:</strong> Verify "Email Validated" shows False (email auth not implemented yet)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Registration Date:</strong> Check dates are formatted correctly</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 8. Dashboard & Insights */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">8️⃣ Dashboard & Insights (User View)</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Dashboard Totals:</strong> Verify total income/expenses calculate correctly</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Net Cash Flow:</strong> Check net amount is income - expenses</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Category Breakdown:</strong> Verify pie chart/bar chart displays correctly</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Top Categories:</strong> Check top spending categories are accurate</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Recent Transactions:</strong> Verify recent transactions list shows latest items</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Date Range Selector:</strong> Change date range, verify data updates</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Empty State:</strong> Test dashboard with no transactions</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 9. Edge Cases & Error Handling */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">9️⃣ Edge Cases & Error Handling</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>No Network:</strong> Disable internet, try uploading statement, verify error message</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Slow Connection:</strong> Throttle network (Chrome DevTools), test loading states</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Browser Back Button:</strong> Use browser back, verify navigation works correctly</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Page Refresh:</strong> Refresh page mid-action, verify state is preserved (or gracefully reset)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Multiple Tabs:</strong> Open app in 2 tabs, make changes in one, verify sync in other</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Mobile Browser:</strong> Test on mobile (responsive design)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Console Errors:</strong> Open F12 Console, browse entire app, check for errors</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Network Tab:</strong> Check Network tab for failed requests</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 10. Performance & UX */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">🔟 Performance & UX</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Upload Speed:</strong> Time how long it takes to upload and parse a statement</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Loading States:</strong> Verify spinners/loading indicators appear during async operations</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Button States:</strong> Check buttons disable during save/delete operations</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Success Messages:</strong> Verify success toasts/messages appear after actions</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Error Messages:</strong> Check error messages are clear and helpful</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Modal UX:</strong> Verify modals can be closed with ESC key and clicking outside</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Table Pagination:</strong> Test with 1000+ transactions (if pagination exists)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">☐</span>
+                <span><strong>Keyboard Navigation:</strong> Try navigating with Tab key</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Next Build Steps */}
+        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-lg p-6 mt-8">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">🚀 Next Build Steps</h2>
+          <div className="space-y-3 text-sm">
+            <div className="flex items-start">
+              <span className="text-blue-600 font-bold mr-3">1.</span>
+              <div>
+                <strong className="text-gray-900">Add Internal Checkers Throughout the App</strong>
+                <p className="text-gray-600 mt-1">Implement validation, error boundaries, and data consistency checks at key points in the application flow.</p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              <span className="text-blue-600 font-bold mr-3">2.</span>
+              <div>
+                <strong className="text-gray-900">Build Admin Dashboard for Bug Capture & User Feedback</strong>
+                <p className="text-gray-600 mt-1">Create the Inbox tab functionality to capture user-submitted bugs, feature requests, and feedback directly in the admin panel.</p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              <span className="text-blue-600 font-bold mr-3">3.</span>
+              <div>
+                <strong className="text-gray-900">Build Insights Dashboard with Better Demo Data</strong>
+                <p className="text-gray-600 mt-1">Enhance the Insights Engine tab with rich demo data showing automated spending insights, trends, and personalized recommendations.</p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              <span className="text-blue-600 font-bold mr-3">4.</span>
+              <div>
+                <strong className="text-gray-900">Set Up Settings Page & Email Authentication</strong>
+                <p className="text-gray-600 mt-1">Implement user settings (profile, preferences) and email verification system for account security.</p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              <span className="text-blue-600 font-bold mr-3">5.</span>
+              <div>
+                <strong className="text-gray-900">Analytics Dashboard Implementation</strong>
+                <p className="text-gray-600 mt-1">Build out the Analytics tab with categorization performance metrics, user activity statistics, and system health monitoring.</p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              <span className="text-blue-600 font-bold mr-3">6.</span>
+              <div>
+                <strong className="text-gray-900">Deprioritize Budget Tab (Future Phase)</strong>
+                <p className="text-gray-600 mt-1">Budget planning features are lower priority - focus on core categorization and insights first.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tips */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-sm text-yellow-800">
+            <strong>💡 Pro Tip:</strong> Always have the browser console open (F12 → Console) when testing. 
+            The detailed categorization logs will help you understand exactly what's happening under the hood.
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
     router.push('/admin/login');
@@ -892,6 +1358,16 @@ export default function AdminDashboard() {
             >
               👥 Accounts
             </button>
+            <button
+              onClick={() => setActiveTab('debugging')}
+              className={`px-6 py-4 font-medium text-sm transition-colors relative ${
+                activeTab === 'debugging'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              🐛 Debugging Guide
+            </button>
           </div>
         </div>
       </div>
@@ -903,6 +1379,7 @@ export default function AdminDashboard() {
         {activeTab === 'insights' && renderPlaceholderTab('Insights Engine', 'Automated spending insights and personalized recommendations', '🔍')}
         {activeTab === 'analytics' && renderPlaceholderTab('Analytics', 'View categorization performance, user activity, and system metrics', '📊')}
         {activeTab === 'accounts' && renderAccountsTab()}
+        {activeTab === 'debugging' && renderDebuggingGuide()}
       </div>
       
       {/* Add Modal - only for keywords and merchants */}
