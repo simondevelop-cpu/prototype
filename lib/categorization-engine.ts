@@ -102,84 +102,13 @@ function cleanMerchantName(description: string): string {
     .trim();
 }
 
-// Keyword patterns - SHORT keywords for maximum coverage
-// Includes merchants as keywords (e.g., "TIM" for Tim Hortons)
+// Keyword patterns interface
 interface KeywordPattern {
   keywords: string[];
   category: string;
   label: string;
-  score: number; // Not used in new logic, kept for database compatibility
+  score: number;
 }
-
-const KEYWORD_PATTERNS: KeywordPattern[] = [
-  // === HOUSING ===
-  { keywords: ['RENT', 'LOYER', 'LANDLORD'], score: 10, category: 'Housing', label: 'Rent' },
-  { keywords: ['MORTGAGE', 'HYPOTHEQUE'], score: 10, category: 'Housing', label: 'Home' },
-  { keywords: ['VET', 'VETERINAR', 'PET'], score: 10, category: 'Housing', label: 'Pets' },
-  { keywords: ['DAYCARE', 'GARDERIE', 'CHILDCARE'], score: 10, category: 'Housing', label: 'Daycare' },
-  
-  // === BILLS ===
-  { keywords: ['BILL PAYMENT', 'BILLPAY', 'PREAUTHORIZED', 'PREAUTH', 'AUTOPAY'], score: 10, category: 'Bills', label: 'Other bills' },
-  { keywords: ['UTIL', 'WATER', 'EAU', 'HYDRO', 'ELECTRIC', 'GAS BILL'], score: 10, category: 'Bills', label: 'Gas & Electricity' },
-  { keywords: ['ROGERS', 'BELL', 'TELUS', 'FIDO', 'VIDEOTRON', 'FREEDOM'], score: 10, category: 'Bills', label: 'Phone' },
-  { keywords: ['INTERNET', 'CABLE'], score: 10, category: 'Bills', label: 'Internet' },
-  { keywords: ['INSURANCE', 'ASSURANCE'], score: 10, category: 'Bills', label: 'Home insurance' },
-  { keywords: ['SERVICE CHARGE', 'BANK FEE', 'NSF', 'OVERDRAFT'], score: 10, category: 'Bills', label: 'Bank and other fees' },
-  
-  // === SUBSCRIPTIONS ===
-  { keywords: ['NETFLIX', 'SPOTIFY', 'APPLE.COM', 'AMAZON PRIME', 'DISNEY'], score: 10, category: 'Subscriptions', label: 'Subscriptions' },
-  { keywords: ['SUBSCRIPTION', 'RECURRING', 'MONTHLY', 'MENSUEL'], score: 8, category: 'Subscriptions', label: 'Subscriptions' },
-  { keywords: ['GYM', 'FITNESS', 'YOGA', 'GOODLIFE', 'PLANET FITNESS'], score: 10, category: 'Subscriptions', label: 'Subscriptions' },
-  
-  // === FOOD ===
-  // Groceries (short keywords + major chains)
-  { keywords: ['GROCER', 'SUPERMARKET', 'MARKET', 'LOBLAWS', 'METRO', 'SOBEYS', 'IGA', 'PROVIGO'], score: 10, category: 'Food', label: 'Groceries' },
-  { keywords: ['WALMART', 'COSTCO', 'NOFRILLS', 'FRESHCO', 'FOODBASICS'], score: 10, category: 'Food', label: 'Groceries' },
-  { keywords: ['DEPANNEUR', 'CONVENIENCE', '7-ELEVEN', 'CIRCLE K'], score: 10, category: 'Food', label: 'Groceries' },
-  
-  // Coffee (short keywords)
-  { keywords: ['TIM', 'STARBUCK', 'SECOND CUP', 'COFFEE', 'CAFE'], score: 10, category: 'Food', label: 'Coffee' },
-  
-  // Eating Out (short keywords + chains)
-  { keywords: ['MCDONALD', 'BURGER KING', 'WENDY', 'A&W', 'KFC', 'SUBWAY', 'PIZZA'], score: 10, category: 'Food', label: 'Eating Out' },
-  { keywords: ['RESTAURANT', 'RESTO', 'BAR', 'PUB', 'GRILL', 'BISTRO'], score: 8, category: 'Food', label: 'Eating Out' },
-  { keywords: ['SUSHI', 'THAI', 'CHINESE', 'INDIAN', 'JAPANESE'], score: 8, category: 'Food', label: 'Eating Out' },
-  
-  // === TRAVEL ===
-  { keywords: ['HOTEL', 'AIRBNB', 'BOOKING', 'EXPEDIA'], score: 10, category: 'Travel', label: 'Travel' },
-  { keywords: ['AIRLINE', 'AIR CANADA', 'WESTJET', 'FLIGHT'], score: 10, category: 'Travel', label: 'Travel' },
-  { keywords: ['TRAVEL', 'VOYAGE', 'VACATION'], score: 8, category: 'Travel', label: 'Travel' },
-  
-  // === HEALTH ===
-  { keywords: ['PHARM', 'DRUG', 'SHOPPERS', 'JEAN COUTU', 'REXALL'], score: 10, category: 'Health', label: 'Health' },
-  { keywords: ['MEDIC', 'CLINIC', 'DOCTOR', 'DENTIST', 'HOSPITAL'], score: 10, category: 'Health', label: 'Health' },
-  { keywords: ['HEALTH', 'SANTE'], score: 8, category: 'Health', label: 'Health' },
-  
-  // === TRANSPORT ===
-  { keywords: ['UBER', 'LYFT', 'TAXI'], score: 10, category: 'Transport', label: 'Transport' },
-  { keywords: ['TRANSIT', 'BUS', 'METRO', 'TRAIN', 'PRESTO', 'OPUS'], score: 10, category: 'Transport', label: 'Transport' },
-  { keywords: ['GAS', 'FUEL', 'ESSO', 'SHELL', 'PETRO', 'ULTRAMAR'], score: 10, category: 'Transport', label: 'Car' },
-  { keywords: ['PARKING', 'STATIONNEMENT'], score: 10, category: 'Transport', label: 'Transport' },
-  
-  // === EDUCATION ===
-  { keywords: ['TUITION', 'SCHOOL', 'UNIVERSITY', 'COLLEGE', 'ECOLE'], score: 10, category: 'Education', label: 'Education' },
-  { keywords: ['BOOK', 'TEXTBOOK', 'COURSE'], score: 8, category: 'Education', label: 'Education' },
-  
-  // === PERSONAL ===
-  { keywords: ['CINEMA', 'MOVIE', 'THEATRE', 'CONCERT'], score: 10, category: 'Personal', label: 'Entertainment' },
-  { keywords: ['SPORT', 'GAME', 'ENTERTAINMENT', 'HOBBY'], score: 8, category: 'Personal', label: 'Sport & Hobbies' },
-  
-  // === SHOPPING ===
-  { keywords: ['AMAZON', 'EBAY', 'ETSY'], score: 10, category: 'Shopping', label: 'Shopping' },
-  { keywords: ['CANADIAN TIRE', 'HOME DEPOT', 'RONA', 'LOWES'], score: 10, category: 'Shopping', label: 'Shopping' },
-  { keywords: ['BEST BUY', 'STAPLES', 'IKEA', 'WINNERS'], score: 10, category: 'Shopping', label: 'Shopping' },
-  { keywords: ['SHOP', 'STORE', 'BOUTIQUE', 'RETAIL'], score: 6, category: 'Shopping', label: 'Shopping' },
-  { keywords: ['CLOTHING', 'FASHION', 'SHOES'], score: 8, category: 'Shopping', label: 'Clothes' },
-  { keywords: ['COSMETIC', 'BEAUTY', 'MAKEUP', 'SALON', 'SPA'], score: 8, category: 'Shopping', label: 'Beauty' },
-  
-  // === WORK ===
-  { keywords: ['OFFICE', 'SUPPLIES', 'STAPLES', 'CONFERENCE'], score: 10, category: 'Work', label: 'Work' },
-];
 
 /**
  * Learned pattern interface
@@ -232,8 +161,17 @@ export function categorizeTransaction(
   }
   
   // Step 2: Loop through categories in priority order and check keywords
-  // Use database keywords if available, otherwise fall back to hardcoded
-  const keywordPatterns = cachedKeywords || KEYWORD_PATTERNS;
+  // ONLY use database keywords - no fallback
+  const keywordPatterns = cachedKeywords;
+  
+  if (!keywordPatterns || keywordPatterns.length === 0) {
+    console.warn('[Categorization] No keyword patterns loaded from database. Returning Uncategorised.');
+    return {
+      category: 'Uncategorised',
+      label: 'Uncategorised',
+      confidence: 0,
+    };
+  }
   
   for (const categoryName of CATEGORY_PRIORITY) {
     // Get all keyword patterns for this category

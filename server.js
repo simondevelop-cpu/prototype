@@ -221,6 +221,19 @@ async function ensureSchema() {
   await seedAdminPatterns();
 }
 
+/**
+ * Seed initial admin categorization patterns (keywords and merchants)
+ * 
+ * PURPOSE: This function provides the initial set of categorization patterns
+ * for new deployments. It only runs ONCE on first deployment when tables are empty.
+ * 
+ * AFTER SEEDING: All categorization patterns are managed through the admin dashboard at /admin
+ * - Admins can add, edit, and delete keywords/merchants
+ * - The categorization engine ONLY uses patterns from admin_keywords and admin_merchants tables
+ * - No hardcoded fallback patterns exist in the code
+ * 
+ * NOTE: This function is safe to keep - it checks if data exists first and skips if already seeded.
+ */
 async function seedAdminPatterns() {
   if (disableDb || !pool) return;
   
@@ -230,11 +243,11 @@ async function seedAdminPatterns() {
     const existingMerchants = await pool.query('SELECT COUNT(*) as count FROM admin_merchants');
     
     if (parseInt(existingKeywords.rows[0].count) > 0 || parseInt(existingMerchants.rows[0].count) > 0) {
-      console.log('[DB] Admin patterns already seeded');
+      console.log('[DB] Admin patterns already seeded - skipping');
       return;
     }
     
-    console.log('[DB] Seeding admin patterns...');
+    console.log('[DB] Seeding initial admin patterns (first-time deployment)...');
     
     // Insert keywords (streamlined, short, powerful terms)
     const keywords = [
