@@ -26,13 +26,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
     
-    const { merchant_pattern, category, label, score, notes } = await request.json();
+    const { merchant_pattern, alternate_patterns, category, label, notes } = await request.json();
     
     const result = await pool.query(
-      `INSERT INTO admin_merchants (merchant_pattern, category, label, score, notes, is_active)
+      `INSERT INTO admin_merchants (merchant_pattern, alternate_patterns, category, label, notes, is_active)
        VALUES ($1, $2, $3, $4, $5, true)
        RETURNING *`,
-      [merchant_pattern, category, label, score, notes]
+      [merchant_pattern, alternate_patterns || [], category, label, notes]
     );
     
     return NextResponse.json({ success: true, merchant: result.rows[0] }, { status: 201 });

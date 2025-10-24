@@ -26,13 +26,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
     
-    const { keyword, category, label, score, language, notes } = await request.json();
+    const { keyword, category, label, notes } = await request.json();
     
     const result = await pool.query(
-      `INSERT INTO admin_keywords (keyword, category, label, score, language, notes, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, true)
+      `INSERT INTO admin_keywords (keyword, category, label, notes, is_active)
+       VALUES ($1, $2, $3, $4, true)
        RETURNING *`,
-      [keyword, category, label, score, language, notes]
+      [keyword, category, label, notes]
     );
     
     return NextResponse.json({ success: true, keyword: result.rows[0] }, { status: 201 });

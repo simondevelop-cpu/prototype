@@ -29,15 +29,15 @@ export async function PUT(
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
     
-    const { merchant_pattern, category, label, score, notes } = await request.json();
+    const { merchant_pattern, alternate_patterns, category, label, notes } = await request.json();
     const id = parseInt(params.id);
     
     const result = await pool.query(
       `UPDATE admin_merchants 
-       SET merchant_pattern = $1, category = $2, label = $3, score = $4, notes = $5, updated_at = NOW()
+       SET merchant_pattern = $1, alternate_patterns = $2, category = $3, label = $4, notes = $5, updated_at = NOW()
        WHERE id = $6
        RETURNING *`,
-      [merchant_pattern, category, label, score, notes, id]
+      [merchant_pattern, alternate_patterns || [], category, label, notes, id]
     );
     
     if (result.rows.length === 0) {

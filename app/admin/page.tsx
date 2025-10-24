@@ -326,7 +326,6 @@ export default function AdminDashboard() {
                         selected={selectedLabels}
                         onChange={setSelectedLabels}
                       />
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Score</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                         {editingItemId ? 'Save' : 'Actions'}
                       </th>
@@ -404,24 +403,6 @@ export default function AdminDashboard() {
                               item.label || '-'
                             )}
                           </td>
-                          <td 
-                            className="px-6 py-4 text-sm text-gray-600 cursor-pointer"
-                            onDoubleClick={() => startEditing(item, 'score')}
-                          >
-                            {isEditing && editingField === 'score' ? (
-                              <input
-                                type="number"
-                                min="1"
-                                max="100"
-                                value={editFormData.score || item.score}
-                                onChange={(e) => setEditFormData({ ...editFormData, score: parseInt(e.target.value) })}
-                                className="w-20 px-2 py-1 border border-blue-500 rounded"
-                                autoFocus
-                              />
-                            ) : (
-                              <span className="font-semibold">{item.score}</span>
-                            )}
-                          </td>
                           <td className="px-6 py-4 text-sm text-right">
                             <div className="flex justify-end gap-2">
                               {isEditing ? (
@@ -490,8 +471,6 @@ export default function AdminDashboard() {
       keyword: viewType === 'keywords' ? item.keyword : item.merchant_pattern,
       category: item.category,
       label: item.label,
-      score: item.score,
-      language: item.language,
       notes: item.notes
     });
   };
@@ -512,15 +491,13 @@ export default function AdminDashboard() {
             keyword: editFormData.keyword,
             category: editFormData.category,
             label: editFormData.label,
-            score: editFormData.score,
-            language: editFormData.language,
             notes: editFormData.notes
           }
         : {
             merchant_pattern: editFormData.keyword,
+            alternate_patterns: [],  // Inline editing doesn't support alternate patterns (use modal for that)
             category: editFormData.category,
             label: editFormData.label,
-            score: editFormData.score,
             notes: editFormData.notes
           };
       
@@ -718,8 +695,7 @@ function AddEditModal({
     keyword: item?.keyword || item?.merchant_pattern || '',
     category: item?.category || 'Food',
     label: item?.label || '',
-    score: item?.score || 10,
-    language: item?.language || 'both',
+    alternatePatterns: item?.alternate_patterns?.join(', ') || '', // Comma-separated string
     notes: item?.notes || ''
   });
   const [saving, setSaving] = useState(false);
@@ -741,15 +717,16 @@ function AddEditModal({
             keyword: formData.keyword,
             category: formData.category,
             label: formData.label,
-            score: formData.score,
-            language: formData.language,
             notes: formData.notes
           }
         : {
             merchant_pattern: formData.keyword,
+            alternate_patterns: formData.alternatePatterns
+              .split(',')
+              .map(p => p.trim().toUpperCase())
+              .filter(p => p.length > 0),
             category: formData.category,
             label: formData.label,
-            score: formData.score,
             notes: formData.notes
           };
       
@@ -827,32 +804,24 @@ function AddEditModal({
               />
             </div>
             
-            {viewType === 'keywords' && (
+            {viewType === 'merchants' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Language</label>
-                <select
-                  value={formData.language}
-                  onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Alternate Patterns (optional)
+                  <span className="text-gray-500 text-xs ml-2">Comma-separated variations</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.alternatePatterns}
+                  onChange={(e) => setFormData({ ...formData, alternatePatterns: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="en">English</option>
-                  <option value="fr">French</option>
-                  <option value="both">Both</option>
-                </select>
+                  placeholder="e.g. TIMHORT, TIM HORT, HORTONS"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Example: For "TIM HORTONS", add variations like "TIMHORT, TIM HORT, HORTONS"
+                </p>
               </div>
             )}
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Score</label>
-              <input
-                type="number"
-                min="1"
-                max="100"
-                value={formData.score}
-                onChange={(e) => setFormData({ ...formData, score: parseInt(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
