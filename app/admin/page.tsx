@@ -267,10 +267,10 @@ export default function AdminDashboard() {
         ? item.keyword 
         : item.merchant_pattern;
       
-      // Search filter
-      const matchesSearch = keyword.toLowerCase().includes(searchLower) ||
-        item.label?.toLowerCase().includes(searchLower) ||
-        item.category.toLowerCase().includes(searchLower);
+      // Search filter (with null checks)
+      const matchesSearch = (keyword?.toLowerCase() || '').includes(searchLower) ||
+        (item.label?.toLowerCase() || '').includes(searchLower) ||
+        (item.category?.toLowerCase() || '').includes(searchLower);
       
       // Category filter
       const matchesCategory = selectedCategories.length === 0 || 
