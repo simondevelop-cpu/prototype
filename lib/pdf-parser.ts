@@ -1298,8 +1298,8 @@ function createTransaction(
     console.log(`[PDF Parser] 💰 Cashflow: "${cleanDescription.substring(0, 50)}" | amt=${amount} | isTransfer=${isTransfer} | type=${cashflow}`);
   }
 
-  // Auto-categorize based on merchant/description
-  const category = categorizeTransaction(cleanDescription, merchant);
+  // Don't categorize during parsing - let the proper categorization engine handle it
+  const category = 'Uncategorised';
 
   return {
     date,
@@ -1314,9 +1314,11 @@ function createTransaction(
 }
 
 /**
- * Simple auto-categorization based on keywords
+ * OLD: Simple auto-categorization based on keywords
+ * NO LONGER USED - Replaced by lib/categorization-engine.ts
+ * Kept for reference only
  */
-function categorizeTransaction(description: string, merchant: string): string {
+function categorizeTransaction_OLD_DEPRECATED(description: string, merchant: string): string {
   const text = `${description} ${merchant}`.toLowerCase();
 
   // Income

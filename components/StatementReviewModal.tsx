@@ -204,6 +204,40 @@ export default function StatementReviewModal({
       return;
     }
 
+    // Auto-categorize all expense transactions if not already categorized
+    if (!categorizationApplied) {
+      const expenseTransactions = transactionsToImport.filter(tx => tx.cashflow === 'expense');
+      
+      if (expenseTransactions.length > 0) {
+        console.log('[Import] Auto-categorizing', expenseTransactions.length, 'expense transactions...');
+        
+        const categorized = categorizeBatch(
+          expenseTransactions.map(tx => ({
+            description: tx.description,
+            amount: tx.amount,
+          })),
+          learnedPatterns
+        );
+        
+        // Update transactions with categorization results
+        const newEdited = new Map(editedTransactions);
+        expenseTransactions.forEach((tx, index) => {
+          const key = getTxKey(tx);
+          const existing = newEdited.get(key) || tx;
+          newEdited.set(key, {
+            ...existing,
+            category: categorized[index].category,
+            label: categorized[index].label,
+          });
+        });
+        
+        setEditedTransactions(newEdited);
+        setCategorizationApplied(true);
+        
+        console.log('[Import] Auto-categorization complete!');
+      }
+    }
+
     // Apply custom account name to all transactions
     const transactionsWithAccount = transactionsToImport.map(tx => ({
       ...tx,
