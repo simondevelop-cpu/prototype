@@ -47,6 +47,9 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<Keyword | Merchant | null>(null);
 
   // Check authentication on mount
   useEffect(() => {
@@ -136,13 +139,29 @@ export default function AdminDashboard() {
         const keyword = viewType === 'keywords' 
           ? (item as Keyword).keyword 
           : (item as Merchant).merchant_pattern;
-        return keyword.toLowerCase().includes(searchLower);
+        
+        // Search filter
+        const matchesSearch = keyword.toLowerCase().includes(searchLower);
+        
+        // Language filter (only for keywords)
+        const matchesLanguage = viewType === 'merchants' || selectedLanguage === 'all' || 
+          (item as Keyword).language === selectedLanguage;
+        
+        return matchesSearch && matchesLanguage;
       });
       if (items.length > 0) {
         acc[cat] = items;
       }
       return acc;
     }, {});
+    
+    const clearFilters = () => {
+      setSearchTerm('');
+      setSelectedCategory('all');
+      setSelectedLanguage('all');
+    };
+    
+    const hasActiveFilters = searchTerm !== '' || selectedCategory !== 'all' || selectedLanguage !== 'all';
 
     return (
       <div className="space-y-6">
@@ -212,7 +231,7 @@ export default function AdminDashboard() {
         )}
 
         {/* Search & Filter */}
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-center">
           <input
             type="text"
             placeholder={`Search ${viewType}...`}
@@ -223,7 +242,7 @@ export default function AdminDashboard() {
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-w-[200px]"
           >
             <option value="all">All Categories</option>
             {categories.map((cat) => (
@@ -232,6 +251,35 @@ export default function AdminDashboard() {
               </option>
             ))}
           </select>
+          
+          {viewType === 'keywords' && (
+            <select
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+            >
+              <option value="all">All Languages</option>
+              <option value="en">English</option>
+              <option value="fr">French</option>
+              <option value="both">Both</option>
+            </select>
+          )}
+          
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors whitespace-nowrap"
+            >
+              Clear Filters
+            </button>
+          )}
+          
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap font-medium"
+          >
+            + Add {viewType === 'keywords' ? 'Keyword' : 'Merchant'}
+          </button>
         </div>
 
         {/* Error Display */}
@@ -274,6 +322,7 @@ export default function AdminDashboard() {
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Label</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Score</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -298,6 +347,24 @@ export default function AdminDashboard() {
                               <span className="font-semibold">{item.score}</span>
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-500">{item.notes || '-'}</td>
+                            <td className="px-6 py-4 text-sm text-right">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => setEditingItem(item)}
+                                  className="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                  title="Edit"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(item.id)}
+                                  className="px-3 py-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Delete"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -330,6 +397,28 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
     router.push('/admin/login');
+  };
+  
+  const handleDelete = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('admin_token');
+      const endpoint = viewType === 'keywords' ? 'keywords' : 'merchants';
+      const response = await fetch(`/api/admin/${endpoint}/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!response.ok) throw new Error('Failed to delete');
+      
+      // Refresh data
+      await fetchData();
+    } catch (error: any) {
+      alert(`Error deleting item: ${error.message}`);
+    }
   };
 
   // Show loading state while checking authentication
@@ -424,6 +513,210 @@ export default function AdminDashboard() {
         {activeTab === 'analytics' && renderPlaceholderTab('Analytics', 'View categorization performance, user activity, and system metrics', '📊')}
         {activeTab === 'inbox' && renderPlaceholderTab('Inbox', 'Manage bug reports, feature requests, and user feedback', '📥')}
         {activeTab === 'approved-accounts' && renderPlaceholderTab('Approved Accounts', 'Manage beta testers and approved user accounts', '✅')}
+      </div>
+      
+      {/* Add/Edit Modal */}
+      {(showAddModal || editingItem) && (
+        <AddEditModal
+          viewType={viewType}
+          item={editingItem}
+          onClose={() => {
+            setShowAddModal(false);
+            setEditingItem(null);
+          }}
+          onSave={() => {
+            setShowAddModal(false);
+            setEditingItem(null);
+            fetchData();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Add/Edit Modal Component
+function AddEditModal({ 
+  viewType, 
+  item, 
+  onClose, 
+  onSave 
+}: { 
+  viewType: 'keywords' | 'merchants';
+  item: any | null;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const [formData, setFormData] = useState({
+    keyword: item?.keyword || item?.merchant_pattern || '',
+    category: item?.category || 'Food',
+    label: item?.label || '',
+    score: item?.score || 10,
+    language: item?.language || 'both',
+    notes: item?.notes || ''
+  });
+  const [saving, setSaving] = useState(false);
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    
+    try {
+      const token = localStorage.getItem('admin_token');
+      const endpoint = viewType === 'keywords' ? 'keywords' : 'merchants';
+      const method = item ? 'PUT' : 'POST';
+      const url = item 
+        ? `/api/admin/${endpoint}/${item.id}` 
+        : `/api/admin/${endpoint}`;
+      
+      const payload = viewType === 'keywords' 
+        ? {
+            keyword: formData.keyword,
+            category: formData.category,
+            label: formData.label,
+            score: formData.score,
+            language: formData.language,
+            notes: formData.notes
+          }
+        : {
+            merchant_pattern: formData.keyword,
+            category: formData.category,
+            label: formData.label,
+            score: formData.score,
+            notes: formData.notes
+          };
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to save');
+      }
+      
+      onSave();
+    } catch (error: any) {
+      alert(`Error saving: ${error.message}`);
+      setSaving(false);
+    }
+  };
+  
+  const categories = [
+    'Food', 'Bills', 'Housing', 'Transport', 'Travel', 'Health', 
+    'Education', 'Personal', 'Shopping', 'Work', 'Subscriptions'
+  ];
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">
+            {item ? 'Edit' : 'Add'} {viewType === 'keywords' ? 'Keyword' : 'Merchant'}
+          </h3>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {viewType === 'keywords' ? 'Keyword' : 'Merchant Pattern'}
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.keyword}
+                onChange={(e) => setFormData({ ...formData, keyword: e.target.value.toUpperCase() })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder={viewType === 'keywords' ? 'e.g. COFFEE' : 'e.g. STARBUCKS'}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <select
+                required
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Label (optional)</label>
+              <input
+                type="text"
+                value={formData.label}
+                onChange={(e) => setFormData({ ...formData, label: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. Coffee"
+              />
+            </div>
+            
+            {viewType === 'keywords' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Language</label>
+                <select
+                  value={formData.language}
+                  onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="en">English</option>
+                  <option value="fr">French</option>
+                  <option value="both">Both</option>
+                </select>
+              </div>
+            )}
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Score</label>
+              <input
+                type="number"
+                min="1"
+                max="100"
+                value={formData.score}
+                onChange={(e) => setFormData({ ...formData, score: parseInt(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                rows={2}
+                placeholder="Any additional notes..."
+              />
+            </div>
+            
+            <div className="flex gap-3 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={saving}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : (item ? 'Update' : 'Add')}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
