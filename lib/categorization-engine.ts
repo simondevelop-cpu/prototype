@@ -10,18 +10,25 @@
 
 // Cache for database patterns (refreshed periodically)
 let cachedKeywords: KeywordPattern[] | null = null;
+let cachedMerchants: MerchantPattern[] | null = null;
 let lastFetchTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+interface MerchantPattern {
+  pattern: string;
+  alternatePatterns: string[];
+  category: string;
+  label: string;
+}
+
 /**
- * Fetch keyword patterns from database
- * Falls back to hardcoded patterns if database is unavailable
+ * Fetch keyword and merchant patterns from database
  */
 export async function refreshCategorizationPatterns(): Promise<void> {
   const now = Date.now();
   
   // Use cache if still valid
-  if (cachedKeywords && (now - lastFetchTime) < CACHE_TTL) {
+  if (cachedKeywords && cachedMerchants && (now - lastFetchTime) < CACHE_TTL) {
     return;
   }
 
@@ -51,11 +58,24 @@ export async function refreshCategorizationPatterns(): Promise<void> {
       });
     }
 
+    // Fetch merchants from database
+    const merchantsRes = await fetch('/api/admin/merchants');
+    if (merchantsRes.ok) {
+      const merchantsData = await merchantsRes.json();
+      cachedMerchants = merchantsData.merchants.map((m: any) => ({
+        pattern: m.merchant_pattern,
+        alternatePatterns: m.alternate_patterns || [],
+        category: m.category,
+        label: m.label,
+      }));
+    }
+
     lastFetchTime = now;
-    console.log(`[Categorization] Loaded ${cachedKeywords?.length || 0} keyword groups from database`);
+    console.log(`[Categorization] Loaded ${cachedKeywords?.length || 0} keyword groups and ${cachedMerchants?.length || 0} merchants from database`);
   } catch (error) {
-    console.warn('[Categorization] Failed to fetch from database, using hardcoded patterns:', error);
+    console.warn('[Categorization] Failed to fetch from database:', error);
     cachedKeywords = null;
+    cachedMerchants = null;
   }
 }
 
@@ -121,14 +141,13 @@ export interface LearnedPattern {
 }
 
 /**
- * Main categorization function - SIMPLIFIED FIRST-MATCH APPROACH
+ * Main categorization function - FIRST-MATCH APPROACH
  * 
- * Logic:
- * 1. Check learned patterns (user's corrections)
- * 2. Loop through categories in priority order
- * 3. For each category, check if ANY keyword matches
- * 4. Return FIRST match found
- * 5. If no match, return Uncategorised
+ * Logic (in priority order):
+ * 1. Check learned patterns (user's corrections) - HIGHEST PRIORITY
+ * 2. Check merchant patterns (exact + alternate patterns)
+ * 3. Check keyword patterns (by category priority order)
+ * 4. Return Uncategorised if no match
  * 
  * @param description Transaction description
  * @param amount Transaction amount (not used in new logic)
@@ -151,6 +170,7 @@ export function categorizeTransaction(
       if (cleaned.includes(pattern.description_pattern) || cleanedNoSpaces.includes(patternNoSpaces)) {
         // Very high confidence for learned patterns, boosted by frequency
         const confidenceBoost = Math.min(pattern.frequency * 2, 10);
+        console.log(`[Categorization] ✓ USER HISTORY MATCH! Pattern "${pattern.description_pattern}" → ${pattern.corrected_category}/${pattern.corrected_label}`);
         return {
           category: pattern.corrected_category,
           label: pattern.corrected_label,
@@ -160,7 +180,38 @@ export function categorizeTransaction(
     }
   }
   
-  // Step 2: Loop through categories in priority order and check keywords
+  // Step 2: Check merchant patterns (including alternates)
+  const merchantPatterns = cachedMerchants;
+  
+  if (merchantPatterns && merchantPatterns.length > 0) {
+    for (const merchant of merchantPatterns) {
+      // Check primary merchant pattern
+      const merchantNoSpaces = merchant.pattern.replace(/\s+/g, '');
+      if (cleaned.includes(merchant.pattern) || cleanedNoSpaces.includes(merchantNoSpaces)) {
+        console.log(`[Categorization] ✓ MERCHANT MATCH! "${merchant.pattern}" → ${merchant.category}/${merchant.label}`);
+        return {
+          category: merchant.category,
+          label: merchant.label,
+          confidence: 90, // High confidence for merchant matches
+        };
+      }
+      
+      // Check alternate patterns
+      for (const altPattern of merchant.alternatePatterns) {
+        const altNoSpaces = altPattern.replace(/\s+/g, '');
+        if (cleaned.includes(altPattern) || cleanedNoSpaces.includes(altNoSpaces)) {
+          console.log(`[Categorization] ✓ MERCHANT ALTERNATE MATCH! "${altPattern}" (→ "${merchant.pattern}") → ${merchant.category}/${merchant.label}`);
+          return {
+            category: merchant.category,
+            label: merchant.label,
+            confidence: 90,
+          };
+        }
+      }
+    }
+  }
+  
+  // Step 3: Loop through categories in priority order and check keywords
   // ONLY use database keywords - no fallback
   const keywordPatterns = cachedKeywords;
   

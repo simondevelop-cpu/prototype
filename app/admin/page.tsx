@@ -187,6 +187,46 @@ export default function AdminDashboard() {
           </button>
         </div>
 
+        {/* Auto-Categorization Logic Explanation */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+            🤖 Auto-Categorization Engine
+          </h3>
+          <div className="space-y-3 text-sm text-gray-700">
+            <p className="font-medium text-gray-900">How it works (in priority order):</p>
+            <ol className="space-y-2 ml-4">
+              <li className="flex items-start gap-2">
+                <span className="font-bold text-blue-600 min-w-[1.5rem]">1.</span>
+                <div>
+                  <span className="font-semibold text-gray-900">User History</span>
+                  <span className="text-gray-600"> – Your past recategorizations are checked first and always take priority.</span>
+                </div>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="font-bold text-blue-600 min-w-[1.5rem]">2.</span>
+                <div>
+                  <span className="font-semibold text-gray-900">Merchant Matching</span>
+                  <span className="text-gray-600"> – We match against known Canadian merchants and their alternate spellings (e.g., "TIMHORT" → "TIM HORTONS").</span>
+                </div>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="font-bold text-blue-600 min-w-[1.5rem]">3.</span>
+                <div>
+                  <span className="font-semibold text-gray-900">Keyword Search (First Match)</span>
+                  <span className="text-gray-600"> – We search by category priority: </span>
+                  <span className="font-mono text-xs bg-white px-2 py-0.5 rounded border border-gray-200">
+                    Housing → Bills → Subscriptions → Food → Travel → Health → Transport → Education → Personal → Shopping → Work
+                  </span>
+                  <span className="text-gray-600">. The first matching keyword wins.</span>
+                </div>
+              </li>
+            </ol>
+            <p className="text-xs text-gray-500 italic mt-4 pt-3 border-t border-blue-200">
+              💡 Manage keywords and merchants below. All changes immediately affect categorization for future uploads.
+            </p>
+          </div>
+        </div>
+
         {/* View Type Toggle */}
         <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
           <button
