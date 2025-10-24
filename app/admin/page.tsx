@@ -825,7 +825,7 @@ function ColumnFilterHeader({
   onChange: (values: string[]) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLTableHeaderCellElement>(null);
   
   // Close dropdown when clicking outside
   useEffect(() => {
