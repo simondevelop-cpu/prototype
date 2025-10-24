@@ -948,8 +948,7 @@ function AddEditModal({
         ? {
             keyword: formData.keyword,
             category: formData.category,
-            label: formData.label,
-            notes: formData.notes
+            label: formData.label
           }
         : {
             merchant_pattern: formData.keyword,

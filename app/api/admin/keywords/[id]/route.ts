@@ -29,15 +29,15 @@ export async function PUT(
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
     
-    const { keyword, category, label, notes } = await request.json();
+    const { keyword, category, label } = await request.json();
     const id = parseInt(params.id);
     
     const result = await pool.query(
       `UPDATE admin_keywords 
-       SET keyword = $1, category = $2, label = $3, notes = $4, updated_at = NOW()
-       WHERE id = $5
+       SET keyword = $1, category = $2, label = $3, updated_at = NOW()
+       WHERE id = $4
        RETURNING *`,
-      [keyword, category, label, notes, id]
+      [keyword, category, label, id]
     );
     
     if (result.rows.length === 0) {
