@@ -41,6 +41,7 @@ export default function AdminDashboard() {
   const [checking, setChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<TabName>('inbox');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'dashboard' | 'customer-data' | 'macro-data' | 'app-health'>('dashboard');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
   const [stats, setStats] = useState<any>(null);
@@ -63,6 +64,10 @@ export default function AdminDashboard() {
   const [recategorizations, setRecategorizations] = useState<any[]>([]);
   const [recatLoading, setRecatLoading] = useState(false);
   const [reviewed, setReviewed] = useState<{[key: number]: boolean}>({});
+  
+  // State for Customer Data tab
+  const [customerData, setCustomerData] = useState<any[]>([]);
+  const [customerDataLoading, setCustomerDataLoading] = useState(false);
 
   // Check authentication on mount
   useEffect(() => {
@@ -145,6 +150,28 @@ export default function AdminDashboard() {
       fetchRecategorizations();
     }
   }, [activeTab, viewType, authenticated]);
+
+  // Fetch customer data when Analytics → Customer Data tab is active
+  useEffect(() => {
+    if (activeTab === 'analytics' && analyticsSubTab === 'customer-data' && authenticated) {
+      const fetchCustomerData = async () => {
+        setCustomerDataLoading(true);
+        try {
+          const token = localStorage.getItem('admin_token');
+          const response = await fetch('/api/admin/customer-data', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await response.json();
+          setCustomerData(data.customerData || []);
+        } catch (error) {
+          console.error('Error fetching customer data:', error);
+        } finally {
+          setCustomerDataLoading(false);
+        }
+      };
+      fetchCustomerData();
+    }
+  }, [activeTab, analyticsSubTab, authenticated]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -673,6 +700,152 @@ export default function AdminDashboard() {
             {users.length === 0 && (
               <div className="text-center py-12 text-gray-500">
                 No users registered yet
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render Analytics Tab
+  const renderAnalyticsTab = () => {
+    const renderPlaceholder = (title: string) => (
+      <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
+        <div className="text-6xl mb-4">🚧</div>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
+        <p className="text-gray-600">Coming soon...</p>
+      </div>
+    );
+
+    return (
+      <div className="space-y-6">
+        {/* Sub-tabs */}
+        <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
+          <button
+            onClick={() => setAnalyticsSubTab('dashboard')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'dashboard'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            📊 Dashboard
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('customer-data')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'customer-data'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            👥 Customer Data
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('macro-data')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'macro-data'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            📈 Macro Data
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('app-health')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'app-health'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            💚 App Health
+          </button>
+        </div>
+
+        {/* Content */}
+        {analyticsSubTab === 'dashboard' && renderPlaceholder('Analytics Dashboard')}
+        {analyticsSubTab === 'macro-data' && renderPlaceholder('Macro Data')}
+        {analyticsSubTab === 'app-health' && renderPlaceholder('App Health')}
+        
+        {analyticsSubTab === 'customer-data' && (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Customer Data</h2>
+              <p className="text-gray-600 mt-1">All user onboarding responses and profile information</p>
+            </div>
+
+            {customerDataLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-600 mt-4">Loading customer data...</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Province</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emotional State</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Financial Context</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Motivation</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acquisition</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Insights Wanted</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Completed</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {customerData.map((user) => (
+                      <tr key={user.email} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.first_name && user.last_name 
+                            ? `${user.first_name} ${user.last_name}` 
+                            : <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.province_region || <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                          {user.emotional_state && user.emotional_state.length > 0
+                            ? <div className="text-xs">{user.emotional_state.join(', ')}</div>
+                            : <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                          {user.financial_context && user.financial_context.length > 0
+                            ? <div className="text-xs">{user.financial_context.join(', ')}</div>
+                            : <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                          {user.motivation || <span className="text-gray-400 italic">null</span>}
+                          {user.motivation_other && <div className="text-xs text-gray-500 mt-1">({user.motivation_other})</div>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.acquisition_source || <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                          {user.insight_preferences && user.insight_preferences.length > 0
+                            ? <div className="text-xs">{user.insight_preferences.join(', ')}</div>
+                            : <span className="text-gray-400 italic">null</span>}
+                          {user.insight_other && <div className="text-xs text-gray-500 mt-1">({user.insight_other})</div>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.completed_at 
+                            ? new Date(user.completed_at).toLocaleDateString()
+                            : <span className="text-gray-400 italic">null</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {customerData.length === 0 && (
+                  <div className="text-center py-12 text-gray-500">
+                    No customer data available yet
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1475,7 +1648,7 @@ export default function AdminDashboard() {
         {activeTab === 'inbox' && renderPlaceholderTab('Inbox', 'Manage bug reports, feature requests, and user feedback', '📥')}
         {activeTab === 'categories' && renderCategoriesTab()}
         {activeTab === 'insights' && renderPlaceholderTab('Insights Engine', 'Automated spending insights and personalized recommendations', '🔍')}
-        {activeTab === 'analytics' && renderPlaceholderTab('Analytics', 'View categorization performance, user activity, and system metrics', '📊')}
+        {activeTab === 'analytics' && renderAnalyticsTab()}
         {activeTab === 'accounts' && renderAccountsTab()}
         {activeTab === 'debugging' && renderDebuggingGuide()}
       </div>
