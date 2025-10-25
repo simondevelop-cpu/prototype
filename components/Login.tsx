@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface LoginProps {
   onLogin: (token: string, user: any) => void;
 }
 
 export default function Login({ onLogin }: LoginProps) {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -37,7 +39,17 @@ export default function Login({ onLogin }: LoginProps) {
       }
 
       const data = await response.json();
-      onLogin(data.token, data.user);
+      
+      // If registering, store token and redirect to onboarding
+      if (isRegister) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('ci.session.token', data.token);
+        localStorage.setItem('ci.session.user', JSON.stringify(data.user));
+        router.push('/onboarding');
+      } else {
+        // If logging in, proceed normally
+        onLogin(data.token, data.user);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
