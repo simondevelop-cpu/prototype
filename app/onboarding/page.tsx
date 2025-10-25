@@ -373,7 +373,7 @@ export default function OnboardingPage() {
             rows={3}
             placeholder="What insight would you like to see?"
             required
-          </label>
+          />
         </div>
       )}
     </div>
