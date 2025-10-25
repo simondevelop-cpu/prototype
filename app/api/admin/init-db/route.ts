@@ -61,6 +61,44 @@ async function initializeTables() {
     `);
     console.log('[DB Init] ✅ categorization_learning table created');
     
+    // Create onboarding_responses table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS onboarding_responses (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL UNIQUE,
+        
+        -- Q1: Emotional calibration (multi-select, stored as array)
+        emotional_state TEXT[],
+        
+        -- Q2: Financial context (multi-select, stored as array)
+        financial_context TEXT[],
+        
+        -- Q3: Motivation/segmentation (single select)
+        motivation TEXT,
+        motivation_other TEXT,
+        
+        -- Q4: Acquisition source (single select)
+        acquisition_source TEXT,
+        
+        -- Q6: Insight preferences (multi-select, stored as array)
+        insight_preferences TEXT[],
+        insight_other TEXT,
+        
+        -- Q9: Account profile
+        first_name TEXT,
+        last_name TEXT,
+        date_of_birth DATE,
+        recovery_phone TEXT,
+        province_region TEXT,
+        
+        -- Metadata
+        completed_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('[DB Init] ✅ onboarding_responses table created');
+    
     // Check if data exists
     const keywordCount = await client.query('SELECT COUNT(*) as count FROM admin_keywords');
     const merchantCount = await client.query('SELECT COUNT(*) as count FROM admin_merchants');
