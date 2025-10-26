@@ -69,6 +69,23 @@ export default function AdminDashboard() {
   const [customerData, setCustomerData] = useState<any[]>([]);
   const [customerDataLoading, setCustomerDataLoading] = useState(false);
 
+  // Fetch customer data function (used by Refresh button and initial load)
+  const fetchCustomerData = async () => {
+    setCustomerDataLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch('/api/admin/customer-data', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setCustomerData(data.customerData || []);
+    } catch (error) {
+      console.error('Error fetching customer data:', error);
+    } finally {
+      setCustomerDataLoading(false);
+    }
+  };
+
   // Check authentication on mount
   useEffect(() => {
     const checkAuth = async () => {
@@ -154,21 +171,6 @@ export default function AdminDashboard() {
   // Fetch customer data when Analytics → Customer Data tab is active
   useEffect(() => {
     if (activeTab === 'analytics' && analyticsSubTab === 'customer-data' && authenticated) {
-      const fetchCustomerData = async () => {
-        setCustomerDataLoading(true);
-        try {
-          const token = localStorage.getItem('admin_token');
-          const response = await fetch('/api/admin/customer-data', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const data = await response.json();
-          setCustomerData(data.customerData || []);
-        } catch (error) {
-          console.error('Error fetching customer data:', error);
-        } finally {
-          setCustomerDataLoading(false);
-        }
-      };
       fetchCustomerData();
     }
   }, [activeTab, analyticsSubTab, authenticated]);
