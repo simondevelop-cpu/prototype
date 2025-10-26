@@ -27,6 +27,7 @@ export default function OnboardingPage() {
     
     // Q4: Acquisition source
     acquisitionSource: '',
+    acquisitionOther: '',
     
     // Q6: Insight preferences
     insightPreferences: [] as string[],
@@ -112,11 +113,24 @@ export default function OnboardingPage() {
       }
     }
 
-    if (currentStep === 7) {
+    if (currentStep === 6) {
       // Q9: Profile validation
       if (!formData.firstName.trim()) newErrors.firstName = "First name is required";
       if (!formData.dateOfBirth) newErrors.dateOfBirth = "Date of birth is required";
       if (!formData.provinceRegion) newErrors.provinceRegion = "Province is required";
+      
+      // Age validation (must be 18+)
+      if (formData.dateOfBirth) {
+        const today = new Date();
+        const birthDate = new Date(formData.dateOfBirth);
+        const age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) ? age - 1 : age;
+        
+        if (actualAge < 18) {
+          newErrors.dateOfBirth = "You need to be older than 18 years old to create an account.";
+        }
+      }
     }
 
     setErrors(newErrors);
@@ -200,18 +214,12 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      <div className="flex gap-3">
-        <button
-          className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-          disabled
-        >
-          Resend Code
-        </button>
+      <div className="flex justify-end">
         <button
           onClick={handleNext}
-          className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium"
         >
-          Skip for Now
+          Skip
         </button>
       </div>
 
@@ -232,12 +240,12 @@ export default function OnboardingPage() {
 
       <div className="space-y-3">
         {[
-          "I feel stressed about it",
-          "It sometimes feels overwhelming",
-          "It's a chore I tend to put off",
-          "I feel mostly in control",
-          "I'm curious to learn new ways to do better",
-          "I'd love some personalized guidance"
+          "😰 I feel stressed about it",
+          "😵 It sometimes feels overwhelming",
+          "😮‍💨 It's a chore I tend to put off",
+          "😊 I feel mostly in control",
+          "🤔 I'm curious to learn new ways to do better",
+          "🙏 I'd love some personalized guidance"
         ].map(option => (
           <label key={option} className="flex items-start p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer transition-colors">
             <input
@@ -270,7 +278,7 @@ export default function OnboardingPage() {
           "I've been dipping into my savings this year",
           "I have a comfortable savings cushion",
           "I share finances with a partner or have dependents",
-          "I manage multiple accounts or budgets (e.g. work vs. personal, family members)",
+          "I manage multiple accounts (e.g. work vs. personal, family members)",
           "Prefer not to answer"
         ].map(option => (
           <label key={option} className="flex items-start p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer transition-colors">
@@ -286,7 +294,7 @@ export default function OnboardingPage() {
       </div>
 
       {errors.financialContext && (
-        <p className="text-red-500 text-sm">{errors.financialContext}</p>
+        <p className="text-red-500 text-sm">Please select only one of growing savings, dipping into savings or prefer not to answer</p>
       )}
     </div>
   );
@@ -359,13 +367,26 @@ export default function OnboardingPage() {
               type="radio"
               name="acquisitionSource"
               checked={formData.acquisitionSource === option}
-              onChange={() => setFormData({ ...formData, acquisitionSource: option })}
+              onChange={() => setFormData({ ...formData, acquisitionSource: option, acquisitionOther: '' })}
               className="mt-1 mr-3 h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500"
             />
             <span className="text-gray-700">{option}</span>
           </label>
         ))}
       </div>
+
+      {formData.acquisitionSource === "Other" && (
+        <div>
+          <textarea
+            value={formData.acquisitionOther}
+            onChange={(e) => setFormData({ ...formData, acquisitionOther: e.target.value })}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            rows={3}
+            placeholder="Please tell us how you heard about us"
+            required
+          />
+        </div>
+      )}
     </div>
   );
 
@@ -373,7 +394,7 @@ export default function OnboardingPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-gray-900">
-          Which AI-powered insights interest you most?
+          Would any of these AI-powered insights interest you?
         </h2>
         <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
       </div>
@@ -386,7 +407,7 @@ export default function OnboardingPage() {
           "Track and manage growing subscriptions",
           "Compare my spending to peers",
           "Discover where I could rebalance my spending",
-          "I have an idea you didn't mention"
+          "I have a great idea that you didn't mention"
         ].map(option => (
           <label key={option} className="flex items-start p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer transition-colors">
             <input
@@ -400,7 +421,7 @@ export default function OnboardingPage() {
         ))}
       </div>
 
-      {formData.insightPreferences.includes("I have an idea you didn't mention") && (
+      {formData.insightPreferences.includes("I have a great idea that you didn't mention") && (
         <div>
           <textarea
             value={formData.insightOther}
@@ -505,9 +526,9 @@ export default function OnboardingPage() {
             {currentStep === 0 && renderStep0()}
             {currentStep === 1 && renderStep1()}
             {currentStep === 2 && renderStep2()}
-            {currentStep === 3 && renderStep3()}
-            {currentStep === 4 && renderStep4()}
-            {currentStep === 5 && renderStep5()}
+            {currentStep === 3 && renderStep5()}
+            {currentStep === 4 && renderStep3()}
+            {currentStep === 5 && renderStep4()}
             {currentStep === 6 && renderStep6()}
           </div>
 

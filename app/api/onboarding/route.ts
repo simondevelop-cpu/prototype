@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
     
     const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const userId = decoded.userId || decoded.id;
+    const userId = decoded.userId || decoded.id || decoded.sub;
     
     if (!userId) {
       console.error('[Onboarding API] No userId in JWT:', decoded);
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
     }
     
     const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const userId = decoded.userId || decoded.id;
+    const userId = decoded.userId || decoded.id || decoded.sub;
     
     if (!userId) {
       return NextResponse.json({ error: 'Invalid token: no user ID' }, { status: 401 });
