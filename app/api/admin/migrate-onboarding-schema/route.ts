@@ -80,6 +80,29 @@ export async function POST(request: NextRequest) {
       console.log('[Onboarding Schema Migration] ✅ Added updated_at column');
     }
 
+    // Remove UNIQUE constraint on user_id if it exists (CRITICAL for multiple attempts)
+    try {
+      const constraintCheck = await pool.query(`
+        SELECT constraint_name 
+        FROM information_schema.table_constraints 
+        WHERE table_name = 'onboarding_responses' 
+        AND constraint_type = 'UNIQUE'
+        AND constraint_name LIKE '%user_id%'
+      `);
+
+      if (constraintCheck.rows.length > 0) {
+        const constraintName = constraintCheck.rows[0].constraint_name;
+        await pool.query(`
+          ALTER TABLE onboarding_responses 
+          DROP CONSTRAINT ${constraintName}
+        `);
+        migrations.push(`Removed UNIQUE constraint on user_id (${constraintName})`);
+        console.log('[Onboarding Schema Migration] ✅ Removed UNIQUE constraint:', constraintName);
+      }
+    } catch (error: any) {
+      console.log('[Onboarding Schema Migration] Note: Could not check/remove UNIQUE constraint:', error.message);
+    }
+
     if (migrations.length === 0) {
       return NextResponse.json({
         success: true,
