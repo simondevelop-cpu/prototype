@@ -100,6 +100,28 @@ export default function OnboardingPage() {
   const validateStep = (): boolean => {
     const newErrors: {[key: string]: string} = {};
 
+    // Force selection validation for multi-select steps
+    if (currentStep === 1) {
+      // Q1: Emotional State (multi-select, at least one required)
+      if (formData.emotionalState.length === 0) {
+        newErrors.emotionalState = "Please select at least one option";
+      }
+    }
+
+    if (currentStep === 2) {
+      // Q3: Motivation (single select, required)
+      if (!formData.motivation) {
+        newErrors.motivation = "Please select an option";
+      }
+    }
+
+    if (currentStep === 3) {
+      // Q4: Acquisition Source (single select, required)
+      if (!formData.acquisitionSource) {
+        newErrors.acquisitionSource = "Please select an option";
+      }
+    }
+
     if (currentStep === 4) {
       // Q2: Financial Context - Check savings radio group constraint
       const savingsOptions = [
@@ -110,6 +132,17 @@ export default function OnboardingPage() {
       const selectedSavings = formData.financialContext.filter(opt => savingsOptions.includes(opt));
       if (selectedSavings.length > 1) {
         newErrors.financialContext = "Please select only one of growing savings, dipping into savings or prefer not to answer";
+      }
+      // At least one option required
+      if (formData.financialContext.length === 0) {
+        newErrors.financialContext = "Please select at least one option";
+      }
+    }
+
+    if (currentStep === 5) {
+      // Q5: AI Insights (multi-select, at least one required)
+      if (formData.insightPreferences.length === 0) {
+        newErrors.insightPreferences = "Please select at least one option";
       }
     }
 
@@ -156,7 +189,8 @@ export default function OnboardingPage() {
   // Update progress to track drop-offs (updates same row)
   const updateProgress = async (completedStep: number) => {
     try {
-      const token = localStorage.getItem('token');
+      // Use the correct token key (ci.session.token, not just 'token')
+      const token = localStorage.getItem('ci.session.token') || localStorage.getItem('token');
       if (!token) return;
 
       const progressData = {
@@ -198,7 +232,12 @@ export default function OnboardingPage() {
 
   const handleSubmit = async () => {
     try {
-      const token = localStorage.getItem('token');
+      // Use the correct token key (ci.session.token, not just 'token')
+      const token = localStorage.getItem('ci.session.token') || localStorage.getItem('token');
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
       
       // Add completion metadata
       const submissionData = {
