@@ -48,9 +48,10 @@ export async function POST(request: NextRequest) {
         date_of_birth,
         recovery_phone,
         province_region,
+        last_step,
         completed_at,
         updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
       ON CONFLICT (user_id) 
       DO UPDATE SET
         emotional_state = EXCLUDED.emotional_state,
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
         date_of_birth = EXCLUDED.date_of_birth,
         recovery_phone = EXCLUDED.recovery_phone,
         province_region = EXCLUDED.province_region,
+        last_step = EXCLUDED.last_step,
         completed_at = NOW(),
         updated_at = NOW()
       RETURNING *`,
@@ -82,6 +84,7 @@ export async function POST(request: NextRequest) {
         data.dateOfBirth || null,
         data.recoveryPhone || null,
         data.provinceRegion || null,
+        7, // last_step = 7 means completed
       ]
     );
 

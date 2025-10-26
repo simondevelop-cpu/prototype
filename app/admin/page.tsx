@@ -835,7 +835,9 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {user.completed_at 
                             ? new Date(user.completed_at).toLocaleDateString()
-                            : <span className="text-gray-400 italic">null</span>}
+                            : user.last_step 
+                            ? <span className="text-orange-600 font-medium">Dropped at Step {user.last_step}</span>
+                            : <span className="text-gray-400 italic">Not started</span>}
                         </td>
                       </tr>
                     ))}

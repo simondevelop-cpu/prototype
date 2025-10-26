@@ -92,6 +92,7 @@ async function initializeTables() {
         province_region TEXT,
         
         -- Metadata
+        last_step INTEGER DEFAULT 0,
         completed_at TIMESTAMP WITH TIME ZONE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

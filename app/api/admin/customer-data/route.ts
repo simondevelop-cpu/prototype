@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
         o.acquisition_source,
         o.insight_preferences,
         o.insight_other,
+        o.last_step,
         o.completed_at,
         o.created_at
       FROM users u
