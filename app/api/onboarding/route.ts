@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json();
-    console.log('[Onboarding API] Saving for user:', userId);
+    console.log('[Onboarding API] Saving for user:', userId, 'lastStep:', data.lastStep);
 
     // Always INSERT new row (allow multiple attempts per user)
     const result = await pool.query(
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
         last_step,
         completed_at,
         updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
       RETURNING *`,
       [
         userId,
@@ -67,7 +67,8 @@ export async function POST(request: NextRequest) {
         data.dateOfBirth || null,
         data.recoveryPhone || null,
         data.provinceRegion || null,
-        7, // last_step = 7 means completed
+        data.lastStep || 7, // Default to 7 if not provided
+        data.completedAt || null, // Only set if completed
       ]
     );
 

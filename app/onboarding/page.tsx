@@ -100,8 +100,8 @@ export default function OnboardingPage() {
   const validateStep = (): boolean => {
     const newErrors: {[key: string]: string} = {};
 
-    if (currentStep === 2) {
-      // Q2: Check savings radio group constraint
+    if (currentStep === 4) {
+      // Q2: Financial Context - Check savings radio group constraint
       const savingsOptions = [
         "I've been growing my savings this year",
         "I've been dipping into my savings this year",
@@ -109,7 +109,7 @@ export default function OnboardingPage() {
       ];
       const selectedSavings = formData.financialContext.filter(opt => savingsOptions.includes(opt));
       if (selectedSavings.length > 1) {
-        newErrors.financialContext = "Please select only one: growing savings, dipping into savings, or prefer not to answer";
+        newErrors.financialContext = "Please select only one of growing savings, dipping into savings or prefer not to answer";
       }
     }
 
@@ -159,13 +159,23 @@ export default function OnboardingPage() {
   const handleSubmit = async () => {
     try {
       const token = localStorage.getItem('token');
+      
+      // Add completion metadata
+      const submissionData = {
+        ...formData,
+        lastStep: 7, // Completed all steps
+        completedAt: new Date().toISOString()
+      };
+      
+      console.log('[Onboarding] Submitting data:', submissionData);
+      
       const response = await fetch('/api/onboarding', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(submissionData)
       });
 
       if (!response.ok) {
@@ -173,6 +183,8 @@ export default function OnboardingPage() {
         throw new Error(errorData.error || 'Failed to save onboarding data');
       }
 
+      console.log('[Onboarding] Successfully saved responses');
+      
       // Redirect to home (which will show dashboard if logged in)
       router.push('/');
     } catch (error: any) {
@@ -525,10 +537,10 @@ export default function OnboardingPage() {
           <div className="mb-8">
             {currentStep === 0 && renderStep0()}
             {currentStep === 1 && renderStep1()}
-            {currentStep === 2 && renderStep2()}
-            {currentStep === 3 && renderStep5()}
-            {currentStep === 4 && renderStep3()}
-            {currentStep === 5 && renderStep4()}
+            {currentStep === 2 && renderStep3()}
+            {currentStep === 3 && renderStep4()}
+            {currentStep === 4 && renderStep2()}
+            {currentStep === 5 && renderStep5()}
             {currentStep === 6 && renderStep6()}
           </div>
 
