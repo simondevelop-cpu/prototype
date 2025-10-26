@@ -77,6 +77,18 @@ export default function OnboardingPage() {
     }
   };
 
+  const handleVerificationPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    const newCode = pastedData.split('').concat(Array(6 - pastedData.length).fill(''));
+    setVerificationCode(newCode.slice(0, 6));
+    
+    // Focus the last filled input or first empty
+    const focusIndex = Math.min(pastedData.length, 5);
+    const targetInput = document.getElementById(`code-${focusIndex}`);
+    targetInput?.focus();
+  };
+
   const handleVerificationKeyDown = (index: number, e: React.KeyboardEvent) => {
     if (e.key === 'Backspace' && !verificationCode[index] && index > 0) {
       const prevInput = document.getElementById(`code-${index - 1}`);
@@ -142,13 +154,16 @@ export default function OnboardingPage() {
         body: JSON.stringify(formData)
       });
 
-      if (!response.ok) throw new Error('Failed to save onboarding data');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save onboarding data');
+      }
 
-      // Redirect to dashboard
-      router.push('/dashboard');
-    } catch (error) {
+      // Redirect to home (which will show dashboard if logged in)
+      router.push('/');
+    } catch (error: any) {
       console.error('Error saving onboarding:', error);
-      alert('Failed to save your responses. Please try again.');
+      alert(`Failed to save your responses. ${error.message || 'Please try again.'}`);
     }
   };
 
@@ -178,6 +193,7 @@ export default function OnboardingPage() {
               value={digit}
               onChange={(e) => handleVerificationCodeChange(index, e.target.value)}
               onKeyDown={(e) => handleVerificationKeyDown(index, e)}
+              onPaste={index === 0 ? handleVerificationPaste : undefined}
               className="w-12 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           ))}
@@ -207,9 +223,12 @@ export default function OnboardingPage() {
 
   const renderStep1 = () => (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900 mb-4">
-        How do you feel about managing your money right now?
-      </h2>
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900">
+          How do you feel about managing your money right now?
+        </h2>
+        <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
+      </div>
 
       <div className="space-y-3">
         {[
@@ -236,9 +255,12 @@ export default function OnboardingPage() {
 
   const renderStep2 = () => (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900 mb-4">
-        Everyone's finances look different — help us tailor your insights.
-      </h2>
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900">
+          Everyone's finances look different — help us tailor your insights.
+        </h2>
+        <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
+      </div>
 
       <div className="space-y-3">
         {[
@@ -271,9 +293,12 @@ export default function OnboardingPage() {
 
   const renderStep3 = () => (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900 mb-4">
-        What brings you here today?
-      </h2>
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900">
+          What brings you here today?
+        </h2>
+        <p className="text-sm text-gray-600 mt-1">(Select the one that best describes you)</p>
+      </div>
 
       <div className="space-y-3">
         {[
@@ -344,9 +369,12 @@ export default function OnboardingPage() {
 
   const renderStep5 = () => (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900 mb-4">
-        Which AI-powered insights interest you most?
-      </h2>
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900">
+          Which AI-powered insights interest you most?
+        </h2>
+        <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
+      </div>
 
       <div className="space-y-3">
         {[

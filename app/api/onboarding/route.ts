@@ -22,9 +22,15 @@ export async function POST(request: NextRequest) {
     }
     
     const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const userId = decoded.userId;
+    const userId = decoded.userId || decoded.id;
+    
+    if (!userId) {
+      console.error('[Onboarding API] No userId in JWT:', decoded);
+      return NextResponse.json({ error: 'Invalid token: no user ID' }, { status: 401 });
+    }
 
     const data = await request.json();
+    console.log('[Onboarding API] Saving for user:', userId);
 
     // Insert or update onboarding responses
     const result = await pool.query(
@@ -105,7 +111,11 @@ export async function GET(request: NextRequest) {
     }
     
     const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const userId = decoded.userId;
+    const userId = decoded.userId || decoded.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Invalid token: no user ID' }, { status: 401 });
+    }
 
     const result = await pool.query(
       'SELECT * FROM onboarding_responses WHERE user_id = $1',
