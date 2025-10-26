@@ -33,15 +33,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Check if last_step column exists (schema-adaptive query)
+    // Check which columns exist (schema-adaptive query)
     let hasLastStep = false;
+    let hasAcquisitionOther = false;
     try {
       const schemaCheck = await pool.query(`
         SELECT column_name 
         FROM information_schema.columns 
-        WHERE table_name = 'onboarding_responses' AND column_name = 'last_step'
+        WHERE table_name = 'onboarding_responses' 
+        AND column_name IN ('last_step', 'acquisition_other')
       `);
-      hasLastStep = schemaCheck.rows.length > 0;
+      hasLastStep = schemaCheck.rows.some(row => row.column_name === 'last_step');
+      hasAcquisitionOther = schemaCheck.rows.some(row => row.column_name === 'acquisition_other');
+      console.log('[Customer Data API] Schema check:', { hasLastStep, hasAcquisitionOther });
     } catch (e) {
       console.log('[Customer Data API] Could not check schema, assuming old schema');
     }
@@ -59,7 +63,7 @@ export async function GET(request: NextRequest) {
       o.motivation,
       o.motivation_other,
       o.acquisition_source,
-      o.acquisition_other,
+      ${hasAcquisitionOther ? 'o.acquisition_other,' : ''}
       o.insight_preferences,
       o.insight_other,
       ${hasLastStep ? 'o.last_step,' : ''}
