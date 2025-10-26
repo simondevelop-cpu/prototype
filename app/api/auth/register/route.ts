@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     if (existingUser.rows.length > 0) {
       return NextResponse.json(
-        { error: 'Email already registered' },
+        { error: 'This email is already registered. Please sign in instead.' },
         { status: 400 }
       );
     }

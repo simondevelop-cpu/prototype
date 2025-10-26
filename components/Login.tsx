@@ -35,7 +35,17 @@ export default function Login({ onLogin }: LoginProps) {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Authentication failed');
+        const errorMessage = data.error || 'Authentication failed';
+        
+        // If trying to register with existing email, switch to Sign In mode
+        if (isRegister && errorMessage.toLowerCase().includes('already registered')) {
+          setIsRegister(false);
+          setError('This account already exists. Please sign in below to continue.');
+          setLoading(false);
+          return;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
