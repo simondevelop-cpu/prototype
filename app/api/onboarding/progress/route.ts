@@ -64,10 +64,10 @@ export async function PUT(request: NextRequest) {
 
     // LOGIC: Create a NEW row if:
     // 1. No incomplete attempt exists (first time ever)
-    // 2. OR this is step 1 AND the last incomplete attempt was also at step 1 or 0 (indicates a fresh login/retry)
+    // 2. OR this is step 1 (indicates a fresh login/retry, regardless of where they dropped off before)
     const shouldCreateNewRow = 
       currentAttempt.rows.length === 0 || 
-      (data.lastStep === 1 && (currentAttempt.rows[0].last_step === 0 || currentAttempt.rows[0].last_step === 1));
+      data.lastStep === 1;
 
     if (currentAttempt.rows.length > 0 && !shouldCreateNewRow) {
       // Update existing incomplete attempt (continuing same session)
