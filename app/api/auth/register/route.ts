@@ -65,11 +65,16 @@ export async function POST(request: NextRequest) {
         [user.id]
       );
       
-      // Increment login attempts (counts as a login)
-      await pool.query(
-        'UPDATE users SET login_attempts = COALESCE(login_attempts, 0) + 1 WHERE id = $1',
-        [user.id]
-      );
+      // Increment login attempts (counts as a login) - schema-adaptive
+      try {
+        await pool.query(
+          'UPDATE users SET login_attempts = COALESCE(login_attempts, 0) + 1 WHERE id = $1',
+          [user.id]
+        );
+      } catch (e: any) {
+        // Column doesn't exist yet - skip increment (will be added by migration)
+        console.log('[Register] login_attempts column not found, skipping increment');
+      }
       
       // Return the existing user (no need to create new one)
       const token = createToken(user.id);

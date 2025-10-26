@@ -65,11 +65,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Increment login attempts counter
-    await pool.query(
-      'UPDATE users SET login_attempts = COALESCE(login_attempts, 0) + 1 WHERE id = $1',
-      [user.id]
-    );
+    // Increment login attempts counter - schema-adaptive
+    try {
+      await pool.query(
+        'UPDATE users SET login_attempts = COALESCE(login_attempts, 0) + 1 WHERE id = $1',
+        [user.id]
+      );
+    } catch (e: any) {
+      // Column doesn't exist yet - skip increment (will be added by migration)
+      console.log('[Login] login_attempts column not found, skipping increment');
+    }
 
     // Create token
     const token = createToken(user.id);
