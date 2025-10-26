@@ -12,7 +12,7 @@ export default function MigrateOnboardingSchema() {
     setMessage('Running migration...');
     
     try {
-      const token = localStorage.getItem('ci.admin.token');
+      const token = localStorage.getItem('admin_token');
       if (!token) {
         setStatus('error');
         setMessage('Not authenticated. Please login as admin first.');
