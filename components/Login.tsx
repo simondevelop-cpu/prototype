@@ -50,8 +50,7 @@ export default function Login({ onLogin }: LoginProps) {
 
       const data = await response.json();
       
-      // Store token and user data
-      localStorage.setItem('token', data.token);
+      // Store token and user data (standardized keys)
       localStorage.setItem('ci.session.token', data.token);
       localStorage.setItem('ci.session.user', JSON.stringify(data.user));
       

@@ -59,8 +59,11 @@ export default function Home() {
   const handleLogout = () => {
     setToken(null);
     setUser(null);
+    // Clear all possible token keys (current and legacy)
     localStorage.removeItem('ci.session.token');
     localStorage.removeItem('ci.session.user');
+    localStorage.removeItem('token'); // Legacy cleanup
+    localStorage.removeItem('user');  // Legacy cleanup
   };
 
   if (loading) {

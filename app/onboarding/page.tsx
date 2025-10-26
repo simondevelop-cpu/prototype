@@ -217,11 +217,11 @@ export default function OnboardingPage() {
 
   const handleBack = () => {
     if (currentStep === 0) {
-      // Clear session and go back to login page
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      // Clear ALL session data (current and legacy keys)
       localStorage.removeItem('ci.session.token');
       localStorage.removeItem('ci.session.user');
+      localStorage.removeItem('token'); // Legacy cleanup
+      localStorage.removeItem('user');  // Legacy cleanup
       window.location.href = '/';
     } else if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
