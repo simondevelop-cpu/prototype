@@ -27,6 +27,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    // Check if this is a special account (demo/test accounts bypass onboarding)
+    const userResult = await pool.query(
+      'SELECT email FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    
+    const userEmail = userResult.rows[0].email.toLowerCase();
+    const specialAccounts = ['test@gmail.com', 'test2@gmail.com', 'demo@canadianinsights.ca'];
+    const isSpecialAccount = specialAccounts.includes(userEmail);
+    
+    // Special accounts don't need onboarding
+    if (isSpecialAccount) {
+      return NextResponse.json({ 
+        hasCompleted: true,
+        lastStep: 0,
+        needsOnboarding: false
+      }, { status: 200 });
+    }
+
     // Check if user has completed onboarding
     const result = await pool.query(
       `SELECT 
