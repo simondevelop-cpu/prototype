@@ -23,10 +23,13 @@ export async function GET(request: NextRequest) {
     
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
-      if (decoded.email !== ADMIN_EMAIL) {
+      // Check if user is admin (either by role or email)
+      if (decoded.role !== 'admin' && decoded.email !== ADMIN_EMAIL) {
+        console.error('[Customer Data API] Not admin:', decoded);
         return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
       }
-    } catch {
+    } catch (error) {
+      console.error('[Customer Data API] Token verification failed:', error);
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
