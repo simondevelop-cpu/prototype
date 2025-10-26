@@ -139,9 +139,9 @@ export default function OnboardingPage() {
 
   const handleNext = async () => {
     if (validateStep()) {
-      // Save progress after each step (to track drop-offs)
+      // Update progress after each step (to track drop-offs)
       if (currentStep > 0) { // Don't save on email verification step
-        await saveProgress(currentStep);
+        await updateProgress(currentStep);
       }
       
       if (currentStep < totalSteps - 1) {
@@ -153,8 +153,8 @@ export default function OnboardingPage() {
     }
   };
 
-  // Save progress to track drop-offs
-  const saveProgress = async (completedStep: number) => {
+  // Update progress to track drop-offs (updates same row)
+  const updateProgress = async (completedStep: number) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
@@ -165,10 +165,10 @@ export default function OnboardingPage() {
         completedAt: null,  // Not fully completed yet
       };
 
-      console.log(`[Onboarding] Saving progress after step ${completedStep}`);
+      console.log(`[Onboarding] Updating progress after step ${completedStep}`);
 
-      await fetch('/api/onboarding', {
-        method: 'POST',
+      await fetch('/api/onboarding/progress', {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -176,7 +176,7 @@ export default function OnboardingPage() {
         body: JSON.stringify(progressData)
       });
     } catch (error) {
-      console.error('[Onboarding] Failed to save progress:', error);
+      console.error('[Onboarding] Failed to update progress:', error);
       // Don't block user progress if auto-save fails
     }
   };

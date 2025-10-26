@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json();
-    console.log('[Onboarding API] Saving for user:', userId, 'lastStep:', data.lastStep);
+    console.log('[Onboarding API] Completing onboarding for user:', userId);
 
     // Check if last_step column exists (schema-adaptive)
     const schemaCheck = await pool.query(`
@@ -46,9 +46,64 @@ export async function POST(request: NextRequest) {
     let result;
     
     if (hasLastStep && hasCompletedAt) {
-      // New schema with last_step and completed_at
-      result = await pool.query(
-        `INSERT INTO onboarding_responses (
+      // Check if there's an incomplete attempt to update
+      const currentAttempt = await pool.query(
+        `SELECT id FROM onboarding_responses 
+         WHERE user_id = $1 AND completed_at IS NULL 
+         ORDER BY created_at DESC 
+         LIMIT 1`,
+        [userId]
+      );
+
+      if (currentAttempt.rows.length > 0) {
+        // Update existing incomplete attempt with completion
+        const attemptId = currentAttempt.rows[0].id;
+        console.log('[Onboarding API] Completing existing attempt:', attemptId);
+        
+        result = await pool.query(
+          `UPDATE onboarding_responses SET
+            emotional_state = $1,
+            financial_context = $2,
+            motivation = $3,
+            motivation_other = $4,
+            acquisition_source = $5,
+            acquisition_other = $6,
+            insight_preferences = $7,
+            insight_other = $8,
+            first_name = $9,
+            last_name = $10,
+            date_of_birth = $11,
+            recovery_phone = $12,
+            province_region = $13,
+            last_step = $14,
+            completed_at = $15,
+            updated_at = NOW()
+          WHERE id = $16
+          RETURNING *`,
+          [
+            data.emotionalState || [],
+            data.financialContext || [],
+            data.motivation || null,
+            data.motivationOther || null,
+            data.acquisitionSource || null,
+            data.acquisitionOther || null,
+            data.insightPreferences || [],
+            data.insightOther || null,
+            data.firstName || null,
+            data.lastName || null,
+            data.dateOfBirth || null,
+            data.recoveryPhone || null,
+            data.provinceRegion || null,
+            7, // Completed all steps
+            data.completedAt || new Date().toISOString(),
+            attemptId
+          ]
+        );
+      } else {
+        // No incomplete attempt found, create new completed entry
+        console.log('[Onboarding API] Creating new completed entry');
+        result = await pool.query(
+          `INSERT INTO onboarding_responses (
           user_id,
           emotional_state,
           financial_context,
@@ -84,9 +139,10 @@ export async function POST(request: NextRequest) {
           data.recoveryPhone || null,
           data.provinceRegion || null,
           data.lastStep || 7,
-          data.completedAt || null,
+          data.completedAt || new Date().toISOString(),
         ]
-      );
+        );
+      }
     } else {
       // Old schema without last_step/completed_at
       console.log('[Onboarding API] Using old schema (no last_step/completed_at columns)');
