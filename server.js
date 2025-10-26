@@ -175,7 +175,7 @@ async function ensureSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS onboarding_responses (
       id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       
       -- Q1: Emotional calibration (multi-select, stored as array)
       emotional_state TEXT[],

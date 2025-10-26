@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     const data = await request.json();
     console.log('[Onboarding API] Saving for user:', userId);
 
-    // Insert or update onboarding responses
+    // Always INSERT new row (allow multiple attempts per user)
     const result = await pool.query(
       `INSERT INTO onboarding_responses (
         user_id,
@@ -52,23 +52,6 @@ export async function POST(request: NextRequest) {
         completed_at,
         updated_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
-      ON CONFLICT (user_id) 
-      DO UPDATE SET
-        emotional_state = EXCLUDED.emotional_state,
-        financial_context = EXCLUDED.financial_context,
-        motivation = EXCLUDED.motivation,
-        motivation_other = EXCLUDED.motivation_other,
-        acquisition_source = EXCLUDED.acquisition_source,
-        insight_preferences = EXCLUDED.insight_preferences,
-        insight_other = EXCLUDED.insight_other,
-        first_name = EXCLUDED.first_name,
-        last_name = EXCLUDED.last_name,
-        date_of_birth = EXCLUDED.date_of_birth,
-        recovery_phone = EXCLUDED.recovery_phone,
-        province_region = EXCLUDED.province_region,
-        last_step = EXCLUDED.last_step,
-        completed_at = NOW(),
-        updated_at = NOW()
       RETURNING *`,
       [
         userId,

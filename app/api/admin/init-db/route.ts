@@ -65,7 +65,7 @@ async function initializeTables() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS onboarding_responses (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL UNIQUE,
+        user_id INTEGER NOT NULL,
         
         -- Q1: Emotional calibration (multi-select, stored as array)
         emotional_state TEXT[],

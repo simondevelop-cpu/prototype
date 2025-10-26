@@ -339,9 +339,11 @@ export default function OnboardingPage() {
 
   const renderStep4 = () => (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900 mb-4">
-        How did you hear about us?
-      </h2>
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900">
+          How did you hear about us?
+        </h2>
+      </div>
 
       <div className="space-y-3">
         {[
