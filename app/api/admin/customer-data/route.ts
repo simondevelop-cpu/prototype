@@ -33,25 +33,41 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Fetch all customer data with user emails
+    // Check if last_step column exists (schema-adaptive query)
+    let hasLastStep = false;
+    try {
+      const schemaCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'onboarding_responses' AND column_name = 'last_step'
+      `);
+      hasLastStep = schemaCheck.rows.length > 0;
+    } catch (e) {
+      console.log('[Customer Data API] Could not check schema, assuming old schema');
+    }
+
+    // Fetch all customer data with user emails (schema-adaptive)
+    const selectFields = `
+      u.email,
+      o.first_name,
+      o.last_name,
+      o.date_of_birth,
+      o.recovery_phone,
+      o.province_region,
+      o.emotional_state,
+      o.financial_context,
+      o.motivation,
+      o.motivation_other,
+      o.acquisition_source,
+      o.insight_preferences,
+      o.insight_other,
+      ${hasLastStep ? 'o.last_step,' : ''}
+      o.completed_at,
+      o.created_at
+    `;
+
     const result = await pool.query(`
-      SELECT 
-        u.email,
-        o.first_name,
-        o.last_name,
-        o.date_of_birth,
-        o.recovery_phone,
-        o.province_region,
-        o.emotional_state,
-        o.financial_context,
-        o.motivation,
-        o.motivation_other,
-        o.acquisition_source,
-        o.insight_preferences,
-        o.insight_other,
-        o.last_step,
-        o.completed_at,
-        o.created_at
+      SELECT ${selectFields}
       FROM users u
       LEFT JOIN onboarding_responses o ON u.id = o.user_id
       WHERE u.email != $1
