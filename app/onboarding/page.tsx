@@ -411,6 +411,10 @@ export default function OnboardingPage() {
           </label>
         ))}
       </div>
+
+      {errors.emotionalState && (
+        <p className="text-red-500 text-sm">{errors.emotionalState}</p>
+      )}
     </div>
   );
 
@@ -447,7 +451,7 @@ export default function OnboardingPage() {
       </div>
 
       {errors.financialContext && (
-        <p className="text-red-500 text-sm">Please select only one of growing savings, dipping into savings or prefer not to answer</p>
+        <p className="text-red-500 text-sm">{errors.financialContext}</p>
       )}
     </div>
   );
@@ -495,6 +499,10 @@ export default function OnboardingPage() {
           />
         </div>
       )}
+
+      {errors.motivation && (
+        <p className="text-red-500 text-sm">{errors.motivation}</p>
+      )}
     </div>
   );
 
@@ -539,6 +547,10 @@ export default function OnboardingPage() {
             required
           />
         </div>
+      )}
+
+      {errors.acquisitionSource && (
+        <p className="text-red-500 text-sm">{errors.acquisitionSource}</p>
       )}
     </div>
   );
@@ -585,6 +597,10 @@ export default function OnboardingPage() {
             required
           />
         </div>
+      )}
+
+      {errors.insightPreferences && (
+        <p className="text-red-500 text-sm">{errors.insightPreferences}</p>
       )}
     </div>
   );

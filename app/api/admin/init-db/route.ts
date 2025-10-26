@@ -13,6 +13,30 @@ async function initializeTables() {
   try {
     console.log('[DB Init] Starting database initialization...');
     
+    // Add login_attempts column to users table if it doesn't exist
+    try {
+      const columnCheck = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' 
+        AND column_name = 'login_attempts'
+      `);
+      
+      if (columnCheck.rows.length === 0) {
+        console.log('[DB Init] Adding login_attempts column to users table...');
+        await client.query(`
+          ALTER TABLE users 
+          ADD COLUMN login_attempts INTEGER DEFAULT 0
+        `);
+        console.log('[DB Init] ✅ login_attempts column added');
+      } else {
+        console.log('[DB Init] ℹ️  login_attempts column already exists');
+      }
+    } catch (e: any) {
+      console.log('[DB Init] Note: Could not add login_attempts column:', e.message);
+      // Continue anyway - table might not exist yet
+    }
+    
     // Create admin_keywords table (NEW SCHEMA - no score/language)
     await client.query(`
       CREATE TABLE IF NOT EXISTS admin_keywords (
