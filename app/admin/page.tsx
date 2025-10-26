@@ -814,7 +814,7 @@ export default function AdminDashboard() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Insight Suggestions</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Created</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Onboarding Completed</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Onboarding Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">

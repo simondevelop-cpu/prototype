@@ -221,8 +221,8 @@ export default function OnboardingPage() {
 
       console.log('[Onboarding] Successfully saved responses');
       
-      // Redirect directly to dashboard (onboarding complete)
-      router.push('/dashboard');
+      // Redirect to home (which will show dashboard for authenticated users)
+      window.location.href = '/';
     } catch (error: any) {
       console.error('Error saving onboarding:', error);
       alert(`Failed to save your responses. ${error.message || 'Please try again.'}`);
