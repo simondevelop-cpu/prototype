@@ -825,6 +825,7 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {user.acquisition_source || <span className="text-gray-400 italic">null</span>}
+                          {user.acquisition_other && <div className="text-xs text-gray-500 mt-1">({user.acquisition_other})</div>}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
                           {user.insight_preferences && user.insight_preferences.length > 0

@@ -189,6 +189,7 @@ async function ensureSchema() {
       
       -- Q4: Acquisition source (single select)
       acquisition_source TEXT,
+      acquisition_other TEXT,
       
       -- Q6: Insight preferences (multi-select, stored as array)
       insight_preferences TEXT[],

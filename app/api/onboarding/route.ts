@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
           motivation,
           motivation_other,
           acquisition_source,
+          acquisition_other,
           insight_preferences,
           insight_other,
           first_name,
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
           last_step,
           completed_at,
           updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
         RETURNING *`,
         [
           userId,
@@ -74,6 +75,7 @@ export async function POST(request: NextRequest) {
           data.motivation || null,
           data.motivationOther || null,
           data.acquisitionSource || null,
+          data.acquisitionOther || null,
           data.insightPreferences || [],
           data.insightOther || null,
           data.firstName || null,
@@ -96,6 +98,7 @@ export async function POST(request: NextRequest) {
           motivation,
           motivation_other,
           acquisition_source,
+          acquisition_other,
           insight_preferences,
           insight_other,
           first_name,
@@ -104,7 +107,7 @@ export async function POST(request: NextRequest) {
           recovery_phone,
           province_region,
           updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
         RETURNING *`,
         [
           userId,
@@ -113,6 +116,7 @@ export async function POST(request: NextRequest) {
           data.motivation || null,
           data.motivationOther || null,
           data.acquisitionSource || null,
+          data.acquisitionOther || null,
           data.insightPreferences || [],
           data.insightOther || null,
           data.firstName || null,

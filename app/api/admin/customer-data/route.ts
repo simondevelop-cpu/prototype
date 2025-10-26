@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
       o.motivation,
       o.motivation_other,
       o.acquisition_source,
+      o.acquisition_other,
       o.insight_preferences,
       o.insight_other,
       ${hasLastStep ? 'o.last_step,' : ''}
