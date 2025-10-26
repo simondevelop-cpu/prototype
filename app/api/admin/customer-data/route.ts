@@ -68,13 +68,21 @@ export async function GET(request: NextRequest) {
       o.insight_other,
       ${hasLastStep ? 'o.last_step,' : ''}
       o.completed_at,
-      o.created_at
+      o.created_at,
+      o.updated_at
     `;
 
+    // Get only the MOST RECENT onboarding attempt per user (to avoid duplicate rows)
     const result = await pool.query(`
       SELECT ${selectFields}
       FROM users u
-      LEFT JOIN onboarding_responses o ON u.id = o.user_id
+      LEFT JOIN LATERAL (
+        SELECT *
+        FROM onboarding_responses
+        WHERE user_id = u.id
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) o ON true
       WHERE u.email != $1
       ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
     `, [ADMIN_EMAIL]);

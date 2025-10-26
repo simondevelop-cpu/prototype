@@ -1308,6 +1308,44 @@ export default function AdminDashboard() {
         {/* Next Build Steps */}
         <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-lg p-6 mt-8">
           <h2 className="text-xl font-bold text-gray-900 mb-4">🚀 Next Build Steps (Prioritized)</h2>
+          
+          {/* CRITICAL: Security P0s */}
+          <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-6">
+            <h3 className="text-base font-bold text-red-900 mb-3">🔴 CRITICAL: Security P0s (Before Production)</h3>
+            <p className="text-xs text-red-700 mb-3">
+              These security issues MUST be fixed before launching to production. Estimated time: 11 hours.
+            </p>
+            <div className="space-y-2 text-xs text-red-900">
+              <div className="flex items-start">
+                <span className="mr-2">•</span>
+                <div>
+                  <strong>Replace SHA-256 with bcrypt</strong> (2 hours) - Current password hashing is vulnerable to brute force. Database breach = instant password compromise.
+                </div>
+              </div>
+              <div className="flex items-start">
+                <span className="mr-2">•</span>
+                <div>
+                  <strong>Add rate limiting</strong> (3 hours) - No protection against brute force attacks. Install @upstash/ratelimit for login/register endpoints.
+                </div>
+              </div>
+              <div className="flex items-start">
+                <span className="mr-2">•</span>
+                <div>
+                  <strong>Implement token refresh</strong> (4 hours) - Users are kicked out after 24h. Add refresh endpoint and "Remember me" option.
+                </div>
+              </div>
+              <div className="flex items-start">
+                <span className="mr-2">•</span>
+                <div>
+                  <strong>Add CSRF protection</strong> (2 hours) - Vulnerable to cross-site request forgery. Add CSRF tokens to state-changing operations.
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-red-700 mt-3 italic">
+              📄 Full security review: See ONBOARDING_SECURITY_REVIEW.md for complete analysis and 8 additional medium-priority issues.
+            </p>
+          </div>
+
           <div className="space-y-3 text-sm">
             <div className="flex items-start">
               <span className="text-blue-600 font-bold mr-3">1.</span>

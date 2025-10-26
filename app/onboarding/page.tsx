@@ -53,7 +53,36 @@ export default function OnboardingPage() {
       setUserEmail(user.email || '');
       setFormData(prev => ({ ...prev, firstName: user.name || '' }));
     }
-  }, []);
+
+    // Check for concurrent onboarding sessions (multiple tabs)
+    const onboardingLock = localStorage.getItem('onboarding.lock');
+    if (onboardingLock) {
+      const lockTime = parseInt(onboardingLock);
+      const now = Date.now();
+      // If lock is less than 5 minutes old, warn user
+      if (now - lockTime < 5 * 60 * 1000) {
+        console.warn('[Onboarding] Concurrent session detected');
+        // Allow it but log warning - user might have closed other tab
+      }
+    }
+    // Set lock for this session
+    localStorage.setItem('onboarding.lock', Date.now().toString());
+
+    // Handle browser back button (prevent data loss)
+    const handleBrowserBack = (e: PopStateEvent) => {
+      e.preventDefault();
+      if (currentStep > 0) {
+        setCurrentStep(prev => Math.max(0, prev - 1));
+      }
+    };
+    window.addEventListener('popstate', handleBrowserBack);
+
+    // Clear lock on unmount
+    return () => {
+      localStorage.removeItem('onboarding.lock');
+      window.removeEventListener('popstate', handleBrowserBack);
+    };
+  }, [currentStep]);
 
   const handleMultiSelect = (field: 'emotionalState' | 'financialContext' | 'insightPreferences', value: string) => {
     const currentValues = formData[field];
@@ -104,21 +133,21 @@ export default function OnboardingPage() {
     if (currentStep === 1) {
       // Q1: Emotional State (multi-select, at least one required)
       if (formData.emotionalState.length === 0) {
-        newErrors.emotionalState = "Please select at least one option";
+        newErrors.emotionalState = "Please make a selection to continue";
       }
     }
 
     if (currentStep === 2) {
       // Q3: Motivation (single select, required)
       if (!formData.motivation) {
-        newErrors.motivation = "Please select an option";
+        newErrors.motivation = "Please make a selection to continue";
       }
     }
 
     if (currentStep === 3) {
       // Q4: Acquisition Source (single select, required)
       if (!formData.acquisitionSource) {
-        newErrors.acquisitionSource = "Please select an option";
+        newErrors.acquisitionSource = "Please make a selection to continue";
       }
     }
 
@@ -130,19 +159,21 @@ export default function OnboardingPage() {
         "Prefer not to answer"
       ];
       const selectedSavings = formData.financialContext.filter(opt => savingsOptions.includes(opt));
-      if (selectedSavings.length > 1) {
+      
+      // Only show savings error if 2 or more are selected (not if none)
+      if (selectedSavings.length >= 2) {
         newErrors.financialContext = "Please select only one of growing savings, dipping into savings or prefer not to answer";
       }
       // At least one option required
-      if (formData.financialContext.length === 0) {
-        newErrors.financialContext = "Please select at least one option";
+      else if (formData.financialContext.length === 0) {
+        newErrors.financialContext = "Please make a selection to continue";
       }
     }
 
     if (currentStep === 5) {
       // Q5: AI Insights (multi-select, at least one required)
       if (formData.insightPreferences.length === 0) {
-        newErrors.insightPreferences = "Please select at least one option";
+        newErrors.insightPreferences = "Please make a selection to continue";
       }
     }
 
@@ -230,13 +261,27 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (retryCount = 0) => {
+    const MAX_RETRIES = 2;
+    
     try {
       // Use the correct token key (ci.session.token, not just 'token')
       const token = localStorage.getItem('ci.session.token') || localStorage.getItem('token');
       
       if (!token) {
         throw new Error('No authentication token found. Please log in again.');
+      }
+
+      // Check if token is expired (basic check - decode JWT payload)
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const now = Math.floor(Date.now() / 1000);
+        if (payload.exp && payload.exp < now) {
+          throw new Error('Your session has expired. Please log in again.');
+        }
+      } catch (e) {
+        console.warn('[Onboarding] Could not validate token expiry:', e);
+        // Continue anyway - server will validate
       }
       
       // Add completion metadata
@@ -246,7 +291,7 @@ export default function OnboardingPage() {
         completedAt: new Date().toISOString()
       };
       
-      console.log('[Onboarding] Submitting data:', submissionData);
+      console.log('[Onboarding] Submitting data (attempt ' + (retryCount + 1) + '):', submissionData);
       
       const response = await fetch('/api/onboarding', {
         method: 'POST',
@@ -264,11 +309,21 @@ export default function OnboardingPage() {
 
       console.log('[Onboarding] Successfully saved responses');
       
+      // Clear onboarding lock
+      localStorage.removeItem('onboarding.lock');
+      
       // Redirect to home (which will show dashboard for authenticated users)
       window.location.href = '/';
     } catch (error: any) {
       console.error('Error saving onboarding:', error);
-      alert(`Failed to save your responses. ${error.message || 'Please try again.'}`);
+      
+      // Retry on network failure
+      if (retryCount < MAX_RETRIES && (error.message.includes('fetch') || error.message.includes('network'))) {
+        console.log(`[Onboarding] Retrying submission (${retryCount + 1}/${MAX_RETRIES})...`);
+        setTimeout(() => handleSubmit(retryCount + 1), 1000 * (retryCount + 1)); // Exponential backoff
+      } else {
+        alert(`Failed to save your responses. ${error.message || 'Please try again.'}\n\nYour progress has been saved. You can try submitting again.`);
+      }
     }
   };
 
