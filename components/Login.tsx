@@ -50,14 +50,33 @@ export default function Login({ onLogin }: LoginProps) {
 
       const data = await response.json();
       
-      // If registering, store token and redirect to onboarding
+      // Store token and user data
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('ci.session.token', data.token);
+      localStorage.setItem('ci.session.user', JSON.stringify(data.user));
+      
+      // If registering, always go to onboarding
       if (isRegister) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('ci.session.token', data.token);
-        localStorage.setItem('ci.session.user', JSON.stringify(data.user));
         router.push('/onboarding');
       } else {
-        // If logging in, proceed normally
+        // If logging in, check if they need to complete onboarding
+        const statusResponse = await fetch('/api/onboarding/status', {
+          headers: {
+            'Authorization': `Bearer ${data.token}`
+          }
+        });
+        
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json();
+          if (statusData.needsOnboarding) {
+            // User hasn't completed onboarding, redirect there
+            console.log('[Login] User needs onboarding, redirecting...');
+            router.push('/onboarding');
+            return;
+          }
+        }
+        
+        // User has completed onboarding, proceed to dashboard
         onLogin(data.token, data.user);
       }
     } catch (err: any) {

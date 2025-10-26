@@ -231,7 +231,7 @@ export default function OnboardingPage() {
 
   const renderStep0 = () => (
     <div className="space-y-6">
-      <div>
+      <div className="pt-4">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
           Verify your email
         </h2>
@@ -262,6 +262,10 @@ export default function OnboardingPage() {
         </div>
       </div>
 
+      <p className="text-xs text-gray-500 text-center pb-4">
+        (Don't worry Ella, will actually check authentication once I confirm reg)
+      </p>
+
       <div className="flex justify-between items-center">
         <button
           onClick={handleBack}
@@ -276,10 +280,6 @@ export default function OnboardingPage() {
           Skip
         </button>
       </div>
-
-      <p className="text-xs text-gray-500 text-center">
-        (Email verification will be fully implemented in a future update)
-      </p>
     </div>
   );
 
@@ -292,7 +292,7 @@ export default function OnboardingPage() {
         <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {[
           { text: "I feel stressed just by you mentioning it", emoji: "😰" },
           { text: "It sometimes feels overwhelming", emoji: "😵" },
@@ -327,7 +327,7 @@ export default function OnboardingPage() {
         <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {[
           "I earn a regular income",
           "I'm living paycheck to paycheck",
@@ -365,7 +365,7 @@ export default function OnboardingPage() {
         <p className="text-sm text-gray-600 mt-1">(Select the one that best describes you)</p>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {[
           "Just exploring",
           "Get organized (see where my money goes, combine accounts)",
@@ -410,7 +410,7 @@ export default function OnboardingPage() {
         </h2>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {[
           "I know one of the founders (hi 👋)",
           "Friend or family",
@@ -456,7 +456,7 @@ export default function OnboardingPage() {
         <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {[
           "Detect fraud or unwanted bank charges",
           "Flag changes in bills or recurring spend",
