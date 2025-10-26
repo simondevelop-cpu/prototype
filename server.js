@@ -134,6 +134,7 @@ async function ensureSchema() {
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       display_name TEXT NOT NULL,
+      login_attempts INTEGER DEFAULT 0,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
   `);

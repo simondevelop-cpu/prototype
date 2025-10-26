@@ -48,6 +48,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Increment login attempts counter
+    await pool.query(
+      'UPDATE users SET login_attempts = COALESCE(login_attempts, 0) + 1 WHERE id = $1',
+      [user.id]
+    );
+
     // Create token
     const token = createToken(user.id);
 

@@ -56,13 +56,26 @@ export async function POST(request: NextRequest) {
       }
       
       // User exists but never completed onboarding and has no transactions
-      // DON'T delete - just tell them to sign in instead
-      console.log('[Register] User exists with incomplete onboarding, redirecting to sign in:', email);
+      // Allow re-registration: delete old incomplete onboarding attempts and keep user
+      console.log('[Register] User exists with incomplete onboarding, allowing fresh start:', email);
       
-      return NextResponse.json(
-        { error: 'This email is already registered. Please sign in to continue your onboarding.' },
-        { status: 400 }
+      // Delete all incomplete onboarding attempts for this user
+      await pool.query(
+        'DELETE FROM onboarding_responses WHERE user_id = $1 AND completed_at IS NULL',
+        [user.id]
       );
+      
+      // Return the existing user (no need to create new one)
+      const token = createToken(user.id);
+      
+      return NextResponse.json({
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.display_name || user.email,
+        },
+      });
     }
 
     // Create user

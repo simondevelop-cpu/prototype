@@ -35,14 +35,14 @@ export async function GET(request: NextRequest) {
         u.id,
         u.email,
         u.created_at,
+        COALESCE(u.login_attempts, 0) as login_attempts,
         COUNT(DISTINCT t.id) as transaction_count,
         MAX(t.created_at) as last_activity,
-        COUNT(DISTINCT CASE WHEN o.completed_at IS NOT NULL THEN o.id END) as completed_onboarding_count,
-        COUNT(DISTINCT o.id) as login_attempts
+        COUNT(DISTINCT CASE WHEN o.completed_at IS NOT NULL THEN o.id END) as completed_onboarding_count
       FROM users u
       LEFT JOIN transactions t ON u.id = t.user_id
       LEFT JOIN onboarding_responses o ON u.id = o.user_id
-      GROUP BY u.id, u.email, u.created_at
+      GROUP BY u.id, u.email, u.created_at, u.login_attempts
       ORDER BY u.created_at DESC
     `);
 
