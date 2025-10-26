@@ -678,7 +678,7 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-gray-200">
                 {users.map((user, index) => (
                   <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">{users.length - index}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{index + 1}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
                     <td className="px-6 py-4 text-sm">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
