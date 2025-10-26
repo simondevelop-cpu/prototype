@@ -265,8 +265,8 @@ export default function OnboardingPage() {
           { text: "It sometimes feels overwhelming", emoji: "😵" },
           { text: "It's a chore I tend to put off", emoji: "💤" },
           { text: "I feel mostly in control", emoji: "😊" },
-          { text: "I'm curious to learn new ways to do better", emoji: "✨" },
-          { text: "I'd love some personalized guidance", emoji: "🙏" }
+          { text: "I'm curious to learn new ways to do better", emoji: "🤔" },
+          { text: "I'd love some personalized guidance", emoji: "✨" }
         ].map(option => (
           <label key={option.text} className="flex items-center justify-between p-4 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
             <div className="flex items-center flex-1">
