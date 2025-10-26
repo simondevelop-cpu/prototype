@@ -82,25 +82,44 @@ export async function POST(request: NextRequest) {
 
     // Remove UNIQUE constraint on user_id if it exists (CRITICAL for multiple attempts)
     try {
-      const constraintCheck = await pool.query(`
-        SELECT constraint_name 
+      // Check for ALL constraints on onboarding_responses table
+      const allConstraints = await pool.query(`
+        SELECT constraint_name, constraint_type
         FROM information_schema.table_constraints 
-        WHERE table_name = 'onboarding_responses' 
-        AND constraint_type = 'UNIQUE'
-        AND constraint_name LIKE '%user_id%'
+        WHERE table_name = 'onboarding_responses'
+        ORDER BY constraint_name
+      `);
+      
+      console.log('[Onboarding Schema Migration] All constraints found:', allConstraints.rows);
+
+      // Look for UNIQUE constraint specifically on user_id column
+      const userIdConstraint = await pool.query(`
+        SELECT tc.constraint_name 
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu 
+          ON tc.constraint_name = kcu.constraint_name
+        WHERE tc.table_name = 'onboarding_responses' 
+        AND tc.constraint_type = 'UNIQUE'
+        AND kcu.column_name = 'user_id'
       `);
 
-      if (constraintCheck.rows.length > 0) {
-        const constraintName = constraintCheck.rows[0].constraint_name;
+      if (userIdConstraint.rows.length > 0) {
+        const constraintName = userIdConstraint.rows[0].constraint_name;
+        console.log('[Onboarding Schema Migration] Found UNIQUE constraint on user_id:', constraintName);
+        
         await pool.query(`
           ALTER TABLE onboarding_responses 
-          DROP CONSTRAINT ${constraintName}
+          DROP CONSTRAINT IF EXISTS "${constraintName}"
         `);
+        
         migrations.push(`Removed UNIQUE constraint on user_id (${constraintName})`);
         console.log('[Onboarding Schema Migration] ✅ Removed UNIQUE constraint:', constraintName);
+      } else {
+        console.log('[Onboarding Schema Migration] No UNIQUE constraint found on user_id column');
       }
     } catch (error: any) {
-      console.log('[Onboarding Schema Migration] Note: Could not check/remove UNIQUE constraint:', error.message);
+      console.error('[Onboarding Schema Migration] Error checking/removing UNIQUE constraint:', error);
+      migrations.push(`Warning: Could not remove UNIQUE constraint - ${error.message}`);
     }
 
     if (migrations.length === 0) {
