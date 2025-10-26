@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    // Fetch all users with transaction count and onboarding completion
+    // Fetch all users with transaction count, onboarding completion, and login attempts
     const result = await pool.query(`
       SELECT 
         u.id,
@@ -37,7 +37,8 @@ export async function GET(request: NextRequest) {
         u.created_at,
         COUNT(DISTINCT t.id) as transaction_count,
         MAX(t.created_at) as last_activity,
-        COUNT(DISTINCT CASE WHEN o.completed_at IS NOT NULL THEN o.id END) as completed_onboarding_count
+        COUNT(DISTINCT CASE WHEN o.completed_at IS NOT NULL THEN o.id END) as completed_onboarding_count,
+        COUNT(DISTINCT o.id) as login_attempts
       FROM users u
       LEFT JOIN transactions t ON u.id = t.user_id
       LEFT JOIN onboarding_responses o ON u.id = o.user_id
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
     const users = result.rows.map(row => {
       const transactionCount = parseInt(row.transaction_count) || 0;
       const completedOnboarding = parseInt(row.completed_onboarding_count) || 0;
+      const loginAttempts = parseInt(row.login_attempts) || 0;
       
       return {
         id: row.id,
@@ -55,6 +57,7 @@ export async function GET(request: NextRequest) {
         created_at: row.created_at,
         transaction_count: transactionCount,
         last_activity: row.last_activity,
+        login_attempts: loginAttempts,
         status: (transactionCount > 0 || completedOnboarding > 0) ? 'Active Account' : 'Failed to log in',
         email_validated: false, // No email validation yet
       };

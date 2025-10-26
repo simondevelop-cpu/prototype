@@ -655,7 +655,7 @@ export default function AdminDashboard() {
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Registered Accounts</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Unique Users</h2>
           <p className="text-gray-600 mt-1">View all user registrations and account status</p>
         </div>
 
@@ -670,6 +670,7 @@ export default function AdminDashboard() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email Address</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Login Attempts</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Validated Email</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registered</th>
@@ -680,6 +681,7 @@ export default function AdminDashboard() {
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-900">{users.length - index}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{user.login_attempts || 0}</td>
                     <td className="px-6 py-4 text-sm">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         user.status === 'Active Account' 
@@ -771,9 +773,21 @@ export default function AdminDashboard() {
         
         {analyticsSubTab === 'customer-data' && (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Customer Data</h2>
-              <p className="text-gray-600 mt-1">All user onboarding responses and profile information</p>
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Customer Data</h2>
+                <p className="text-gray-600 mt-1">All user onboarding responses and profile information</p>
+              </div>
+              <button
+                onClick={fetchCustomerData}
+                disabled={customerDataLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                <svg className={`w-4 h-4 ${customerDataLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh Data
+              </button>
             </div>
 
             {customerDataLoading ? (
@@ -787,14 +801,18 @@ export default function AdminDashboard() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Name</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Province</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emotional State</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Financial Context</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Motivation</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acquisition</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Insights Wanted</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Completed</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Insight Suggestions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Created</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Onboarding Completed</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
@@ -802,9 +820,10 @@ export default function AdminDashboard() {
                       <tr key={user.email} className="hover:bg-gray-50">
                         <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">
-                          {user.first_name && user.last_name 
-                            ? `${user.first_name} ${user.last_name}` 
-                            : <span className="text-gray-400 italic">null</span>}
+                          {user.first_name || <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.last_name || <span className="text-gray-400 italic">null</span>}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {user.province_region || <span className="text-gray-400 italic">null</span>}
@@ -831,11 +850,23 @@ export default function AdminDashboard() {
                           {user.insight_preferences && user.insight_preferences.length > 0
                             ? <div className="text-xs">{user.insight_preferences.join(', ')}</div>
                             : <span className="text-gray-400 italic">null</span>}
-                          {user.insight_other && <div className="text-xs text-gray-500 mt-1">({user.insight_other})</div>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                          {user.insight_other || <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.created_at 
+                            ? new Date(user.created_at).toLocaleString()
+                            : <span className="text-gray-400 italic">null</span>}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {user.completed_at 
-                            ? new Date(user.completed_at).toLocaleDateString()
+                            ? new Date(user.completed_at).toLocaleString()
+                            : <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.completed_at 
+                            ? <span className="text-green-600 font-medium">Completed</span>
                             : user.last_step 
                             ? <span className="text-orange-600 font-medium">Dropped after Step {user.last_step}</span>
                             : <span className="text-gray-400 italic">Not started</span>}
