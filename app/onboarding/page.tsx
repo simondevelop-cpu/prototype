@@ -232,7 +232,7 @@ export default function OnboardingPage() {
   const renderStep0 = () => (
     <div className="space-y-6">
       <div className="pt-4">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-10">
           Verify your email
         </h2>
         <p className="text-gray-600 text-center">
@@ -269,7 +269,7 @@ export default function OnboardingPage() {
           onClick={handleBack}
           className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
         >
-          Back
+          Change email or restart
         </button>
         <button
           onClick={handleNext}
