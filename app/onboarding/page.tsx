@@ -232,16 +232,16 @@ export default function OnboardingPage() {
   const renderStep0 = () => (
     <div className="space-y-6">
       <div className="pt-4">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">
           Verify your email
         </h2>
-        <p className="text-gray-600">
-          We sent a verification code to <span className="font-semibold">{userEmail}</span>
+        <p className="text-gray-600 text-center">
+          We sent a verification code to <span className="font-semibold">{userEmail}</span> - please enter it here
         </p>
       </div>
 
       {/* Extra whitespace before verification code input */}
-      <div className="mt-12">
+      <div className="mt-10">
         <div className="flex gap-2 justify-center">
           {verificationCode.map((digit, index) => (
             <input
