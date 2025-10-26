@@ -183,8 +183,12 @@ export default function OnboardingPage() {
 
   const handleBack = () => {
     if (currentStep === 0) {
-      // Go back to login/email entry page
-      router.push('/');
+      // Clear session and go back to login page
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('ci.session.token');
+      localStorage.removeItem('ci.session.user');
+      window.location.href = '/';
     } else if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
       setErrors({});
