@@ -240,8 +240,8 @@ export default function OnboardingPage() {
         </p>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
+      <div className="mt-8">
+        <label className="block text-sm font-medium text-gray-700 mb-4">
           Enter verification code
         </label>
         <div className="flex gap-2 justify-center">
@@ -292,7 +292,7 @@ export default function OnboardingPage() {
         <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1">
         {[
           { text: "I feel stressed just by you mentioning it", emoji: "😰" },
           { text: "It sometimes feels overwhelming", emoji: "😵" },
@@ -327,7 +327,7 @@ export default function OnboardingPage() {
         <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1">
         {[
           "I earn a regular income",
           "I'm living paycheck to paycheck",
@@ -365,7 +365,7 @@ export default function OnboardingPage() {
         <p className="text-sm text-gray-600 mt-1">(Select the one that best describes you)</p>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1">
         {[
           "Just exploring",
           "Get organized (see where my money goes, combine accounts)",
@@ -410,7 +410,7 @@ export default function OnboardingPage() {
         </h2>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1">
         {[
           "I know one of the founders (hi 👋)",
           "Friend or family",
@@ -456,7 +456,7 @@ export default function OnboardingPage() {
         <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1">
         {[
           "Detect fraud or unwanted bank charges",
           "Flag changes in bills or recurring spend",

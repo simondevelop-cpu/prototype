@@ -56,12 +56,13 @@ export async function POST(request: NextRequest) {
       }
       
       // User exists but never completed onboarding and has no transactions
-      // Allow them to sign in (they'll be redirected to continue onboarding)
-      console.log('[Register] User exists but incomplete onboarding, redirecting to sign in:', email);
-      return NextResponse.json(
-        { error: 'This email is already registered. Please sign in to continue your setup.' },
-        { status: 400 }
-      );
+      // Delete the incomplete account and allow them to re-register
+      console.log('[Register] User exists but incomplete onboarding, allowing re-registration:', email);
+      
+      // Delete the incomplete user account
+      await pool.query('DELETE FROM users WHERE id = $1', [user.id]);
+      
+      // Now proceed with creating new account (fall through to CREATE USER below)
     }
 
     // Create user
