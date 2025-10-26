@@ -53,7 +53,7 @@ export async function PUT(request: NextRequest) {
 
     // Find the current incomplete attempt for this user
     const currentAttempt = await pool.query(
-      `SELECT id FROM onboarding_responses 
+      `SELECT id, created_at, last_step FROM onboarding_responses 
        WHERE user_id = $1 AND completed_at IS NULL 
        ORDER BY created_at DESC 
        LIMIT 1`,
@@ -62,10 +62,17 @@ export async function PUT(request: NextRequest) {
 
     let result;
 
-    if (currentAttempt.rows.length > 0) {
-      // Update existing incomplete attempt
+    // LOGIC: Create a NEW row if:
+    // 1. No incomplete attempt exists (first time ever)
+    // 2. OR this is step 1 AND the last incomplete attempt was also at step 1 or 0 (indicates a fresh login/retry)
+    const shouldCreateNewRow = 
+      currentAttempt.rows.length === 0 || 
+      (data.lastStep === 1 && (currentAttempt.rows[0].last_step === 0 || currentAttempt.rows[0].last_step === 1));
+
+    if (currentAttempt.rows.length > 0 && !shouldCreateNewRow) {
+      // Update existing incomplete attempt (continuing same session)
       const attemptId = currentAttempt.rows[0].id;
-      console.log('[Onboarding Progress API] Updating existing attempt:', attemptId);
+      console.log('[Onboarding Progress API] Updating existing attempt:', attemptId, 'from step', currentAttempt.rows[0].last_step, 'to step', data.lastStep);
       
       result = await pool.query(
         `UPDATE onboarding_responses SET
@@ -105,8 +112,8 @@ export async function PUT(request: NextRequest) {
         ]
       );
     } else {
-      // Create new attempt (first time user starts onboarding)
-      console.log('[Onboarding Progress API] Creating new attempt');
+      // Create new attempt (first time OR fresh retry after incomplete)
+      console.log('[Onboarding Progress API] Creating NEW attempt for user', userId, 'at step', data.lastStep);
       
       result = await pool.query(
         `INSERT INTO onboarding_responses (
