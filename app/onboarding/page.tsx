@@ -137,14 +137,47 @@ export default function OnboardingPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (validateStep()) {
+      // Save progress after each step (to track drop-offs)
+      if (currentStep > 0) { // Don't save on email verification step
+        await saveProgress(currentStep);
+      }
+      
       if (currentStep < totalSteps - 1) {
         setCurrentStep(currentStep + 1);
         window.scrollTo(0, 0);
       } else {
         handleSubmit();
       }
+    }
+  };
+
+  // Save progress to track drop-offs
+  const saveProgress = async (completedStep: number) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const progressData = {
+        ...formData,
+        lastStep: completedStep, // Track which step they just completed
+        completedAt: null,  // Not fully completed yet
+      };
+
+      console.log(`[Onboarding] Saving progress after step ${completedStep}`);
+
+      await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(progressData)
+      });
+    } catch (error) {
+      console.error('[Onboarding] Failed to save progress:', error);
+      // Don't block user progress if auto-save fails
     }
   };
 

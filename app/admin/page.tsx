@@ -837,7 +837,7 @@ export default function AdminDashboard() {
                           {user.completed_at 
                             ? new Date(user.completed_at).toLocaleDateString()
                             : user.last_step 
-                            ? <span className="text-orange-600 font-medium">Dropped at Step {user.last_step}</span>
+                            ? <span className="text-orange-600 font-medium">Dropped after Step {user.last_step}</span>
                             : <span className="text-gray-400 italic">Not started</span>}
                         </td>
                       </tr>
