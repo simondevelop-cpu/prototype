@@ -240,10 +240,8 @@ export default function OnboardingPage() {
         </p>
       </div>
 
-      <div className="mt-8">
-        <label className="block text-sm font-medium text-gray-700 mb-4">
-          Enter verification code
-        </label>
+      {/* Extra whitespace before verification code input */}
+      <div className="mt-12">
         <div className="flex gap-2 justify-center">
           {verificationCode.map((digit, index) => (
             <input
@@ -292,7 +290,7 @@ export default function OnboardingPage() {
         <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-0">
         {[
           { text: "I feel stressed just by you mentioning it", emoji: "😰" },
           { text: "It sometimes feels overwhelming", emoji: "😵" },
@@ -301,7 +299,7 @@ export default function OnboardingPage() {
           { text: "I'm curious to learn new ways to do better", emoji: "🤔" },
           { text: "I'd love some personalized guidance", emoji: "✨" }
         ].map(option => (
-          <label key={option.text} className="flex items-center justify-between p-4 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
+          <label key={option.text} className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
             <div className="flex items-center flex-1">
               <input
                 type="checkbox"
@@ -327,7 +325,7 @@ export default function OnboardingPage() {
         <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-0">
         {[
           "I earn a regular income",
           "I'm living paycheck to paycheck",
@@ -338,7 +336,7 @@ export default function OnboardingPage() {
           "I manage multiple accounts (e.g. work vs. personal, family members)",
           "Prefer not to answer"
         ].map(option => (
-          <label key={option} className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
+          <label key={option} className="flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
             <input
               type="checkbox"
               checked={formData.financialContext.includes(option)}
@@ -365,7 +363,7 @@ export default function OnboardingPage() {
         <p className="text-sm text-gray-600 mt-1">(Select the one that best describes you)</p>
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-0">
         {[
           "Just exploring",
           "Get organized (see where my money goes, combine accounts)",
@@ -374,7 +372,7 @@ export default function OnboardingPage() {
           "Discover smarter, AI-powered insights",
           "Something else"
         ].map(option => (
-          <label key={option} className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
+          <label key={option} className="flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
             <input
               type="radio"
               name="motivation"
@@ -410,7 +408,7 @@ export default function OnboardingPage() {
         </h2>
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-0">
         {[
           "I know one of the founders (hi 👋)",
           "Friend or family",
@@ -419,7 +417,7 @@ export default function OnboardingPage() {
           "AI tools (ChatGPT, Grok, Copilot…)",
           "Other"
         ].map(option => (
-          <label key={option} className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
+          <label key={option} className="flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
             <input
               type="radio"
               name="acquisitionSource"
@@ -456,7 +454,7 @@ export default function OnboardingPage() {
         <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-0">
         {[
           "Detect fraud or unwanted bank charges",
           "Flag changes in bills or recurring spend",
@@ -466,7 +464,7 @@ export default function OnboardingPage() {
           "Discover where I could rebalance my spending",
           "I have a great idea that you didn't mention"
         ].map(option => (
-          <label key={option} className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
+          <label key={option} className="flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
             <input
               type="checkbox"
               checked={formData.insightPreferences.includes(option)}
