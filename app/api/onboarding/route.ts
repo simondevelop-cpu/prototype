@@ -32,45 +32,97 @@ export async function POST(request: NextRequest) {
     const data = await request.json();
     console.log('[Onboarding API] Saving for user:', userId, 'lastStep:', data.lastStep);
 
-    // Always INSERT new row (allow multiple attempts per user)
-    const result = await pool.query(
-      `INSERT INTO onboarding_responses (
-        user_id,
-        emotional_state,
-        financial_context,
-        motivation,
-        motivation_other,
-        acquisition_source,
-        insight_preferences,
-        insight_other,
-        first_name,
-        last_name,
-        date_of_birth,
-        recovery_phone,
-        province_region,
-        last_step,
-        completed_at,
-        updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
-      RETURNING *`,
-      [
-        userId,
-        data.emotionalState || [],
-        data.financialContext || [],
-        data.motivation || null,
-        data.motivationOther || null,
-        data.acquisitionSource || null,
-        data.insightPreferences || [],
-        data.insightOther || null,
-        data.firstName || null,
-        data.lastName || null,
-        data.dateOfBirth || null,
-        data.recoveryPhone || null,
-        data.provinceRegion || null,
-        data.lastStep || 7, // Default to 7 if not provided
-        data.completedAt || null, // Only set if completed
-      ]
-    );
+    // Check if last_step column exists (schema-adaptive)
+    const schemaCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'onboarding_responses' 
+      AND column_name IN ('last_step', 'completed_at')
+    `);
+    
+    const hasLastStep = schemaCheck.rows.some(row => row.column_name === 'last_step');
+    const hasCompletedAt = schemaCheck.rows.some(row => row.column_name === 'completed_at');
+
+    let result;
+    
+    if (hasLastStep && hasCompletedAt) {
+      // New schema with last_step and completed_at
+      result = await pool.query(
+        `INSERT INTO onboarding_responses (
+          user_id,
+          emotional_state,
+          financial_context,
+          motivation,
+          motivation_other,
+          acquisition_source,
+          insight_preferences,
+          insight_other,
+          first_name,
+          last_name,
+          date_of_birth,
+          recovery_phone,
+          province_region,
+          last_step,
+          completed_at,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
+        RETURNING *`,
+        [
+          userId,
+          data.emotionalState || [],
+          data.financialContext || [],
+          data.motivation || null,
+          data.motivationOther || null,
+          data.acquisitionSource || null,
+          data.insightPreferences || [],
+          data.insightOther || null,
+          data.firstName || null,
+          data.lastName || null,
+          data.dateOfBirth || null,
+          data.recoveryPhone || null,
+          data.provinceRegion || null,
+          data.lastStep || 7,
+          data.completedAt || null,
+        ]
+      );
+    } else {
+      // Old schema without last_step/completed_at
+      console.log('[Onboarding API] Using old schema (no last_step/completed_at columns)');
+      result = await pool.query(
+        `INSERT INTO onboarding_responses (
+          user_id,
+          emotional_state,
+          financial_context,
+          motivation,
+          motivation_other,
+          acquisition_source,
+          insight_preferences,
+          insight_other,
+          first_name,
+          last_name,
+          date_of_birth,
+          recovery_phone,
+          province_region,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+        RETURNING *`,
+        [
+          userId,
+          data.emotionalState || [],
+          data.financialContext || [],
+          data.motivation || null,
+          data.motivationOther || null,
+          data.acquisitionSource || null,
+          data.insightPreferences || [],
+          data.insightOther || null,
+          data.firstName || null,
+          data.lastName || null,
+          data.dateOfBirth || null,
+          data.recoveryPhone || null,
+          data.provinceRegion || null,
+        ]
+      );
+    }
 
     return NextResponse.json({ 
       success: true, 

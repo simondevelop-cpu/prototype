@@ -149,7 +149,10 @@ export default function OnboardingPage() {
   };
 
   const handleBack = () => {
-    if (currentStep > 0) {
+    if (currentStep === 0) {
+      // Go back to login/email entry page
+      router.push('/');
+    } else if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
       setErrors({});
       window.scrollTo(0, 0);
@@ -226,7 +229,13 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center">
+        <button
+          onClick={handleBack}
+          className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          Back
+        </button>
         <button
           onClick={handleNext}
           className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium"
@@ -245,28 +254,31 @@ export default function OnboardingPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-gray-900">
-          How do you feel about managing your money right now?
+          How does managing money make you feel?
         </h2>
         <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
       </div>
 
       <div className="space-y-3">
         {[
-          "😰 I feel stressed about it",
-          "😵 It sometimes feels overwhelming",
-          "😮‍💨 It's a chore I tend to put off",
-          "😊 I feel mostly in control",
-          "🤔 I'm curious to learn new ways to do better",
-          "🙏 I'd love some personalized guidance"
+          { text: "I feel stressed just by you mentioning it", emoji: "😰" },
+          { text: "It sometimes feels overwhelming", emoji: "😵" },
+          { text: "It's a chore I tend to put off", emoji: "💤" },
+          { text: "I feel mostly in control", emoji: "😊" },
+          { text: "I'm curious to learn new ways to do better", emoji: "✨" },
+          { text: "I'd love some personalized guidance", emoji: "🙏" }
         ].map(option => (
-          <label key={option} className="flex items-start p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer transition-colors">
-            <input
-              type="checkbox"
-              checked={formData.emotionalState.includes(option)}
-              onChange={() => handleMultiSelect('emotionalState', option)}
-              className="mt-1 mr-3 h-5 w-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <span className="text-gray-700">{option}</span>
+          <label key={option.text} className="flex items-center justify-between p-4 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
+            <div className="flex items-center flex-1">
+              <input
+                type="checkbox"
+                checked={formData.emotionalState.includes(`${option.text} ${option.emoji}`)}
+                onChange={() => handleMultiSelect('emotionalState', `${option.text} ${option.emoji}`)}
+                className="mr-3 h-5 w-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-gray-700">{option.text}</span>
+            </div>
+            <span className="text-2xl ml-3">{option.emoji}</span>
           </label>
         ))}
       </div>
@@ -293,12 +305,12 @@ export default function OnboardingPage() {
           "I manage multiple accounts (e.g. work vs. personal, family members)",
           "Prefer not to answer"
         ].map(option => (
-          <label key={option} className="flex items-start p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer transition-colors">
+          <label key={option} className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
             <input
               type="checkbox"
               checked={formData.financialContext.includes(option)}
               onChange={() => handleMultiSelect('financialContext', option)}
-              className="mt-1 mr-3 h-5 w-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              className="mr-3 h-5 w-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
             />
             <span className="text-gray-700">{option}</span>
           </label>
@@ -329,13 +341,13 @@ export default function OnboardingPage() {
           "Discover smarter, AI-powered insights",
           "Something else"
         ].map(option => (
-          <label key={option} className="flex items-start p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer transition-colors">
+          <label key={option} className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
             <input
               type="radio"
               name="motivation"
               checked={formData.motivation === option}
               onChange={() => setFormData({ ...formData, motivation: option, motivationOther: '' })}
-              className="mt-1 mr-3 h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500"
+              className="mr-3 h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500"
             />
             <span className="text-gray-700">{option}</span>
           </label>
@@ -374,13 +386,13 @@ export default function OnboardingPage() {
           "AI tools (ChatGPT, Grok, Copilot…)",
           "Other"
         ].map(option => (
-          <label key={option} className="flex items-start p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer transition-colors">
+          <label key={option} className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
             <input
               type="radio"
               name="acquisitionSource"
               checked={formData.acquisitionSource === option}
               onChange={() => setFormData({ ...formData, acquisitionSource: option, acquisitionOther: '' })}
-              className="mt-1 mr-3 h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500"
+              className="mr-3 h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500"
             />
             <span className="text-gray-700">{option}</span>
           </label>
@@ -421,12 +433,12 @@ export default function OnboardingPage() {
           "Discover where I could rebalance my spending",
           "I have a great idea that you didn't mention"
         ].map(option => (
-          <label key={option} className="flex items-start p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer transition-colors">
+          <label key={option} className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
             <input
               type="checkbox"
               checked={formData.insightPreferences.includes(option)}
               onChange={() => handleMultiSelect('insightPreferences', option)}
-              className="mt-1 mr-3 h-5 w-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              className="mr-3 h-5 w-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
             />
             <span className="text-gray-700">{option}</span>
           </label>
