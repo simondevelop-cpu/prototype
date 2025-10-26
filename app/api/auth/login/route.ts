@@ -48,21 +48,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user has completed onboarding
-    const onboardingCheck = await pool.query(
-      `SELECT COUNT(*) as completed_count 
-       FROM onboarding_responses 
-       WHERE user_id = $1 AND completed_at IS NOT NULL`,
-      [user.id]
-    );
+    // Check if user has completed onboarding (except for special accounts)
+    const specialAccounts = ['test@gmail.com', 'test2@gmail.com', 'demo@canadianinsights.ca'];
+    const isSpecialAccount = specialAccounts.includes(email.toLowerCase());
     
-    const hasCompletedOnboarding = parseInt(onboardingCheck.rows[0]?.completed_count || '0') > 0;
-    
-    if (!hasCompletedOnboarding) {
-      return NextResponse.json(
-        { error: 'Please complete your account setup first. Click "Create Account" to continue.' },
-        { status: 403 }
+    if (!isSpecialAccount) {
+      const onboardingCheck = await pool.query(
+        `SELECT COUNT(*) as completed_count 
+         FROM onboarding_responses 
+         WHERE user_id = $1 AND completed_at IS NOT NULL`,
+        [user.id]
       );
+      
+      const hasCompletedOnboarding = parseInt(onboardingCheck.rows[0]?.completed_count || '0') > 0;
+      
+      if (!hasCompletedOnboarding) {
+        return NextResponse.json(
+          { error: 'Please complete your account setup first. Click "Create Account" to continue.' },
+          { status: 403 }
+        );
+      }
     }
 
     // Increment login attempts counter - schema-adaptive

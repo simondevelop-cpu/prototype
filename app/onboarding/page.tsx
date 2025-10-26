@@ -160,8 +160,12 @@ export default function OnboardingPage() {
       ];
       const selectedSavings = formData.financialContext.filter(opt => savingsOptions.includes(opt));
       
-      // Only show savings error if 2 or more are selected (not if none)
-      if (selectedSavings.length >= 2) {
+      // Check if "Prefer not to answer" is selected with other options
+      if (formData.financialContext.includes("Prefer not to answer") && formData.financialContext.length > 1) {
+        newErrors.financialContext = "Did you mean to select 'Prefer not to answer'? Please unselect other options.";
+      }
+      // Only show savings error if 2 or more savings options are selected (not if none)
+      else if (selectedSavings.length >= 2) {
         newErrors.financialContext = "Please select only one of growing savings, dipping into savings or prefer not to answer";
       }
       // At least one option required
