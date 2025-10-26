@@ -134,6 +134,7 @@ async function ensureSchema() {
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       display_name TEXT NOT NULL,
+      login_attempts INTEGER DEFAULT 0,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
   `);
@@ -168,6 +169,45 @@ async function ensureSchema() {
       frequency INTEGER DEFAULT 1,
       last_used TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Onboarding responses table for customer data
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS onboarding_responses (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      
+      -- Q1: Emotional calibration (multi-select, stored as array)
+      emotional_state TEXT[],
+      
+      -- Q2: Financial context (multi-select, stored as array)
+      financial_context TEXT[],
+      
+      -- Q3: Motivation/segmentation (single select)
+      motivation TEXT,
+      motivation_other TEXT,
+      
+      -- Q4: Acquisition source (single select)
+      acquisition_source TEXT,
+      acquisition_other TEXT,
+      
+      -- Q6: Insight preferences (multi-select, stored as array)
+      insight_preferences TEXT[],
+      insight_other TEXT,
+      
+      -- Q9: Account profile
+      first_name TEXT,
+      last_name TEXT,
+      date_of_birth DATE,
+      recovery_phone TEXT,
+      province_region TEXT,
+      
+      -- Metadata
+      last_step INTEGER DEFAULT 0,
+      completed_at TIMESTAMP WITH TIME ZONE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
   `);
 

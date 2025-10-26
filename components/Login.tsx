@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface LoginProps {
   onLogin: (token: string, user: any) => void;
 }
 
 export default function Login({ onLogin }: LoginProps) {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -33,11 +35,49 @@ export default function Login({ onLogin }: LoginProps) {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Authentication failed');
+        const errorMessage = data.error || 'Authentication failed';
+        
+        // If trying to register with existing email, switch to Sign In mode
+        if (isRegister && errorMessage.toLowerCase().includes('already registered')) {
+          setIsRegister(false);
+          setError('This account already exists. Please sign in below to continue.');
+          setLoading(false);
+          return;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
-      onLogin(data.token, data.user);
+      
+      // Store token and user data (standardized keys)
+      localStorage.setItem('ci.session.token', data.token);
+      localStorage.setItem('ci.session.user', JSON.stringify(data.user));
+      
+      // If registering, always go to onboarding
+      if (isRegister) {
+        router.push('/onboarding');
+      } else {
+        // If logging in, check if they need to complete onboarding
+        const statusResponse = await fetch('/api/onboarding/status', {
+          headers: {
+            'Authorization': `Bearer ${data.token}`
+          }
+        });
+        
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json();
+          if (statusData.needsOnboarding) {
+            // User hasn't completed onboarding, redirect there
+            console.log('[Login] User needs onboarding, redirecting...');
+            router.push('/onboarding');
+            return;
+          }
+        }
+        
+        // User has completed onboarding, proceed to dashboard
+        onLogin(data.token, data.user);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -101,7 +141,7 @@ export default function Login({ onLogin }: LoginProps) {
             {isRegister && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Name
+                  First Name
                 </label>
                 <input
                   type="text"
@@ -109,6 +149,7 @@ export default function Login({ onLogin }: LoginProps) {
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required={isRegister}
+                  placeholder="John"
                 />
               </div>
             )}

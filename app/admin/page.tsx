@@ -41,6 +41,7 @@ export default function AdminDashboard() {
   const [checking, setChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<TabName>('inbox');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'dashboard' | 'customer-data' | 'macro-data' | 'app-health'>('dashboard');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
   const [stats, setStats] = useState<any>(null);
@@ -63,6 +64,27 @@ export default function AdminDashboard() {
   const [recategorizations, setRecategorizations] = useState<any[]>([]);
   const [recatLoading, setRecatLoading] = useState(false);
   const [reviewed, setReviewed] = useState<{[key: number]: boolean}>({});
+  
+  // State for Customer Data tab
+  const [customerData, setCustomerData] = useState<any[]>([]);
+  const [customerDataLoading, setCustomerDataLoading] = useState(false);
+
+  // Fetch customer data function (used by Refresh button and initial load)
+  const fetchCustomerData = async () => {
+    setCustomerDataLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch('/api/admin/customer-data', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setCustomerData(data.customerData || []);
+    } catch (error) {
+      console.error('Error fetching customer data:', error);
+    } finally {
+      setCustomerDataLoading(false);
+    }
+  };
 
   // Check authentication on mount
   useEffect(() => {
@@ -145,6 +167,13 @@ export default function AdminDashboard() {
       fetchRecategorizations();
     }
   }, [activeTab, viewType, authenticated]);
+
+  // Fetch customer data when Analytics → Customer Data tab is active
+  useEffect(() => {
+    if (activeTab === 'analytics' && analyticsSubTab === 'customer-data' && authenticated) {
+      fetchCustomerData();
+    }
+  }, [activeTab, analyticsSubTab, authenticated]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -628,7 +657,7 @@ export default function AdminDashboard() {
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Registered Accounts</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Unique Users</h2>
           <p className="text-gray-600 mt-1">View all user registrations and account status</p>
         </div>
 
@@ -643,6 +672,7 @@ export default function AdminDashboard() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email Address</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Login Attempts</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Validated Email</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registered</th>
@@ -651,8 +681,9 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-gray-200">
                 {users.map((user, index) => (
                   <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">{index + 1}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{users.length - index}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{user.login_attempts || 0}</td>
                     <td className="px-6 py-4 text-sm">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         user.status === 'Active Account' 
@@ -673,6 +704,193 @@ export default function AdminDashboard() {
             {users.length === 0 && (
               <div className="text-center py-12 text-gray-500">
                 No users registered yet
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render Analytics Tab
+  const renderAnalyticsTab = () => {
+    const renderPlaceholder = (title: string) => (
+      <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
+        <div className="text-6xl mb-4">🚧</div>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
+        <p className="text-gray-600">Coming soon...</p>
+      </div>
+    );
+
+    return (
+      <div className="space-y-6">
+        {/* Sub-tabs */}
+        <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
+          <button
+            onClick={() => setAnalyticsSubTab('dashboard')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'dashboard'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            📊 Dashboard
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('customer-data')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'customer-data'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            👥 Customer Data
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('macro-data')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'macro-data'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            📈 Macro Data
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('app-health')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'app-health'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            💚 App Health
+          </button>
+        </div>
+
+        {/* Content */}
+        {analyticsSubTab === 'dashboard' && renderPlaceholder('Analytics Dashboard')}
+        {analyticsSubTab === 'macro-data' && renderPlaceholder('Macro Data')}
+        {analyticsSubTab === 'app-health' && renderPlaceholder('App Health')}
+        
+        {analyticsSubTab === 'customer-data' && (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Customer Data</h2>
+                <p className="text-gray-600 mt-1">All user onboarding responses and profile information</p>
+              </div>
+              <button
+                onClick={fetchCustomerData}
+                disabled={customerDataLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                <svg className={`w-4 h-4 ${customerDataLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh Data
+              </button>
+            </div>
+
+            {customerDataLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-600 mt-4">Loading customer data...</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Province</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emotional State</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Financial Context</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Motivation</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acquisition</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Insights Wanted</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Insight Suggestions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Created</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Onboarding Completed</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Onboarding Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {customerData.map((user) => (
+                      <tr key={user.email} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.first_name || <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.last_name || <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.province_region || <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                          {user.emotional_state && user.emotional_state.length > 0
+                            ? <div className="text-xs">{user.emotional_state.join(', ')}</div>
+                            : <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                          {user.financial_context && user.financial_context.length > 0
+                            ? <div className="text-xs">{user.financial_context.join(', ')}</div>
+                            : <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                          {user.motivation || <span className="text-gray-400 italic">null</span>}
+                          {user.motivation_other && <div className="text-xs text-gray-500 mt-1">({user.motivation_other})</div>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.acquisition_source || <span className="text-gray-400 italic">null</span>}
+                          {user.acquisition_other && <div className="text-xs text-gray-500 mt-1">({user.acquisition_other})</div>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                          {user.insight_preferences && user.insight_preferences.length > 0
+                            ? <div className="text-xs">{user.insight_preferences.join(', ')}</div>
+                            : <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                          {user.insight_other || <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.created_at 
+                            ? new Date(user.created_at).toLocaleString()
+                            : <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.completed_at 
+                            ? new Date(user.completed_at).toLocaleString()
+                            : <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.completed_at 
+                            ? <span className="text-green-600 font-medium">Completed</span>
+                            : user.last_step 
+                            ? (
+                              <div>
+                                <span className="text-orange-600 font-medium">Dropped after Step {user.last_step}</span>
+                                {user.updated_at && (
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {new Date(user.updated_at).toLocaleString()}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                            : <span className="text-gray-400 italic">Not started</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {customerData.length === 0 && (
+                  <div className="text-center py-12 text-gray-500">
+                    No customer data available yet
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1090,6 +1308,44 @@ export default function AdminDashboard() {
         {/* Next Build Steps */}
         <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-lg p-6 mt-8">
           <h2 className="text-xl font-bold text-gray-900 mb-4">🚀 Next Build Steps (Prioritized)</h2>
+          
+          {/* CRITICAL: Security P0s */}
+          <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-6">
+            <h3 className="text-base font-bold text-red-900 mb-3">🔴 CRITICAL: Security P0s (Before Production)</h3>
+            <p className="text-xs text-red-700 mb-3">
+              These security issues MUST be fixed before launching to production. Estimated time: 11 hours.
+            </p>
+            <div className="space-y-2 text-xs text-red-900">
+              <div className="flex items-start">
+                <span className="mr-2">•</span>
+                <div>
+                  <strong>Replace SHA-256 with bcrypt</strong> (2 hours) - Current password hashing is vulnerable to brute force. Database breach = instant password compromise.
+                </div>
+              </div>
+              <div className="flex items-start">
+                <span className="mr-2">•</span>
+                <div>
+                  <strong>Add rate limiting</strong> (3 hours) - No protection against brute force attacks. Install @upstash/ratelimit for login/register endpoints.
+                </div>
+              </div>
+              <div className="flex items-start">
+                <span className="mr-2">•</span>
+                <div>
+                  <strong>Implement token refresh</strong> (4 hours) - Users are kicked out after 24h. Add refresh endpoint and "Remember me" option.
+                </div>
+              </div>
+              <div className="flex items-start">
+                <span className="mr-2">•</span>
+                <div>
+                  <strong>Add CSRF protection</strong> (2 hours) - Vulnerable to cross-site request forgery. Add CSRF tokens to state-changing operations.
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-red-700 mt-3 italic">
+              📄 Full security review: See ONBOARDING_SECURITY_REVIEW.md for complete analysis and 8 additional medium-priority issues.
+            </p>
+          </div>
+
           <div className="space-y-3 text-sm">
             <div className="flex items-start">
               <span className="text-blue-600 font-bold mr-3">1.</span>
@@ -1475,7 +1731,7 @@ export default function AdminDashboard() {
         {activeTab === 'inbox' && renderPlaceholderTab('Inbox', 'Manage bug reports, feature requests, and user feedback', '📥')}
         {activeTab === 'categories' && renderCategoriesTab()}
         {activeTab === 'insights' && renderPlaceholderTab('Insights Engine', 'Automated spending insights and personalized recommendations', '🔍')}
-        {activeTab === 'analytics' && renderPlaceholderTab('Analytics', 'View categorization performance, user activity, and system metrics', '📊')}
+        {activeTab === 'analytics' && renderAnalyticsTab()}
         {activeTab === 'accounts' && renderAccountsTab()}
         {activeTab === 'debugging' && renderDebuggingGuide()}
       </div>

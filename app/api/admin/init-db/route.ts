@@ -13,6 +13,30 @@ async function initializeTables() {
   try {
     console.log('[DB Init] Starting database initialization...');
     
+    // Add login_attempts column to users table if it doesn't exist
+    try {
+      const columnCheck = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' 
+        AND column_name = 'login_attempts'
+      `);
+      
+      if (columnCheck.rows.length === 0) {
+        console.log('[DB Init] Adding login_attempts column to users table...');
+        await client.query(`
+          ALTER TABLE users 
+          ADD COLUMN login_attempts INTEGER DEFAULT 0
+        `);
+        console.log('[DB Init] ✅ login_attempts column added');
+      } else {
+        console.log('[DB Init] ℹ️  login_attempts column already exists');
+      }
+    } catch (e: any) {
+      console.log('[DB Init] Note: Could not add login_attempts column:', e.message);
+      // Continue anyway - table might not exist yet
+    }
+    
     // Create admin_keywords table (NEW SCHEMA - no score/language)
     await client.query(`
       CREATE TABLE IF NOT EXISTS admin_keywords (
@@ -60,6 +84,46 @@ async function initializeTables() {
       )
     `);
     console.log('[DB Init] ✅ categorization_learning table created');
+    
+    // Create onboarding_responses table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS onboarding_responses (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        
+        -- Q1: Emotional calibration (multi-select, stored as array)
+        emotional_state TEXT[],
+        
+        -- Q2: Financial context (multi-select, stored as array)
+        financial_context TEXT[],
+        
+        -- Q3: Motivation/segmentation (single select)
+        motivation TEXT,
+        motivation_other TEXT,
+        
+        -- Q4: Acquisition source (single select)
+        acquisition_source TEXT,
+        acquisition_other TEXT,
+        
+        -- Q6: Insight preferences (multi-select, stored as array)
+        insight_preferences TEXT[],
+        insight_other TEXT,
+        
+        -- Q9: Account profile
+        first_name TEXT,
+        last_name TEXT,
+        date_of_birth DATE,
+        recovery_phone TEXT,
+        province_region TEXT,
+        
+        -- Metadata
+        last_step INTEGER DEFAULT 0,
+        completed_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('[DB Init] ✅ onboarding_responses table created');
     
     // Check if data exists
     const keywordCount = await client.query('SELECT COUNT(*) as count FROM admin_keywords');
