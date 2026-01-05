@@ -1,6 +1,9 @@
 /**
  * Test setup file - runs before all tests
  * Configures test environment, mocks, and utilities
+ * 
+ * Note: This file is only used in test environment (Vitest)
+ * Next.js build excludes this file via tsconfig.json
  */
 
 import '@testing-library/jest-dom';
