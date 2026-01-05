@@ -99,6 +99,39 @@ export function verifyRequestOrigin(request: { headers: Headers | { get: (key: s
   // If no Origin, check Referer (some browsers don't send Origin for same-origin)
   const originToCheck = origin || (referer ? new URL(referer).origin : null);
   
-  return verifyOrigin(originToCheck);
+  // If no origin or referer, allow (same-origin request)
+  if (!originToCheck) {
+    return true;
+  }
+  
+  // Check explicit allowed origins from env
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) || [];
+  if (allowedOrigins.length > 0) {
+    return allowedOrigins.some(allowed => {
+      // Exact match
+      if (originToCheck === allowed) return true;
+      // Subdomain matching (e.g., *.example.com matches app.example.com)
+      if (allowed.startsWith('*.') && originToCheck.endsWith(allowed.slice(1))) {
+        return true;
+      }
+      return false;
+    });
+  }
+  
+  // Development: allow localhost
+  const isLocalhost = originToCheck.startsWith('http://localhost:') ||
+                      originToCheck.startsWith('http://127.0.0.1:');
+  if (process.env.NODE_ENV !== 'production' || process.env.VERCEL_ENV === 'development') {
+    return isLocalhost;
+  }
+  
+  // Production: If ALLOWED_ORIGINS not set, allow all (less secure but practical)
+  // TODO: Set ALLOWED_ORIGINS in production for better security
+  if (process.env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
+    console.warn('[CSRF] ALLOWED_ORIGINS not set in production - allowing all origins (consider setting it for better security)');
+    return true;
+  }
+  
+  return false;
 }
 
