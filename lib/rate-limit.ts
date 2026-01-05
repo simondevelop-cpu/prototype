@@ -76,11 +76,13 @@ export function checkRateLimit(
  * Clean up expired entries to prevent memory bloat
  */
 function cleanupExpiredEntries(now: number): void {
-  for (const [key, entry] of rateLimitStore.entries()) {
+  const keysToDelete: string[] = [];
+  rateLimitStore.forEach((entry, key) => {
     if (entry.resetAt <= now) {
-      rateLimitStore.delete(key);
+      keysToDelete.push(key);
     }
-  }
+  });
+  keysToDelete.forEach(key => rateLimitStore.delete(key));
 }
 
 /**
