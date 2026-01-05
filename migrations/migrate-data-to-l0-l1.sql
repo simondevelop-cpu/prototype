@@ -16,6 +16,7 @@ FROM users
 ON CONFLICT (internal_user_id) DO NOTHING;
 
 -- Step 2: Migrate PII from onboarding_responses to l0_pii_users
+-- Use a subquery to ensure only one row per user_id
 INSERT INTO l0_pii_users (
   internal_user_id,
   email,
@@ -25,16 +26,27 @@ INSERT INTO l0_pii_users (
   recovery_phone,
   province_region
 )
-SELECT DISTINCT ON (u.id)
-  u.id as internal_user_id,
-  u.email,
-  o.first_name,
-  o.last_name,
-  o.date_of_birth,
-  o.recovery_phone,
-  o.province_region
-FROM users u
-LEFT JOIN onboarding_responses o ON u.id = o.user_id
+SELECT 
+  internal_user_id,
+  email,
+  first_name,
+  last_name,
+  date_of_birth,
+  recovery_phone,
+  province_region
+FROM (
+  SELECT DISTINCT ON (u.id)
+    u.id as internal_user_id,
+    u.email,
+    o.first_name,
+    o.last_name,
+    o.date_of_birth,
+    o.recovery_phone,
+    o.province_region
+  FROM users u
+  LEFT JOIN onboarding_responses o ON u.id = o.user_id
+  ORDER BY u.id, o.id DESC NULLS LAST
+) subquery
 ON CONFLICT (internal_user_id) DO UPDATE
 SET
   first_name = COALESCE(EXCLUDED.first_name, l0_pii_users.first_name),
@@ -89,6 +101,7 @@ JOIN l0_user_tokenization ut ON t.user_id = ut.internal_user_id
 ON CONFLICT DO NOTHING;
 
 -- Step 4: Populate l1_customer_facts from existing data
+-- Use DISTINCT ON to ensure only one row per tokenized_user_id
 INSERT INTO l1_customer_facts (
   tokenized_user_id,
   province_region,
@@ -99,18 +112,18 @@ INSERT INTO l1_customer_facts (
   total_imports,
   last_active_at
 )
-SELECT 
+SELECT DISTINCT ON (ut.tokenized_user_id)
   ut.tokenized_user_id,
   p.province_region,
   'active' as account_status,
   u.created_at as account_created_at,
-  CASE WHEN o.id IS NOT NULL AND o.completed_at IS NOT NULL THEN TRUE ELSE FALSE END as onboarding_completed,
-  COALESCE(tx_counts.tx_count, 0) as total_transactions,
+  CASE WHEN MAX(o.completed_at) IS NOT NULL THEN TRUE ELSE FALSE END as onboarding_completed,
+  COALESCE(MAX(tx_counts.tx_count), 0) as total_transactions,
   0 as total_imports,
   GREATEST(
     u.created_at,
-    COALESCE(tx_counts.last_tx_at, u.created_at),
-    COALESCE(o.updated_at, u.created_at)
+    COALESCE(MAX(tx_counts.last_tx_at), u.created_at),
+    COALESCE(MAX(o.updated_at), u.created_at)
   ) as last_active_at
 FROM l0_user_tokenization ut
 JOIN users u ON ut.internal_user_id = u.id
@@ -124,12 +137,8 @@ LEFT JOIN LATERAL (
 GROUP BY 
   ut.tokenized_user_id,
   p.province_region,
-  u.created_at,
-  o.id,
-  o.completed_at,
-  o.updated_at,
-  tx_counts.tx_count,
-  tx_counts.last_tx_at
+  u.created_at
+ORDER BY ut.tokenized_user_id, MAX(o.completed_at) DESC NULLS LAST
 ON CONFLICT (tokenized_user_id) DO UPDATE
 SET
   onboarding_completed = EXCLUDED.onboarding_completed,
