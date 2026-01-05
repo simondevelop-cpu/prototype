@@ -1019,12 +1019,19 @@ export default function AdminDashboard() {
                       <h3 className="text-lg font-bold">{check.name}</h3>
                     </div>
                     <p className="text-sm mb-3 opacity-90">{check.description}</p>
-                    <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                      check.status === 'pass' ? 'bg-green-200 text-green-900' :
-                      check.status === 'fail' ? 'bg-red-200 text-red-900' :
-                      'bg-yellow-200 text-yellow-900'
-                    }`}>
-                      {check.message}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                        check.status === 'pass' ? 'bg-green-200 text-green-900' :
+                        check.status === 'fail' ? 'bg-red-200 text-red-900' :
+                        'bg-yellow-200 text-yellow-900'
+                      }`}>
+                        {check.message}
+                      </div>
+                      {check.responseTimeMs !== undefined && (
+                        <span className="text-xs text-gray-500">
+                          ({check.responseTimeMs}ms)
+                        </span>
+                      )}
                     </div>
                     {check.details && (
                       <details className="mt-4">
