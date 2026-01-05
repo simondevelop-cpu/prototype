@@ -1,12 +1,12 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  // Note: @vitejs/plugin-react will be added when installing dependencies
-  // plugins: [react()],
+  plugins: [react()],
   test: {
     globals: true,
-    environment: 'jsdom', // For React Testing Library
+    environment: 'happy-dom', // Lighter than jsdom, faster for tests
     setupFiles: ['./tests/setup.ts'],
     include: ['**/*.{test,spec}.{js,ts,tsx}'],
     exclude: ['node_modules', '.next', 'tests/e2e/**'],
