@@ -295,14 +295,33 @@ async function checkPasswordSecurity(): Promise<HealthCheck> {
 }
 
 async function checkEnvironmentVariables(): Promise<HealthCheck> {
-  const required = ['DATABASE_URL', 'JWT_SECRET'];
+  const required = ['DATABASE_URL'];
+  const recommended = ['JWT_SECRET']; // Has default fallback in code
   const optional = ['ALLOWED_ORIGINS', 'TOKENIZATION_SALT'];
   
   const missing = required.filter(key => !process.env[key]);
   const present = required.filter(key => process.env[key]);
+  const recommendedPresent = recommended.filter(key => process.env[key]);
+  const recommendedMissing = recommended.filter(key => !process.env[key]);
   const optionalPresent = optional.filter(key => process.env[key]);
 
   if (missing.length === 0) {
+    // Check if recommended variables are missing (warn but don't fail)
+    if (recommendedMissing.length > 0) {
+      return {
+        name: 'Environment Variables',
+        description: 'Verifies required environment variables are set (JWT_SECRET has default fallback)',
+        status: 'warning',
+        message: `All required variables set. Recommended: ${recommendedMissing.join(', ')} not set (using defaults)`,
+        details: { 
+          required: present, 
+          recommended: recommendedPresent,
+          recommendedMissing,
+          optional: optionalPresent 
+        },
+      };
+    }
+
     return {
       name: 'Environment Variables',
       description: 'Verifies required environment variables are set',
@@ -310,6 +329,7 @@ async function checkEnvironmentVariables(): Promise<HealthCheck> {
       message: 'All required environment variables are set',
       details: {
         required: present,
+        recommended: recommendedPresent,
         optional: optionalPresent,
       },
     };
@@ -320,7 +340,7 @@ async function checkEnvironmentVariables(): Promise<HealthCheck> {
     description: 'Verifies required environment variables are set',
     status: 'fail',
     message: `Missing required variables: ${missing.join(', ')}`,
-    details: { missing, present, optional: optionalPresent },
+    details: { missing, present, recommended: recommendedPresent, optional: optionalPresent },
   };
 }
 
