@@ -9,7 +9,16 @@
     "lint": "next lint",
     "api": "node server.js",
     "seed-admin": "node scripts/seed-final-patterns.js",
-    "migrate": "ts-node migrations/run-migration.ts"
+    "migrate": "ts-node migrations/run-migration.ts",
+    "test": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:security": "vitest run tests/security",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:watch": "vitest watch",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "next": "14.2.0",
