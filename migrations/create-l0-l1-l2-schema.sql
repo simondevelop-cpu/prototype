@@ -11,6 +11,9 @@
 -- 4. Regional compliance - All data stays in-region, encrypted in transit & at rest
 -- ============================================================================
 
+-- Enable pgcrypto extension for cryptographic functions (digest for tokenization)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- ============================================================================
 -- L0: AUTH / PRIVACY / CONFIG LAYER
 -- ============================================================================
