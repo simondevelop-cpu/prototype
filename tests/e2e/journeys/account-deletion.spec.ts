@@ -8,16 +8,15 @@
 
 import { test } from '@playwright/test';
 
+// E2E Tests: Account Deletion (PIPEDA)
+// TODO: Implement E2E account deletion tests
+// Requires:
+// - Test account creation/setup
+// - Database access for verification
+// - API endpoint access
+// - Token generation for authenticated requests
+
 test.describe.skip('Account Deletion (PIPEDA)', () => {
-  // TODO: Implement E2E account deletion tests
-  // Requires:
-  // - Test account creation/setup
-  // - Database access for verification
-  // - API endpoint access
-  // - Token generation for authenticated requests
-  
-  test.todo('should delete user account via API');
-  test.todo('should show confirmation before account deletion');
-  test.todo('should mark account as deleted (soft delete)');
-  test.todo('should prevent access after account deletion');
+  // Tests will be implemented when infrastructure is ready
+  // Playwright doesn't support test.todo() - using describe.skip instead
 });

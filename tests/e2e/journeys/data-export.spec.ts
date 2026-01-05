@@ -8,16 +8,15 @@
 
 import { test } from '@playwright/test';
 
+// E2E Tests: Data Export (PIPEDA)
+// TODO: Implement E2E data export tests
+// Requires:
+// - Test account with data
+// - Database access for verification
+// - API endpoint access
+// - Token generation for authenticated requests
+
 test.describe.skip('Data Export (PIPEDA)', () => {
-  // TODO: Implement E2E data export tests
-  // Requires:
-  // - Test account with data
-  // - Database access for verification
-  // - API endpoint access
-  // - Token generation for authenticated requests
-  
-  test.todo('should export user data as JSON');
-  test.todo('should export user data as CSV');
-  test.todo('should include all user data in export');
-  test.todo('should only export data for authenticated user');
+  // Tests will be implemented when infrastructure is ready
+  // Playwright doesn't support test.todo() - using describe.skip instead
 });
