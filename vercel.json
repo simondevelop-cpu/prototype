@@ -1,4 +1,9 @@
 {
-  "version": 2
+  "version": 2,
+  "crons": [
+    {
+      "path": "/api/admin/cleanup-deleted-users",
+      "schedule": "0 2 * * *"
+    }
+  ]
 }
-
