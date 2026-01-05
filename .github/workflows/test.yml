@@ -23,13 +23,13 @@ jobs:
         run: npm install
       
       - name: Run unit tests
-        run: npm run test:unit
+        run: npx vitest run tests/unit
       
       - name: Run integration tests
-        run: npm run test:integration
+        run: npx vitest run tests/integration
       
       - name: Generate coverage report
-        run: npm run test:coverage
+        run: npx vitest run --coverage
       
       - name: Upload coverage to artifacts (on failure)
         if: failure()
@@ -58,7 +58,7 @@ jobs:
         run: npx playwright install --with-deps
       
       - name: Run E2E tests
-        run: npm run test:e2e
+        run: npx playwright test
         env:
           DISABLE_DB: '1'
       
