@@ -1,11 +1,9 @@
 -- ============================================================================
--- DATA MIGRATION: Migrate existing data to L0/L1/L2 structure
+-- DATA MIGRATION: Migrate existing data to L0/L1/L2 structure (SAFE VERSION)
 -- ============================================================================
--- This script migrates data from existing tables to the new layered architecture.
--- Run this AFTER creating the schema (create-l0-l1-l2-schema.sql)
+-- This version runs WITHOUT a transaction block, so each step commits independently.
+-- If one step fails, previous steps remain committed.
 -- ============================================================================
--- NOTE: Runs without transaction block - each step commits independently
--- If one step fails, previous steps remain committed (safer for large migrations)
 
 -- Step 1: Generate tokenized user IDs for all existing users
 INSERT INTO l0_user_tokenization (internal_user_id, tokenized_user_id)
@@ -137,12 +135,7 @@ SET
   last_active_at = EXCLUDED.last_active_at,
   updated_at = CURRENT_TIMESTAMP;
 
--- Step 5: Create event_facts records from existing user activity
--- Login events (if we have login timestamps - placeholder)
--- Import events (if tracked - placeholder)
--- Note: This is a placeholder - actual events should be tracked going forward
-
--- Step 6: Migrate category metadata from admin_keywords to l0_category_list
+-- Step 5: Migrate category metadata from admin_keywords to l0_category_list
 INSERT INTO l0_category_list (category_key, display_name, is_active)
 SELECT DISTINCT
   category as category_key,
@@ -152,17 +145,11 @@ FROM admin_keywords
 WHERE is_active = TRUE
 ON CONFLICT (category_key) DO NOTHING;
 
--- Step 7: Seed default insights (placeholder)
+-- Step 6: Seed default insights
 INSERT INTO l0_insight_list (insight_key, insight_name, description, is_active)
 VALUES 
   ('spending_spike', 'Spending Spike Alert', 'Alerts when spending increases significantly', TRUE),
   ('low_balance', 'Low Balance Warning', 'Warns when account balance is low', TRUE),
   ('unusual_transaction', 'Unusual Transaction Detection', 'Flags unusual spending patterns', TRUE)
 ON CONFLICT (insight_key) DO NOTHING;
-
--- Verification queries (run separately to check migration)
--- SELECT COUNT(*) as total_users FROM l0_user_tokenization;
--- SELECT COUNT(*) as total_transactions FROM l1_transaction_facts;
--- SELECT COUNT(*) as total_customers FROM l1_customer_facts;
--- SELECT COUNT(*) as pii_records FROM l0_pii_users;
 
