@@ -156,49 +156,6 @@ export async function POST(request: NextRequest) {
             attemptId
           ]
         );
-      } else {
-        // No incomplete attempt found, create new completed entry
-        console.log('[Onboarding API] Creating new completed entry');
-        result = await pool.query(
-          `INSERT INTO onboarding_responses (
-          user_id,
-          emotional_state,
-          financial_context,
-          motivation,
-          motivation_other,
-          acquisition_source,
-          acquisition_other,
-          insight_preferences,
-          insight_other,
-          first_name,
-          last_name,
-          date_of_birth,
-          recovery_phone,
-          province_region,
-          last_step,
-          completed_at,
-          updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
-        RETURNING *`,
-        [
-          userId,
-          data.emotionalState || [],
-          data.financialContext || [],
-          data.motivation || null,
-          data.motivationOther || null,
-          data.acquisitionSource || null,
-          data.acquisitionOther || null,
-          data.insightPreferences || [],
-          data.insightOther || null,
-          data.firstName || null,
-          data.lastName || null,
-          data.dateOfBirth || null,
-          data.recoveryPhone || null,
-          data.provinceRegion || null,
-          data.lastStep || 7,
-          data.completedAt || new Date().toISOString(),
-        ]
-        );
         
         // Store PII in L0 table after successful onboarding completion
         await upsertPII(userId, {
