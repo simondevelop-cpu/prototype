@@ -40,9 +40,9 @@ describe('Rate Limiting', () => {
     expect(result.remaining).toBe(0);
   });
 
-  it('should reset after time window', async () => {
-    // Test that rate limits reset after the time window
-    expect(true).toBe(true);
+  it.todo('should reset after time window', async () => {
+    // TODO: Test that rate limits reset after the time window
+    // Requires: Time manipulation or waiting for timeout
   });
 });
 

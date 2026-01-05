@@ -28,24 +28,19 @@ describe('Database Migrations', () => {
     pool = new Pool({ connectionString });
   });
 
-  it('should create L0/L1/L2 schema tables', async () => {
-    // Load and execute schema migration SQL
-    // This is a placeholder - actual implementation would:
+  it.todo('should create L0/L1/L2 schema tables', async () => {
+    // TODO: Load and execute schema migration SQL
     // 1. Read create-l0-l1-l2-schema.sql
     // 2. Execute SQL statements
     // 3. Verify tables exist
-    
-    expect(true).toBe(true);
   });
 
-  it('should create indexes correctly', async () => {
-    // Verify indexes are created
-    expect(true).toBe(true);
+  it.todo('should create indexes correctly', async () => {
+    // TODO: Verify indexes are created
   });
 
-  it('should handle migration rollback', async () => {
-    // Test that migrations can be rolled back safely
-    expect(true).toBe(true);
+  it.todo('should handle migration rollback', async () => {
+    // TODO: Test that migrations can be rolled back safely
   });
 });
 
