@@ -1,9 +1,11 @@
 /**
  * Integration Tests: Account Deletion (PIPEDA Compliance)
  * Tests that account deletion works correctly and sets deleted_at timestamp
+ * 
+ * NOTE: These tests use pg-mem for in-memory PostgreSQL
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { newDb } from 'pg-mem';
 import { Pool } from 'pg';
 
@@ -13,9 +15,16 @@ describe('Account Deletion (PIPEDA)', () => {
 
   beforeAll(async () => {
     db = newDb();
+    
+    // Register required PostgreSQL functions
     db.public.registerFunction({
       name: 'current_database',
       implementation: () => 'test',
+    });
+    
+    db.public.registerFunction({
+      name: 'version',
+      implementation: () => 'PostgreSQL 14.0',
     });
 
     const connectionString = db.adapters.createPg().connectionString;
@@ -42,6 +51,12 @@ describe('Account Deletion (PIPEDA)', () => {
         deleted_at TIMESTAMP WITH TIME ZONE
       )
     `);
+  });
+
+  afterAll(async () => {
+    if (pool) {
+      await pool.end();
+    }
   });
 
   it('should set deleted_at timestamp on account deletion', async () => {
@@ -94,4 +109,3 @@ describe('Account Deletion (PIPEDA)', () => {
     expect(activeUsers.rows[0].email).toBe('active@example.com');
   });
 });
-

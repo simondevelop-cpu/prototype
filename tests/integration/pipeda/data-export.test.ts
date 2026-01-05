@@ -1,9 +1,11 @@
 /**
  * Integration Tests: Data Export (PIPEDA Right to Access)
  * Tests that data export returns all user data correctly
+ * 
+ * NOTE: These tests use pg-mem for in-memory PostgreSQL
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { newDb } from 'pg-mem';
 import { Pool } from 'pg';
 
@@ -13,6 +15,7 @@ describe('Data Export (PIPEDA)', () => {
 
   beforeAll(async () => {
     db = newDb();
+    
     db.public.registerFunction({
       name: 'current_database',
       implementation: () => 'test',
@@ -57,6 +60,12 @@ describe('Data Export (PIPEDA)', () => {
         category TEXT NOT NULL
       )
     `);
+  });
+
+  afterAll(async () => {
+    if (pool) {
+      await pool.end();
+    }
   });
 
   it('should export all user profile data', async () => {
@@ -118,4 +127,3 @@ describe('Data Export (PIPEDA)', () => {
     expect(profile.rows[0]).toHaveProperty('last_name');
   });
 });
-

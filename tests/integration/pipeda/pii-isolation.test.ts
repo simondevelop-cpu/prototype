@@ -1,9 +1,11 @@
 /**
  * Integration Tests: PII Isolation (PIPEDA Compliance)
  * Tests that PII is properly isolated and not exposed in analytics
+ * 
+ * NOTE: These tests use pg-mem for in-memory PostgreSQL
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { newDb } from 'pg-mem';
 import { Pool } from 'pg';
 
@@ -13,6 +15,7 @@ describe('PII Isolation (PIPEDA)', () => {
 
   beforeAll(async () => {
     db = newDb();
+    
     db.public.registerFunction({
       name: 'current_database',
       implementation: () => 'test',
@@ -60,6 +63,12 @@ describe('PII Isolation (PIPEDA)', () => {
         category TEXT NOT NULL
       )
     `);
+  });
+
+  afterAll(async () => {
+    if (pool) {
+      await pool.end();
+    }
   });
 
   it('should store PII only in L0 table', async () => {
@@ -154,4 +163,3 @@ describe('PII Isolation (PIPEDA)', () => {
     // PII is isolated in l0_pii_users, not accessible from L1
   });
 });
-
