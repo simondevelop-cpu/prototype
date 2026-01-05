@@ -1,14 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { hashPassword, createToken } from '@/lib/auth';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { verifyRequestOrigin } from '@/lib/csrf';
 
 // Force dynamic rendering (POST endpoint requires runtime request body)
 export const dynamic = 'force-dynamic';
 
+// Rate limiting: 3 registrations per hour per email/IP
+const RATE_LIMIT_MAX = 3;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
 export async function POST(request: NextRequest) {
   try {
+    // CSRF protection: Verify Origin header
+    if (!verifyRequestOrigin(request)) {
+      return NextResponse.json(
+        { error: 'Invalid request origin' },
+        { status: 403 }
+      );
+    }
+    
     const body = await request.json();
     const { email, password, name } = body;
+    
+    // Rate limiting check (use email or IP)
+    const identifier = email || request.headers.get('x-forwarded-for') || 'unknown';
+    const rateLimit = checkRateLimit(identifier, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+    if (!rateLimit.allowed) {
+      const resetInMinutes = Math.ceil((rateLimit.resetAt - Date.now()) / 60000);
+      return NextResponse.json(
+        { 
+          error: 'Too many registration attempts. Please try again later.',
+          retryAfter: resetInMinutes,
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)),
+            'X-RateLimit-Limit': String(RATE_LIMIT_MAX),
+            'X-RateLimit-Remaining': String(rateLimit.remaining),
+            'X-RateLimit-Reset': String(Math.ceil(rateLimit.resetAt / 1000)),
+          },
+        }
+      );
+    }
 
     if (!email || !password) {
       return NextResponse.json(
@@ -89,8 +125,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Create user
-    const passwordHash = hashPassword(password);
+    // Create user with bcrypt password hash
+    const passwordHash = await hashPassword(password);
     const result = await pool.query(
       'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id, email, display_name',
       [email.toLowerCase(), passwordHash, name || email]

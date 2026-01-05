@@ -1,8 +1,9 @@
 import dayjs from 'dayjs';
+import { ensureTokenizedForAnalytics } from './tokenization';
 
 const DEMO_EMAIL = process.env.DEMO_EMAIL || 'demo@canadianinsights.ca';
 
-export async function seedDemoTransactions(pool: any, userId: string) {
+export async function seedDemoTransactions(pool: any, userId: string | number) {
   console.log('[DB] Seeding 12 months of realistic Canadian demo transactions...');
   
   const transactions = [];
@@ -141,12 +142,19 @@ export async function seedDemoTransactions(pool: any, userId: string) {
     }
   }
   
-  // Insert all transactions
+  // Get tokenized user ID for inserts
+  const internalUserId = typeof userId === 'string' ? parseInt(userId) : userId;
+  const tokenizedUserId = await ensureTokenizedForAnalytics(internalUserId);
+  if (!tokenizedUserId) {
+    throw new Error('Failed to get tokenized user identifier for seeding');
+  }
+  
+  // Insert all transactions into L1 fact table
   for (const tx of transactions) {
     await pool.query(
-      `INSERT INTO transactions (user_id, date, description, merchant, amount, cashflow, category, account, label, created_at)
+      `INSERT INTO l1_transaction_facts (tokenized_user_id, transaction_date, description, merchant, amount, cashflow, category, account, label, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
-      [userId, tx.date, tx.description, tx.merchant, tx.amount, tx.cashflow, tx.category, tx.account, tx.label]
+      [tokenizedUserId, tx.date, tx.description, tx.merchant, tx.amount, tx.cashflow, tx.category, tx.account, tx.label]
     );
   }
   
@@ -165,9 +173,13 @@ export async function ensureDemoDataExists(pool: any) {
       const userId = demoUser.rows[0].id;
       console.log('[DB] Demo user found, ID:', userId);
       
+      // Get tokenized user ID for checking
+      const internalUserId = typeof userId === 'string' ? parseInt(userId) : userId;
+      const tokenizedUserId = await ensureTokenizedForAnalytics(internalUserId);
+      
       const txCount = await pool.query(
-        'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1',
-        [userId]
+        'SELECT COUNT(*) as count FROM l1_transaction_facts WHERE tokenized_user_id = $1',
+        [tokenizedUserId || userId] // Fallback to userId if tokenization fails (for backward compat during migration)
       );
       
       const count = parseInt(txCount.rows[0].count);

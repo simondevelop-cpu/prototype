@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { ensureTokenizedForAnalytics } from '@/lib/tokenization';
 import { ensureDemoDataExists } from '@/lib/seed-demo';
 import dayjs from 'dayjs';
 
@@ -27,6 +28,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
     
+    // Get tokenized user ID for analytics (L1 tables)
+    const tokenizedUserId = await ensureTokenizedForAnalytics(userId);
+    if (!tokenizedUserId) {
+      return NextResponse.json({ error: 'Failed to get user identifier' }, { status: 500 });
+    }
+    
     // Ensure demo data exists (only seeds if count = 0)
     await ensureDemoDataExists(pool);
 
@@ -46,8 +53,8 @@ export async function GET(request: NextRequest) {
       // Calculate date range based on latest transaction
       // This ensures the view shows the most recent N months that have data
       const latestResult = await pool.query(
-        'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
-        [userId]
+        'SELECT MAX(transaction_date) as latest FROM l1_transaction_facts WHERE tokenized_user_id = $1',
+        [tokenizedUserId]
       );
 
       if (latestResult.rows[0]?.latest) {
@@ -62,19 +69,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Query transactions
+    // Query transactions from L1 fact table
     const result = await pool.query(
       `SELECT 
-        DATE_TRUNC('month', date) as month,
+        DATE_TRUNC('month', transaction_date) as month,
         cashflow,
         SUM(amount) as total
-       FROM transactions
-       WHERE user_id = $1
-         AND date >= $2
-         AND date <= $3
-       GROUP BY DATE_TRUNC('month', date), cashflow
+       FROM l1_transaction_facts
+       WHERE tokenized_user_id = $1
+         AND transaction_date >= $2
+         AND transaction_date <= $3
+       GROUP BY DATE_TRUNC('month', transaction_date), cashflow
        ORDER BY month`,
-      [userId, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')]
+      [tokenizedUserId, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')]
     );
 
     // Create a map with ALL months in the range (including empty ones)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { ensureTokenizedForAnalytics } from '@/lib/tokenization';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -39,6 +40,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
+    // Get tokenized user ID for analytics (L1 tables)
+    const tokenizedUserId = await ensureTokenizedForAnalytics(userId);
+    if (!tokenizedUserId) {
+      return NextResponse.json({ error: 'Failed to get user identifier' }, { status: 500 });
+    }
+
     // Get transactions from request body
     const { transactions } = await request.json();
 
@@ -52,11 +59,23 @@ export async function POST(request: NextRequest) {
 
     for (const tx of transactions as Transaction[]) {
       try {
+        // Check for duplicates first (since L1 table may not have unique constraint)
+        const duplicateCheck = await pool.query(
+          `SELECT id FROM l1_transaction_facts 
+           WHERE tokenized_user_id = $1 AND transaction_date = $2 AND amount = $3 AND merchant = $4 AND cashflow = $5`,
+          [tokenizedUserId, tx.date, tx.amount, tx.merchant, tx.cashflow]
+        );
+        
+        if (duplicateCheck.rows.length > 0) {
+          // Skip duplicate
+          continue;
+        }
+        
+        // Insert into L1 fact table
         await pool.query(
-          `INSERT INTO transactions (user_id, date, description, merchant, amount, cashflow, category, account, label, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-           ON CONFLICT (user_id, date, amount, merchant, cashflow) DO NOTHING`,
-          [userId, tx.date, tx.description, tx.merchant, tx.amount, tx.cashflow, tx.category, tx.account, tx.label]
+          `INSERT INTO l1_transaction_facts (tokenized_user_id, transaction_date, description, merchant, amount, cashflow, category, account, label, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+          [tokenizedUserId, tx.date, tx.description, tx.merchant, tx.amount, tx.cashflow, tx.category, tx.account, tx.label]
         );
         imported++;
       } catch (error: any) {

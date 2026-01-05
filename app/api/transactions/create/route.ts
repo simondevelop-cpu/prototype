@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { ensureTokenizedForAnalytics } from '@/lib/tokenization';
 
 // Force dynamic rendering (POST endpoint requires runtime request body)
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
+    // Get tokenized user ID for analytics (L1 tables)
+    const tokenizedUserId = await ensureTokenizedForAnalytics(userId);
+    if (!tokenizedUserId) {
+      return NextResponse.json({ error: 'Failed to get user identifier' }, { status: 500 });
+    }
+
     // Get transaction data from request body
     const body = await request.json();
     const { date, description, merchant, amount, cashflow, category, account, label } = body;
@@ -34,12 +41,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Insert transaction
+    // Insert transaction into L1 fact table
     const result = await pool.query(
-      `INSERT INTO transactions (user_id, date, description, merchant, amount, cashflow, category, account, label)
+      `INSERT INTO l1_transaction_facts (tokenized_user_id, transaction_date, description, merchant, amount, cashflow, category, account, label)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, date, description, merchant, amount, cashflow, category, account, label`,
-      [userId, date, description, merchant || description, amount, cashflow, category, account, label]
+       RETURNING id, transaction_date as date, description, merchant, amount, cashflow, category, account, label`,
+      [tokenizedUserId, date, description, merchant || description, amount, cashflow, category, account, label]
     );
 
     const transaction = result.rows[0];

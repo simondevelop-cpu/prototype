@@ -10,6 +10,65 @@ const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,
 });
 
+// Helper to ensure PII is stored in L0 table
+async function upsertPII(userId: number, piiData: {
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  recoveryPhone?: string;
+  provinceRegion?: string;
+  email?: string;
+}) {
+  try {
+    // Get user email if not provided
+    let email = piiData.email;
+    if (!email) {
+      const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+      if (userResult.rows.length > 0) {
+        email = userResult.rows[0].email;
+      }
+    }
+
+    // Only upsert if we have at least one PII field
+    if (!piiData.firstName && !piiData.lastName && !piiData.dateOfBirth && !piiData.recoveryPhone && !piiData.provinceRegion) {
+      return; // No PII to store yet
+    }
+
+    // Upsert into l0_pii_users (for compliance - PII isolation)
+    await pool.query(
+      `INSERT INTO l0_pii_users (
+        internal_user_id, email, first_name, last_name, date_of_birth, 
+        recovery_phone, province_region, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      ON CONFLICT (internal_user_id) 
+      DO UPDATE SET
+        email = EXCLUDED.email,
+        first_name = COALESCE(EXCLUDED.first_name, l0_pii_users.first_name),
+        last_name = COALESCE(EXCLUDED.last_name, l0_pii_users.last_name),
+        date_of_birth = COALESCE(EXCLUDED.date_of_birth, l0_pii_users.date_of_birth),
+        recovery_phone = COALESCE(EXCLUDED.recovery_phone, l0_pii_users.recovery_phone),
+        province_region = COALESCE(EXCLUDED.province_region, l0_pii_users.province_region),
+        updated_at = NOW()`,
+      [
+        userId,
+        email || null,
+        piiData.firstName || null,
+        piiData.lastName || null,
+        piiData.dateOfBirth || null,
+        piiData.recoveryPhone || null,
+        piiData.provinceRegion || null,
+      ]
+    );
+  } catch (error: any) {
+    // If l0_pii_users doesn't exist yet (pre-migration), just log and continue
+    if (error.code === '42P01') { // Table doesn't exist
+      // Silent - pre-migration, no action needed
+    } else {
+      console.error('[Onboarding Progress API] Error storing PII:', error);
+    }
+  }
+}
+
 // Update progress for current onboarding attempt (UPSERT)
 export async function PUT(request: NextRequest) {
   try {
@@ -111,6 +170,17 @@ export async function PUT(request: NextRequest) {
           attemptId
         ]
       );
+      
+      // Store PII in L0 table when PII fields are updated
+      if (data.firstName || data.lastName || data.dateOfBirth || data.recoveryPhone || data.provinceRegion) {
+        await upsertPII(userId, {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          dateOfBirth: data.dateOfBirth,
+          recoveryPhone: data.recoveryPhone,
+          provinceRegion: data.provinceRegion,
+        });
+      }
     } else {
       // Create new attempt (first time OR fresh retry after incomplete)
       console.log('[Onboarding Progress API] Creating NEW attempt for user', userId, 'at step', data.lastStep);
@@ -154,6 +224,17 @@ export async function PUT(request: NextRequest) {
           data.lastStep || 0,
         ]
       );
+      
+      // Store PII in L0 table when PII fields are provided
+      if (data.firstName || data.lastName || data.dateOfBirth || data.recoveryPhone || data.provinceRegion) {
+        await upsertPII(userId, {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          dateOfBirth: data.dateOfBirth,
+          recoveryPhone: data.recoveryPhone,
+          provinceRegion: data.provinceRegion,
+        });
+      }
     }
 
     return NextResponse.json({ 

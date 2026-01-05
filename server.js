@@ -9,6 +9,39 @@ dayjs.extend(isBetween);
 const cors = require('cors');
 const { Pool } = require('pg');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+
+// Simple in-memory rate limiter
+const rateLimitStore = new Map();
+
+function checkRateLimit(identifier, maxRequests, windowMs) {
+  const now = Date.now();
+  const key = identifier.toLowerCase();
+  
+  let entry = rateLimitStore.get(key);
+  
+  // Clean expired entries occasionally (1% chance per request)
+  if (Math.random() < 0.01) {
+    for (const [k, e] of rateLimitStore.entries()) {
+      if (e.resetAt <= now) {
+        rateLimitStore.delete(k);
+      }
+    }
+  }
+  
+  if (entry && entry.resetAt > now) {
+    entry.count++;
+    if (entry.count > maxRequests) {
+      return { allowed: false, remaining: 0, resetAt: entry.resetAt };
+    }
+    return { allowed: true, remaining: maxRequests - entry.count, resetAt: entry.resetAt };
+  }
+  
+  const resetAt = now + windowMs;
+  entry = { count: 1, resetAt };
+  rateLimitStore.set(key, entry);
+  return { allowed: true, remaining: maxRequests - 1, resetAt };
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,7 +53,115 @@ const DEMO_EMAIL = process.env.DEMO_EMAIL || 'demo@canadianinsights.ca';
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'northstar-demo';
 const IS_VERCEL = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
 
-// Middleware
+// Tokenization helper (for analytics - L1 tables)
+const TOKENIZATION_SALT = process.env.TOKENIZATION_SALT || 'default_salt_change_in_production';
+
+async function getTokenizedUserId(internalUserId) {
+  if (!pool || disableDb) return null;
+  
+  try {
+    // Check if tokenized ID already exists
+    const existing = await pool.query(
+      'SELECT tokenized_user_id FROM l0_user_tokenization WHERE internal_user_id = $1',
+      [internalUserId]
+    );
+    
+    if (existing.rows.length > 0) {
+      return existing.rows[0].tokenized_user_id;
+    }
+    
+    // Generate tokenized ID (SHA256 hash)
+    const hash = crypto.createHash('sha256')
+      .update(`${internalUserId}${TOKENIZATION_SALT}`)
+      .digest('hex');
+    
+    // Store mapping
+    await pool.query(
+      'INSERT INTO l0_user_tokenization (internal_user_id, tokenized_user_id) VALUES ($1, $2) ON CONFLICT (internal_user_id) DO UPDATE SET tokenized_user_id = EXCLUDED.tokenized_user_id',
+      [internalUserId, hash]
+    );
+    
+    return hash;
+  } catch (error) {
+    console.error('[Tokenization] Error getting tokenized user ID:', error);
+    // If table doesn't exist yet (pre-migration), return null
+    // This allows graceful fallback
+    return null;
+  }
+}
+
+// Helper to get table/field names based on migration status
+async function getTransactionTableInfo(userId) {
+  const tokenizedUserId = await getTokenizedUserId(userId);
+  if (tokenizedUserId) {
+    return {
+      table: 'l1_transaction_facts',
+      userIdField: 'tokenized_user_id',
+      userIdValue: tokenizedUserId,
+      dateField: 'transaction_date'
+    };
+  } else {
+    return {
+      table: 'transactions',
+      userIdField: 'user_id',
+      userIdValue: userId,
+      dateField: 'date'
+    };
+  }
+}
+
+// Helper to get table/field names based on migration status
+async function getTransactionTableInfo(userId) {
+  const tokenizedUserId = await getTokenizedUserId(userId);
+  if (tokenizedUserId) {
+    return {
+      table: 'l1_transaction_facts',
+      userIdField: 'tokenized_user_id',
+      userIdValue: tokenizedUserId,
+      dateField: 'transaction_date'
+    };
+  } else {
+    return {
+      table: 'transactions',
+      userIdField: 'user_id',
+      userIdValue: userId,
+      dateField: 'date'
+    };
+  }
+}
+
+// CSRF protection helper
+function verifyOrigin(origin) {
+  if (!origin) return true; // Same-origin requests may not have Origin
+  
+  // Allow localhost in development
+  const isLocalhost = origin.startsWith('http://localhost:') ||
+                      origin.startsWith('http://127.0.0.1:');
+  
+  if (process.env.NODE_ENV !== 'production') {
+    return isLocalhost;
+  }
+  
+  // Production: check against allowed origins
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
+  if (allowedOrigins.length > 0) {
+    return allowedOrigins.some(allowed => origin === allowed || origin.endsWith(`.${allowed}`));
+  }
+  
+  return false;
+}
+
+// Middleware for CSRF protection on state-changing routes
+app.use((req, res, next) => {
+  if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE' || req.method === 'PATCH') {
+    const origin = req.headers.origin || req.headers.referer ? new URL(req.headers.referer).origin : null;
+    if (!verifyOrigin(origin)) {
+      return res.status(403).json({ error: 'Invalid request origin' });
+    }
+  }
+  next();
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirnameResolved));
@@ -48,7 +189,38 @@ if (!disableDb) {
 // AUTHENTICATION UTILITIES
 // ============================================================================
 
-function hashPassword(password) {
+const BCRYPT_ROUNDS = 12;
+
+/**
+ * Hash password using bcrypt (secure, slow hash with salt)
+ * Replaces old SHA-256 implementation for security
+ */
+async function hashPassword(password) {
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
+}
+
+/**
+ * Verify password against hash
+ * Supports both bcrypt (new) and SHA-256 (legacy) for backward compatibility
+ */
+async function verifyPassword(password, hash) {
+  // Check if hash is bcrypt format (starts with $2a$, $2b$, or $2y$)
+  if (hash.startsWith('$2')) {
+    return bcrypt.compare(password, hash);
+  }
+  
+  // Legacy SHA-256 support (for existing passwords)
+  // Will be migrated to bcrypt on next successful login
+  const sha256Hash = crypto.createHash('sha256').update(password).digest('hex');
+  return sha256Hash === hash;
+}
+
+/**
+ * Legacy SHA-256 hash function (deprecated)
+ * Kept for migration purposes only - do not use for new passwords
+ * @deprecated Use hashPassword() instead
+ */
+function hashPasswordLegacy(password) {
   return crypto.createHash('sha256').update(password).digest('hex');
 }
 
@@ -620,8 +792,8 @@ async function seedDemoUser() {
       return existingUser.rows[0].id;
     }
     
-    // Create demo user
-    const passwordHash = hashPassword(DEMO_PASSWORD);
+    // Create demo user with bcrypt password hash
+    const passwordHash = await hashPassword(DEMO_PASSWORD);
   const result = await pool.query(
       'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id',
       [DEMO_EMAIL.toLowerCase(), passwordHash, 'Taylor Nguyen']
@@ -640,19 +812,26 @@ async function seedSampleTransactions(userId) {
   if (disableDb || !pool || !userId) return;
   
   try {
+    // Get tokenized user ID for L1 tables
+    const tokenizedUserId = await getTokenizedUserId(userId);
+    const tableName = tokenizedUserId ? 'l1_transaction_facts' : 'transactions';
+    const userIdField = tokenizedUserId ? 'tokenized_user_id' : 'user_id';
+    const userIdValue = tokenizedUserId || userId;
+    const dateField = tokenizedUserId ? 'transaction_date' : 'date';
+    
     // Check if transactions already exist (only seeds once, preserves user edits)
     const existing = await pool.query(
-      'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1',
-      [userId]
+      `SELECT COUNT(*) as count FROM ${tableName} WHERE ${userIdField} = $1`,
+      [userIdValue]
     );
     
     if (parseInt(existing.rows[0].count) > 0) {
       console.log('[DB] Demo transactions already exist, checking if refresh needed...');
-      // Check if data is old (compare to expected end date: Oct 2025)
-      const oldestDate = await pool.query(
-        'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
-        [userId]
-      );
+        // Check if data is old (compare to expected end date: Oct 2025)
+        const oldestDate = await pool.query(
+          `SELECT MAX(${dateField}) as latest FROM ${tableName} WHERE ${userIdField} = $1`,
+          [userIdValue]
+        );
       if (oldestDate.rows[0]?.latest) {
         const latestDate = dayjs(oldestDate.rows[0].latest);
         const expectedLatest = dayjs('2025-10-22'); // Should end at Oct 22, 2025
@@ -661,7 +840,7 @@ async function seedSampleTransactions(userId) {
         // This catches any data from 2024 or wrong months
         if (!latestDate.isSame('2025-10', 'month')) {
           console.log('[DB] Data is outdated (latest:', latestDate.format('YYYY-MM-DD'), '), refreshing to Oct 2025...');
-          await pool.query('DELETE FROM transactions WHERE user_id = $1', [userId]);
+          await pool.query(`DELETE FROM ${tableName} WHERE ${userIdField} = $1`, [userIdValue]);
         } else {
           console.log('[DB] Data is current (latest:', latestDate.format('YYYY-MM-DD'), '), skipping reseed');
           return;
@@ -864,13 +1043,24 @@ async function seedSampleTransactions(userId) {
     // Shuffle to make dates more realistic
     transactions.sort((a, b) => a.date.localeCompare(b.date));
     
-    // Insert all transactions
-    for (const tx of transactions) {
-      await pool.query(
-        `INSERT INTO transactions (user_id, description, merchant, date, cashflow, account, category, label, amount)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [userId, tx.description, tx.description, tx.date, tx.cashflow, tx.account, tx.category, tx.label, tx.amount]
-      );
+    // Insert all transactions into L1 fact table (or fallback to old table if not migrated)
+    if (tokenizedUserId) {
+      for (const tx of transactions) {
+        await pool.query(
+          `INSERT INTO l1_transaction_facts (tokenized_user_id, transaction_date, description, merchant, amount, cashflow, category, account, label, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+          [tokenizedUserId, tx.date, tx.description, tx.description, tx.amount, tx.cashflow, tx.category, tx.label]
+        );
+      }
+    } else {
+      // Fallback to old table (pre-migration)
+      for (const tx of transactions) {
+        await pool.query(
+          `INSERT INTO transactions (user_id, description, merchant, date, cashflow, account, category, label, amount)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [userId, tx.description, tx.description, tx.date, tx.amount, tx.cashflow, tx.account, tx.category, tx.label]
+        );
+      }
     }
     
     console.log(`[DB] Seeded ${transactions.length} sample transactions across 12 months`);
@@ -928,10 +1118,13 @@ async function ensureDemoDataExists() {
       const userId = demoUser.rows[0].id;
       console.log('[DB] Demo user found, ID:', userId);
       
-      const txCount = await pool.query(
-        'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1',
-        [userId]
-      );
+      // Check in L1 table (or fallback to old table)
+      const tokenizedUserId = await getTokenizedUserId(userId);
+      const checkQuery = tokenizedUserId
+        ? 'SELECT COUNT(*) as count FROM l1_transaction_facts WHERE tokenized_user_id = $1'
+        : 'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1';
+      const checkValue = tokenizedUserId || userId;
+      const txCount = await pool.query(checkQuery, [checkValue]);
       
       const count = parseInt(txCount.rows[0].count);
       console.log('[DB] Demo user transaction count:', count);
@@ -997,6 +1190,16 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
     
+    // Rate limiting: 5 attempts per 15 minutes per email
+    const rateLimit = checkRateLimit(email, 5, 15 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      const resetInMinutes = Math.ceil((rateLimit.resetAt - Date.now()) / 60000);
+      return res.status(429).json({
+        error: 'Too many login attempts. Please try again later.',
+        retryAfter: resetInMinutes,
+      });
+    }
+    
     if (disableDb || !pool) {
       return res.status(503).json({ error: 'Database not available' });
     }
@@ -1012,10 +1215,23 @@ app.post('/api/auth/login', async (req, res) => {
     }
     
     const user = result.rows[0];
-    const passwordHash = hashPassword(password);
     
-    if (passwordHash !== user.password_hash) {
+    // Verify password (supports both bcrypt and legacy SHA-256)
+    const isValid = await verifyPassword(password, user.password_hash);
+    
+    if (!isValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    // Migrate legacy SHA-256 passwords to bcrypt on successful login
+    // Check if hash is legacy format (doesn't start with $2)
+    if (!user.password_hash.startsWith('$2')) {
+      const newHash = await hashPassword(password);
+      await pool.query(
+        'UPDATE users SET password_hash = $1 WHERE id = $2',
+        [newHash, user.id]
+      );
+      console.log('[Login] Migrated legacy password hash to bcrypt for user:', user.id);
     }
     
     // Create JWT token with integer user ID
@@ -1043,11 +1259,23 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'Email, password, and name required' });
     }
     
+    // Rate limiting: 3 registrations per hour per email/IP
+    const identifier = email || req.ip || 'unknown';
+    const rateLimit = checkRateLimit(identifier, 3, 60 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      const resetInMinutes = Math.ceil((rateLimit.resetAt - Date.now()) / 60000);
+      return res.status(429).json({
+        error: 'Too many registration attempts. Please try again later.',
+        retryAfter: resetInMinutes,
+      });
+    }
+    
     if (disableDb || !pool) {
       return res.status(503).json({ error: 'Database not available' });
     }
     
-    const passwordHash = hashPassword(password);
+    // Create user with bcrypt password hash
+    const passwordHash = await hashPassword(password);
     
     // Insert new user
     const result = await pool.query(
@@ -1118,11 +1346,7 @@ app.post('/api/reset-demo-data', async (req, res) => {
   try {
     console.log('[RESET] Resetting demo data...');
     
-    // Delete all transactions for demo user
-    await pool.query('DELETE FROM transactions WHERE user_id = (SELECT id FROM users WHERE email = $1)', [DEMO_EMAIL.toLowerCase()]);
-    console.log('[RESET] Deleted existing transactions');
-    
-    // Get demo user ID
+    // Get demo user first
     const userResult = await pool.query('SELECT id FROM users WHERE email = $1', [DEMO_EMAIL.toLowerCase()]);
     if (userResult.rows.length === 0) {
       return res.status(404).json({ error: 'Demo user not found' });
@@ -1130,12 +1354,25 @@ app.post('/api/reset-demo-data', async (req, res) => {
     
     const userId = userResult.rows[0].id;
     
+    // Delete all transactions for demo user (from L1 table if migrated)
+    const tokenizedUserId = await getTokenizedUserId(userId);
+    if (tokenizedUserId) {
+      await pool.query('DELETE FROM l1_transaction_facts WHERE tokenized_user_id = $1', [tokenizedUserId]);
+    } else {
+      await pool.query('DELETE FROM transactions WHERE user_id = $1', [userId]);
+    }
+    console.log('[RESET] Deleted existing transactions');
+    
     // Reseed transactions
     await seedSampleTransactions(userId);
     console.log('[RESET] Reseeded demo data');
     
-    // Count transactions
-    const count = await pool.query('SELECT COUNT(*) as count FROM transactions WHERE user_id = $1', [userId]);
+    // Count transactions (from L1 table if migrated - reuse tokenizedUserId)
+    const countQuery = tokenizedUserId
+      ? 'SELECT COUNT(*) as count FROM l1_transaction_facts WHERE tokenized_user_id = $1'
+      : 'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1';
+    const countValue = tokenizedUserId || userId;
+    const count = await pool.query(countQuery, [countValue]);
     
     res.json({ 
       success: true, 
@@ -1156,14 +1393,15 @@ app.get('/api/transactions', authenticate, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 500;
     const userId = req.userId;
+    const txInfo = await getTransactionTableInfo(userId);
     
     const result = await pool.query(
-      `SELECT id, description, merchant, date, cashflow, account, category, label, amount
-      FROM transactions
-       WHERE user_id = $1
-      ORDER BY date DESC, id DESC
+      `SELECT id, description, merchant, ${txInfo.dateField} as date, cashflow, account, category, label, amount
+      FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1
+      ORDER BY ${txInfo.dateField} DESC, id DESC
        LIMIT $2`,
-      [userId, limit]
+      [txInfo.userIdValue, limit]
     );
 
     const transactions = result.rows.map((row) => ({
@@ -1173,13 +1411,13 @@ app.get('/api/transactions', authenticate, async (req, res) => {
     }));
 
     const categoriesResult = await pool.query(
-      'SELECT DISTINCT category FROM transactions WHERE user_id = $1 ORDER BY category ASC',
-      [userId]
+      `SELECT DISTINCT category FROM ${txInfo.table} WHERE ${txInfo.userIdField} = $1 ORDER BY category ASC`,
+      [txInfo.userIdValue]
     );
     
     const labelsResult = await pool.query(
-      "SELECT DISTINCT label FROM transactions WHERE user_id = $1 AND label <> '' ORDER BY label ASC",
-      [userId]
+      `SELECT DISTINCT label FROM ${txInfo.table} WHERE ${txInfo.userIdField} = $1 AND label <> '' ORDER BY label ASC`,
+      [txInfo.userIdValue]
     );
 
     res.json({
@@ -1208,16 +1446,17 @@ app.get('/api/summary', authenticate, async (req, res) => {
     const window = req.query.window || '3m';
     const monthCount = Number.parseInt(window, 10) || 3;
     const userId = req.userId;
+    const txInfo = await getTransactionTableInfo(userId);
     
-    const { start, end } = await ensureRangeMonths(monthCount, userId);
+    const { start, end } = await ensureRangeMonths(monthCount, userId, txInfo);
     const labels = monthLabels(start, monthCount);
 
     const summaryResult = await pool.query(
-      `SELECT TO_CHAR(date, 'YYYY-MM') AS month, cashflow, SUM(amount) AS total
-       FROM transactions
-       WHERE user_id = $1 AND date BETWEEN $2 AND $3
+      `SELECT TO_CHAR(${txInfo.dateField}, 'YYYY-MM') AS month, cashflow, SUM(amount) AS total
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND ${txInfo.dateField} BETWEEN $2 AND $3
        GROUP BY month, cashflow`,
-      [userId, start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD')]
+      [txInfo.userIdValue, start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD')]
     );
 
     const chart = {
@@ -1242,12 +1481,12 @@ app.get('/api/summary', authenticate, async (req, res) => {
     const latestMonth = labels[labels.length - 1];
     const categoriesResult = await pool.query(
       `SELECT category, ABS(SUM(amount)) as value
-       FROM transactions
-       WHERE user_id = $1 AND TO_CHAR(date, 'YYYY-MM') = $2 AND cashflow = 'expense'
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND TO_CHAR(${txInfo.dateField}, 'YYYY-MM') = $2 AND cashflow = 'expense'
        GROUP BY category
        ORDER BY value DESC
        LIMIT 12`,
-      [userId, latestMonth]
+      [txInfo.userIdValue, latestMonth]
     );
 
     const categories = categoriesResult.rows.map(row => ({
@@ -1263,13 +1502,18 @@ app.get('/api/summary', authenticate, async (req, res) => {
 });
 
 // Helper functions for date ranges
-async function ensureRangeMonths(monthCount, userId) {
+async function ensureRangeMonths(monthCount, userId, txInfo = null) {
+  // Get transaction table info if not provided
+  if (!txInfo) {
+    txInfo = await getTransactionTableInfo(userId);
+  }
+  
   // For demo data, use the actual date range of transactions
   if (pool && userId) {
     try {
       const result = await pool.query(
-        'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
-        [userId]
+        `SELECT MAX(${txInfo.dateField}) as latest FROM ${txInfo.table} WHERE ${txInfo.userIdField} = $1`,
+        [txInfo.userIdValue]
       );
       
       if (result.rows[0]?.latest) {
@@ -1303,9 +1547,10 @@ async function getLatestMonthRange(months, userId) {
     return { start, end };
   }
 
+  const txInfo = await getTransactionTableInfo(userId);
   const result = await pool.query(
-    'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
-    [userId]
+    `SELECT MAX(${txInfo.dateField}) as latest FROM ${txInfo.table} WHERE ${txInfo.userIdField} = $1`,
+    [txInfo.userIdValue]
   );
 
   if (!result.rows[0]?.latest) {
@@ -1339,25 +1584,27 @@ app.get('/api/budget', authenticate, async (req, res) => {
     const startDate = start.format('YYYY-MM-DD');
     const endDate = end.format('YYYY-MM-DD');
 
+    const txInfo = await getTransactionTableInfo(userId);
+    
     const expenseRow = await pool.query(
       `SELECT COALESCE(ABS(SUM(amount)), 0) AS spent
-       FROM transactions
-       WHERE user_id = $1 AND cashflow = 'expense' AND date BETWEEN $2 AND $3`,
-      [userId, startDate, endDate]
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND cashflow = 'expense' AND ${txInfo.dateField} BETWEEN $2 AND $3`,
+      [txInfo.userIdValue, startDate, endDate]
     );
 
     const incomeRow = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) AS income
-       FROM transactions
-       WHERE user_id = $1 AND cashflow = 'income' AND date BETWEEN $2 AND $3`,
-      [userId, startDate, endDate]
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND cashflow = 'income' AND ${txInfo.dateField} BETWEEN $2 AND $3`,
+      [txInfo.userIdValue, startDate, endDate]
     );
 
     const otherRow = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) AS other
-       FROM transactions
-       WHERE user_id = $1 AND cashflow = 'other' AND date BETWEEN $2 AND $3`,
-      [userId, startDate, endDate]
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND cashflow = 'other' AND ${txInfo.dateField} BETWEEN $2 AND $3`,
+      [txInfo.userIdValue, startDate, endDate]
     );
 
     const spent = Math.abs(Number(expenseRow.rows[0].spent));
@@ -1369,11 +1616,11 @@ app.get('/api/budget', authenticate, async (req, res) => {
     const baselineMonths = period === 'quarterly' ? 6 : 3;
     const baselineRange = await getLatestMonthRange(baselineMonths, userId);
     const baselineResult = await pool.query(
-      `SELECT TO_CHAR(date, 'YYYY-MM') as month, ABS(SUM(amount)) as total
-       FROM transactions
-       WHERE user_id = $1 AND cashflow = 'expense' AND date BETWEEN $2 AND $3
+      `SELECT TO_CHAR(${txInfo.dateField}, 'YYYY-MM') as month, ABS(SUM(amount)) as total
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND cashflow = 'expense' AND ${txInfo.dateField} BETWEEN $2 AND $3
        GROUP BY month`,
-      [userId, baselineRange.start.format('YYYY-MM-DD'), baselineRange.end.format('YYYY-MM-DD')]
+      [txInfo.userIdValue, baselineRange.start.format('YYYY-MM-DD'), baselineRange.end.format('YYYY-MM-DD')]
     );
 
     const baselineValues = baselineResult.rows.map(r => Number(r.total));
@@ -1384,12 +1631,12 @@ app.get('/api/budget', authenticate, async (req, res) => {
     // Category breakdown
     const categoriesResult = await pool.query(
       `SELECT category, ABS(SUM(amount)) as spent
-       FROM transactions
-       WHERE user_id = $1 AND cashflow = 'expense' AND date BETWEEN $2 AND $3
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND cashflow = 'expense' AND ${txInfo.dateField} BETWEEN $2 AND $3
        GROUP BY category
        ORDER BY spent DESC
        LIMIT 10`,
-      [userId, startDate, endDate]
+      [txInfo.userIdValue, startDate, endDate]
     );
 
     const categories = categoriesResult.rows.map(row => ({
@@ -1421,10 +1668,12 @@ app.get('/api/savings', authenticate, async (req, res) => {
 
     let startDate, endDate, label;
 
+    const txInfo = await getTransactionTableInfo(userId);
+    
     if (rangeParam === 'since-start') {
       const result = await pool.query(
-        'SELECT MIN(date) as first FROM transactions WHERE user_id = $1',
-        [userId]
+        `SELECT MIN(${txInfo.dateField}) as first FROM ${txInfo.table} WHERE ${txInfo.userIdField} = $1`,
+        [txInfo.userIdValue]
       );
       startDate = result.rows[0]?.first
         ? dayjs(result.rows[0].first).format('YYYY-MM-DD')
@@ -1446,9 +1695,9 @@ app.get('/api/savings', authenticate, async (req, res) => {
         SUM(CASE WHEN cashflow = 'income' THEN amount ELSE 0 END) AS income,
         SUM(CASE WHEN cashflow = 'other' THEN amount ELSE 0 END) AS other,
         SUM(CASE WHEN cashflow = 'expense' THEN amount ELSE 0 END) AS expense
-       FROM transactions
-       WHERE user_id = $1 AND date BETWEEN $2 AND $3`,
-      [userId, startDate, endDate]
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND ${txInfo.dateField} BETWEEN $2 AND $3`,
+      [txInfo.userIdValue, startDate, endDate]
     );
 
     const totalsRow = totalsResult.rows[0] || { income: 0, other: 0, expense: 0 };
@@ -1462,9 +1711,9 @@ app.get('/api/savings', authenticate, async (req, res) => {
         SUM(CASE WHEN cashflow = 'income' THEN amount ELSE 0 END) AS income,
         SUM(CASE WHEN cashflow = 'other' THEN amount ELSE 0 END) AS other,
         SUM(CASE WHEN cashflow = 'expense' THEN amount ELSE 0 END) AS expense
-       FROM transactions
-       WHERE user_id = $1`,
-      [userId]
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1`,
+      [txInfo.userIdValue]
     );
 
     const cumRow = cumulativeResult.rows[0] || { income: 0, other: 0, expense: 0 };
@@ -1498,15 +1747,17 @@ app.get('/api/insights', authenticate, async (req, res) => {
 
     const insights = [];
 
+    const txInfo = await getTransactionTableInfo(userId);
+    
     // Top spending category
     const topCategoryResult = await pool.query(
       `SELECT category, ABS(SUM(amount)) as total
-       FROM transactions
-       WHERE user_id = $1 AND cashflow = 'expense'
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND cashflow = 'expense'
        GROUP BY category
        ORDER BY total DESC
        LIMIT 1`,
-      [userId]
+      [txInfo.userIdValue]
     );
 
     if (topCategoryResult.rows.length > 0) {
@@ -1520,13 +1771,13 @@ app.get('/api/insights', authenticate, async (req, res) => {
 
     // Average monthly spending
     const avgResult = await pool.query(
-      `SELECT TO_CHAR(date, 'YYYY-MM') as month, ABS(SUM(amount)) as total
-       FROM transactions
-       WHERE user_id = $1 AND cashflow = 'expense'
+      `SELECT TO_CHAR(${txInfo.dateField}, 'YYYY-MM') as month, ABS(SUM(amount)) as total
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND cashflow = 'expense'
        GROUP BY month
        ORDER BY month DESC
        LIMIT 3`,
-      [userId]
+      [txInfo.userIdValue]
     );
 
     if (avgResult.rows.length > 0) {
@@ -1543,9 +1794,9 @@ app.get('/api/insights', authenticate, async (req, res) => {
       `SELECT
         SUM(CASE WHEN cashflow = 'income' THEN amount ELSE 0 END) as income,
         SUM(CASE WHEN cashflow = 'expense' THEN amount ELSE 0 END) as expense
-       FROM transactions
-       WHERE user_id = $1`,
-      [userId]
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1`,
+      [txInfo.userIdValue]
     );
 
     if (savingsResult.rows.length > 0) {

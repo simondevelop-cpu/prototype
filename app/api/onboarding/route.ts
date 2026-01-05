@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
+import { getPool } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +10,62 @@ const JWT_SECRET = process.env.JWT_SECRET || 'canadian-insights-demo-secret-key-
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,
 });
+
+// Helper to ensure PII is stored in L0 table
+async function upsertPII(userId: number, piiData: {
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  recoveryPhone?: string;
+  provinceRegion?: string;
+  email?: string;
+}) {
+  try {
+    // Get user email if not provided
+    let email = piiData.email;
+    if (!email) {
+      const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+      if (userResult.rows.length > 0) {
+        email = userResult.rows[0].email;
+      }
+    }
+
+    // Upsert into l0_pii_users (for compliance - PII isolation)
+    await pool.query(
+      `INSERT INTO l0_pii_users (
+        internal_user_id, email, first_name, last_name, date_of_birth, 
+        recovery_phone, province_region, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      ON CONFLICT (internal_user_id) 
+      DO UPDATE SET
+        email = EXCLUDED.email,
+        first_name = COALESCE(EXCLUDED.first_name, l0_pii_users.first_name),
+        last_name = COALESCE(EXCLUDED.last_name, l0_pii_users.last_name),
+        date_of_birth = COALESCE(EXCLUDED.date_of_birth, l0_pii_users.date_of_birth),
+        recovery_phone = COALESCE(EXCLUDED.recovery_phone, l0_pii_users.recovery_phone),
+        province_region = COALESCE(EXCLUDED.province_region, l0_pii_users.province_region),
+        updated_at = NOW()`,
+      [
+        userId,
+        email || null,
+        piiData.firstName || null,
+        piiData.lastName || null,
+        piiData.dateOfBirth || null,
+        piiData.recoveryPhone || null,
+        piiData.provinceRegion || null,
+      ]
+    );
+    console.log('[Onboarding API] PII stored in l0_pii_users for user:', userId);
+  } catch (error: any) {
+    // If l0_pii_users doesn't exist yet (pre-migration), just log and continue
+    // This allows graceful fallback during migration
+    if (error.code === '42P01') { // Table doesn't exist
+      console.log('[Onboarding API] l0_pii_users table not found (pre-migration), skipping PII storage');
+    } else {
+      console.error('[Onboarding API] Error storing PII:', error);
+    }
+  }
+}
 
 // Save onboarding responses
 export async function POST(request: NextRequest) {
@@ -142,6 +199,67 @@ export async function POST(request: NextRequest) {
           data.completedAt || new Date().toISOString(),
         ]
         );
+        
+        // Store PII in L0 table after successful onboarding completion
+        await upsertPII(userId, {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          dateOfBirth: data.dateOfBirth,
+          recoveryPhone: data.recoveryPhone,
+          provinceRegion: data.provinceRegion,
+        });
+      } else {
+        // No incomplete attempt found, create new completed entry
+        console.log('[Onboarding API] Creating new completed entry');
+        result = await pool.query(
+          `INSERT INTO onboarding_responses (
+          user_id,
+          emotional_state,
+          financial_context,
+          motivation,
+          motivation_other,
+          acquisition_source,
+          acquisition_other,
+          insight_preferences,
+          insight_other,
+          first_name,
+          last_name,
+          date_of_birth,
+          recovery_phone,
+          province_region,
+          last_step,
+          completed_at,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
+        RETURNING *`,
+        [
+          userId,
+          data.emotionalState || [],
+          data.financialContext || [],
+          data.motivation || null,
+          data.motivationOther || null,
+          data.acquisitionSource || null,
+          data.acquisitionOther || null,
+          data.insightPreferences || [],
+          data.insightOther || null,
+          data.firstName || null,
+          data.lastName || null,
+          data.dateOfBirth || null,
+          data.recoveryPhone || null,
+          data.provinceRegion || null,
+          data.lastStep || 7,
+          data.completedAt || new Date().toISOString(),
+        ]
+        );
+        
+        // Store PII in L0 table after successful onboarding completion
+        await upsertPII(userId, {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          dateOfBirth: data.dateOfBirth,
+          recoveryPhone: data.recoveryPhone,
+          provinceRegion: data.provinceRegion,
+        });
       }
     } else {
       // Old schema without last_step/completed_at
@@ -182,6 +300,15 @@ export async function POST(request: NextRequest) {
           data.provinceRegion || null,
         ]
       );
+      
+      // Store PII in L0 table (even for old schema)
+      await upsertPII(userId, {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        dateOfBirth: data.dateOfBirth,
+        recoveryPhone: data.recoveryPhone,
+        provinceRegion: data.provinceRegion,
+      });
     }
 
     return NextResponse.json({ 

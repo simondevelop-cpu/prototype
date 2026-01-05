@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { ensureTokenizedForAnalytics } from '@/lib/tokenization';
 
 // Force dynamic rendering (POST endpoint requires runtime request body)
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,12 @@ export async function POST(request: NextRequest) {
     const pool = getPool();
     if (!pool) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
+    }
+
+    // Get tokenized user ID for analytics (L1 tables)
+    const tokenizedUserId = await ensureTokenizedForAnalytics(userId);
+    if (!tokenizedUserId) {
+      return NextResponse.json({ error: 'Failed to get user identifier' }, { status: 500 });
     }
 
     // Get bulk update data from request body
@@ -64,19 +71,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No valid update fields provided' }, { status: 400 });
     }
 
-    // Add user_id to values
-    values.push(userId);
+    // Add tokenized_user_id to values
+    values.push(tokenizedUserId);
     const userIdParam = paramCount++;
 
     // Add transaction IDs to values
     values.push(transactionIds);
     const idsParam = paramCount;
 
-    // Bulk update transactions (only if they belong to the user)
+    // Bulk update transactions in L1 fact table (only if they belong to the user)
     const result = await pool.query(
-      `UPDATE transactions 
+      `UPDATE l1_transaction_facts 
        SET ${updateFields.join(', ')}
-       WHERE user_id = $${userIdParam} 
+       WHERE tokenized_user_id = $${userIdParam} 
          AND id = ANY($${idsParam})
        RETURNING id`,
       values

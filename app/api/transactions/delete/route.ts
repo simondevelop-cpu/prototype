@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { ensureTokenizedForAnalytics } from '@/lib/tokenization';
 
 // Force dynamic rendering (DELETE endpoint requires runtime request)
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
+    // Get tokenized user ID for analytics (L1 tables)
+    const tokenizedUserId = await ensureTokenizedForAnalytics(userId);
+    if (!tokenizedUserId) {
+      return NextResponse.json({ error: 'Failed to get user identifier' }, { status: 500 });
+    }
+
     // Get transaction ID from query params
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
@@ -33,10 +40,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Transaction ID required' }, { status: 400 });
     }
 
-    // Delete transaction (only if it belongs to the user)
+    // Delete transaction from L1 fact table (only if it belongs to the user)
     const result = await pool.query(
-      'DELETE FROM transactions WHERE user_id = $1 AND id = $2 RETURNING id',
-      [userId, id]
+      'DELETE FROM l1_transaction_facts WHERE tokenized_user_id = $1 AND id = $2 RETURNING id',
+      [tokenizedUserId, id]
     );
 
     if (result.rows.length === 0) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { ensureTokenizedForAnalytics } from '@/lib/tokenization';
 import dayjs from 'dayjs';
 
 // Force dynamic rendering (required for auth headers)
@@ -26,6 +27,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
+    // Get tokenized user ID for analytics (L1 tables)
+    const tokenizedUserId = await ensureTokenizedForAnalytics(userId);
+    if (!tokenizedUserId) {
+      return NextResponse.json({ error: 'Failed to get user identifier' }, { status: 500 });
+    }
+
     // Get date range parameters
     const url = new URL(request.url);
     const startParam = url.searchParams.get('start');
@@ -41,7 +48,7 @@ export async function GET(request: NextRequest) {
       
       query = `SELECT 
         id,
-        date,
+        transaction_date as date,
         description,
         merchant,
         cashflow,
@@ -49,18 +56,18 @@ export async function GET(request: NextRequest) {
         category,
         label,
         amount
-       FROM transactions
-       WHERE user_id = $1
-         AND date >= $2
-         AND date <= $3
-       ORDER BY date DESC`;
-      params = [userId, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')];
+       FROM l1_transaction_facts
+       WHERE tokenized_user_id = $1
+         AND transaction_date >= $2
+         AND transaction_date <= $3
+       ORDER BY transaction_date DESC`;
+      params = [tokenizedUserId, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')];
     } else if (monthsParam) {
       // Calculate date range based on months parameter
       const months = parseInt(monthsParam);
       const latestResult = await pool.query(
-        'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
-        [userId]
+        'SELECT MAX(transaction_date) as latest FROM l1_transaction_facts WHERE tokenized_user_id = $1',
+        [tokenizedUserId]
       );
 
       let endDate, startDate;
@@ -74,7 +81,7 @@ export async function GET(request: NextRequest) {
       
       query = `SELECT 
         id,
-        date,
+        transaction_date as date,
         description,
         merchant,
         cashflow,
@@ -82,17 +89,17 @@ export async function GET(request: NextRequest) {
         category,
         label,
         amount
-       FROM transactions
-       WHERE user_id = $1
-         AND date >= $2
-         AND date <= $3
-       ORDER BY date DESC`;
-      params = [userId, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')];
+       FROM l1_transaction_facts
+       WHERE tokenized_user_id = $1
+         AND transaction_date >= $2
+         AND transaction_date <= $3
+       ORDER BY transaction_date DESC`;
+      params = [tokenizedUserId, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')];
     } else {
       // No date filter - return ALL transactions
       query = `SELECT 
         id,
-        date,
+        transaction_date as date,
         description,
         merchant,
         cashflow,
@@ -100,10 +107,10 @@ export async function GET(request: NextRequest) {
         category,
         label,
         amount
-       FROM transactions
-       WHERE user_id = $1
-       ORDER BY date DESC`;
-      params = [userId];
+       FROM l1_transaction_facts
+       WHERE tokenized_user_id = $1
+       ORDER BY transaction_date DESC`;
+      params = [tokenizedUserId];
     }
 
     // Query transactions (no LIMIT - show all)
