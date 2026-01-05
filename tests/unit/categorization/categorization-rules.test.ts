@@ -19,19 +19,19 @@ describe('Categorization Rules', () => {
       expect(result.label).toBeDefined();
     });
 
-    it('should handle merchant name variations', () => {
-      // Test alternate patterns (e.g., "TIMHORT" → "TIM HORTONS")
-      expect(true).toBe(true);
+    it.todo('should handle merchant name variations', () => {
+      // TODO: Test alternate patterns (e.g., "TIMHORT" → "TIM HORTONS")
+      // Requires: Merchant pattern setup with alternate patterns
     });
 
-    it('should handle case-insensitive matching', () => {
-      // Test that "tim hortons" matches "TIM HORTONS"
-      expect(true).toBe(true);
+    it.todo('should handle case-insensitive matching', () => {
+      // TODO: Test that "tim hortons" matches "TIM HORTONS"
+      // Requires: Merchant pattern setup
     });
 
-    it('should handle space-insensitive matching', () => {
-      // Test that "TIMHORT" matches "TIM HORTONS"
-      expect(true).toBe(true);
+    it.todo('should handle space-insensitive matching', () => {
+      // TODO: Test that "TIMHORT" matches "TIM HORTONS"
+      // Requires: Merchant pattern setup
     });
   });
 
