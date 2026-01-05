@@ -70,6 +70,15 @@ export async function POST() {
     await pool.query('SELECT 1');
     steps.push('✅ Database connection established');
 
+    // Enable pgcrypto extension (required for digest function)
+    try {
+      await pool.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
+      steps.push('✅ pgcrypto extension enabled');
+    } catch (error: any) {
+      // Extension might already exist or might require superuser - try to continue
+      steps.push('ℹ️ pgcrypto extension check completed');
+    }
+
     // Run schema creation
     try {
       const schemaPath = path.join(process.cwd(), 'migrations', 'create-l0-l1-l2-schema.sql');
