@@ -214,9 +214,10 @@ describe('Transactions API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(data)).toBe(true);
-      expect(data.length).toBe(2);
-      expect(data[0].description).toBe('Transaction 2'); // Ordered by date DESC
+      expect(data).toHaveProperty('transactions');
+      expect(Array.isArray(data.transactions)).toBe(true);
+      expect(data.transactions.length).toBe(2);
+      expect(data.transactions[0].description).toBe('Transaction 2'); // Ordered by date DESC
     });
 
     it('should reject request without authentication', async () => {
@@ -481,8 +482,9 @@ describe('Transactions API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.length).toBe(1);
-      expect(data[0].description).toBe('User 1 Transaction');
+      expect(data).toHaveProperty('transactions');
+      expect(data.transactions.length).toBe(1);
+      expect(data.transactions[0].description).toBe('User 1 Transaction');
     });
   });
 });
