@@ -53,6 +53,11 @@ describe('30-Day Data Retention (PIPEDA)', () => {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         deleted_at TIMESTAMP WITH TIME ZONE
       );
+      CREATE TABLE IF NOT EXISTS l0_user_tokenization (
+        internal_user_id INTEGER PRIMARY KEY REFERENCES users(id),
+        tokenized_user_id TEXT NOT NULL UNIQUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
     `);
   });
 

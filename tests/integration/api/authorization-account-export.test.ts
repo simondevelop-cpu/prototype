@@ -90,8 +90,13 @@ describe('Account Export API Authorization', () => {
         emotional_state TEXT,
         financial_context TEXT,
         motivation TEXT,
+        motivation_other TEXT,
+        acquisition_source TEXT,
+        insight_preferences TEXT[],
+        insight_other TEXT,
         completed_at TIMESTAMP WITH TIME ZONE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 

@@ -48,6 +48,14 @@ describe('Categories API Authorization', () => {
       },
     });
 
+    // Register ABS function for pg-mem
+    db.public.registerFunction({
+      name: 'abs',
+      args: ['float'],
+      returns: 'float',
+      implementation: (value: number) => Math.abs(value),
+    });
+
     const adapter = db.adapters.createPg();
     const MockClient = adapter.Client;
     testClient = new MockClient();
