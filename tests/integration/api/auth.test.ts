@@ -38,7 +38,7 @@ describe('Authentication API', () => {
       end: async () => {},
     } as unknown as Pool;
 
-    // Create schema
+    // Create schema - all tables needed by auth routes
     await testClient.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -46,7 +46,24 @@ describe('Authentication API', () => {
         password_hash TEXT NOT NULL,
         display_name TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      )
+      );
+      
+      CREATE TABLE IF NOT EXISTS transactions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        date DATE NOT NULL,
+        description TEXT NOT NULL,
+        amount NUMERIC(12, 2) NOT NULL,
+        category TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS onboarding_responses (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        completed_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Mock getPool to return our test pool
@@ -61,7 +78,9 @@ describe('Authentication API', () => {
   });
 
   beforeEach(async () => {
-    // Clear users table before each test
+    // Clear all tables before each test
+    await testClient.query('DELETE FROM onboarding_responses');
+    await testClient.query('DELETE FROM transactions');
     await testClient.query('DELETE FROM users');
   });
 
@@ -177,9 +196,16 @@ describe('Authentication API', () => {
     beforeEach(async () => {
       // Create a test user for login tests
       const passwordHash = await hashPassword('TestP@ss1');
-      await testClient.query(
-        'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3)',
+      const userResult = await testClient.query(
+        'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id',
         ['logintest@test.com', passwordHash, 'Login Test User']
+      );
+      const userId = userResult.rows[0].id;
+      
+      // Create completed onboarding response (required for login)
+      await testClient.query(
+        'INSERT INTO onboarding_responses (user_id, completed_at) VALUES ($1, CURRENT_TIMESTAMP)',
+        [userId]
       );
     });
 
