@@ -71,8 +71,8 @@ describe('30-Day Data Retention (PIPEDA)', () => {
   it('should delete PII records older than 30 days', async () => {
     // Create test users
     await client.query('INSERT INTO users (id, email) VALUES (1, $1)', ['user1@example.com']);
-    await client.query('INSERT INTO users (id, email) VALUES (2, $2)', ['user2@example.com']);
-    await client.query('INSERT INTO users (id, email) VALUES (3, $3)', ['user3@example.com']);
+    await client.query('INSERT INTO users (id, email) VALUES (2, $1)', ['user2@example.com']);
+    await client.query('INSERT INTO users (id, email) VALUES (3, $1)', ['user3@example.com']);
 
     // Create PII records with different deletion dates
     const thirtyOneDaysAgo = new Date();

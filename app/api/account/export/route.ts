@@ -42,15 +42,16 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const format = url.searchParams.get('format') || 'json';
 
-    // Check if L0/L1 tables exist
-    const l0Check = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'l0_pii_users'
-      )
-    `);
-    const hasL0 = l0Check.rows[0]?.exists || false;
+    // Check if L0/L1 tables exist (gracefully handle pg-mem or other environments)
+    let hasL0 = false;
+    try {
+      // Try to query the table directly - if it exists, this will work
+      await pool.query('SELECT 1 FROM l0_pii_users LIMIT 1');
+      hasL0 = true;
+    } catch (e: any) {
+      // Table doesn't exist or query failed
+      hasL0 = false;
+    }
 
     // Get user profile/PII
     let profile: any = {};

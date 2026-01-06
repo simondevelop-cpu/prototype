@@ -31,19 +31,20 @@ describe('Categories API Authorization', () => {
     });
 
     // Register DATE_TRUNC function for pg-mem
-    const { Type } = await import('pg-mem');
     db.public.registerFunction({
       name: 'date_trunc',
-      args: [Type.text, Type.date],
-      returns: Type.date,
-      implementation: (unit: string, date: Date) => {
-        const d = dayjs(date);
-        switch (unit) {
-          case 'month': return d.startOf('month').toDate();
-          case 'year': return d.startOf('year').toDate();
-          case 'day': return d.startOf('day').toDate();
-          default: throw new Error(`Unsupported date_trunc unit: ${unit}`);
+      args: ['text', 'date'],
+      returns: 'date',
+      implementation: (interval: string, date: Date | string) => {
+        const d = typeof date === 'string' ? dayjs(date) : dayjs(date);
+        if (interval === 'month') {
+          return d.startOf('month').toDate();
+        } else if (interval === 'year') {
+          return d.startOf('year').toDate();
+        } else if (interval === 'day') {
+          return d.startOf('day').toDate();
         }
+        return d.toDate();
       },
     });
 
