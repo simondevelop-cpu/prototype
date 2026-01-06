@@ -89,8 +89,8 @@ describe('Data Migration Integrity', () => {
       ON CONFLICT (internal_user_id) DO NOTHING
     `);
 
-    const tokenizedCount = await client.query('SELECT COUNT(*) FROM l0_user_tokenization');
-    const usersCount = await client.query('SELECT COUNT(*) FROM users');
+    const tokenizedCount = await client.query('SELECT COUNT(*) as count FROM l0_user_tokenization');
+    const usersCount = await client.query('SELECT COUNT(*) as count FROM users');
 
     expect(parseInt(tokenizedCount.rows[0].count)).toBe(parseInt(usersCount.rows[0].count));
   });
@@ -102,29 +102,42 @@ describe('Data Migration Integrity', () => {
       VALUES (1, '2024-01-15', 'Test Transaction', -50.00, 'Food')
     `);
 
-    // Simulate migration (would use actual migration function)
-    await client.query(`
-      INSERT INTO l1_transaction_facts 
-      (tokenized_user_id, transaction_date, description, amount, cashflow, account, category, legacy_transaction_id)
-      SELECT 
-        ut.tokenized_user_id,
-        t.date,
-        t.description,
-        t.amount,
-        'expense',
-        'Credit Card',
-        t.category,
-        t.id
-      FROM transactions t
-      JOIN l0_user_tokenization ut ON t.user_id = ut.internal_user_id
-      WHERE NOT EXISTS (
-        SELECT 1 FROM l1_transaction_facts tf 
-        WHERE tf.legacy_transaction_id = t.id
-      )
-    `);
+    // Get the transaction ID first
+    const txResult = await client.query('SELECT id FROM transactions WHERE user_id = 1 LIMIT 1');
+    const txId = txResult.rows[0]?.id;
 
-    const oldCount = await client.query('SELECT COUNT(*) FROM transactions');
-    const newCount = await client.query('SELECT COUNT(*) FROM l1_transaction_facts');
+    if (!txId) {
+      throw new Error('Transaction not found');
+    }
+
+    // Check if migration already exists
+    const existing = await client.query(
+      'SELECT COUNT(*) as count FROM l1_transaction_facts WHERE legacy_transaction_id = $1',
+      [txId]
+    );
+
+    if (parseInt(existing.rows[0].count) === 0) {
+      // Simulate migration (rewritten to avoid subquery scope issues in pg-mem)
+      await client.query(`
+        INSERT INTO l1_transaction_facts 
+        (tokenized_user_id, transaction_date, description, amount, cashflow, account, category, legacy_transaction_id)
+        SELECT 
+          ut.tokenized_user_id,
+          t.date,
+          t.description,
+          t.amount,
+          'expense',
+          'Credit Card',
+          t.category,
+          t.id
+        FROM transactions t
+        JOIN l0_user_tokenization ut ON t.user_id = ut.internal_user_id
+        WHERE t.id = $1
+      `, [txId]);
+    }
+
+    const oldCount = await client.query('SELECT COUNT(*) as count FROM transactions');
+    const newCount = await client.query('SELECT COUNT(*) as count FROM l1_transaction_facts');
 
     expect(parseInt(newCount.rows[0].count)).toBeGreaterThanOrEqual(parseInt(oldCount.rows[0].count));
   });
@@ -138,7 +151,7 @@ describe('Data Migration Integrity', () => {
     `);
 
     const count = await client.query(`
-      SELECT COUNT(*) FROM l0_user_tokenization WHERE internal_user_id = 1
+      SELECT COUNT(*) as count FROM l0_user_tokenization WHERE internal_user_id = 1
     `);
 
     expect(parseInt(count.rows[0].count)).toBe(1); // Should still be 1, not 2
@@ -146,14 +159,13 @@ describe('Data Migration Integrity', () => {
 
   it('should maintain referential integrity', async () => {
     // All transactions in L1 should have valid tokenized user IDs
-    const orphaned = await client.query(`
-      SELECT COUNT(*) FROM l1_transaction_facts tf
-      WHERE NOT EXISTS (
-        SELECT 1 FROM l0_user_tokenization ut 
-        WHERE ut.tokenized_user_id = tf.tokenized_user_id
-      )
-    `);
+    // Rewritten to avoid subquery scope issues in pg-mem
+    const allTx = await client.query('SELECT tokenized_user_id FROM l1_transaction_facts');
+    const allTokens = await client.query('SELECT tokenized_user_id FROM l0_user_tokenization');
+    
+    const tokenSet = new Set(allTokens.rows.map((r: any) => r.tokenized_user_id));
+    const orphaned = allTx.rows.filter((r: any) => !tokenSet.has(r.tokenized_user_id));
 
-    expect(parseInt(orphaned.rows[0].count)).toBe(0); // No orphaned transactions
+    expect(orphaned.length).toBe(0); // No orphaned transactions
   });
 });
