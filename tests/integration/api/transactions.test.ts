@@ -87,7 +87,8 @@ describe('Transactions API', () => {
   });
 
   describe('POST /api/transactions/create', () => {
-    it('should create a transaction for authenticated user', async () => {
+    describe('Happy Path', () => {
+      it('should create a transaction for authenticated user', async () => {
       // Create user and tokenization
       const passwordHash = await hashPassword('TestP@ss1');
       const userResult = await testClient.query(
@@ -125,9 +126,11 @@ describe('Transactions API', () => {
       expect(data.success).toBe(true);
       expect(data.transaction.description).toBe('Test Transaction');
       expect(data.transaction.amount).toBe(-50.00);
+      });
     });
 
-    it('should reject transaction creation without authentication', async () => {
+    describe('Unhappy Path', () => {
+      it('should reject transaction creation without authentication', async () => {
       const request = new NextRequest('http://localhost/api/transactions/create', {
         method: 'POST',
         headers: {
@@ -174,10 +177,12 @@ describe('Transactions API', () => {
 
       const response = await createTransactionHandler(request);
       expect(response.status).toBe(400);
+      });
     });
   });
 
   describe('GET /api/transactions', () => {
+    describe('Happy Path', () => {
     it('should return transactions for authenticated user', async () => {
       // Create user and tokenization
       const passwordHash = await hashPassword('TestP@ss1');
@@ -218,9 +223,11 @@ describe('Transactions API', () => {
       expect(Array.isArray(data.transactions)).toBe(true);
       expect(data.transactions.length).toBe(2);
       expect(data.transactions[0].description).toBe('Transaction 2'); // Ordered by date DESC
+      });
     });
 
-    it('should reject request without authentication', async () => {
+    describe('Unhappy Path', () => {
+      it('should reject request without authentication', async () => {
       const request = new NextRequest('http://localhost/api/transactions', {
         method: 'GET',
         headers: {
@@ -230,10 +237,12 @@ describe('Transactions API', () => {
 
       const response = await getTransactionsHandler(request);
       expect(response.status).toBe(401);
+      });
     });
   });
 
   describe('PUT /api/transactions/update', () => {
+    describe('Happy Path', () => {
     it('should update transaction for authenticated user', async () => {
       // Create user and transaction
       const passwordHash = await hashPassword('TestP@ss1');
@@ -278,9 +287,11 @@ describe('Transactions API', () => {
       expect(data.success).toBe(true);
       expect(data.transaction.description).toBe('Updated Description');
       expect(data.transaction.category).toBe('Groceries');
+      });
     });
 
-    it('should reject update without transaction ID', async () => {
+    describe('Unhappy Path', () => {
+      it('should reject update without transaction ID', async () => {
       const passwordHash = await hashPassword('TestP@ss1');
       const userResult = await testClient.query(
         'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id',
@@ -303,10 +314,12 @@ describe('Transactions API', () => {
 
       const response = await updateTransactionHandler(request);
       expect(response.status).toBe(400);
+      });
     });
   });
 
   describe('DELETE /api/transactions/delete', () => {
+    describe('Happy Path', () => {
     it('should delete transaction for authenticated user', async () => {
       // Create user and transaction
       const passwordHash = await hashPassword('TestP@ss1');
@@ -350,9 +363,11 @@ describe('Transactions API', () => {
         [txId]
       );
       expect(checkResult.rows.length).toBe(0);
+      });
     });
 
-    it('should reject delete without transaction ID', async () => {
+    describe('Unhappy Path', () => {
+      it('should reject delete without transaction ID', async () => {
       const passwordHash = await hashPassword('TestP@ss1');
       const userResult = await testClient.query(
         'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id',

@@ -85,7 +85,8 @@ describe('Authentication API', () => {
   });
 
   describe('POST /api/auth/register', () => {
-    it('should register a new user with valid credentials', async () => {
+    describe('Happy Path', () => {
+      it('should register a new user with valid credentials', async () => {
       const request = new NextRequest('http://localhost/api/auth/register', {
         method: 'POST',
         headers: { 
@@ -106,9 +107,9 @@ describe('Authentication API', () => {
       expect(data).toHaveProperty('token');
       expect(data).toHaveProperty('user');
       expect(data.user.email).toBe('newuser@test.com');
-    });
+      });
 
-    it('should reject weak passwords', async () => {
+      it('should hash passwords with bcrypt', async () => {
       const request = new NextRequest('http://localhost/api/auth/register', {
         method: 'POST',
         headers: { 
@@ -152,9 +153,11 @@ describe('Authentication API', () => {
 
       const hash = result.rows[0].password_hash;
       expect(hash).toMatch(/^\$2[aby]\$/); // bcrypt hash format
+      });
     });
 
-    it('should reject duplicate email addresses', async () => {
+    describe('Unhappy Path', () => {
+      it('should reject weak passwords', async () => {
       // Register first user
       const request1 = new NextRequest('http://localhost/api/auth/register', {
         method: 'POST',
@@ -197,10 +200,12 @@ describe('Authentication API', () => {
 
       expect(response.status).toBe(400);
       expect(data.error).toContain('already registered');
+      });
     });
   });
 
   describe('POST /api/auth/login', () => {
+    describe('Happy Path', () => {
     beforeEach(async () => {
       // Create a test user for login tests
       const passwordHash = await hashPassword('TestP@ss1');
@@ -237,9 +242,11 @@ describe('Authentication API', () => {
       expect(data).toHaveProperty('token');
       expect(data).toHaveProperty('user');
       expect(data.user.email).toBe('logintest@test.com');
+      });
     });
 
-    it('should reject invalid credentials', async () => {
+    describe('Unhappy Path', () => {
+      it('should reject invalid credentials', async () => {
       const request = new NextRequest('http://localhost/api/auth/login', {
         method: 'POST',
         headers: { 

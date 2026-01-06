@@ -22,6 +22,21 @@ describe('Summary API Authorization', () => {
       name: 'current_database',
       implementation: () => 'test',
     });
+    
+    // Register date_trunc function for pg-mem (used by summary API)
+    db.public.registerFunction({
+      name: 'date_trunc',
+      args: ['text', 'date'],
+      returns: 'date',
+      implementation: (interval: string, date: Date | string) => {
+        const d = typeof date === 'string' ? new Date(date) : date;
+        if (interval === 'month') {
+          // Return first day of the month
+          return new Date(d.getFullYear(), d.getMonth(), 1);
+        }
+        return d;
+      },
+    });
 
     const adapter = db.adapters.createPg();
     const MockClient = adapter.Client;
