@@ -13,16 +13,7 @@ import { vi } from 'vitest';
 process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/test';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key';
 process.env.TOKENIZATION_SALT = process.env.TOKENIZATION_SALT || 'test-salt';
-
-// Suppress console logs in tests (uncomment if needed)
-// global.console = {
-//   ...console,
-//   log: vi.fn(),
-//   debug: vi.fn(),
-//   info: vi.fn(),
-//   warn: vi.fn(),
-//   error: vi.fn(),
-// };
+process.env.CLEANUP_API_KEY = process.env.CLEANUP_API_KEY || 'test-cleanup-key';
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
@@ -36,18 +27,21 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-// Mock Next.js server components
-vi.mock('next/server', () => ({
-  NextResponse: {
-    json: (data: any, init?: ResponseInit) => {
-      return new Response(JSON.stringify(data), {
-        ...init,
-        headers: {
-          'Content-Type': 'application/json',
-          ...init?.headers,
-        },
-      });
+// Mock Next.js server components - use importOriginal to preserve NextRequest
+vi.mock('next/server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/server')>();
+  return {
+    ...actual,
+    NextResponse: {
+      json: (data: any, init?: ResponseInit) => {
+        return new Response(JSON.stringify(data), {
+          ...init,
+          headers: {
+            'Content-Type': 'application/json',
+            ...init?.headers,
+          },
+        });
+      },
     },
-  },
-}));
-
+  };
+});
