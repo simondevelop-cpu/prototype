@@ -87,125 +87,124 @@ describe('Authentication API', () => {
   describe('POST /api/auth/register', () => {
     describe('Happy Path', () => {
       it('should register a new user with valid credentials', async () => {
-      const request = new NextRequest('http://localhost/api/auth/register', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'origin': 'http://localhost',
-        },
-        body: JSON.stringify({
-          email: 'newuser@test.com',
-          password: 'StrongP@ss1',
-          name: 'Test User',
-        }),
-      });
+        const request = new NextRequest('http://localhost/api/auth/register', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'origin': 'http://localhost',
+          },
+          body: JSON.stringify({
+            email: 'newuser@test.com',
+            password: 'StrongP@ss1',
+            name: 'Test User',
+          }),
+        });
 
-      const response = await registerHandler(request);
-      const data = await response.json();
+        const response = await registerHandler(request);
+        const data = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(data).toHaveProperty('token');
-      expect(data).toHaveProperty('user');
-      expect(data.user.email).toBe('newuser@test.com');
+        expect(response.status).toBe(200);
+        expect(data).toHaveProperty('token');
+        expect(data).toHaveProperty('user');
+        expect(data.user.email).toBe('newuser@test.com');
       });
 
       it('should hash passwords with bcrypt', async () => {
-      const request = new NextRequest('http://localhost/api/auth/register', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'origin': 'http://localhost',
-        },
-        body: JSON.stringify({
-          email: 'weak@test.com',
-          password: 'weak',
-          name: 'Test User',
-        }),
-      });
+        const request = new NextRequest('http://localhost/api/auth/register', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'origin': 'http://localhost',
+          },
+          body: JSON.stringify({
+            email: 'hashtest@test.com',
+            password: 'StrongP@ss1',
+            name: 'Test User',
+          }),
+        });
 
-      const response = await registerHandler(request);
-      const data = await response.json();
+        await registerHandler(request);
 
-      expect(response.status).toBe(400);
-      expect(data.error).toContain('Password');
-    });
+        const result = await testClient.query(
+          'SELECT password_hash FROM users WHERE email = $1',
+          ['hashtest@test.com']
+        );
 
-    it('should hash passwords with bcrypt', async () => {
-      const request = new NextRequest('http://localhost/api/auth/register', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'origin': 'http://localhost',
-        },
-        body: JSON.stringify({
-          email: 'hashtest@test.com',
-          password: 'StrongP@ss1',
-          name: 'Test User',
-        }),
-      });
-
-      await registerHandler(request);
-
-      const result = await testClient.query(
-        'SELECT password_hash FROM users WHERE email = $1',
-        ['hashtest@test.com']
-      );
-
-      const hash = result.rows[0].password_hash;
-      expect(hash).toMatch(/^\$2[aby]\$/); // bcrypt hash format
+        const hash = result.rows[0].password_hash;
+        expect(hash).toMatch(/^\$2[aby]\$/); // bcrypt hash format
       });
     });
 
     describe('Unhappy Path', () => {
       it('should reject weak passwords', async () => {
-      // Register first user
-      const request1 = new NextRequest('http://localhost/api/auth/register', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'origin': 'http://localhost',
-        },
-        body: JSON.stringify({
-          email: 'duplicate@test.com',
-          password: 'StrongP@ss1',
-          name: 'Test User',
-        }),
-      });
-      const response1 = await registerHandler(request1);
-      const data1 = await response1.json();
-      const userId = data1.user.id;
+        const request = new NextRequest('http://localhost/api/auth/register', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'origin': 'http://localhost',
+          },
+          body: JSON.stringify({
+            email: 'weak@test.com',
+            password: 'weak',
+            name: 'Test User',
+          }),
+        });
 
-      // Mark onboarding as completed (so duplicate registration is rejected)
-      await testClient.query(
-        'INSERT INTO onboarding_responses (user_id, completed_at) VALUES ($1, CURRENT_TIMESTAMP)',
-        [userId]
-      );
+        const response = await registerHandler(request);
+        const data = await response.json();
 
-      // Try to register again with same email - should be rejected
-      const request2 = new NextRequest('http://localhost/api/auth/register', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'origin': 'http://localhost',
-        },
-        body: JSON.stringify({
-          email: 'duplicate@test.com',
-          password: 'StrongP@ss2',
-          name: 'Test User 2',
-        }),
+        expect(response.status).toBe(400);
+        expect(data.error).toContain('Password');
       });
 
-      const response = await registerHandler(request2);
-      const data = await response.json();
+      it('should reject duplicate email addresses', async () => {
+        // Register first user
+        const request1 = new NextRequest('http://localhost/api/auth/register', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'origin': 'http://localhost',
+          },
+          body: JSON.stringify({
+            email: 'duplicate@test.com',
+            password: 'StrongP@ss1',
+            name: 'Test User',
+          }),
+        });
+        const response1 = await registerHandler(request1);
+        const data1 = await response1.json();
+        const userId = data1.user.id;
 
-      expect(response.status).toBe(400);
-      expect(data.error).toContain('already registered');
+        // Mark onboarding as completed (so duplicate registration is rejected)
+        await testClient.query(
+          'INSERT INTO onboarding_responses (user_id, completed_at) VALUES ($1, CURRENT_TIMESTAMP)',
+          [userId]
+        );
+
+        // Try to register again with same email - should be rejected
+        const request2 = new NextRequest('http://localhost/api/auth/register', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'origin': 'http://localhost',
+          },
+          body: JSON.stringify({
+            email: 'duplicate@test.com',
+            password: 'StrongP@ss2',
+            name: 'Test User 2',
+          }),
+        });
+
+        const response = await registerHandler(request2);
+        const data = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(data.error).toContain('already registered');
       });
     });
   });
 
   describe('POST /api/auth/login', () => {
-    describe('Happy Path', () => {
     beforeEach(async () => {
       // Create a test user for login tests
       const passwordHash = await hashPassword('TestP@ss1');
@@ -222,48 +221,50 @@ describe('Authentication API', () => {
       );
     });
 
-    it('should login with valid credentials', async () => {
-      const request = new NextRequest('http://localhost/api/auth/login', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'origin': 'http://localhost',
-        },
-        body: JSON.stringify({
-          email: 'logintest@test.com',
-          password: 'TestP@ss1',
-        }),
-      });
+    describe('Happy Path', () => {
+      it('should login with valid credentials', async () => {
+        const request = new NextRequest('http://localhost/api/auth/login', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'origin': 'http://localhost',
+          },
+          body: JSON.stringify({
+            email: 'logintest@test.com',
+            password: 'TestP@ss1',
+          }),
+        });
 
-      const response = await loginHandler(request);
-      const data = await response.json();
+        const response = await loginHandler(request);
+        const data = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(data).toHaveProperty('token');
-      expect(data).toHaveProperty('user');
-      expect(data.user.email).toBe('logintest@test.com');
+        expect(response.status).toBe(200);
+        expect(data).toHaveProperty('token');
+        expect(data).toHaveProperty('user');
+        expect(data.user.email).toBe('logintest@test.com');
       });
     });
 
     describe('Unhappy Path', () => {
       it('should reject invalid credentials', async () => {
-      const request = new NextRequest('http://localhost/api/auth/login', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'origin': 'http://localhost',
-        },
-        body: JSON.stringify({
-          email: 'logintest@test.com',
-          password: 'WrongPassword1!',
-        }),
+        const request = new NextRequest('http://localhost/api/auth/login', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'origin': 'http://localhost',
+          },
+          body: JSON.stringify({
+            email: 'logintest@test.com',
+            password: 'WrongPassword1!',
+          }),
+        });
+
+        const response = await loginHandler(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(401);
+        expect(data.error).toContain('Invalid credentials');
       });
-
-      const response = await loginHandler(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(401);
-      expect(data.error).toContain('Invalid credentials');
     });
   });
 });

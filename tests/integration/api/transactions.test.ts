@@ -147,9 +147,9 @@ describe('Transactions API', () => {
 
       const response = await createTransactionHandler(request);
       expect(response.status).toBe(401);
-    });
+      });
 
-    it('should reject transaction with missing required fields', async () => {
+      it('should reject transaction with missing required fields', async () => {
       const passwordHash = await hashPassword('TestP@ss1');
       const userResult = await testClient.query(
         'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id',
@@ -183,7 +183,7 @@ describe('Transactions API', () => {
 
   describe('GET /api/transactions', () => {
     describe('Happy Path', () => {
-    it('should return transactions for authenticated user', async () => {
+      it('should return transactions for authenticated user', async () => {
       // Create user and tokenization
       const passwordHash = await hashPassword('TestP@ss1');
       const userResult = await testClient.query(
@@ -243,7 +243,7 @@ describe('Transactions API', () => {
 
   describe('PUT /api/transactions/update', () => {
     describe('Happy Path', () => {
-    it('should update transaction for authenticated user', async () => {
+      it('should update transaction for authenticated user', async () => {
       // Create user and transaction
       const passwordHash = await hashPassword('TestP@ss1');
       const userResult = await testClient.query(
@@ -320,7 +320,7 @@ describe('Transactions API', () => {
 
   describe('DELETE /api/transactions/delete', () => {
     describe('Happy Path', () => {
-    it('should delete transaction for authenticated user', async () => {
+      it('should delete transaction for authenticated user', async () => {
       // Create user and transaction
       const passwordHash = await hashPassword('TestP@ss1');
       const userResult = await testClient.query(
@@ -386,6 +386,7 @@ describe('Transactions API', () => {
 
       const response = await deleteTransactionHandler(request);
       expect(response.status).toBe(400);
+      });
     });
   });
 
