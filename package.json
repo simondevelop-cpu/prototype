@@ -15,6 +15,7 @@
     "test:integration": "vitest run tests/integration",
     "test:security": "vitest run tests/security",
     "test:coverage": "vitest run --coverage",
+    "test:summary": "ts-node scripts/generate-test-summary.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:watch": "vitest watch",
