@@ -75,15 +75,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user exists
+    // Using subqueries to avoid pg-mem bug with COUNT(DISTINCT CASE WHEN ...)
     const existingUser = await pool.query(
-      `SELECT u.id, u.email, 
-              COUNT(DISTINCT t.id) as transaction_count,
-              COUNT(DISTINCT CASE WHEN o.completed_at IS NOT NULL THEN o.id END) as completed_onboarding_count
+      `SELECT u.id, u.email,
+              COALESCE((SELECT COUNT(*) FROM transactions WHERE user_id = u.id), 0) as transaction_count,
+              COALESCE((SELECT COUNT(*) FROM onboarding_responses WHERE user_id = u.id AND completed_at IS NOT NULL), 0) as completed_onboarding_count
        FROM users u
-       LEFT JOIN transactions t ON u.id = t.user_id
-       LEFT JOIN onboarding_responses o ON u.id = o.user_id
-       WHERE u.email = $1
-       GROUP BY u.id, u.email`,
+       WHERE u.email = $1`,
       [email.toLowerCase()]
     );
 
