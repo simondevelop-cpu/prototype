@@ -2,16 +2,16 @@
  * Integration Tests: Transaction Deduplication
  * Tests that duplicate transactions are properly detected and handled
  * 
- * NOTE: Using pg-mem with adapter's query method directly
+ * Using pg-mem's adapter Client approach
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { newDb } from 'pg-mem';
-import { Pool } from 'pg';
+import { Client } from 'pg';
 
 describe('Transaction Deduplication', () => {
   let db: any;
-  let pool: Pool;
+  let client: Client;
 
   beforeAll(async () => {
     // Create in-memory PostgreSQL database
@@ -27,20 +27,16 @@ describe('Transaction Deduplication', () => {
       implementation: () => 'PostgreSQL 14.0',
     });
 
-    // Use pg-mem adapter - get the adapter and use it directly
+    // Get the adapter and use its Client
     const adapter = db.adapters.createPg();
+    const MockClient = adapter.Client;
     
-    // Try using the adapter's query method if available, otherwise use Pool
-    if (adapter.query) {
-      // Use adapter directly if it has query method
-      pool = adapter;
-    } else {
-      // Use Pool with connectionString (fallback)
-      pool = new Pool({ connectionString: adapter.connectionString });
-    }
+    // Create a client using the mock Client from pg-mem
+    client = new MockClient();
+    await client.connect();
 
     // Create test schema
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS l1_transaction_facts (
         id SERIAL PRIMARY KEY,
         tokenized_user_id TEXT NOT NULL,
@@ -58,8 +54,8 @@ describe('Transaction Deduplication', () => {
   });
 
   afterAll(async () => {
-    if (pool && typeof pool.end === 'function') {
-      await pool.end();
+    if (client) {
+      await client.end();
     }
   });
 
@@ -67,14 +63,14 @@ describe('Transaction Deduplication', () => {
     const tokenizedUserId = 'test_user_123';
     
     // Insert first transaction
-    await pool.query(`
+    await client.query(`
       INSERT INTO l1_transaction_facts 
       (tokenized_user_id, transaction_date, description, merchant, amount, cashflow, account, category)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `, [tokenizedUserId, '2024-01-15', 'TIM HORTONS', 'TIM HORTONS', -5.50, 'expense', 'Credit Card', 'Food']);
 
     // Check for duplicate (same date, merchant, amount, cashflow)
-    const duplicateCheck = await pool.query(`
+    const duplicateCheck = await client.query(`
       SELECT id FROM l1_transaction_facts 
       WHERE tokenized_user_id = $1 
       AND transaction_date = $2 
@@ -90,14 +86,14 @@ describe('Transaction Deduplication', () => {
     const tokenizedUserId = 'test_user_456';
     
     // Insert transaction on date 1
-    await pool.query(`
+    await client.query(`
       INSERT INTO l1_transaction_facts 
       (tokenized_user_id, transaction_date, description, merchant, amount, cashflow, account, category)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `, [tokenizedUserId, '2024-01-15', 'TIM HORTONS', 'TIM HORTONS', -5.50, 'expense', 'Credit Card', 'Food']);
 
     // Check for same transaction on different date (should NOT be duplicate)
-    const duplicateCheck = await pool.query(`
+    const duplicateCheck = await client.query(`
       SELECT id FROM l1_transaction_facts 
       WHERE tokenized_user_id = $1 
       AND transaction_date = $2 
@@ -113,14 +109,14 @@ describe('Transaction Deduplication', () => {
     const tokenizedUserId = 'test_user_789';
     
     // Insert transaction with amount 1
-    await pool.query(`
+    await client.query(`
       INSERT INTO l1_transaction_facts 
       (tokenized_user_id, transaction_date, description, merchant, amount, cashflow, account, category)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `, [tokenizedUserId, '2024-01-15', 'TIM HORTONS', 'TIM HORTONS', -5.50, 'expense', 'Credit Card', 'Food']);
 
     // Check for same transaction with different amount (should NOT be duplicate)
-    const duplicateCheck = await pool.query(`
+    const duplicateCheck = await client.query(`
       SELECT id FROM l1_transaction_facts 
       WHERE tokenized_user_id = $1 
       AND transaction_date = $2 
@@ -137,14 +133,14 @@ describe('Transaction Deduplication', () => {
     const user2 = 'user_2';
     
     // User 1 inserts transaction
-    await pool.query(`
+    await client.query(`
       INSERT INTO l1_transaction_facts 
       (tokenized_user_id, transaction_date, description, merchant, amount, cashflow, account, category)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `, [user1, '2024-01-15', 'TIM HORTONS', 'TIM HORTONS', -5.50, 'expense', 'Credit Card', 'Food']);
 
     // User 2 inserts same transaction (should NOT be duplicate - different user)
-    const duplicateCheck = await pool.query(`
+    const duplicateCheck = await client.query(`
       SELECT id FROM l1_transaction_facts 
       WHERE tokenized_user_id = $1 
       AND transaction_date = $2 
