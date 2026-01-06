@@ -65,6 +65,13 @@ describe('SQL Injection Prevention', () => {
         label TEXT DEFAULT '',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+      
+      CREATE TABLE IF NOT EXISTS onboarding_responses (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        completed_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     vi.spyOn(dbModule, 'getPool').mockReturnValue(mockPool);
@@ -80,6 +87,7 @@ describe('SQL Injection Prevention', () => {
   beforeEach(async () => {
     await testClient.query('DELETE FROM l1_transaction_facts');
     await testClient.query('DELETE FROM l0_user_tokenization');
+    await testClient.query('DELETE FROM onboarding_responses');
     await testClient.query('DELETE FROM users');
   });
 
@@ -227,14 +235,15 @@ describe('SQL Injection Prevention', () => {
       // If SQL injection worked, we'd see a 500 error or table deletion
       expect([400, 401, 403, 500]).toContain(response.status);
       
-      // Verify table still exists
-      const tableCheck = await testClient.query(`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE table_name = 'users'
-        )
-      `);
-      expect(tableCheck.rows[0].exists).toBe(true);
+      // Verify table still exists (pg-mem compatible check)
+      // Instead of checking information_schema, we try to query the table directly
+      try {
+        const tableCheck = await testClient.query('SELECT 1 FROM users LIMIT 1');
+        expect(tableCheck.rows).toBeDefined();
+      } catch (e: any) {
+        // If table doesn't exist, this will fail
+        throw new Error('Table check failed - table may have been dropped');
+      }
     });
   });
 });
