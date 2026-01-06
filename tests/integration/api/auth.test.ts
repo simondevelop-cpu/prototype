@@ -168,9 +168,17 @@ describe('Authentication API', () => {
           name: 'Test User',
         }),
       });
-      await registerHandler(request1);
+      const response1 = await registerHandler(request1);
+      const data1 = await response1.json();
+      const userId = data1.user.id;
 
-      // Try to register again with same email
+      // Mark onboarding as completed (so duplicate registration is rejected)
+      await testClient.query(
+        'INSERT INTO onboarding_responses (user_id, completed_at) VALUES ($1, CURRENT_TIMESTAMP)',
+        [userId]
+      );
+
+      // Try to register again with same email - should be rejected
       const request2 = new NextRequest('http://localhost/api/auth/register', {
         method: 'POST',
         headers: { 
