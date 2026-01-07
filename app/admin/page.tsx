@@ -1005,50 +1005,246 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {healthData && healthData.checks && (
-          <div className="grid gap-4">
-            {healthData.checks.map((check: any, index: number) => (
-              <div
-                key={index}
-                className={`border-2 rounded-lg p-6 ${getStatusColor(check.status)}`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-2xl">{getStatusIcon(check.status)}</span>
-                      <h3 className="text-lg font-bold">{check.name}</h3>
+        {healthData && healthData.checks && (() => {
+          // Organize checks into sections
+          const infrastructureChecks = [
+            'Environment Variables',
+            'Database Connection',
+            'Database Performance',
+            'Schema Tables',
+            'Database Extensions',
+            'Database Disk Space',
+          ];
+          
+          const appHealthChecks = [
+            'Data Migration',
+            'Data Integrity',
+            'Password Security',
+          ];
+          
+          const pipedaChecks = [
+            'PII Isolation',
+            'Account Deletion Endpoint',
+            'Data Export Endpoint',
+            '30-Day Data Retention',
+            'User Tokenization',
+          ];
+
+          const infrastructure = healthData.checks.filter((c: any) => 
+            infrastructureChecks.includes(c.name)
+          );
+          const appHealth = healthData.checks.filter((c: any) => 
+            appHealthChecks.includes(c.name)
+          );
+          const pipeda = healthData.checks.filter((c: any) => 
+            pipedaChecks.includes(c.name)
+          );
+
+          // PIPEDA requirements that don't need automated checks
+          const pipedaNoCheck = [
+            {
+              name: 'Password Strength Validation',
+              status: 'pass',
+              description: 'Client and server-side password validation enforced',
+              note: 'Implemented in registration endpoint and Login component',
+            },
+            {
+              name: 'Rate Limiting',
+              status: 'pass',
+              description: 'Rate limiting on authentication endpoints',
+              note: 'Implemented in /api/auth/login and /api/auth/register',
+            },
+            {
+              name: 'CSRF Protection',
+              status: 'pass',
+              description: 'CSRF protection via origin verification',
+              note: 'Implemented in lib/csrf.ts',
+            },
+            {
+              name: 'Bcrypt Password Hashing',
+              status: 'pass',
+              description: 'Passwords hashed with bcrypt (not SHA-256)',
+              note: 'Implemented in lib/auth.ts',
+            },
+          ];
+
+          // PIPEDA requirements that need documentation/process
+          const pipedaDocumentation = [
+            {
+              name: 'Privacy Policy',
+              status: 'warning',
+              description: 'Privacy policy document required',
+              note: 'Create privacy policy document and link from app',
+              action: 'Documentation needed',
+            },
+            {
+              name: 'Terms of Service',
+              status: 'warning',
+              description: 'Terms of service document required',
+              note: 'Create terms of service document',
+              action: 'Documentation needed',
+            },
+            {
+              name: 'Data Processing Agreement',
+              status: 'warning',
+              description: 'DPA for third-party services (e.g., Vercel, Neon)',
+              note: 'Review and document data processing agreements',
+              action: 'Legal review needed',
+            },
+            {
+              name: 'Breach Notification Plan',
+              status: 'warning',
+              description: 'Incident response plan for data breaches',
+              note: 'Document breach notification procedures per Law 25',
+              action: 'Process documentation needed',
+            },
+            {
+              name: 'Privacy Officer',
+              status: 'warning',
+              description: 'Designate privacy officer (Law 25 requirement)',
+              note: 'Assign privacy officer and publish contact information',
+              action: 'Organizational setup needed',
+            },
+          ];
+
+          const renderCheck = (check: any, index: number) => (
+            <div
+              key={index}
+              className={`border-2 rounded-lg p-6 ${getStatusColor(check.status)}`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-2xl">{getStatusIcon(check.status)}</span>
+                    <h3 className="text-lg font-bold">{check.name}</h3>
+                  </div>
+                  <p className="text-sm mb-3 opacity-90">{check.description}</p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                      check.status === 'pass' ? 'bg-green-200 text-green-900' :
+                      check.status === 'fail' ? 'bg-red-200 text-red-900' :
+                      'bg-yellow-200 text-yellow-900'
+                    }`}>
+                      {check.message || check.note}
                     </div>
-                    <p className="text-sm mb-3 opacity-90">{check.description}</p>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                        check.status === 'pass' ? 'bg-green-200 text-green-900' :
-                        check.status === 'fail' ? 'bg-red-200 text-red-900' :
-                        'bg-yellow-200 text-yellow-900'
-                      }`}>
-                        {check.message}
-                      </div>
-                      {check.responseTimeMs !== undefined && (
-                        <span className="text-xs text-gray-500">
-                          ({check.responseTimeMs}ms)
-                        </span>
-                      )}
-                    </div>
-                    {check.details && (
-                      <details className="mt-4">
-                        <summary className="cursor-pointer text-sm font-medium hover:underline">
-                          View Details
-                        </summary>
-                        <pre className="mt-2 p-3 bg-black bg-opacity-10 rounded text-xs overflow-x-auto">
-                          {JSON.stringify(check.details, null, 2)}
-                        </pre>
-                      </details>
+                    {check.responseTimeMs !== undefined && (
+                      <span className="text-xs text-gray-500">
+                        ({check.responseTimeMs}ms)
+                      </span>
                     )}
+                  </div>
+                  {check.details && (
+                    <details className="mt-4">
+                      <summary className="cursor-pointer text-sm font-medium hover:underline">
+                        View Details
+                      </summary>
+                      <pre className="mt-2 p-3 bg-black bg-opacity-10 rounded text-xs overflow-x-auto">
+                        {JSON.stringify(check.details, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                  {check.action && (
+                    <div className="mt-2 text-xs text-gray-600 italic">
+                      Action: {check.action}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+
+          return (
+            <div className="space-y-8">
+              {/* Infrastructure Health */}
+              <div>
+                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                  <span>🏗️</span> Infrastructure Health
+                </h3>
+                <div className="grid gap-4">
+                  {infrastructure.map((check: any, index: number) => renderCheck(check, index))}
+                </div>
+              </div>
+
+              {/* App Health / Operational Correctness */}
+              <div>
+                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                  <span>⚙️</span> App Health / Operational Correctness
+                </h3>
+                <div className="grid gap-4">
+                  {appHealth.map((check: any, index: number) => renderCheck(check, index))}
+                </div>
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>Note:</strong> Product health metrics (ingestion latency, parsing rates, categorization accuracy) 
+                    will be added in future updates.
+                  </p>
+                </div>
+              </div>
+
+              {/* PIPEDA / Law 25 Requirements */}
+              <div>
+                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                  <span>🔒</span> PIPEDA / Law 25 Compliance
+                </h3>
+                
+                {/* Active Tests/Checks */}
+                <div className="mb-6">
+                  <h4 className="text-lg font-semibold mb-3 text-gray-700">Active Tests / Checks</h4>
+                  <div className="grid gap-4">
+                    {pipeda.map((check: any, index: number) => renderCheck(check, index))}
+                  </div>
+                </div>
+
+                {/* Requirements (No Checks Needed) */}
+                <div className="mb-6">
+                  <h4 className="text-lg font-semibold mb-3 text-gray-700">Implemented Requirements (No Automated Checks)</h4>
+                  <div className="grid gap-4">
+                    {pipedaNoCheck.map((req: any, index: number) => (
+                      <div
+                        key={index}
+                        className="border-2 rounded-lg p-4 bg-green-50 border-green-200"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="text-xl">✅</span>
+                          <div className="flex-1">
+                            <h4 className="font-bold text-green-900 mb-1">{req.name}</h4>
+                            <p className="text-sm text-green-800 mb-2">{req.description}</p>
+                            <p className="text-xs text-green-700 italic">{req.note}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Requirements (Documentation/Process Needed) */}
+                <div>
+                  <h4 className="text-lg font-semibold mb-3 text-gray-700">Requirements Needing Documentation / Process</h4>
+                  <div className="grid gap-4">
+                    {pipedaDocumentation.map((req: any, index: number) => (
+                      <div
+                        key={index}
+                        className="border-2 rounded-lg p-4 bg-yellow-50 border-yellow-200"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="text-xl">📝</span>
+                          <div className="flex-1">
+                            <h4 className="font-bold text-yellow-900 mb-1">{req.name}</h4>
+                            <p className="text-sm text-yellow-800 mb-2">{req.description}</p>
+                            <p className="text-xs text-yellow-700 italic mb-2">{req.note}</p>
+                            <div className="text-xs font-medium text-yellow-900">
+                              ⚠️ {req.action}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          );
+        })()}
 
         {healthData && healthData.error && (
           <div className="bg-red-50 border-2 border-red-300 rounded-lg p-6">
