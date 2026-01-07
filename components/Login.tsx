@@ -16,7 +16,6 @@ export default function Login({ onLogin }: LoginProps) {
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,36 +181,32 @@ export default function Login({ onLogin }: LoginProps) {
               <input
                 type="password"
                 value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  if (isRegister) {
-                    const res = validatePasswordStrength(e.target.value);
-                    setPasswordErrors(res.valid ? [] : res.errors);
-                  }
-                }}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               {isRegister && (
-                <div className="mt-2 text-xs text-gray-600">
-                  <p className="font-medium">Password requirements:</p>
-                  <ul className="list-disc ml-5">
-                    <li>At least 8 characters long</li>
-                    <li>At least one uppercase letter (A-Z)</li>
-                    <li>At least one lowercase letter (a-z)</li>
-                    <li>At least one number (0-9)</li>
-                    <li>At least one special character (!@#$%^&*()_+-=[]{}|;:,.&lt;&gt;?)</li>
+                <div className="mt-2 text-xs">
+                  <p className="font-medium text-gray-700 mb-2">Password requirements:</p>
+                  <ul className="space-y-1">
+                    {(() => {
+                      const requirements = [
+                        { label: 'At least 8 characters long', check: password.length >= 8 },
+                        { label: 'At least one uppercase letter (A-Z)', check: /[A-Z]/.test(password) },
+                        { label: 'At least one lowercase letter (a-z)', check: /[a-z]/.test(password) },
+                        { label: 'At least one number (0-9)', check: /[0-9]/.test(password) },
+                        { label: 'At least one special character (!@#$%^&*()_+-=[]{}|;:,.&lt;&gt;?)', check: /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password) },
+                      ];
+                      return requirements.map((req, idx) => (
+                        <li key={idx} className={`flex items-center gap-2 ${req.check ? 'text-green-600' : 'text-gray-600'}`}>
+                          <span className={req.check ? 'text-green-500' : 'text-gray-400'}>
+                            {req.check ? '✓' : '○'}
+                          </span>
+                          <span>{req.label}</span>
+                        </li>
+                      ));
+                    })()}
                   </ul>
-                  {password && passwordErrors.length > 0 && (
-                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-800">
-                      <p className="font-medium mb-1">Please fix:</p>
-                      <ul className="list-disc ml-5">
-                        {passwordErrors.map((err, idx) => (
-                          <li key={idx}>{err}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
