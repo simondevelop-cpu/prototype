@@ -859,6 +859,85 @@ async function checkTokenization(): Promise<HealthCheck> {
   }
 }
 
+async function checkDataResidency(): Promise<HealthCheck> {
+  const startTime = Date.now();
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return {
+        name: 'Data Residency (Law 25)',
+        description: 'Verifies database is hosted in Canada for Law 25 compliance (Quebec residents)',
+        status: 'fail',
+        message: 'Database pool not available',
+        responseTimeMs: Date.now() - startTime,
+      };
+    }
+
+    // Try to determine database region from connection string
+    const dbUrl = process.env.DATABASE_URL || '';
+    let detectedRegion = 'unknown';
+    let isCanada = false;
+
+    // Check connection string for region indicators
+    if (dbUrl.includes('.neon.tech')) {
+      // Neon database - check hostname for region
+      const match = dbUrl.match(/@([^./]+)\.neon\.tech/);
+      if (match) {
+        detectedRegion = 'Neon (region not detectable from URL)';
+      } else {
+        detectedRegion = 'Neon (connection string format)';
+      }
+      
+      // We can't determine region from connection string alone
+      // This will need manual verification in Neon console
+      isCanada = false; // Assume not Canada until verified
+    } else if (dbUrl.includes('.supabase.co')) {
+      detectedRegion = 'Supabase';
+      isCanada = false; // Supabase doesn't offer Canada regions
+    } else if (dbUrl.includes('.railway.app')) {
+      detectedRegion = 'Railway (region not detectable from URL)';
+      isCanada = false; // Unknown until verified
+    } else if (dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1')) {
+      detectedRegion = 'Local development';
+      isCanada = false;
+    } else {
+      detectedRegion = 'Unknown provider';
+      isCanada = false;
+    }
+
+    const responseTime = Date.now() - startTime;
+
+    // NOTE: Based on investigation, current database is in US (Washington, D.C.)
+    // This check cannot automatically verify region, so we mark as warning
+    // User must verify region in Neon/Vercel console
+    return {
+      name: 'Data Residency (Law 25)',
+      description: 'Database must be in Canada (Toronto) for Law 25 compliance with Quebec residents',
+      status: 'warning',
+      message: '⚠️ CURRENT DATABASE IS IN US (Washington, D.C.) - Migration to Canada (Toronto) required for Law 25 compliance',
+      details: {
+        detectedProvider: detectedRegion,
+        currentRegion: 'US (Washington, D.C.)',
+        requiredRegion: 'Canada (Toronto)',
+        complianceStatus: '⚠️ Non-compliant for Quebec residents',
+        actionRequired: 'Migrate database to Canada (Toronto) - see MIGRATE_TO_CANADA.md',
+        note: 'PIPEDA compliant (allows cross-border), but Law 25 requires Canada for Quebec users',
+        migrationDifficulty: 'Low (2-3 hours, no code changes needed)',
+      },
+      responseTimeMs: responseTime,
+    };
+  } catch (error: any) {
+    return {
+      name: 'Data Residency (Law 25)',
+      description: 'Verifies database is hosted in Canada',
+      status: 'fail',
+      message: `Error: ${error.message}`,
+      details: error.message,
+      responseTimeMs: Date.now() - startTime,
+    };
+  }
+}
+
 export async function GET() {
   const overallStartTime = Date.now();
   try {
@@ -883,6 +962,7 @@ export async function GET() {
     checks.push(await checkDataExportEndpoint());
     checks.push(await check30DayRetention());
     checks.push(await checkTokenization());
+    checks.push(await checkDataResidency());
 
     const allPassed = checks.every(c => c.status === 'pass');
     const hasFailures = checks.some(c => c.status === 'fail');

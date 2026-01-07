@@ -1028,6 +1028,7 @@ export default function AdminDashboard() {
             'Data Export Endpoint',
             '30-Day Data Retention',
             'User Tokenization',
+            'Data Residency (Law 25)',
           ];
 
           const infrastructure = healthData.checks.filter((c: any) => 
@@ -1071,10 +1072,17 @@ export default function AdminDashboard() {
           // PIPEDA requirements that need documentation/process
           const pipedaDocumentation = [
             {
+              name: 'Data Residency - Database Migration (Law 25)',
+              status: 'warning',
+              description: 'Database must be hosted in Canada (Toronto) for Law 25 compliance with Quebec residents',
+              note: 'Current database is in US (Washington, D.C.). Must migrate to Canada (Toronto). See MIGRATE_TO_CANADA.md for step-by-step guide. Migration time: 2-3 hours, no code changes needed.',
+              action: 'Migration required - See MIGRATE_TO_CANADA.md',
+            },
+            {
               name: 'Privacy Policy',
               status: 'warning',
               description: 'Privacy policy document required',
-              note: 'Create privacy policy document and link from app',
+              note: 'Create privacy policy document and link from app. Must include data residency disclosure (database in US currently, will be in Canada after migration).',
               action: 'Documentation needed',
             },
             {
@@ -1088,21 +1096,21 @@ export default function AdminDashboard() {
               name: 'Data Processing Agreement',
               status: 'warning',
               description: 'DPA for third-party services (e.g., Vercel, Neon)',
-              note: 'Review and document data processing agreements',
+              note: 'Review and document data processing agreements with Vercel and Neon. Ensure they meet "equivalent protection" standard for PIPEDA.',
               action: 'Legal review needed',
             },
             {
               name: 'Breach Notification Plan',
               status: 'warning',
               description: 'Incident response plan for data breaches',
-              note: 'Document breach notification procedures per Law 25',
+              note: 'Document breach notification procedures per Law 25. Must include notification to Quebec authorities for Quebec residents if database breach occurs.',
               action: 'Process documentation needed',
             },
             {
               name: 'Privacy Officer',
               status: 'warning',
               description: 'Designate privacy officer (Law 25 requirement)',
-              note: 'Assign privacy officer and publish contact information',
+              note: 'Assign privacy officer and publish contact information. Required for organizations handling Quebec resident data.',
               action: 'Organizational setup needed',
             },
           ];

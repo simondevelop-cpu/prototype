@@ -74,28 +74,29 @@
 3. **OR** must meet specific exceptions (e.g., necessary for service delivery)
 
 **Your Current Setup:**
-- **Hosting:** Vercel (likely US-based)
-- **Database:** Neon (region not specified, likely US/EU)
-- **Impact:** ⚠️ **POTENTIAL COMPLIANCE ISSUE** for Quebec residents
+- **Hosting:** Vercel (US-based - no Canada region available)
+- **Database:** Neon in **US (Washington, D.C., USA - `iad1`)**
+- **Impact:** ⚠️ **NON-COMPLIANT** for Quebec residents - Database must be in Canada
 
 ---
 
 ## 🔍 **Current Hosting Assessment**
 
 ### **Vercel (Application Hosting)**
-- **Location:** US-based (primary regions)
+- **Location:** **US-based** (confirmed - no Canada region available)
 - **Options:** 
-  - ✅ Can deploy to edge locations (may include Canada)
-  - ⚠️ Primary compute likely US
-- **Impact:** Medium (application code, but data is the main concern)
+  - ❌ No Canada region available for serverless functions
+  - ⚠️ Primary compute runs in US (Washington, D.C., etc.)
+- **Impact:** ⚠️ **Acceptable** - Processing in US is acceptable IF database is in Canada (see below)
 
-### **Neon / Vercel Postgres (Database)**
-- **Location:** Depends on region selected
+### **Neon (Database) - CURRENT STATUS**
+- **Location:** **US (Washington, D.C., USA - `iad1`)** ❌
+- **Current Region:** Confirmed via dashboard - AWS US East 1 (N. Virginia)
 - **Options:**
-  - ✅ Neon supports **Canada (Toronto)** region
-  - ✅ Vercel Postgres may support Canadian regions
-  - ⚠️ Need to verify current region selection
-- **Impact:** **HIGH** (this is where PII is stored)
+  - ✅ Neon DOES support **Canada (Toronto)** region (when creating via Neon console directly)
+  - ❌ Vercel's Neon integration does NOT show Canada region option
+  - ⚠️ Must create new database via Neon console (not Vercel integration)
+- **Impact:** **HIGH** - ❌ **NON-COMPLIANT** - Database in US violates Law 25 for Quebec residents
 
 ---
 
@@ -105,13 +106,15 @@
 ✅ **FULLY COMPLIANT** - PIPEDA allows cross-border transfers with equivalent protection
 
 ### **For Quebec Users:**
-⚠️ **POTENTIAL ISSUE** - Law 25 requires Quebec/Canada residency OR:
-- Equivalent protection + explicit consent
-- OR meet specific exceptions
+❌ **NON-COMPLIANT** - Law 25 requires Quebec/Canada residency for data storage
+- Database is currently in US (Washington, D.C.) ❌
+- Must migrate to Canada (Toronto) for compliance
+- Toronto is sufficient (Law 25 requires Canada, not specifically Quebec)
 
-**Current Risk:** 🟡 **MEDIUM**
-- Technical safeguards are strong (equivalent protection)
-- But may need explicit consent or data residency
+**Current Risk:** 🔴 **HIGH**
+- Database must be migrated to Canada for Law 25 compliance
+- Migration is straightforward (2-3 hours, see MIGRATE_TO_CANADA.md)
+- No code changes required - just configuration
 
 ---
 
@@ -122,10 +125,11 @@
 **Why it's relatively easy:**
 
 1. **Database Migration:**
-   - ✅ Neon supports **Canada (Toronto)** region
-   - ✅ Can create new database in Canada region
+   - ✅ Neon supports **Canada (Toronto)** region (via Neon console, not Vercel integration)
+   - ⚠️ Must create new database directly in Neon console (Vercel integration doesn't show Canada option)
    - ✅ Migration scripts already exist
-   - ⏱️ **Time:** 1-2 hours
+   - ⏱️ **Time:** 2-3 hours (includes testing)
+   - 📋 **See:** `MIGRATE_TO_CANADA.md` for step-by-step guide
 
 2. **Application Hosting:**
    - ✅ Vercel edge locations may include Canada
@@ -284,12 +288,18 @@
 
 ## 🚀 **Recommended Action Plan**
 
-### **This Week:**
-1. ✅ **Check current database region** (Neon/Vercel dashboard)
-2. ✅ **If not Canada:** Create new database in Canada (Toronto) region
-3. ✅ **Update DATABASE_URL** to Canadian database
-4. ✅ **Run migration** on new database
-5. ✅ **Test thoroughly** before switching
+### **Current Status (Verified January 7, 2026):**
+1. ✅ **Database region confirmed:** US (Washington, D.C., USA - `iad1`) ❌
+2. ⚠️ **Migration required:** Database must move to Canada (Toronto) for Law 25 compliance
+3. 📋 **Migration guide ready:** See `MIGRATE_TO_CANADA.md` for step-by-step instructions
+
+### **Next Steps (When Ready):**
+1. ⏳ **Create new Neon database** in Canada (Toronto) region (via Neon console - Vercel integration doesn't offer Canada)
+2. ⏳ **Run schema migration** on new database
+3. ⏳ **Copy data** from US database to Canadian database
+4. ⏳ **Test thoroughly** with preview deployment
+5. ⏳ **Switch production DATABASE_URL** to Canadian database
+6. ⏳ **Verify** via App Health dashboard
 
 ### **This Month:**
 6. ⚠️ **Create Privacy Policy** (include data residency disclosure)
@@ -304,30 +314,54 @@
 ### **PIPEDA: ✅ FULLY COMPLIANT**
 - No data residency requirement
 - All technical requirements met
-- Just need documentation
+- Just need documentation (privacy policy, DPAs)
 
-### **Law 25: ⚠️ MOSTLY COMPLIANT**
-- All technical requirements met
-- **Data residency needs attention** (but easy to fix)
-- Documentation pending
+### **Law 25: ⚠️ PARTIALLY COMPLIANT**
+- ✅ All technical requirements met (PII isolation, tokenization, deletion, export, retention)
+- ❌ **Database is in US (Washington, D.C.) - NON-COMPLIANT for Quebec residents**
+- ⚠️ Documentation pending (privacy policy, breach plan, privacy officer)
+
+### **Current Status:**
+- **Database Location:** US (Washington, D.C., USA - `iad1`) ❌
+- **Action Required:** Migrate database to Canada (Toronto) for Law 25 compliance
+- **Migration Difficulty:** 🟢 **LOW** (2-3 hours, no code changes needed)
+- **Migration Guide:** See `MIGRATE_TO_CANADA.md`
 
 ### **Difficulty to Fix: 🟢 LOW**
 - Moving database to Canada: **2-3 hours**
 - No code changes needed
 - Just configuration update
+- Can test in parallel (low risk)
 
-**Recommendation:** ✅ **Move database to Canada (Toronto)** - Quick, low-risk, full compliance
+**Recommendation:** ✅ **Move database to Canada (Toronto)** - Quick, low-risk, full compliance. Migration guide ready: `MIGRATE_TO_CANADA.md`
 
 ---
 
-## 📝 **Next Steps**
+## 📝 **Summary**
 
-1. **Check current database region** (5 minutes)
-2. **If not Canada:** Create Canadian database (30 minutes)
-3. **Update DATABASE_URL** (5 minutes)
-4. **Run migration** (30 minutes)
-5. **Test** (30 minutes)
-6. **Switch over** (5 minutes)
+**Status:** Ready for merge ✅
 
-**Total Time:** ~2 hours for full Law 25 compliance ✅
+**What's Done:**
+- ✅ Technical compliance features implemented (PII isolation, tokenization, deletion, export, retention)
+- ✅ Database region confirmed (US - Washington, D.C.)
+- ✅ Migration guide created (`MIGRATE_TO_CANADA.md`)
+- ✅ App Health dashboard updated with data residency check
+- ✅ Compliance documentation updated with current status
+
+**What's Pending (Post-Merge):**
+- ⏳ Database migration to Canada (Toronto) - 2-3 hours when ready
+- ⏳ Privacy policy documentation
+- ⏳ Data processing agreements review
+- ⏳ Breach notification plan
+- ⏳ Privacy officer designation
+
+**Migration Steps (When Ready - see `MIGRATE_TO_CANADA.md`):**
+1. Create new Neon database in Canada (Toronto) via Neon console
+2. Run schema migration on new database
+3. Copy data from US database to Canadian database
+4. Test with preview deployment
+5. Switch production DATABASE_URL to Canadian database
+6. Verify via App Health dashboard
+
+**Total Migration Time:** ~2-3 hours for full Law 25 compliance ✅
 
