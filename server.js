@@ -1,7 +1,6 @@
 // Force rebuild: 2025-10-24
 const express = require('express');
 const path = require('path');
-const multer = require('multer');
 const { parse } = require('csv-parse');
 const dayjs = require('dayjs');
 const isBetween = require('dayjs/plugin/isBetween');
@@ -166,13 +165,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirnameResolved));
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 5 * 1024 * 1024,
-    files: 6,
-  },
-});
+// Note: File uploads are handled by Next.js API routes using FormData (not multer)
+// See: app/api/statements/parse/route.ts and app/api/statements/upload/route.ts
 
 // Database pool
 let pool = null;
