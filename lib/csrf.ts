@@ -126,7 +126,8 @@ export function verifyRequestOrigin(request: { headers: Headers | { get: (key: s
   }
   
   // Production: If ALLOWED_ORIGINS not set, allow all (less secure but practical)
-  // TODO: Set ALLOWED_ORIGINS in production for better security
+  // NOTE: For production deployments, set ALLOWED_ORIGINS environment variable
+  //       for stricter CSRF protection (e.g., ALLOWED_ORIGINS=https://yourapp.com)
   if (process.env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
     console.warn('[CSRF] ALLOWED_ORIGINS not set in production - allowing all origins (consider setting it for better security)');
     return true;

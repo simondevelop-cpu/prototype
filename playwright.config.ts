@@ -22,6 +22,11 @@ export default defineConfig({
     },
   },
   reporter: process.env.CI
-    ? [['html'], ['json', { outputFile: 'playwright-report/results.json' }]]
-    : [['html'], ['list']],
+    ? [
+        ['html'],
+        ['json', { outputFile: 'playwright-report/results.json' }],
+        ['line'], // Shows detailed test names and results
+        ['github'], // Shows detailed output in GitHub Actions
+      ]
+    : [['html'], ['list'], ['line']],
 });
