@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { ensureTokenizedForAnalytics } from '@/lib/tokenization';
 
 // Force dynamic rendering (PUT endpoint requires runtime request body)
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
+    // Get tokenized user ID for analytics (L1 tables)
+    const tokenizedUserId = await ensureTokenizedForAnalytics(userId);
+    if (!tokenizedUserId) {
+      return NextResponse.json({ error: 'Failed to get user identifier' }, { status: 500 });
+    }
+
     // Get transaction data from request body
     const body = await request.json();
     const { id, date, description, merchant, amount, cashflow, category, account, label } = body;
@@ -40,7 +47,7 @@ export async function PUT(request: NextRequest) {
     let paramCount = 1;
 
     if (date !== undefined) {
-      updates.push(`date = $${paramCount++}`);
+      updates.push(`transaction_date = $${paramCount++}`);
       values.push(date);
     }
     if (description !== undefined) {
@@ -76,16 +83,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
     }
 
-    // Add user_id and id to values
-    values.push(userId);
+    // Add tokenized_user_id and id to values
+    values.push(tokenizedUserId);
     values.push(id);
 
-    // Update transaction (only if it belongs to the user)
+    // Update transaction in L1 fact table (only if it belongs to the user)
     const result = await pool.query(
-      `UPDATE transactions 
+      `UPDATE l1_transaction_facts 
        SET ${updates.join(', ')}
-       WHERE user_id = $${paramCount++} AND id = $${paramCount}
-       RETURNING id, date, description, merchant, amount, cashflow, category, account, label`,
+       WHERE tokenized_user_id = $${paramCount++} AND id = $${paramCount}
+       RETURNING id, transaction_date as date, description, merchant, amount, cashflow, category, account, label`,
       values
     );
 

@@ -13,6 +13,7 @@
  */
 
 import { getPool } from '@/lib/db';
+import { ensureTokenizedForAnalytics } from '@/lib/tokenization';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import utc from 'dayjs/plugin/utc';
@@ -1318,11 +1319,18 @@ function createTransaction(
  */
 async function insertTransactionsWithDuplicateCheck(
   transactions: Transaction[], 
-  userId: string
+  userId: string | number
 ): Promise<{ inserted: number; newTransactions: Transaction[]; duplicateTransactions: Transaction[] }> {
   const pool = getPool();
   if (!pool) {
     throw new Error('Database not available');
+  }
+
+  // Get tokenized user ID for analytics (L1 tables)
+  const internalUserId = typeof userId === 'string' ? parseInt(userId) : userId;
+  const tokenizedUserId = await ensureTokenizedForAnalytics(internalUserId);
+  if (!tokenizedUserId) {
+    throw new Error('Failed to get tokenized user identifier');
   }
 
   const newTransactions: Transaction[] = [];
@@ -1330,11 +1338,11 @@ async function insertTransactionsWithDuplicateCheck(
 
   for (const tx of transactions) {
     try {
-      // Check if transaction already exists
+      // Check if transaction already exists in L1 fact table
       const existingCheck = await pool.query(
-        `SELECT id FROM transactions 
-         WHERE user_id = $1 AND date = $2 AND amount = $3 AND merchant = $4 AND cashflow = $5`,
-        [userId, tx.date, tx.amount, tx.merchant, tx.cashflow]
+        `SELECT id FROM l1_transaction_facts 
+         WHERE tokenized_user_id = $1 AND transaction_date = $2 AND amount = $3 AND merchant = $4 AND cashflow = $5`,
+        [tokenizedUserId, tx.date, tx.amount, tx.merchant, tx.cashflow]
       );
 
       if (existingCheck.rows.length > 0) {
@@ -1359,19 +1367,26 @@ async function insertTransactionsWithDuplicateCheck(
     duplicateTransactions,
   };
 }
-async function insertTransactions(transactions: Transaction[], userId: string): Promise<number> {
+async function insertTransactions(transactions: Transaction[], userId: string | number): Promise<number> {
   const result = await insertTransactionsWithDuplicateCheck(transactions, userId);
   
-  // Actually insert the new transactions
+  // Get tokenized user ID
   const pool = getPool();
   if (!pool) return 0;
   
+  const internalUserId = typeof userId === 'string' ? parseInt(userId) : userId;
+  const tokenizedUserId = await ensureTokenizedForAnalytics(internalUserId);
+  if (!tokenizedUserId) {
+    throw new Error('Failed to get tokenized user identifier');
+  }
+  
+  // Actually insert the new transactions into L1 fact table
   for (const tx of result.newTransactions) {
     try {
       await pool.query(
-        `INSERT INTO transactions (user_id, date, description, merchant, amount, cashflow, category, account, label, created_at)
+        `INSERT INTO l1_transaction_facts (tokenized_user_id, transaction_date, description, merchant, amount, cashflow, category, account, label, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
-        [userId, tx.date, tx.description, tx.merchant, tx.amount, tx.cashflow, tx.category, tx.account, tx.label]
+        [tokenizedUserId, tx.date, tx.description, tx.merchant, tx.amount, tx.cashflow, tx.category, tx.account, tx.label]
       );
     } catch (error) {
       console.error('[PDF Parser] Failed to insert transaction:', error);

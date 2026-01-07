@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { validatePasswordStrength } from '@/lib/password-validation';
 
 interface LoginProps {
   onLogin: (token: string, user: any) => void;
@@ -34,8 +35,14 @@ export default function Login({ onLogin }: LoginProps) {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        const errorMessage = data.error || 'Authentication failed';
+        const data = await response.json().catch(() => ({}));
+        const errorLines: string[] = [];
+        if (data?.error) errorLines.push(String(data.error));
+        if (data?.message) errorLines.push(String(data.message));
+        if (Array.isArray(data?.details) && data.details.length > 0) {
+          errorLines.push(...data.details.map((d: any) => String(d)));
+        }
+        const errorMessage = errorLines.length > 0 ? errorLines.join('\n') : 'Authentication failed';
         
         // If trying to register with existing email, switch to Sign In mode
         if (isRegister && errorMessage.toLowerCase().includes('already registered')) {
@@ -178,6 +185,30 @@ export default function Login({ onLogin }: LoginProps) {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
+              {isRegister && (
+                <div className="mt-2 text-xs">
+                  <p className="font-medium text-gray-700 mb-2">Password requirements:</p>
+                  <ul className="space-y-1">
+                    {(() => {
+                      const requirements = [
+                        { label: 'At least 8 characters long', check: password.length >= 8 },
+                        { label: 'At least one uppercase letter (A-Z)', check: /[A-Z]/.test(password) },
+                        { label: 'At least one lowercase letter (a-z)', check: /[a-z]/.test(password) },
+                        { label: 'At least one number (0-9)', check: /[0-9]/.test(password) },
+                        { label: 'At least one special character (!@#$%^&*()_+-=[]{}|;:,.&lt;&gt;?)', check: /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password) },
+                      ];
+                      return requirements.map((req, idx) => (
+                        <li key={idx} className={`flex items-center gap-2 ${req.check ? 'text-green-600' : 'text-gray-600'}`}>
+                          <span className={req.check ? 'text-green-500' : 'text-gray-400'}>
+                            {req.check ? '✓' : '○'}
+                          </span>
+                          <span>{req.label}</span>
+                        </li>
+                      ));
+                    })()}
+                  </ul>
+                </div>
+              )}
             </div>
 
             <button

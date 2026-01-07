@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { ensureTokenizedForAnalytics } from '@/lib/tokenization';
 import dayjs from 'dayjs';
 
 // Force dynamic rendering (required for auth headers)
@@ -26,6 +27,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
+    // Get tokenized user ID for analytics (L1 tables)
+    const tokenizedUserId = await ensureTokenizedForAnalytics(userId);
+    if (!tokenizedUserId) {
+      return NextResponse.json({ error: 'Failed to get user identifier' }, { status: 500 });
+    }
+
     // Get date range and cashflow parameters
     const url = new URL(request.url);
     const monthParam = url.searchParams.get('month');
@@ -47,8 +54,8 @@ export async function GET(request: NextRequest) {
     } else {
       // Standard timeframe based on latest transaction
       const latestResult = await pool.query(
-        'SELECT MAX(date) as latest FROM transactions WHERE user_id = $1',
-        [userId]
+        'SELECT MAX(transaction_date) as latest FROM l1_transaction_facts WHERE tokenized_user_id = $1',
+        [tokenizedUserId]
       );
       if (latestResult.rows[0]?.latest) {
         endDate = dayjs(latestResult.rows[0].latest).endOf('month');
@@ -59,19 +66,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Query transactions grouped by category
+    // Query transactions grouped by category from L1 fact table
     const result = await pool.query(
       `SELECT 
         COALESCE(category, 'Uncategorised') as category,
         SUM(ABS(amount)) as total
-       FROM transactions
-       WHERE user_id = $1
+       FROM l1_transaction_facts
+       WHERE tokenized_user_id = $1
          AND cashflow = $2
-         AND date >= $3
-         AND date <= $4
+         AND transaction_date >= $3
+         AND transaction_date <= $4
        GROUP BY COALESCE(category, 'Uncategorised')
        ORDER BY total DESC`,
-      [userId, cashflowParam, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')]
+      [tokenizedUserId, cashflowParam, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')]
     );
 
     const categories = result.rows.map(row => ({

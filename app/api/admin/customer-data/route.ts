@@ -50,42 +50,96 @@ export async function GET(request: NextRequest) {
       console.log('[Customer Data API] Could not check schema, assuming old schema');
     }
 
-    // Fetch all customer data with user emails (schema-adaptive)
-    const selectFields = `
-      u.email,
-      o.first_name,
-      o.last_name,
-      o.date_of_birth,
-      o.recovery_phone,
-      o.province_region,
-      o.emotional_state,
-      o.financial_context,
-      o.motivation,
-      o.motivation_other,
-      o.acquisition_source,
-      ${hasAcquisitionOther ? 'o.acquisition_other,' : ''}
-      o.insight_preferences,
-      o.insight_other,
-      ${hasLastStep ? 'o.last_step,' : ''}
-      o.completed_at,
-      o.created_at,
-      o.updated_at
-    `;
+    // Check if l0_pii_users table exists (migration status)
+    let useL0PII = false;
+    try {
+      const l0Check = await pool.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_name = 'l0_pii_users'
+        )
+      `);
+      useL0PII = l0Check.rows[0]?.exists || false;
+    } catch (e) {
+      console.log('[Customer Data API] Could not check for l0_pii_users, using legacy tables');
+    }
 
-    // Get only the MOST RECENT onboarding attempt per user (to avoid duplicate rows)
-    const result = await pool.query(`
-      SELECT ${selectFields}
-      FROM users u
-      LEFT JOIN LATERAL (
-        SELECT *
-        FROM onboarding_responses
-        WHERE user_id = u.id
-        ORDER BY created_at DESC
-        LIMIT 1
-      ) o ON true
-      WHERE u.email != $1
-      ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
-    `, [ADMIN_EMAIL]);
+    // Fetch all customer data - prefer L0 PII table if available, fallback to onboarding_responses
+    let result;
+    if (useL0PII) {
+      // Use L0 PII table for compliance (PII isolation)
+      const selectFields = `
+        COALESCE(p.email, u.email) as email,
+        p.first_name,
+        p.last_name,
+        p.date_of_birth,
+        p.recovery_phone,
+        p.province_region,
+        o.emotional_state,
+        o.financial_context,
+        o.motivation,
+        o.motivation_other,
+        o.acquisition_source,
+        ${hasAcquisitionOther ? 'o.acquisition_other,' : ''}
+        o.insight_preferences,
+        o.insight_other,
+        ${hasLastStep ? 'o.last_step,' : ''}
+        o.completed_at,
+        COALESCE(p.created_at, u.created_at) as created_at,
+        COALESCE(p.updated_at, o.updated_at) as updated_at
+      `;
+
+      result = await pool.query(`
+        SELECT ${selectFields}
+        FROM users u
+        LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
+        LEFT JOIN LATERAL (
+          SELECT *
+          FROM onboarding_responses
+          WHERE user_id = u.id
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) o ON true
+        WHERE u.email != $1
+        ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
+      `, [ADMIN_EMAIL]);
+    } else {
+      // Fallback to legacy onboarding_responses table (pre-migration)
+      const selectFields = `
+        u.email,
+        o.first_name,
+        o.last_name,
+        o.date_of_birth,
+        o.recovery_phone,
+        o.province_region,
+        o.emotional_state,
+        o.financial_context,
+        o.motivation,
+        o.motivation_other,
+        o.acquisition_source,
+        ${hasAcquisitionOther ? 'o.acquisition_other,' : ''}
+        o.insight_preferences,
+        o.insight_other,
+        ${hasLastStep ? 'o.last_step,' : ''}
+        o.completed_at,
+        o.created_at,
+        o.updated_at
+      `;
+
+      result = await pool.query(`
+        SELECT ${selectFields}
+        FROM users u
+        LEFT JOIN LATERAL (
+          SELECT *
+          FROM onboarding_responses
+          WHERE user_id = u.id
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) o ON true
+        WHERE u.email != $1
+        ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
+      `, [ADMIN_EMAIL]);
+    }
 
     return NextResponse.json({ 
       success: true,

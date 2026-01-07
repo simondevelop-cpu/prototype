@@ -1,14 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
-import { hashPassword, createToken } from '@/lib/auth';
+import { verifyPassword, hashPassword, createToken } from '@/lib/auth';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { verifyRequestOrigin } from '@/lib/csrf';
 
 // Force dynamic rendering (POST endpoint requires runtime request body)
 export const dynamic = 'force-dynamic';
 
+// Rate limiting: 5 attempts per 15 minutes per email
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
 export async function POST(request: NextRequest) {
   try {
+    // CSRF protection: Verify Origin header
+    if (!verifyRequestOrigin(request)) {
+      return NextResponse.json(
+        { error: 'Invalid request origin' },
+        { status: 403 }
+      );
+    }
+    
     const body = await request.json();
     const { email, password } = body;
+    
+    // Rate limiting check
+    if (email) {
+      const rateLimit = checkRateLimit(email, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+      if (!rateLimit.allowed) {
+        const resetInMinutes = Math.ceil((rateLimit.resetAt - Date.now()) / 60000);
+        return NextResponse.json(
+          { 
+            error: 'Too many login attempts. Please try again later.',
+            retryAfter: resetInMinutes,
+          },
+          { 
+            status: 429,
+            headers: {
+              'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)),
+              'X-RateLimit-Limit': String(RATE_LIMIT_MAX),
+              'X-RateLimit-Remaining': String(rateLimit.remaining),
+              'X-RateLimit-Reset': String(Math.ceil(rateLimit.resetAt / 1000)),
+            },
+          }
+        );
+      }
+    }
 
     if (!email || !password) {
       return NextResponse.json(
@@ -39,13 +76,26 @@ export async function POST(request: NextRequest) {
     }
 
     const user = userResult.rows[0];
-    const passwordHash = hashPassword(password);
-
-    if (passwordHash !== user.password_hash) {
+    
+    // Verify password (supports both bcrypt and legacy SHA-256)
+    const isValid = await verifyPassword(password, user.password_hash);
+    
+    if (!isValid) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
       );
+    }
+    
+    // Migrate legacy SHA-256 passwords to bcrypt on successful login
+    // Check if hash is legacy format (doesn't start with $2)
+    if (!user.password_hash.startsWith('$2')) {
+      const newHash = await hashPassword(password);
+      await pool.query(
+        'UPDATE users SET password_hash = $1 WHERE id = $2',
+        [newHash, user.id]
+      );
+      console.log('[Login] Migrated legacy password hash to bcrypt for user:', user.id);
     }
 
     // Check if user has completed onboarding (except for special accounts)
