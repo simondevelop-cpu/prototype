@@ -86,14 +86,26 @@ A modern, AI-ready personal finance management application built for Canadians. 
 
 ### Environment Variables
 
-Create a `.env` file in the root directory:
+Create a `.env.local` file in the root directory (see `.env.example` for template):
 
 ```env
+# Database
 DATABASE_URL=postgresql://user:password@host:port/database
-JWT_SECRET=your-super-secret-key-change-this-in-production
+DATABASE_SSL=false
+
+# Security (REQUIRED in production)
+JWT_SECRET=your-super-secret-key-minimum-32-characters-long-change-this-in-production
+TOKENIZATION_SALT=your-random-salt-for-user-tokenization-change-in-production
+
+# CSRF Protection (REQUIRED in production)
+ALLOWED_ORIGINS=https://yourapp.com,https://www.yourapp.com
+
+# Demo Account (optional)
 DEMO_EMAIL=demo@example.com
 DEMO_PASSWORD=demo123
 ```
+
+**⚠️ Security Note:** Never commit `.env` files to git. Use `.env.example` as a template. In production, ensure `JWT_SECRET` and `TOKENIZATION_SALT` are strong random strings (32+ characters).
 
 ### Installation
 
