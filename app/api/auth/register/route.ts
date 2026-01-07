@@ -57,9 +57,17 @@ export async function POST(request: NextRequest) {
     // Validate password strength
     const passwordValidation = validatePasswordStrength(password);
     if (!passwordValidation.valid) {
+      const requirementsText = 'Password must meet the following requirements:\n' +
+        '• At least 8 characters long\n' +
+        '• At least one uppercase letter (A-Z)\n' +
+        '• At least one lowercase letter (a-z)\n' +
+        '• At least one number (0-9)\n' +
+        '• At least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)';
+      
       return NextResponse.json(
         {
           error: 'Password does not meet requirements',
+          message: requirementsText,
           details: passwordValidation.errors,
         },
         { status: 400 }

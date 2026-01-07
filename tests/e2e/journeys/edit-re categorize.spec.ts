@@ -2,15 +2,13 @@
  * E2E Test: Edit / Recategorize Transactions
  * Tests editing and recategorizing transactions on the dashboard
  * 
- * NOTE: Currently skipped - needs verification of:
- * - Dashboard route and transaction list UI
- * - Edit/recategorize UI elements and interactions
- * - Works with DISABLE_DB=1 or requires actual database setup
+ * Note: With DISABLE_DB=1, transaction data may not be available.
+ * Tests verify UI elements exist but actual editing may not work.
  */
 
 import { test, expect } from '@playwright/test';
 
-test.describe.skip('Edit / Recategorize Transactions', () => {
+test.describe('Edit / Recategorize Transactions', () => {
   async function login(page: any) {
     await page.goto('/admin/login');
     await page.locator('input[type="email"], input[name="email"]').first().fill('demo@canadianinsights.ca');
