@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { validatePasswordStrength } from '@/lib/password-validation';
 
 interface LoginProps {
   onLogin: (token: string, user: any) => void;
@@ -15,6 +16,7 @@ export default function Login({ onLogin }: LoginProps) {
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,8 +36,14 @@ export default function Login({ onLogin }: LoginProps) {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        const errorMessage = data.error || 'Authentication failed';
+        const data = await response.json().catch(() => ({}));
+        const errorLines: string[] = [];
+        if (data?.error) errorLines.push(String(data.error));
+        if (data?.message) errorLines.push(String(data.message));
+        if (Array.isArray(data?.details) && data.details.length > 0) {
+          errorLines.push(...data.details.map((d: any) => String(d)));
+        }
+        const errorMessage = errorLines.length > 0 ? errorLines.join('\n') : 'Authentication failed';
         
         // If trying to register with existing email, switch to Sign In mode
         if (isRegister && errorMessage.toLowerCase().includes('already registered')) {
@@ -174,10 +182,38 @@ export default function Login({ onLogin }: LoginProps) {
               <input
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (isRegister) {
+                    const res = validatePasswordStrength(e.target.value);
+                    setPasswordErrors(res.valid ? [] : res.errors);
+                  }
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
+              {isRegister && (
+                <div className="mt-2 text-xs text-gray-600">
+                  <p className="font-medium">Password requirements:</p>
+                  <ul className="list-disc ml-5">
+                    <li>At least 8 characters long</li>
+                    <li>At least one uppercase letter (A-Z)</li>
+                    <li>At least one lowercase letter (a-z)</li>
+                    <li>At least one number (0-9)</li>
+                    <li>At least one special character (!@#$%^&*()_+-=[]{}|;:,.&lt;&gt;?)</li>
+                  </ul>
+                  {password && passwordErrors.length > 0 && (
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-800">
+                      <p className="font-medium mb-1">Please fix:</p>
+                      <ul className="list-disc ml-5">
+                        {passwordErrors.map((err, idx) => (
+                          <li key={idx}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <button
