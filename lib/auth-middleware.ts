@@ -10,31 +10,55 @@ export async function requireCompletedOnboarding(
   userId: number
 ): Promise<{ completed: boolean; error?: string }> {
   try {
-    // Check if onboarding_responses table has the required columns
-    const schemaCheck = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'onboarding_responses' 
-      AND column_name = 'completed_at'
-    `);
-
-    const hasCompletedAtColumn = schemaCheck.rows.length > 0;
-
-    if (!hasCompletedAtColumn) {
-      // Old schema without completed_at - allow access (backward compatibility)
-      console.log('[Auth Middleware] Old schema detected, allowing access');
-      return { completed: true };
+    // Schema-adaptive: Check if onboarding columns exist in users table (post-migration)
+    let useUsersTable = false;
+    try {
+      const schemaCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' 
+        AND column_name = 'completed_at'
+      `);
+      useUsersTable = schemaCheck.rows.length > 0;
+    } catch (e) {
+      console.log('[Auth Middleware] Could not check schema, using fallback');
     }
 
-    // Check if user has completed onboarding
-    const result = await pool.query(
-      `SELECT COUNT(*) as count 
-       FROM onboarding_responses 
-       WHERE user_id = $1 AND completed_at IS NOT NULL`,
-      [userId]
-    );
+    let hasCompleted = false;
 
-    const hasCompleted = parseInt(result.rows[0]?.count || '0') > 0;
+    if (useUsersTable) {
+      // Use users table (post-migration)
+      const result = await pool.query(
+        `SELECT completed_at 
+         FROM users 
+         WHERE id = $1`,
+        [userId]
+      );
+      hasCompleted = result.rows.length > 0 && result.rows[0].completed_at !== null;
+    } else {
+      // Fallback to onboarding_responses table (pre-migration)
+      const schemaCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'onboarding_responses' 
+        AND column_name = 'completed_at'
+      `);
+      const hasCompletedAtColumn = schemaCheck.rows.length > 0;
+
+      if (!hasCompletedAtColumn) {
+        // Old schema without completed_at - allow access (backward compatibility)
+        console.log('[Auth Middleware] Old schema detected, allowing access');
+        return { completed: true };
+      }
+
+      const result = await pool.query(
+        `SELECT COUNT(*) as count 
+         FROM onboarding_responses 
+         WHERE user_id = $1 AND completed_at IS NOT NULL`,
+        [userId]
+      );
+      hasCompleted = parseInt(result.rows[0]?.count || '0') > 0;
+    }
 
     if (!hasCompleted) {
       return {

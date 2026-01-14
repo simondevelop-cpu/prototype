@@ -33,41 +33,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Check which columns exist (schema-adaptive query)
+    // Schema-adaptive: Check if onboarding columns exist in users table (post-migration)
+    let useUsersTable = false;
     let hasLastStep = false;
     let hasAcquisitionOther = false;
     try {
       const schemaCheck = await pool.query(`
         SELECT column_name 
         FROM information_schema.columns 
-        WHERE table_name = 'onboarding_responses' 
-        AND column_name IN ('last_step', 'acquisition_other')
+        WHERE table_name = 'users' 
+        AND column_name IN ('completed_at', 'last_step', 'acquisition_other')
       `);
+      useUsersTable = schemaCheck.rows.some(row => row.column_name === 'completed_at');
       hasLastStep = schemaCheck.rows.some(row => row.column_name === 'last_step');
       hasAcquisitionOther = schemaCheck.rows.some(row => row.column_name === 'acquisition_other');
-      console.log('[Customer Data API] Schema check:', { hasLastStep, hasAcquisitionOther });
+      console.log('[Customer Data API] Schema check:', { useUsersTable, hasLastStep, hasAcquisitionOther });
     } catch (e) {
-      console.log('[Customer Data API] Could not check schema, assuming old schema');
+      console.log('[Customer Data API] Could not check schema, using fallback');
     }
 
     // Check if l0_pii_users table exists (migration status)
     let useL0PII = false;
     try {
       const l0Check = await pool.query(`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE table_name = 'l0_pii_users'
-        )
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'l0_pii_users'
+        LIMIT 1
       `);
-      useL0PII = l0Check.rows[0]?.exists || false;
+      useL0PII = l0Check.rows.length > 0;
     } catch (e) {
       console.log('[Customer Data API] Could not check for l0_pii_users, using legacy tables');
     }
 
-    // Fetch all customer data - prefer L0 PII table if available, fallback to onboarding_responses
+    // Fetch all customer data - use users table if migrated, fallback to onboarding_responses
     let result;
-    if (useL0PII) {
-      // Use L0 PII table for compliance (PII isolation)
+    if (useUsersTable) {
+      // Use users table (post-migration) - Simplified: read from users directly
       const selectFields = `
         COALESCE(p.email, u.email) as email,
         p.first_name,
@@ -75,70 +76,117 @@ export async function GET(request: NextRequest) {
         p.date_of_birth,
         p.recovery_phone,
         p.province_region,
-        o.emotional_state,
-        o.financial_context,
-        o.motivation,
-        o.motivation_other,
-        o.acquisition_source,
-        ${hasAcquisitionOther ? 'o.acquisition_other,' : ''}
-        o.insight_preferences,
-        o.insight_other,
-        ${hasLastStep ? 'o.last_step,' : ''}
-        o.completed_at,
-        COALESCE(p.created_at, u.created_at) as created_at,
-        COALESCE(p.updated_at, o.updated_at) as updated_at
+        u.emotional_state,
+        u.financial_context,
+        u.motivation,
+        u.motivation_other,
+        u.acquisition_source,
+        ${hasAcquisitionOther ? 'u.acquisition_other,' : ''}
+        u.insight_preferences,
+        u.insight_other,
+        ${hasLastStep ? 'u.last_step,' : ''}
+        u.completed_at,
+        u.created_at,
+        u.updated_at
       `;
 
       result = await pool.query(`
         SELECT ${selectFields}
         FROM users u
         LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
-        LEFT JOIN LATERAL (
-          SELECT *
-          FROM onboarding_responses
-          WHERE user_id = u.id
-          ORDER BY created_at DESC
-          LIMIT 1
-        ) o ON true
         WHERE u.email != $1
-        ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
+        ORDER BY u.completed_at DESC NULLS LAST, u.created_at DESC
       `, [ADMIN_EMAIL]);
     } else {
-      // Fallback to legacy onboarding_responses table (pre-migration)
-      const selectFields = `
-        u.email,
-        o.first_name,
-        o.last_name,
-        o.date_of_birth,
-        o.recovery_phone,
-        o.province_region,
-        o.emotional_state,
-        o.financial_context,
-        o.motivation,
-        o.motivation_other,
-        o.acquisition_source,
-        ${hasAcquisitionOther ? 'o.acquisition_other,' : ''}
-        o.insight_preferences,
-        o.insight_other,
-        ${hasLastStep ? 'o.last_step,' : ''}
-        o.completed_at,
-        o.created_at,
-        o.updated_at
-      `;
+      // Fallback to onboarding_responses table (pre-migration)
+      // Check which columns exist in onboarding_responses
+      try {
+        const schemaCheck = await pool.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'onboarding_responses' 
+          AND column_name IN ('last_step', 'acquisition_other')
+        `);
+        hasLastStep = schemaCheck.rows.some(row => row.column_name === 'last_step');
+        hasAcquisitionOther = schemaCheck.rows.some(row => row.column_name === 'acquisition_other');
+      } catch (e) {
+        console.log('[Customer Data API] Could not check onboarding_responses schema');
+      }
 
-      result = await pool.query(`
-        SELECT ${selectFields}
-        FROM users u
-        LEFT JOIN LATERAL (
-          SELECT *
-          FROM onboarding_responses
-          WHERE user_id = u.id
-          ORDER BY created_at DESC
-          LIMIT 1
-        ) o ON true
-        WHERE u.email != $1
-        ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
-      `, [ADMIN_EMAIL]);
+      if (useL0PII) {
+        // Use L0 PII table for compliance (PII isolation) with onboarding_responses
+        const selectFields = `
+          COALESCE(p.email, u.email) as email,
+          p.first_name,
+          p.last_name,
+          p.date_of_birth,
+          p.recovery_phone,
+          p.province_region,
+          o.emotional_state,
+          o.financial_context,
+          o.motivation,
+          o.motivation_other,
+          o.acquisition_source,
+          ${hasAcquisitionOther ? 'o.acquisition_other,' : ''}
+          o.insight_preferences,
+          o.insight_other,
+          ${hasLastStep ? 'o.last_step,' : ''}
+          o.completed_at,
+          COALESCE(p.created_at, u.created_at) as created_at,
+          COALESCE(p.updated_at, o.updated_at) as updated_at
+        `;
+
+        result = await pool.query(`
+          SELECT ${selectFields}
+          FROM users u
+          LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
+          LEFT JOIN LATERAL (
+            SELECT *
+            FROM onboarding_responses
+            WHERE user_id = u.id
+            ORDER BY created_at DESC
+            LIMIT 1
+          ) o ON true
+          WHERE u.email != $1
+          ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
+        `, [ADMIN_EMAIL]);
+      } else {
+        // Fallback to legacy onboarding_responses table (pre-migration)
+        const selectFields = `
+          u.email,
+          o.first_name,
+          o.last_name,
+          o.date_of_birth,
+          o.recovery_phone,
+          o.province_region,
+          o.emotional_state,
+          o.financial_context,
+          o.motivation,
+          o.motivation_other,
+          o.acquisition_source,
+          ${hasAcquisitionOther ? 'o.acquisition_other,' : ''}
+          o.insight_preferences,
+          o.insight_other,
+          ${hasLastStep ? 'o.last_step,' : ''}
+          o.completed_at,
+          o.created_at,
+          o.updated_at
+        `;
+
+        result = await pool.query(`
+          SELECT ${selectFields}
+          FROM users u
+          LEFT JOIN LATERAL (
+            SELECT *
+            FROM onboarding_responses
+            WHERE user_id = u.id
+            ORDER BY created_at DESC
+            LIMIT 1
+          ) o ON true
+          WHERE u.email != $1
+          ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
+        `, [ADMIN_EMAIL]);
+      }
     }
 
     return NextResponse.json({ 
