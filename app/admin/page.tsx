@@ -43,7 +43,7 @@ export default function AdminDashboard() {
   const [checking, setChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<TabName>('inbox');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
-  const [analyticsSubTab, setAnalyticsSubTab] = useState<'dashboard' | 'customer-data' | 'macro-data'>('dashboard');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'vanity-metrics' | 'app-health'>('cohort-analysis');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
   const [stats, setStats] = useState<any>(null);
@@ -299,15 +299,22 @@ export default function AdminDashboard() {
     }
   };
 
-  // Fetch cohort analysis when Analytics → Dashboard tab is active
+  // Fetch cohort analysis when Analytics → Cohort Analysis tab is active
   useEffect(() => {
-    if (activeTab === 'analytics' && analyticsSubTab === 'dashboard' && authenticated) {
+    if (activeTab === 'analytics' && analyticsSubTab === 'cohort-analysis' && authenticated) {
       fetchIntentCategories();
       fetchCohortAnalysis();
-      fetchVanityMetrics();
       fetchEngagementChart();
     }
-  }, [activeTab, analyticsSubTab, authenticated, cohortFilters, vanityFilters, chartFilters]);
+  }, [activeTab, analyticsSubTab, authenticated, cohortFilters, chartFilters]);
+
+  // Fetch vanity metrics when Analytics → Vanity Metrics tab is active
+  useEffect(() => {
+    if (activeTab === 'analytics' && analyticsSubTab === 'vanity-metrics' && authenticated) {
+      fetchIntentCategories();
+      fetchVanityMetrics();
+    }
+  }, [activeTab, analyticsSubTab, authenticated, vanityFilters]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -861,9 +868,9 @@ export default function AdminDashboard() {
         {/* Sub-tabs */}
         <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
           <button
-            onClick={() => setAnalyticsSubTab('dashboard')}
+            onClick={() => setAnalyticsSubTab('cohort-analysis')}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              analyticsSubTab === 'dashboard'
+              analyticsSubTab === 'cohort-analysis'
                 ? 'bg-white text-blue-600 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
@@ -893,7 +900,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Content */}
-        {analyticsSubTab === 'dashboard' && (
+        {analyticsSubTab === 'cohort-analysis' && (
           <div className="space-y-6">
             {/* Filters */}
             <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -947,13 +954,22 @@ export default function AdminDashboard() {
                   <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
                   <p className="text-gray-600 mt-4">Loading cohort analysis...</p>
                 </div>
-              ) : cohortData ? (
+              ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
-                        {cohortData.weeks?.map((week: string) => (
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                          return weekLabel;
+                        }).map((week: string) => (
                           <th key={week} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                             {week}
                           </th>
@@ -963,50 +979,36 @@ export default function AdminDashboard() {
                     <tbody className="divide-y divide-gray-200 bg-white">
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Starting Onboarding</td>
-                        {cohortData.weeks?.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData.activation?.[week]?.countStartingOnboarding || 0}
-                          </td>
+                        {Array.from({ length: 12 }, () => (
+                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Drop Off Step 1</td>
-                        {cohortData.weeks?.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData.activation?.[week]?.countDropOffStep1 || 0}
-                          </td>
+                        {Array.from({ length: 12 }, () => (
+                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Drop Off Step 2</td>
-                        {cohortData.weeks?.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData.activation?.[week]?.countDropOffStep2 || 0}
-                          </td>
+                        {Array.from({ length: 12 }, () => (
+                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Completed Onboarding</td>
-                        {cohortData.weeks?.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData.activation?.[week]?.countCompletedOnboarding || 0}
-                          </td>
+                        {Array.from({ length: 12 }, () => (
+                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg Time to Onboard (days)</td>
-                        {cohortData.weeks?.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData.activation?.[week]?.avgTimeToOnboardDays || '-'}
-                          </td>
+                        {Array.from({ length: 12 }, () => (
+                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">-</td>
                         ))}
                       </tr>
                     </tbody>
                   </table>
-                </div>
-              ) : (
-                <div className="text-center py-12 text-gray-500">
-                  No cohort data available. Click "Refresh Data" to load.
                 </div>
               )}
             </div>
@@ -1281,6 +1283,10 @@ export default function AdminDashboard() {
               )}
             </div>
 
+          </div>
+        )}
+        {analyticsSubTab === 'vanity-metrics' && (
+          <div className="space-y-6">
             {/* Vanity Metrics Table */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-4 border-b border-gray-200 flex justify-between items-center">
@@ -1328,13 +1334,20 @@ export default function AdminDashboard() {
                   <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
                   <p className="text-gray-600 mt-4">Loading vanity metrics...</p>
                 </div>
-              ) : vanityData ? (
+              ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
-                        {vanityData.months?.map((month: string) => (
+                        {vanityData?.months?.map((month: string) => (
+                          <th key={month} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                            {month}
+                          </th>
+                        )) || Array.from({ length: 12 }, (_, i) => {
+                          const date = new Date(2026, i, 1);
+                          return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                        }).map((month: string) => (
                           <th key={month} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                             {month}
                           </th>
@@ -1344,56 +1357,63 @@ export default function AdminDashboard() {
                     <tbody className="divide-y divide-gray-200 bg-white">
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Total Users</td>
-                        {vanityData.months?.map((month: string) => (
+                        {vanityData?.months?.map((month: string) => (
                           <td key={month} className="px-4 py-3 text-sm text-gray-600">
                             {vanityData.metrics?.[month]?.totalUsers || 0}
                           </td>
+                        )) || Array.from({ length: 12 }, () => (
+                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Monthly Active Users</td>
-                        {vanityData.months?.map((month: string) => (
+                        {vanityData?.months?.map((month: string) => (
                           <td key={month} className="px-4 py-3 text-sm text-gray-600">
                             {vanityData.metrics?.[month]?.monthlyActiveUsers || 0}
                           </td>
+                        )) || Array.from({ length: 12 }, () => (
+                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">New Users per Month</td>
-                        {vanityData.months?.map((month: string) => (
+                        {vanityData?.months?.map((month: string) => (
                           <td key={month} className="px-4 py-3 text-sm text-gray-600">
                             {vanityData.metrics?.[month]?.newUsers || 0}
                           </td>
+                        )) || Array.from({ length: 12 }, () => (
+                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Total Transactions Uploaded</td>
-                        {vanityData.months?.map((month: string) => (
+                        {vanityData?.months?.map((month: string) => (
                           <td key={month} className="px-4 py-3 text-sm text-gray-600">
                             {vanityData.metrics?.[month]?.totalTransactionsUploaded || 0}
                           </td>
+                        )) || Array.from({ length: 12 }, () => (
+                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Total Unique Banks Uploaded</td>
-                        {vanityData.months?.map((month: string) => (
+                        {vanityData?.months?.map((month: string) => (
                           <td key={month} className="px-4 py-3 text-sm text-gray-600">
                             {vanityData.metrics?.[month]?.totalUniqueBanksUploaded || 0}
                           </td>
+                        )) || Array.from({ length: 12 }, () => (
+                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
                         ))}
                       </tr>
                     </tbody>
                   </table>
                 </div>
-              ) : (
-                <div className="text-center py-12 text-gray-500">
-                  No vanity metrics available. Click "Refresh" to load.
-                </div>
               )}
             </div>
           </div>
         )}
-        {analyticsSubTab === 'macro-data' && renderPlaceholder('Macro Data')}
+        
+        {analyticsSubTab === 'app-health' && renderPlaceholder('App Health')}
         
         {analyticsSubTab === 'customer-data' && (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -2446,5 +2466,6 @@ function ColumnFilterHeader({
     </th>
   );
 }
+
 
 
