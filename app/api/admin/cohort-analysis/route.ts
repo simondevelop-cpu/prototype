@@ -171,6 +171,36 @@ export async function GET(request: NextRequest) {
     const activationResult = await pool.query(activationQuery, filterParams);
     
     console.log('[Cohort Analysis] Activation query returned', activationResult.rows.length, 'weeks');
+    console.log('[Cohort Analysis] Raw signup weeks from query:', activationResult.rows.map((r: any) => ({
+      week: r.signup_week,
+      count: r.count_starting_onboarding,
+      completed: r.count_completed_onboarding
+    })));
+    
+    // Also get distinct signup weeks from users table for comparison
+    try {
+      const distinctWeeksCheck = await pool.query(`
+        SELECT 
+          DATE_TRUNC('week', created_at) as signup_week,
+          COUNT(*) as user_count,
+          COUNT(completed_at) as completed_count,
+          MIN(created_at) as earliest,
+          MAX(created_at) as latest
+        FROM users
+        WHERE email != $1
+        GROUP BY DATE_TRUNC('week', created_at)
+        ORDER BY signup_week DESC
+      `, [ADMIN_EMAIL]);
+      console.log('[Cohort Analysis] Distinct signup weeks from users table:', distinctWeeksCheck.rows.map((r: any) => ({
+        week: r.signup_week,
+        user_count: r.user_count,
+        completed_count: r.completed_count,
+        earliest: r.earliest,
+        latest: r.latest
+      })));
+    } catch (e) {
+      console.log('[Cohort Analysis] Could not check distinct weeks:', e);
+    }
     
     // Extract weeks from query results and build weeks array
     const signupWeeks = activationResult.rows.map((row: any) => row.signup_week);
@@ -179,7 +209,11 @@ export async function GET(request: NextRequest) {
     signupWeeks.forEach((weekDate: any) => {
       if (weekDate) {
         const weekStart = new Date(weekDate);
-        const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        // Adjust to start of week (Sunday) for display
+        const dayOfWeek = weekStart.getDay();
+        const adjustedWeekStart = new Date(weekStart);
+        adjustedWeekStart.setDate(weekStart.getDate() - dayOfWeek);
+        const weekLabel = `w/c ${adjustedWeekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
         weeksSet.add(weekLabel);
       }
     });
