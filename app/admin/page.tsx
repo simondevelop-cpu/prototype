@@ -197,14 +197,21 @@ export default function AdminDashboard() {
     setVanityLoading(true);
     try {
       const token = localStorage.getItem('admin_token');
-      const params = new URLSearchParams({
-        totalAccounts: vanityFilters.totalAccounts.toString(),
-        validatedEmails: vanityFilters.validatedEmails.toString(),
-        // Use pipe delimiter to avoid splitting on commas within intent category values
-        intentCategories: vanityFilters.intentCategories.join('|'),
-        cohorts: vanityFilters.cohorts.join(','),
-        dataCoverage: vanityFilters.dataCoverage.join(','),
-      });
+      // Build URLSearchParams manually to ensure pipe delimiter is preserved
+      // URLSearchParams constructor might encode | as %7C, but that's fine - it will be decoded on the server
+      const params = new URLSearchParams();
+      params.set('totalAccounts', vanityFilters.totalAccounts.toString());
+      params.set('validatedEmails', vanityFilters.validatedEmails.toString());
+      // Use pipe delimiter to avoid splitting on commas within intent category values
+      if (vanityFilters.intentCategories.length > 0) {
+        params.set('intentCategories', vanityFilters.intentCategories.join('|'));
+      }
+      if (vanityFilters.cohorts.length > 0) {
+        params.set('cohorts', vanityFilters.cohorts.join(','));
+      }
+      if (vanityFilters.dataCoverage.length > 0) {
+        params.set('dataCoverage', vanityFilters.dataCoverage.join(','));
+      }
       const response = await fetch(`/api/admin/vanity-metrics?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });

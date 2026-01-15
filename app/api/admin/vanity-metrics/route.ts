@@ -47,17 +47,27 @@ export async function GET(request: NextRequest) {
     // Parse query parameters
     const url = new URL(request.url);
     // Use pipe delimiter for intent categories to avoid splitting on commas within values
-    // The pipe character might be URL encoded as %7C, so decode it first
-    const intentCategoriesParam = decodeURIComponent(url.searchParams.get('intentCategories') || '');
+    // URLSearchParams.get() automatically decodes %7C to |, so we can check for | directly
+    const intentCategoriesParam = url.searchParams.get('intentCategories') || '';
     let intentCategories: string[] = [];
     if (intentCategoriesParam) {
-      // Try pipe delimiter first (new format) - check for both | and %7C
-      const normalizedParam = intentCategoriesParam.replace(/%7C/g, '|');
-      if (normalizedParam.includes('|')) {
-        intentCategories = normalizedParam.split('|').map(s => s.trim()).filter(Boolean);
+      // Check if it contains pipe delimiter (new format)
+      // URLSearchParams.get() already decodes %7C to |
+      if (intentCategoriesParam.includes('|')) {
+        intentCategories = intentCategoriesParam.split('|').map(s => s.trim()).filter(Boolean);
+      } else if (intentCategoriesParam.includes(',')) {
+        // Fallback to comma for backward compatibility, but warn if values might contain commas
+        intentCategories = intentCategoriesParam.split(',').map(s => s.trim()).filter(Boolean);
+        // Check if any value contains a comma (which would indicate incorrect splitting)
+        const hasCommasInValues = intentCategories.some(cat => 
+          cat.includes('(') && cat.includes(')') && !cat.includes('|')
+        );
+        if (hasCommasInValues) {
+          console.warn('[Vanity Metrics] Intent categories may have been incorrectly split on commas. Consider using pipe delimiter.');
+        }
       } else {
-        // Fallback to comma for backward compatibility, but this will break if values contain commas
-        intentCategories = normalizedParam.split(',').map(s => s.trim()).filter(Boolean);
+        // Single value, no delimiter
+        intentCategories = [intentCategoriesParam.trim()].filter(Boolean);
       }
     }
     
@@ -70,7 +80,6 @@ export async function GET(request: NextRequest) {
     };
     
     console.log('[Vanity Metrics] Raw intentCategories param:', url.searchParams.get('intentCategories'));
-    console.log('[Vanity Metrics] Decoded intentCategories param:', intentCategoriesParam);
     console.log('[Vanity Metrics] Parsed intentCategories:', intentCategories);
 
     // Check if users table has required columns (schema-adaptive)
