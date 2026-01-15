@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (filters.intentCategories && filters.intentCategories.length > 0 && hasMotivation) {
-      filterConditions += ` AND u.motivation = ANY($${paramIndex})`;
+      filterConditions += ` AND u.motivation = ANY($${paramIndex}::text[])`;
       filterParams.push(filters.intentCategories);
       console.log('[Vanity Metrics] Applied intentCategories filter:', filters.intentCategories);
       paramIndex++;

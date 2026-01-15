@@ -93,6 +93,7 @@ export default function AdminDashboard() {
     validatedEmails: false,
     intentCategories: [] as string[],
     selectedCohorts: [] as string[], // Empty array means all cohorts selected by default
+    dataCoverage: [] as string[],
   });
   const [engagementChartData, setEngagementChartData] = useState<any>(null);
   const [engagementChartLoading, setEngagementChartLoading] = useState(false);

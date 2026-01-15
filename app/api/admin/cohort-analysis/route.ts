@@ -21,6 +21,7 @@ interface CohortFilters {
   validatedEmails?: boolean;
   intentCategories?: string[];
   cohorts?: string[];
+  dataCoverage?: string[];
 }
 
 export async function GET(request: NextRequest) {
@@ -49,6 +50,7 @@ export async function GET(request: NextRequest) {
       validatedEmails: url.searchParams.get('validatedEmails') === 'true',
       intentCategories: url.searchParams.get('intentCategories')?.split(',').filter(Boolean) || [],
       cohorts: url.searchParams.get('cohorts')?.split(',').filter(Boolean) || [],
+      dataCoverage: url.searchParams.get('dataCoverage')?.split(',').filter(Boolean) || [],
     };
 
     // Check where data actually exists - be flexible
@@ -117,7 +119,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (filters.intentCategories && filters.intentCategories.length > 0) {
-      filterConditions += ` AND u.motivation = ANY($${paramIndex})`;
+      filterConditions += ` AND u.motivation = ANY($${paramIndex}::text[])`;
       filterParams.push(filters.intentCategories);
       paramIndex++;
     }
