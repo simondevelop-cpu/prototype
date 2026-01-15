@@ -228,7 +228,7 @@ export default function AdminDashboard() {
         totalAccounts: chartFilters.totalAccounts.toString(),
         validatedEmails: chartFilters.validatedEmails.toString(),
         cohorts: chartFilters.cohorts.join(','),
-        intentCategories: chartFilters.intentCategories.join(','),
+        intentCategories: chartFilters.intentCategories.join('|'),
         dataCoverage: chartFilters.dataCoverage.join(','),
         userIds: chartFilters.userIds.join(','),
       });
