@@ -42,7 +42,7 @@ export default function AdminDashboard() {
   const [checking, setChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<TabName>('inbox');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
-  const [analyticsSubTab, setAnalyticsSubTab] = useState<'dashboard' | 'customer-data' | 'macro-data' | 'app-health'>('dashboard');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'dashboard' | 'customer-data' | 'macro-data'>('dashboard');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
   const [stats, setStats] = useState<any>(null);
@@ -926,29 +926,15 @@ export default function AdminDashboard() {
                   />
                   <span className="text-sm text-gray-700">Validated Emails</span>
                 </label>
-                <div className="flex flex-col">
-                  <label className="text-xs text-gray-600 mb-1">Intent Categories:</label>
-                  <select
-                    multiple
-                    value={cohortFilters.intentCategories}
-                    onChange={(e) => {
-                      const selected = Array.from(e.target.selectedOptions, option => option.value);
-                      setCohortFilters({ ...cohortFilters, intentCategories: selected });
-                    }}
-                    className="text-sm border border-gray-300 rounded px-2 py-1 min-w-[200px] max-h-32"
-                    size={Math.min(intentCategories.length || 1, 6)}
-                  >
-                    {intentCategoriesLoading ? (
-                      <option>Loading...</option>
-                    ) : intentCategories.length > 0 ? (
-                      intentCategories.map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))
-                    ) : (
-                      <option>No categories found</option>
-                    )}
-                  </select>
-                  <span className="text-xs text-gray-500 mt-1">Hold Cmd/Ctrl to select multiple</span>
+                <div className="min-w-[200px]">
+                  <CheckboxDropdown
+                    label="Intent Categories"
+                    options={intentCategoriesLoading ? [] : intentCategories}
+                    selected={cohortFilters.intentCategories}
+                    onChange={(selected) => setCohortFilters({ ...cohortFilters, intentCategories: selected })}
+                    placeholder={intentCategoriesLoading ? 'Loading...' : 'Select intent categories...'}
+                    disabled={intentCategoriesLoading}
+                  />
                 </div>
                 <button
                   onClick={fetchCohortAnalysis}
