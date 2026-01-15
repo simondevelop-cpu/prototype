@@ -1983,20 +1983,20 @@ export default function AdminDashboard() {
         {/* Overall Status */}
         {healthData && (
           <div className={`rounded-lg border-2 p-6 ${
-            healthData.status === 'pass' ? 'bg-green-50 border-green-300' :
-            healthData.status === 'fail' ? 'bg-red-50 border-red-300' :
+            (healthData.status === 'pass' || (healthData.success && !healthData.compliance?.summary?.fail && !healthData.operational?.summary?.fail && !healthData.infrastructure?.summary?.fail)) ? 'bg-green-50 border-green-300' :
+            (healthData.status === 'fail' || healthData.compliance?.summary?.fail > 0 || healthData.operational?.summary?.fail > 0 || healthData.infrastructure?.summary?.fail > 0) ? 'bg-red-50 border-red-300' :
             'bg-yellow-50 border-yellow-300'
           }`}>
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-bold mb-2">
-                  Overall Status: {healthData.status === 'pass' ? '✅ Healthy' : 
-                                   healthData.status === 'fail' ? '❌ Unhealthy' : 
+                  Overall Status: {(healthData.status === 'pass' || (healthData.success && !healthData.compliance?.summary?.fail && !healthData.operational?.summary?.fail && !healthData.infrastructure?.summary?.fail)) ? '✅ Healthy' : 
+                                   (healthData.status === 'fail' || healthData.compliance?.summary?.fail > 0 || healthData.operational?.summary?.fail > 0 || healthData.infrastructure?.summary?.fail > 0) ? '❌ Unhealthy' : 
                                    '⚠️ Warning'}
                 </h3>
                 {healthData.summary && (
                   <p className="text-sm">
-                    {healthData.summary.passed} passed, {healthData.summary.warnings} warnings, {healthData.summary.failed} failed
+                    {healthData.summary.passed || healthData.summary.pass || 0} passed, {healthData.summary.warnings || healthData.summary.warning || 0} warnings, {healthData.summary.failed || healthData.summary.fail || 0} failed
                   </p>
                 )}
               </div>
@@ -2017,7 +2017,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {healthData && healthData.checks && (() => {
+        {healthData && (healthData.checks || healthData.infrastructure || healthData.operational || healthData.compliance) && (() => {
           // Organize checks into sections
           const infrastructureChecks = [
             'Environment Variables',
