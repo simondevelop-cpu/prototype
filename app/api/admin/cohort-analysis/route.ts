@@ -120,43 +120,6 @@ export async function GET(request: NextRequest) {
       paramIndex++;
     }
 
-    // Execute queries first to get actual signup weeks from data
-    const activationResult = await pool.query(activationQuery, filterParams);
-    
-    // Extract weeks from query results and build weeks array
-    const signupWeeks = activationResult.rows.map((row: any) => row.signup_week);
-    const weeksSet = new Set<string>();
-    
-    signupWeeks.forEach((weekDate: any) => {
-      if (weekDate) {
-        const weekStart = new Date(weekDate);
-        const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-        weeksSet.add(weekLabel);
-      }
-    });
-    
-    // Sort weeks (most recent first)
-    const weeks = Array.from(weeksSet).sort((a, b) => {
-      const dateA = new Date(a.replace('w/c ', ''));
-      const dateB = new Date(b.replace('w/c ', ''));
-      return dateB.getTime() - dateA.getTime();
-    });
-    
-    // If no weeks from data, fall back to last 12 weeks
-    if (weeks.length === 0) {
-      const now = new Date();
-      const currentWeekStart = new Date(now);
-      currentWeekStart.setDate(now.getDate() - now.getDay());
-      currentWeekStart.setHours(0, 0, 0, 0);
-      
-      for (let i = 11; i >= 0; i--) {
-        const weekStart = new Date(currentWeekStart);
-        weekStart.setDate(currentWeekStart.getDate() - (i * 7));
-        const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-        weeks.push(weekLabel);
-      }
-    }
-
     // Get activation metrics (onboarding steps) - from appropriate table
     // Track all steps: 1=Emotional Calibration, 2=Financial Context, 3=Motivation, 4=Acquisition Source, 5=Insight Preferences, 6=Email Verification, 7=Account Profile
     const activationQuery = useUsersTable ? `
@@ -203,7 +166,48 @@ export async function GET(request: NextRequest) {
     `;
 
     filterParams.push(ADMIN_EMAIL);
+    
+    // Execute activation query to get actual signup weeks from data
     const activationResult = await pool.query(activationQuery, filterParams);
+    
+    console.log('[Cohort Analysis] Activation query returned', activationResult.rows.length, 'weeks');
+    
+    // Extract weeks from query results and build weeks array
+    const signupWeeks = activationResult.rows.map((row: any) => row.signup_week);
+    const weeksSet = new Set<string>();
+    
+    signupWeeks.forEach((weekDate: any) => {
+      if (weekDate) {
+        const weekStart = new Date(weekDate);
+        const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        weeksSet.add(weekLabel);
+      }
+    });
+    
+    // Sort weeks (most recent first)
+    const weeks = Array.from(weeksSet).sort((a, b) => {
+      const dateA = new Date(a.replace('w/c ', ''));
+      const dateB = new Date(b.replace('w/c ', ''));
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    // If no weeks from data, fall back to last 12 weeks
+    if (weeks.length === 0) {
+      console.log('[Cohort Analysis] No weeks from data, using fallback');
+      const now = new Date();
+      const currentWeekStart = new Date(now);
+      currentWeekStart.setDate(now.getDate() - now.getDay());
+      currentWeekStart.setHours(0, 0, 0, 0);
+      
+      for (let i = 11; i >= 0; i--) {
+        const weekStart = new Date(currentWeekStart);
+        weekStart.setDate(currentWeekStart.getDate() - (i * 7));
+        const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        weeks.push(weekLabel);
+      }
+    }
+    
+    console.log('[Cohort Analysis] Using', weeks.length, 'weeks:', weeks);
 
     // Get engagement metrics
     // Check if user_events table exists
