@@ -393,11 +393,12 @@ export async function GET(request: NextRequest) {
             WHERE t.user_id = ANY($1::int[])
               AND t.created_at <= $2::timestamp
           `;
-          const filteredResult = await pool.query(filteredTotalTransactionsQuery, [userIds, weekEnd]);
+          const filteredResult = await pool.query(filteredTotalTransactionsQuery, [userIds, weekEnd.toISOString()]);
           totalTransactions = parseInt(filteredResult.rows[0]?.count) || 0;
         }
       } else {
-        const totalTransactionsResult = await pool.query(totalTransactionsQuery, [...filterParams, weekEnd]);
+        const totalTransactionsParams = [...filterParams, weekEnd.toISOString()];
+        const totalTransactionsResult = await pool.query(totalTransactionsQuery, totalTransactionsParams);
         totalTransactions = parseInt(totalTransactionsResult.rows[0]?.count) || 0;
       }
 
