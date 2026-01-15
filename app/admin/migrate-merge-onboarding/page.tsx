@@ -132,6 +132,13 @@ export default function MigrateMergeOnboarding() {
                           <span className="font-medium">{migrationStatus.dataMigration.percentageMigrated}%</span>
                         </div>
                       )}
+                      {migrationStatus.dataMigration.explanation && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <p className="text-xs text-gray-600 italic">
+                            {migrationStatus.dataMigration.explanation}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

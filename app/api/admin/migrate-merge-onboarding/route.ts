@@ -211,13 +211,14 @@ export async function GET(request: NextRequest) {
     if (hasCompletedAt) {
       try {
         // More thorough check: Find users with ANY onboarding_responses entry where users table has NULL
+        // Use DISTINCT ON to get one row per user with their latest onboarding response
         const unmigratedCheck = await pool.query(`
-          SELECT DISTINCT
+          SELECT DISTINCT ON (u.id)
             u.id,
             u.email,
-            COALESCE(o.motivation, 'NULL') as onboarding_motivation,
+            o.motivation as onboarding_motivation,
             o.completed_at as onboarding_completed_at,
-            CASE WHEN u.motivation IS NULL THEN 'NULL' ELSE u.motivation END as users_motivation,
+            u.motivation as users_motivation,
             u.completed_at as users_completed_at,
             (
               SELECT COUNT(*) 
@@ -225,14 +226,24 @@ export async function GET(request: NextRequest) {
               WHERE o2.user_id = u.id
             ) as total_onboarding_entries
           FROM users u
-          INNER JOIN onboarding_responses o ON u.id = o.user_id
+          INNER JOIN (
+            SELECT DISTINCT ON (user_id)
+              user_id,
+              motivation,
+              completed_at,
+              created_at
+            FROM onboarding_responses
+            ORDER BY user_id, created_at DESC
+          ) o ON u.id = o.user_id
           WHERE u.motivation IS NULL
-          GROUP BY u.id, u.email, u.motivation, u.completed_at, o.motivation, o.completed_at
-          ORDER BY u.id
+          ORDER BY u.id, o.created_at DESC
           LIMIT 10
         `);
         unmigratedUsers = unmigratedCheck.rows;
         console.log(`[Migration Status] Found ${unmigratedUsers.length} unmigrated users with data to migrate`);
+        if (unmigratedUsers.length > 0) {
+          console.log('[Migration Status] Unmigrated users:', unmigratedUsers.map(u => ({ id: u.id, email: u.email })));
+        }
       } catch (e) {
         console.log('[Migration Status] Could not check unmigrated users:', e);
       }
@@ -271,7 +282,11 @@ export async function GET(request: NextRequest) {
         migratedCount,
         totalWithOnboarding,
         percentageMigrated: totalWithOnboarding > 0 ? Math.round((migratedCount / totalWithOnboarding) * 100) : 0,
-        unmigratedUsers: unmigratedUsers
+        unmigratedUsers: unmigratedUsers,
+        unmigratedCount: unmigratedUsers.length,
+        explanation: unmigratedUsers.length === 0 
+          ? `All ${totalWithOnboarding} users with onboarding data have been migrated. The remaining ${totalWithOnboarding - migratedCount} users likely have NULL values in onboarding_responses (nothing to migrate).`
+          : `${unmigratedUsers.length} user(s) have onboarding data that wasn't migrated. Re-running migration may fix this.`
       }
     }, { status: 200 });
 
