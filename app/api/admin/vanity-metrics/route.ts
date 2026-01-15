@@ -46,14 +46,20 @@ export async function GET(request: NextRequest) {
 
     // Parse query parameters
     const url = new URL(request.url);
-    // Use a delimiter that won't appear in intent category values (pipe character)
-    // If intentCategories contains pipes, we'll need to URL encode/decode
-    const intentCategoriesParam = url.searchParams.get('intentCategories');
-    const intentCategories = intentCategoriesParam 
-      ? (intentCategoriesParam.includes('|') 
-          ? intentCategoriesParam.split('|').filter(Boolean)
-          : intentCategoriesParam.split(',').filter(Boolean)) // Fallback to comma for backward compatibility
-      : [];
+    // Use pipe delimiter for intent categories to avoid splitting on commas within values
+    // The pipe character might be URL encoded as %7C, so decode it first
+    const intentCategoriesParam = decodeURIComponent(url.searchParams.get('intentCategories') || '');
+    let intentCategories: string[] = [];
+    if (intentCategoriesParam) {
+      // Try pipe delimiter first (new format) - check for both | and %7C
+      const normalizedParam = intentCategoriesParam.replace(/%7C/g, '|');
+      if (normalizedParam.includes('|')) {
+        intentCategories = normalizedParam.split('|').map(s => s.trim()).filter(Boolean);
+      } else {
+        // Fallback to comma for backward compatibility, but this will break if values contain commas
+        intentCategories = normalizedParam.split(',').map(s => s.trim()).filter(Boolean);
+      }
+    }
     
     const filters: VanityFilters = {
       totalAccounts: url.searchParams.get('totalAccounts') === 'true',
@@ -62,6 +68,10 @@ export async function GET(request: NextRequest) {
       cohorts: url.searchParams.get('cohorts')?.split(',').filter(Boolean) || [],
       dataCoverage: url.searchParams.get('dataCoverage')?.split(',').filter(Boolean) || [],
     };
+    
+    console.log('[Vanity Metrics] Raw intentCategories param:', url.searchParams.get('intentCategories'));
+    console.log('[Vanity Metrics] Decoded intentCategories param:', intentCategoriesParam);
+    console.log('[Vanity Metrics] Parsed intentCategories:', intentCategories);
 
     // Check if users table has required columns (schema-adaptive)
     const schemaCheck = await pool.query(`
@@ -341,8 +351,8 @@ export async function GET(request: NextRequest) {
         FROM transactions t
         JOIN users u ON u.id = t.user_id
         WHERE u.email != $${adminEmailParamIndex}
-          AND t.created_at >= $${paramIndex}
-          AND t.created_at <= $${paramIndex + 1}
+          AND t.created_at >= $${paramIndex}::timestamp
+          AND t.created_at <= $${paramIndex + 1}::timestamp
           AND t.account IS NOT NULL
           ${filterConditions}
       `;
