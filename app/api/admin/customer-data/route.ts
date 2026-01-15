@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
+import { ADMIN_EMAIL, JWT_SECRET } from '@/lib/admin-constants';
 
 export const dynamic = 'force-dynamic';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const ADMIN_EMAIL = 'admin@canadianinsights.ca';
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,
