@@ -188,21 +188,47 @@ export async function GET(request: NextRequest) {
 
     console.log('[Customer Data API] Querying users table, useL0PII:', useL0PII, 'hasLastStep:', hasLastStep, 'hasAcquisitionOther:', hasAcquisitionOther);
     
-    result = await pool.query(`
-      SELECT ${selectFields}
-      ${fromClause}
-      LEFT JOIN (
-        SELECT 
-          user_id,
-          COUNT(DISTINCT id) as transaction_count,
-          COUNT(DISTINCT upload_session_id) FILTER (WHERE upload_session_id IS NOT NULL) as upload_session_count,
-          MIN(created_at) as first_transaction_date
-        FROM transactions
-        GROUP BY user_id
-      ) transaction_stats ON transaction_stats.user_id = u.id
-      WHERE u.email != $1
-      ORDER BY u.completed_at DESC NULLS LAST, u.created_at DESC
-    `, [ADMIN_EMAIL]);
+    // First, test if we can query users at all
+    try {
+      const testQuery = await pool.query(`
+        SELECT COUNT(*) as count
+        FROM users
+        WHERE email != $1
+      `, [ADMIN_EMAIL]);
+      console.log('[Customer Data API] Test query found', testQuery.rows[0]?.count, 'total users');
+    } catch (testError) {
+      console.error('[Customer Data API] Test query failed:', testError);
+    }
+    
+    try {
+      result = await pool.query(`
+        SELECT ${selectFields}
+        ${fromClause}
+        LEFT JOIN (
+          SELECT 
+            user_id,
+            COUNT(DISTINCT id) as transaction_count,
+            COUNT(DISTINCT upload_session_id) FILTER (WHERE upload_session_id IS NOT NULL) as upload_session_count,
+            MIN(created_at) as first_transaction_date
+          FROM transactions
+          GROUP BY user_id
+        ) transaction_stats ON transaction_stats.user_id = u.id
+        WHERE u.email != $1
+        ORDER BY u.completed_at DESC NULLS LAST, u.created_at DESC
+      `, [ADMIN_EMAIL]);
+    } catch (queryError: any) {
+      console.error('[Customer Data API] Query failed:', queryError);
+      console.error('[Customer Data API] Query details:', {
+        useL0PII,
+        hasLastStep,
+        hasAcquisitionOther,
+        hasIsActive,
+        hasEmailValidated,
+        selectFieldsLength: selectFields.length,
+        fromClause
+      });
+      throw queryError;
+    }
       
     console.log(`[Customer Data API] Query returned ${result.rows.length} customer records from users table`);
     if (result.rows.length > 0) {
