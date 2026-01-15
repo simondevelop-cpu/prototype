@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 export const dynamic = 'force-dynamic';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const ADMIN_EMAIL = 'admin@canadianinsights.ca';
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
