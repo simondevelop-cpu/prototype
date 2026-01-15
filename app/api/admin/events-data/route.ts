@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
       'e.event_type',
       hasEventData ? 'e.event_data' : 'NULL as event_data',
       hasMetadata ? 'e.metadata' : 'NULL as metadata',
-      'COALESCE(e.event_timestamp, e.created_at) as created_at' // Use event_timestamp if available
+      'e.event_timestamp as created_at' // Use event_timestamp (the actual column name)
     ].join(',\n        ');
 
     // Fetch all user events with user information (only first name, no email or last name)
