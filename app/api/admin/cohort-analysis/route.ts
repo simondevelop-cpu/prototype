@@ -203,9 +203,10 @@ export async function GET(request: NextRequest) {
     }
     
     // Extract weeks from activation query results first
+    const signupWeeks = activationResult.rows.map((row: any) => row.signup_week);
     const weeksSet = new Set<string>();
     
-    allSignupWeeks.forEach((weekDate: any) => {
+    signupWeeks.forEach((weekDate: any) => {
       if (weekDate) {
         // DATE_TRUNC('week', ...) in PostgreSQL returns Monday as start of week
         // Convert to JavaScript Date and adjust to Sunday for display
