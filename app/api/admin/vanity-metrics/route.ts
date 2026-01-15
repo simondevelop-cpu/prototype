@@ -70,16 +70,28 @@ export async function GET(request: NextRequest) {
     const filterParams: any[] = [];
     let paramIndex = 1;
 
+    console.log('[Vanity Metrics] Received filters:', {
+      totalAccounts: filters.totalAccounts,
+      validatedEmails: filters.validatedEmails,
+      intentCategories: filters.intentCategories,
+      cohorts: filters.cohorts,
+      dataCoverage: filters.dataCoverage,
+      hasEmailValidated,
+      hasMotivation
+    });
+
     // Note: totalAccounts = true means show all accounts (no filter)
     // totalAccounts = false means don't show anything (shouldn't happen, but handle it)
     // validatedEmails = true means only show validated emails
     if (filters.validatedEmails && hasEmailValidated) {
       filterConditions += ` AND u.email_validated = true`;
+      console.log('[Vanity Metrics] Applied validatedEmails filter');
     }
 
     if (filters.intentCategories && filters.intentCategories.length > 0 && hasMotivation) {
       filterConditions += ` AND u.motivation = ANY($${paramIndex})`;
       filterParams.push(filters.intentCategories);
+      console.log('[Vanity Metrics] Applied intentCategories filter:', filters.intentCategories);
       paramIndex++;
     }
 

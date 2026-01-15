@@ -1389,10 +1389,39 @@ export default function AdminDashboard() {
                     </div>
                   )}
                   <ResponsiveContainer width="100%" height={500}>
-                    <LineChart margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <LineChart 
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      data={(() => {
+                        // Create unified data structure - all lines share same x-axis (weeks 0-11)
+                        const allWeeks = Array.from({ length: 12 }, (_, i) => i);
+                        
+                        // Build a map of week -> user data for each user
+                        const userDataByWeek = new Map<number, Map<number, number>>();
+                        engagementChartData.userLines.forEach((userLine: any) => {
+                          const weekMap = new Map<number, number>();
+                          userLine.weeks.forEach((w: any) => {
+                            weekMap.set(w.week, w.loginDays);
+                          });
+                          userDataByWeek.set(userLine.userId, weekMap);
+                        });
+                        
+                        // Create unified data array where each entry has week and all user values
+                        return allWeeks.map(weekNum => {
+                          const dataPoint: any = { week: weekNum };
+                          engagementChartData.userLines.forEach((userLine: any) => {
+                            const weekMap = userDataByWeek.get(userLine.userId);
+                            dataPoint[`user_${userLine.userId}`] = weekMap?.get(weekNum) || 0;
+                          });
+                          return dataPoint;
+                        });
+                      })()}
+                    >
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis 
-                        dataKey="week" 
+                        dataKey="week"
+                        type="number"
+                        domain={[0, 11]}
+                        ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]}
                         label={{ value: 'Week from Signup', position: 'insideBottom', offset: -5 }}
                       />
                       <YAxis 
@@ -1417,48 +1446,21 @@ export default function AdminDashboard() {
                         }}
                       />
                       <Legend />
-                      {(() => {
-                        // Create unified data structure - all lines share same x-axis (weeks 0-11)
-                        const allWeeks = Array.from({ length: 12 }, (_, i) => i);
-                        
-                        // Build a map of week -> user data for each user
-                        const userDataByWeek = new Map<number, Map<number, number>>();
-                        engagementChartData.userLines.forEach((userLine: any) => {
-                          const weekMap = new Map<number, number>();
-                          userLine.weeks.forEach((w: any) => {
-                            weekMap.set(w.week, w.loginDays);
-                          });
-                          userDataByWeek.set(userLine.userId, weekMap);
-                        });
-                        
-                        // Create unified data array where each entry has week and all user values
-                        const unifiedData = allWeeks.map(weekNum => {
-                          const dataPoint: any = { week: weekNum };
-                          engagementChartData.userLines.forEach((userLine: any) => {
-                            const weekMap = userDataByWeek.get(userLine.userId);
-                            dataPoint[`user_${userLine.userId}`] = weekMap?.get(weekNum) || 0;
-                          });
-                          return dataPoint;
-                        });
-                        
-                        // Render lines using unified data
-                        return engagementChartData.userLines.map((userLine: any, idx: number) => {
-                          const color = `hsl(${(idx * 137.5) % 360}, 70%, 50%)`;
-                          return (
-                            <Line
-                              key={userLine.userId}
-                              type="monotone"
-                              dataKey={`user_${userLine.userId}`}
-                              data={unifiedData}
-                              stroke={color}
-                              strokeWidth={2}
-                              dot={{ r: 4 }}
-                              name={`User ${userLine.userId}`}
-                              connectNulls
-                            />
-                          );
-                        });
-                      })()}
+                      {engagementChartData.userLines.map((userLine: any, idx: number) => {
+                        const color = `hsl(${(idx * 137.5) % 360}, 70%, 50%)`;
+                        return (
+                          <Line
+                            key={userLine.userId}
+                            type="monotone"
+                            dataKey={`user_${userLine.userId}`}
+                            stroke={color}
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            name={`User ${userLine.userId}`}
+                            connectNulls
+                          />
+                        );
+                      })}
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
