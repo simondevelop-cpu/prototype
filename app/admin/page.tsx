@@ -2076,7 +2076,7 @@ export default function AdminDashboard() {
           }
 
           // PIPEDA requirements that don't need automated checks (use from API if available, otherwise use defaults)
-          const pipedaNoCheck = implementedRequirements.length > 0 ? implementedRequirements : [
+          const pipedaNoCheck = (implementedRequirements && implementedRequirements.length > 0) ? implementedRequirements : [
             {
               name: 'Password Strength Validation',
               status: 'pass',
@@ -2233,7 +2233,13 @@ export default function AdminDashboard() {
                 <div className="mb-6">
                   <h4 className="text-lg font-semibold mb-3 text-gray-700">Active Tests / Checks</h4>
                   <div className="grid gap-4">
-                    {pipeda.map((check: any, index: number) => renderCheck(check, index))}
+                    {pipeda.length > 0 ? (
+                      pipeda.map((check: any, index: number) => renderCheck(check, index))
+                    ) : (
+                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center text-gray-500">
+                        No active compliance tests available
+                      </div>
+                    )}
                   </div>
                 </div>
 
