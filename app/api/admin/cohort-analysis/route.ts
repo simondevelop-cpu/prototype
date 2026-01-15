@@ -539,7 +539,7 @@ export async function GET(request: NextRequest) {
         avgTimeToOnboardMinutes: row.avg_time_to_onboard_days ? Math.round(parseFloat(row.avg_time_to_onboard_days) * 1440) : null,
         // First upload metrics split by first day vs after first day
         usersUploadedFirstDay: parseInt(row.users_uploaded_first_day) || 0,
-        avgTimeToFirstUploadFirstDayMinutes: row.avg_time_to_first_upload_first_day_days ? Math.round(parseFloat(row.avg_time_to_first_upload_first_day_days) * 1440) : null,
+        avgTimeToFirstUploadFirstDayMinutes: row.avg_time_to_first_upload_first_day_minutes ? Math.round(parseFloat(row.avg_time_to_first_upload_first_day_minutes)) : null,
         usersUploadedAfterFirstDay: parseInt(row.users_uploaded_after_first_day) || 0,
         avgTimeToFirstUploadAfterFirstDayDays: row.avg_time_to_first_upload_after_first_day_days ? parseFloat(row.avg_time_to_first_upload_after_first_day_days).toFixed(1) : null,
         // Engagement signals
