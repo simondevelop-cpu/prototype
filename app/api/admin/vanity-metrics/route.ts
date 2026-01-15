@@ -46,10 +46,19 @@ export async function GET(request: NextRequest) {
 
     // Parse query parameters
     const url = new URL(request.url);
+    // Use a delimiter that won't appear in intent category values (pipe character)
+    // If intentCategories contains pipes, we'll need to URL encode/decode
+    const intentCategoriesParam = url.searchParams.get('intentCategories');
+    const intentCategories = intentCategoriesParam 
+      ? (intentCategoriesParam.includes('|') 
+          ? intentCategoriesParam.split('|').filter(Boolean)
+          : intentCategoriesParam.split(',').filter(Boolean)) // Fallback to comma for backward compatibility
+      : [];
+    
     const filters: VanityFilters = {
       totalAccounts: url.searchParams.get('totalAccounts') === 'true',
       validatedEmails: url.searchParams.get('validatedEmails') === 'true',
-      intentCategories: url.searchParams.get('intentCategories')?.split(',').filter(Boolean) || [],
+      intentCategories,
       cohorts: url.searchParams.get('cohorts')?.split(',').filter(Boolean) || [],
       dataCoverage: url.searchParams.get('dataCoverage')?.split(',').filter(Boolean) || [],
     };

@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       totalAccounts: url.searchParams.get('totalAccounts') === 'true',
       validatedEmails: url.searchParams.get('validatedEmails') === 'true',
       cohorts: url.searchParams.get('cohorts')?.split(',').filter(Boolean) || [],
-      intentCategories: url.searchParams.get('intentCategories')?.split(',').filter(Boolean) || [],
+      intentCategories: url.searchParams.get('intentCategories')?.split('|').filter(Boolean) || [],
       dataCoverage: url.searchParams.get('dataCoverage')?.split(',').filter(Boolean) || [],
       userIds: url.searchParams.get('userIds')?.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) || [],
     };

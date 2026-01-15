@@ -174,7 +174,7 @@ export default function AdminDashboard() {
       const params = new URLSearchParams({
         totalAccounts: cohortFilters.totalAccounts.toString(),
         validatedEmails: cohortFilters.validatedEmails.toString(),
-        intentCategories: cohortFilters.intentCategories.join(','),
+        intentCategories: cohortFilters.intentCategories.join('|'),
         cohorts: cohortFilters.selectedCohorts.join(','),
         dataCoverage: cohortFilters.dataCoverage.join(','),
       });
@@ -200,7 +200,8 @@ export default function AdminDashboard() {
       const params = new URLSearchParams({
         totalAccounts: vanityFilters.totalAccounts.toString(),
         validatedEmails: vanityFilters.validatedEmails.toString(),
-        intentCategories: vanityFilters.intentCategories.join(','),
+        // Use pipe delimiter to avoid splitting on commas within intent category values
+        intentCategories: vanityFilters.intentCategories.join('|'),
         cohorts: vanityFilters.cohorts.join(','),
         dataCoverage: vanityFilters.dataCoverage.join(','),
       });

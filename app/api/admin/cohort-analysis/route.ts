@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     const filters: CohortFilters = {
       totalAccounts: url.searchParams.get('totalAccounts') === 'true',
       validatedEmails: url.searchParams.get('validatedEmails') === 'true',
-      intentCategories: url.searchParams.get('intentCategories')?.split(',').filter(Boolean) || [],
+      intentCategories: url.searchParams.get('intentCategories')?.split('|').filter(Boolean) || [],
       cohorts: url.searchParams.get('cohorts')?.split(',').filter(Boolean) || [],
       dataCoverage: url.searchParams.get('dataCoverage')?.split(',').filter(Boolean) || [],
     };
