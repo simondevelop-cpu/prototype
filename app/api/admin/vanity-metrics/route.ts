@@ -188,23 +188,6 @@ export async function GET(request: NextRequest) {
 
     // Get metrics for each week (only for weeks that should be displayed)
     const metrics: { [week: string]: any } = {};
-    
-    // Log total users before filtering for debugging
-    // Build params array correctly - ADMIN_EMAIL is first, then filter params
-    // Note: filterParams doesn't include ADMIN_EMAIL yet at this point
-    const totalUsersCheckParams: any[] = [ADMIN_EMAIL];
-    if (filterParams.length > 0) {
-      totalUsersCheckParams.push(...filterParams);
-    }
-    const totalUsersCheck = await pool.query(`
-      SELECT COUNT(*) as count
-      FROM users u
-      WHERE u.email != $1
-        ${filterConditions}
-    `, totalUsersCheckParams);
-    console.log('[Vanity Metrics] Total users matching filters (excluding cohort):', parseInt(totalUsersCheck.rows[0]?.count) || 0);
-    console.log('[Vanity Metrics] Filter conditions:', filterConditions);
-    console.log('[Vanity Metrics] Filter params:', filterParams);
 
     for (let i = 0; i < numWeeks; i++) {
       const weekStart = new Date(weekStartDate);
