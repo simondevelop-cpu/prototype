@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
          LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL`
       : `FROM users u`;
 
-    console.log('[Customer Data API] Querying users table, useL0PII:', useL0PII, 'hasLastStep:', hasLastStep, 'hasAcquisitionOther:', hasAcquisitionOther);
+    console.log('[Customer Data API] Querying users table, useL0PII:', useL0PII, 'hasLastStep:', hasLastStep, 'hasAcquisitionOther:', hasAcquisitionOther, 'hasUploadSessionId:', hasUploadSessionId);
     
     // First, test if we can query users at all
     try {
@@ -214,19 +214,32 @@ export async function GET(request: NextRequest) {
       console.error('[Customer Data API] Test query failed:', testError);
     }
     
+    // Build transaction stats subquery based on schema
+    const transactionStatsQuery = hasUploadSessionId ? `
+      SELECT 
+        user_id,
+        COUNT(DISTINCT id) as transaction_count,
+        COUNT(DISTINCT upload_session_id) FILTER (WHERE upload_session_id IS NOT NULL) as upload_session_count,
+        MIN(created_at) as first_transaction_date
+      FROM transactions
+      GROUP BY user_id
+    ` : `
+      SELECT 
+        user_id,
+        COUNT(DISTINCT id) as transaction_count,
+        0 as upload_session_count,
+        MIN(created_at) as first_transaction_date
+      FROM transactions
+      GROUP BY user_id
+    `;
+    
     try {
       // Log the actual query for debugging (first 500 chars)
       const fullQuery = `
         SELECT ${selectFields}
         ${fromClause}
         LEFT JOIN (
-          SELECT 
-            user_id,
-            COUNT(DISTINCT id) as transaction_count,
-            COUNT(DISTINCT upload_session_id) FILTER (WHERE upload_session_id IS NOT NULL) as upload_session_count,
-            MIN(created_at) as first_transaction_date
-          FROM transactions
-          GROUP BY user_id
+          ${transactionStatsQuery}
         ) transaction_stats ON transaction_stats.user_id = u.id
         WHERE u.email != $1
         ORDER BY u.completed_at DESC NULLS LAST, u.created_at DESC
