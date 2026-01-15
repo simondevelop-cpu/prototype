@@ -181,12 +181,16 @@ export async function GET(request: NextRequest) {
     const metrics: { [week: string]: any } = {};
     
     // Log total users before filtering for debugging
+    // Build params array correctly - ADMIN_EMAIL is first, then filter params
+    const totalUsersCheckParams = filterParams.length > 0 
+      ? [ADMIN_EMAIL, ...filterParams] 
+      : [ADMIN_EMAIL];
     const totalUsersCheck = await pool.query(`
       SELECT COUNT(*) as count
       FROM users u
       WHERE u.email != $1
         ${filterConditions}
-    `, [ADMIN_EMAIL, ...filterParams.slice(1)]);
+    `, totalUsersCheckParams);
     console.log('[Vanity Metrics] Total users matching filters (excluding cohort):', parseInt(totalUsersCheck.rows[0]?.count) || 0);
     console.log('[Vanity Metrics] Filter conditions:', filterConditions);
     console.log('[Vanity Metrics] Filter params:', filterParams);
@@ -255,8 +259,8 @@ export async function GET(request: NextRequest) {
             FROM user_events e
             JOIN users u ON u.id = e.user_id
             WHERE e.event_type = 'login'
-              AND e.event_timestamp >= $${paramIndex}
-              AND e.event_timestamp <= $${paramIndex + 1}
+              AND e.event_timestamp >= $${paramIndex}::timestamp
+              AND e.event_timestamp <= $${paramIndex + 1}::timestamp
               AND u.email != $${adminEmailParamIndex}
               ${filterConditions}
           `;
@@ -307,8 +311,8 @@ export async function GET(request: NextRequest) {
         FROM transactions t
         JOIN users u ON u.id = t.user_id
         WHERE u.email != $${adminEmailParamIndex}
-          AND t.created_at >= $${paramIndex}
-          AND t.created_at <= $${paramIndex + 1}
+          AND t.created_at >= $${paramIndex}::timestamp
+          AND t.created_at <= $${paramIndex + 1}::timestamp
           ${filterConditions}
       `;
       let totalTransactions = 0;
@@ -333,9 +337,9 @@ export async function GET(request: NextRequest) {
           const filteredTransactionsQuery = `
             SELECT COUNT(*) as count
             FROM transactions t
-            WHERE t.user_id = ANY($${paramIndex})
-              AND t.created_at >= $${paramIndex + 1}
-              AND t.created_at <= $${paramIndex + 2}
+            WHERE t.user_id = ANY($1::int[])
+              AND t.created_at >= $2::timestamp
+              AND t.created_at <= $3::timestamp
           `;
           const filteredResult = await pool.query(filteredTransactionsQuery, [userIds, weekStart, weekEnd]);
           totalTransactions = parseInt(filteredResult.rows[0]?.count) || 0;
