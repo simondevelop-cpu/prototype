@@ -1996,7 +1996,12 @@ export default function AdminDashboard() {
                 </h3>
                 {healthData.summary && (
                   <p className="text-sm">
-                    {healthData.summary.passed || healthData.summary.pass || 0} passed, {healthData.summary.warnings || healthData.summary.warning || 0} warnings, {healthData.summary.failed || healthData.summary.fail || 0} failed
+                    {healthData.summary.passed || healthData.summary.pass || healthData.infrastructure?.summary?.pass || healthData.operational?.summary?.pass || healthData.compliance?.summary?.pass || 0} passed, {healthData.summary.warnings || healthData.summary.warning || healthData.infrastructure?.summary?.warning || healthData.operational?.summary?.warning || healthData.compliance?.summary?.warning || 0} warnings, {healthData.summary.failed || healthData.summary.fail || healthData.infrastructure?.summary?.fail || healthData.operational?.summary?.fail || healthData.compliance?.summary?.fail || 0} failed
+                  </p>
+                )}
+                {!healthData.summary && healthData.success && (
+                  <p className="text-sm">
+                    {(healthData.infrastructure?.summary?.pass || 0) + (healthData.operational?.summary?.pass || 0) + (healthData.compliance?.summary?.pass || 0)} passed, {(healthData.infrastructure?.summary?.warning || 0) + (healthData.operational?.summary?.warning || 0) + (healthData.compliance?.summary?.warning || 0)} warnings, {(healthData.infrastructure?.summary?.fail || 0) + (healthData.operational?.summary?.fail || 0) + (healthData.compliance?.summary?.fail || 0)} failed
                   </p>
                 )}
               </div>
