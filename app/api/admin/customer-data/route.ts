@@ -123,8 +123,6 @@ export async function GET(request: NextRequest) {
       console.log('[Customer Data API] Could not check for l0_pii_users');
     }
 
-    // Fetch all customer data from users table ONLY (post-migration)
-    let result;
     // Use appropriate table based on where data exists
     let result;
     
