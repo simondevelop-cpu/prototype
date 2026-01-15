@@ -1,6 +1,7 @@
 /**
  * Vanity Metrics API
- * Returns monthly metrics (Total users, MAU, New users, Transactions, Unique banks)
+ * Returns weekly metrics (Total users, WAU, New users, Transactions, Unique banks)
+ * Weekly from beginning of November to now
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -76,36 +77,68 @@ export async function GET(request: NextRequest) {
     }
 
     filterParams.push(ADMIN_EMAIL);
+    const adminEmailParamIndex = paramIndex;
+    paramIndex++;
 
-    // Generate months (Jan 2026 to Dec 2026)
-    const months: string[] = [];
-    for (let month = 0; month < 12; month++) {
-      const date = new Date(2026, month, 1);
-      months.push(date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
+    // Generate weeks (beginning of November to now)
+    // Find first Monday of November (or first day of November if it's a Monday)
+    const now = new Date();
+    const novemberStart = new Date(now.getFullYear(), 10, 1); // Month 10 = November
+    const firstMonday = new Date(novemberStart);
+    // Find first Monday of November
+    const dayOfWeek = novemberStart.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    if (dayOfWeek === 0) {
+      // If November 1st is Sunday, go to next Monday
+      firstMonday.setDate(novemberStart.getDate() + 1);
+    } else if (dayOfWeek !== 1) {
+      // If not Monday, go to next Monday
+      firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+    }
+    firstMonday.setHours(0, 0, 0, 0);
+
+    // Calculate weeks from first Monday of November to current week
+    const currentWeekStart = new Date(now);
+    currentWeekStart.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
+    currentWeekStart.setHours(0, 0, 0, 0);
+
+    // Calculate number of weeks
+    const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    const numWeeks = Math.max(1, weeksDiff + 1); // At least 1 week
+
+    const weeks: string[] = [];
+    for (let i = 0; i < numWeeks; i++) {
+      const weekStart = new Date(firstMonday);
+      weekStart.setDate(firstMonday.getDate() + (i * 7));
+      const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+      weeks.push(weekLabel);
     }
 
-    // Get metrics for each month
-    const metrics: { [month: string]: any } = {};
+    // Get metrics for each week
+    const metrics: { [week: string]: any } = {};
 
-    for (let month = 0; month < 12; month++) {
-      const monthStart = new Date(2026, month, 1);
-      const monthEnd = new Date(2026, month + 1, 0, 23, 59, 59);
-      const monthKey = monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    for (let i = 0; i < numWeeks; i++) {
+      const weekStart = new Date(firstMonday);
+      weekStart.setDate(firstMonday.getDate() + (i * 7));
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      const weekKey = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
-      // Total users (cumulative up to end of month)
+      // Total users (cumulative up to end of week)
       const totalUsersQuery = `
         SELECT COUNT(*) as count
         FROM users u
-        WHERE u.email != $${paramIndex}
-          AND u.created_at <= $${paramIndex + 1}
+        WHERE u.email != $${adminEmailParamIndex}
+          AND u.created_at <= $${paramIndex}
           ${filterConditions}
       `;
-      const totalUsersResult = await pool.query(totalUsersQuery, [...filterParams, monthEnd]);
+      const totalUsersResult = await pool.query(totalUsersQuery, [...filterParams, weekEnd]);
       const totalUsers = parseInt(totalUsersResult.rows[0]?.count) || 0;
 
-      // Monthly Active Users (users who logged in during the month)
+      // Weekly Active Users (users who logged in during the week)
       // Check if user_events table exists
-      let mau = 0;
+      let wau = 0;
       try {
         const eventsCheck = await pool.query(`
           SELECT 1 FROM information_schema.tables 
@@ -113,65 +146,65 @@ export async function GET(request: NextRequest) {
           LIMIT 1
         `);
         if (eventsCheck.rows.length > 0) {
-          const mauQuery = `
+          const wauQuery = `
             SELECT COUNT(DISTINCT e.user_id) as count
             FROM user_events e
             JOIN users u ON u.id = e.user_id
             WHERE e.event_type = 'login'
               AND e.event_timestamp >= $${paramIndex}
               AND e.event_timestamp <= $${paramIndex + 1}
-              AND u.email != $${paramIndex + 2}
+              AND u.email != $${adminEmailParamIndex}
               ${filterConditions}
           `;
-          const mauResult = await pool.query(mauQuery, [monthStart, monthEnd, ...filterParams]);
-          mau = parseInt(mauResult.rows[0]?.count) || 0;
+          const wauResult = await pool.query(wauQuery, [weekStart, weekEnd, ...filterParams]);
+          wau = parseInt(wauResult.rows[0]?.count) || 0;
         }
       } catch (e) {
-        // user_events table doesn't exist, MAU = 0
+        // user_events table doesn't exist, WAU = 0
       }
 
-      // New users per month
+      // New users per week
       const newUsersQuery = `
         SELECT COUNT(*) as count
         FROM users u
-        WHERE u.email != $${paramIndex}
-          AND u.created_at >= $${paramIndex + 1}
-          AND u.created_at <= $${paramIndex + 2}
+        WHERE u.email != $${adminEmailParamIndex}
+          AND u.created_at >= $${paramIndex}
+          AND u.created_at <= $${paramIndex + 1}
           ${filterConditions}
       `;
-      const newUsersResult = await pool.query(newUsersQuery, [...filterParams, monthStart, monthEnd]);
+      const newUsersResult = await pool.query(newUsersQuery, [...filterParams, weekStart, weekEnd]);
       const newUsers = parseInt(newUsersResult.rows[0]?.count) || 0;
 
-      // Total transactions uploaded (in the month)
+      // Total transactions uploaded (in the week)
       const transactionsQuery = `
         SELECT COUNT(*) as count
         FROM transactions t
         JOIN users u ON u.id = t.user_id
-        WHERE u.email != $${paramIndex}
-          AND t.created_at >= $${paramIndex + 1}
-          AND t.created_at <= $${paramIndex + 2}
+        WHERE u.email != $${adminEmailParamIndex}
+          AND t.created_at >= $${paramIndex}
+          AND t.created_at <= $${paramIndex + 1}
           ${filterConditions}
       `;
-      const transactionsResult = await pool.query(transactionsQuery, [...filterParams, monthStart, monthEnd]);
+      const transactionsResult = await pool.query(transactionsQuery, [...filterParams, weekStart, weekEnd]);
       const totalTransactions = parseInt(transactionsResult.rows[0]?.count) || 0;
 
-      // Total unique banks uploaded (in the month)
+      // Total unique banks uploaded (in the week)
       const banksQuery = `
         SELECT COUNT(DISTINCT t.account) as count
         FROM transactions t
         JOIN users u ON u.id = t.user_id
-        WHERE u.email != $${paramIndex}
-          AND t.created_at >= $${paramIndex + 1}
-          AND t.created_at <= $${paramIndex + 2}
+        WHERE u.email != $${adminEmailParamIndex}
+          AND t.created_at >= $${paramIndex}
+          AND t.created_at <= $${paramIndex + 1}
           AND t.account IS NOT NULL
           ${filterConditions}
       `;
-      const banksResult = await pool.query(banksQuery, [...filterParams, monthStart, monthEnd]);
+      const banksResult = await pool.query(banksQuery, [...filterParams, weekStart, weekEnd]);
       const uniqueBanks = parseInt(banksResult.rows[0]?.count) || 0;
 
-      metrics[monthKey] = {
+      metrics[weekKey] = {
         totalUsers,
-        monthlyActiveUsers: mau,
+        weeklyActiveUsers: wau,
         newUsers,
         totalTransactionsUploaded: totalTransactions,
         totalUniqueBanksUploaded: uniqueBanks,
@@ -180,7 +213,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      months,
+      weeks,
       metrics,
       filters,
     }, { status: 200 });
@@ -193,4 +226,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

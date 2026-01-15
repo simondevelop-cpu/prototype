@@ -90,12 +90,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Get activation metrics (onboarding steps)
+    // Track all steps: 1=Emotional Calibration, 2=Financial Context, 3=Motivation, 4=Acquisition Source, 5=Insight Preferences, 6=Email Verification, 7=Account Profile
     const activationQuery = useUsersTable ? `
       SELECT 
         DATE_TRUNC('week', u.created_at) as signup_week,
         COUNT(*) FILTER (WHERE u.created_at IS NOT NULL) as count_starting_onboarding,
-        COUNT(*) FILTER (WHERE u.last_step >= 1 AND u.completed_at IS NULL) as count_drop_off_step_1,
-        COUNT(*) FILTER (WHERE u.last_step >= 2 AND u.completed_at IS NULL) as count_drop_off_step_2,
+        COUNT(*) FILTER (WHERE u.last_step = 1 AND u.completed_at IS NULL) as count_drop_off_step_1,
+        COUNT(*) FILTER (WHERE u.last_step = 2 AND u.completed_at IS NULL) as count_drop_off_step_2,
+        COUNT(*) FILTER (WHERE u.last_step = 3 AND u.completed_at IS NULL) as count_drop_off_step_3,
+        COUNT(*) FILTER (WHERE u.last_step = 4 AND u.completed_at IS NULL) as count_drop_off_step_4,
+        COUNT(*) FILTER (WHERE u.last_step = 5 AND u.completed_at IS NULL) as count_drop_off_step_5,
+        COUNT(*) FILTER (WHERE u.last_step = 6 AND u.completed_at IS NULL) as count_drop_off_step_6,
+        COUNT(*) FILTER (WHERE u.last_step = 7 AND u.completed_at IS NULL) as count_drop_off_step_7,
         COUNT(*) FILTER (WHERE u.completed_at IS NOT NULL) as count_completed_onboarding,
         AVG(EXTRACT(EPOCH FROM (u.completed_at - u.created_at)) / 86400) FILTER (WHERE u.completed_at IS NOT NULL) as avg_time_to_onboard_days
       FROM users u
@@ -228,6 +234,11 @@ export async function GET(request: NextRequest) {
         countStartingOnboarding: parseInt(row.count_starting_onboarding) || 0,
         countDropOffStep1: parseInt(row.count_drop_off_step_1) || 0,
         countDropOffStep2: parseInt(row.count_drop_off_step_2) || 0,
+        countDropOffStep3: parseInt(row.count_drop_off_step_3) || 0,
+        countDropOffStep4: parseInt(row.count_drop_off_step_4) || 0,
+        countDropOffStep5: parseInt(row.count_drop_off_step_5) || 0,
+        countDropOffStep6: parseInt(row.count_drop_off_step_6) || 0,
+        countDropOffStep7: parseInt(row.count_drop_off_step_7) || 0,
         countCompletedOnboarding: parseInt(row.count_completed_onboarding) || 0,
         avgTimeToOnboardDays: row.avg_time_to_onboard_days ? parseFloat(row.avg_time_to_onboard_days).toFixed(1) : null,
       };

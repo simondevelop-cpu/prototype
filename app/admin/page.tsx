@@ -920,7 +920,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            📊 Dashboard
+            📊 Cohort Analysis
           </button>
           <button
             onClick={() => setAnalyticsSubTab('customer-data')}
@@ -1018,15 +1018,99 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Drop Off Step 1</td>
-                        {Array.from({ length: 12 }, () => (
-                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Emotional Calibration</td>
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countDropOffStep1 || 0}
+                          </td>
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Drop Off Step 2</td>
-                        {Array.from({ length: 12 }, () => (
-                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Financial Context</td>
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countDropOffStep2 || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Motivation</td>
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countDropOffStep3 || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Acquisition Source</td>
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countDropOffStep4 || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Insight Preferences</td>
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countDropOffStep5 || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Account Profile</td>
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countDropOffStep7 || 0}
+                          </td>
                         ))}
                       </tr>
                       <tr>
@@ -1466,70 +1550,174 @@ export default function AdminDashboard() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
-                        {vanityData?.months?.map((month: string) => (
-                          <th key={month} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
-                            {month}
+                        {vanityData?.weeks?.map((week: string) => (
+                          <th key={week} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                            {week}
                           </th>
-                        )) || Array.from({ length: 12 }, (_, i) => {
-                          const date = new Date(2026, i, 1);
-                          return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                        }).map((month: string) => (
-                          <th key={month} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
-                            {month}
-                          </th>
-                        ))}
+                        )) || (() => {
+                          // Generate weeks from November to now as fallback
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1); // Month 10 = November
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, (_, i) => {
+                            const weekStart = new Date(firstMonday);
+                            weekStart.setDate(firstMonday.getDate() + (i * 7));
+                            return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                          }).map((week: string) => (
+                            <th key={week} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                              {week}
+                            </th>
+                          ));
+                        })()}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Total Users</td>
-                        {vanityData?.months?.map((month: string) => (
-                          <td key={month} className="px-4 py-3 text-sm text-gray-600">
-                            {vanityData.metrics?.[month]?.totalUsers || 0}
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.totalUsers || 0}
                           </td>
-                        )) || Array.from({ length: 12 }, () => (
-                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
-                        ))}
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Monthly Active Users</td>
-                        {vanityData?.months?.map((month: string) => (
-                          <td key={month} className="px-4 py-3 text-sm text-gray-600">
-                            {vanityData.metrics?.[month]?.monthlyActiveUsers || 0}
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Weekly Active Users</td>
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.weeklyActiveUsers || 0}
                           </td>
-                        )) || Array.from({ length: 12 }, () => (
-                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
-                        ))}
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">New Users per Month</td>
-                        {vanityData?.months?.map((month: string) => (
-                          <td key={month} className="px-4 py-3 text-sm text-gray-600">
-                            {vanityData.metrics?.[month]?.newUsers || 0}
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">New Users per Week</td>
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.newUsers || 0}
                           </td>
-                        )) || Array.from({ length: 12 }, () => (
-                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
-                        ))}
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Total Transactions Uploaded</td>
-                        {vanityData?.months?.map((month: string) => (
-                          <td key={month} className="px-4 py-3 text-sm text-gray-600">
-                            {vanityData.metrics?.[month]?.totalTransactionsUploaded || 0}
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.totalTransactionsUploaded || 0}
                           </td>
-                        )) || Array.from({ length: 12 }, () => (
-                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
-                        ))}
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Total Unique Banks Uploaded</td>
-                        {vanityData?.months?.map((month: string) => (
-                          <td key={month} className="px-4 py-3 text-sm text-gray-600">
-                            {vanityData.metrics?.[month]?.totalUniqueBanksUploaded || 0}
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.totalUniqueBanksUploaded || 0}
                           </td>
-                        )) || Array.from({ length: 12 }, () => (
-                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
-                        ))}
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
                       </tr>
                     </tbody>
                   </table>
