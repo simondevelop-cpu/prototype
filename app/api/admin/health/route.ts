@@ -734,6 +734,7 @@ export async function GET() {
       checkDataExportEndpoint(),
       check30DayDataRetention(),
       checkBlockUserFunctionality(),
+      checkDataFlowVerification(),
     ]);
 
     // PIPEDA / Law 25 Compliance Checks

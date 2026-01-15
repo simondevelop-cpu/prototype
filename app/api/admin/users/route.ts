@@ -137,7 +137,8 @@ export async function GET(request: NextRequest) {
         last_activity: row.last_activity,
         login_attempts: loginAttempts,
         status: (transactionCount > 0 || completedOnboarding > 0) ? 'Active Account' : 'Failed to log in',
-        email_validated: false, // No email validation yet
+        is_active: row.is_active !== undefined ? row.is_active : true, // Include is_active if available
+        email_validated: row.email_validated !== undefined ? row.email_validated : false, // Include email_validated if available
       };
     });
 

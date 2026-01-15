@@ -80,35 +80,25 @@ export async function GET(request: NextRequest) {
     const adminEmailParamIndex = paramIndex;
     paramIndex++;
 
-    // Generate weeks (beginning of November to now)
-    // Find first Monday of November (or first day of November if it's a Monday)
+    // Generate weeks starting from w/c Nov 2, 2025 to now
     const now = new Date();
-    const novemberStart = new Date(now.getFullYear(), 10, 1); // Month 10 = November
-    const firstMonday = new Date(novemberStart);
-    // Find first Monday of November
-    const dayOfWeek = novemberStart.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    if (dayOfWeek === 0) {
-      // If November 1st is Sunday, go to next Monday
-      firstMonday.setDate(novemberStart.getDate() + 1);
-    } else if (dayOfWeek !== 1) {
-      // If not Monday, go to next Monday
-      firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
-    }
-    firstMonday.setHours(0, 0, 0, 0);
+    // Nov 2, 2025 is a Sunday, so week starts from Nov 2
+    const nov2Start = new Date(2025, 10, 2); // Month 10 = November, day 2
+    nov2Start.setHours(0, 0, 0, 0);
 
-    // Calculate weeks from first Monday of November to current week
+    // Calculate weeks from Nov 2, 2025 to current week
     const currentWeekStart = new Date(now);
     currentWeekStart.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
     currentWeekStart.setHours(0, 0, 0, 0);
 
     // Calculate number of weeks
-    const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    const weeksDiff = Math.ceil((currentWeekStart.getTime() - nov2Start.getTime()) / (7 * 24 * 60 * 60 * 1000));
     const numWeeks = Math.max(1, weeksDiff + 1); // At least 1 week
 
     const weeks: string[] = [];
     for (let i = 0; i < numWeeks; i++) {
-      const weekStart = new Date(firstMonday);
-      weekStart.setDate(firstMonday.getDate() + (i * 7));
+      const weekStart = new Date(nov2Start);
+      weekStart.setDate(nov2Start.getDate() + (i * 7));
       const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
       weeks.push(weekLabel);
     }
@@ -117,8 +107,8 @@ export async function GET(request: NextRequest) {
     const metrics: { [week: string]: any } = {};
 
     for (let i = 0; i < numWeeks; i++) {
-      const weekStart = new Date(firstMonday);
-      weekStart.setDate(firstMonday.getDate() + (i * 7));
+      const weekStart = new Date(nov2Start);
+      weekStart.setDate(nov2Start.getDate() + (i * 7));
       weekStart.setHours(0, 0, 0, 0);
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 6);
