@@ -373,9 +373,15 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (activeTab === 'analytics' && analyticsSubTab === 'vanity-metrics' && authenticated) {
       fetchIntentCategories();
+    }
+  }, [activeTab, analyticsSubTab, authenticated]);
+  
+  // Fetch vanity metrics when filters change (but only if on vanity metrics tab)
+  useEffect(() => {
+    if (activeTab === 'analytics' && analyticsSubTab === 'vanity-metrics' && authenticated) {
       fetchVanityMetrics();
     }
-  }, [activeTab, analyticsSubTab, authenticated, vanityFilters]);
+  }, [vanityFilters, activeTab, analyticsSubTab, authenticated]);
 
   const fetchData = async () => {
     setLoading(true);
