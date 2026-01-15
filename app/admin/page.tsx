@@ -1792,12 +1792,11 @@ export default function AdminDashboard() {
               <div className="flex gap-2">
                 <button
                   onClick={() => {
-                    // Export to Excel (CSV format)
-                    const headers = ['Email', 'First Name', 'Last Name', 'Province', 'Emotional State', 'Financial Context', 'Motivation', 'Acquisition', 'Insights Wanted', 'Account Created', 'Onboarding Completed', 'Onboarding Status'];
+                    // Export to Excel (CSV format) - no email or last name
+                    const headers = ['User ID', 'First Name', 'Province', 'Emotional State', 'Financial Context', 'Motivation', 'Acquisition', 'Insights Wanted', 'Account Created', 'Onboarding Completed', 'Onboarding Status'];
                     const rows = customerData.map((user: any) => [
-                      user.email || '',
+                      user.user_id || user.id || '',
                       user.first_name || '',
-                      user.last_name || '',
                       user.province_region || '',
                       (user.emotional_state || []).join('; '),
                       (user.financial_context || []).join('; '),
@@ -1847,9 +1846,7 @@ export default function AdminDashboard() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Name</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Province</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emotional State</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Financial Context</th>
@@ -1866,14 +1863,10 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
                     {customerData.map((user) => (
-                      <tr key={user.user_id || user.id || user.email} className="hover:bg-gray-50">
+                      <tr key={user.user_id || user.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 text-sm text-gray-600 font-mono">{user.user_id || user.id || '-'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {user.first_name || <span className="text-gray-400 italic">null</span>}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {user.last_name || <span className="text-gray-400 italic">null</span>}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {user.province_region || <span className="text-gray-400 italic">null</span>}
@@ -1983,7 +1976,7 @@ export default function AdminDashboard() {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event ID</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Name</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Type</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Data</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metadata</th>
@@ -1996,7 +1989,9 @@ export default function AdminDashboard() {
                         <tr key={event.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 text-sm text-gray-600 font-mono">{event.id}</td>
                           <td className="px-6 py-4 text-sm text-gray-600 font-mono">{event.user_id}</td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{event.email || '-'}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            {event.first_name || <span className="text-gray-400 italic">null</span>}
+                          </td>
                           <td className="px-6 py-4 text-sm">
                             <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
                               {event.event_type || 'unknown'}

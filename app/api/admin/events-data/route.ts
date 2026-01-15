@@ -54,12 +54,12 @@ export async function GET(request: NextRequest) {
       }, { status: 200 });
     }
 
-    // Fetch all user events with user information
+    // Fetch all user events with user information (only first name, no email or last name)
     const result = await pool.query(`
       SELECT 
         e.id,
         e.user_id,
-        COALESCE(p.email, u.email) as email,
+        p.first_name,
         e.event_type,
         e.event_data,
         e.created_at,
