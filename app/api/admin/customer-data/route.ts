@@ -101,25 +101,27 @@ export async function GET(request: NextRequest) {
       console.log('[Customer Data API] Could not check for l0_pii_users, using legacy tables');
     }
 
-    // Fetch all customer data - use users table if migrated, fallback to onboarding_responses
+    // Fetch all customer data - check BOTH users table AND onboarding_responses
+    // This ensures we get data regardless of migration status
     let result;
-    if (useUsersTable) {
-      // Check if is_active and email_validated columns exist
-      let hasIsActive = false;
-      let hasEmailValidated = false;
-      try {
-        const activeCheck = await pool.query(`
-          SELECT column_name 
-          FROM information_schema.columns 
-          WHERE table_name = 'users' 
-          AND column_name IN ('is_active', 'email_validated')
-        `);
-        hasIsActive = activeCheck.rows.some(row => row.column_name === 'is_active');
-        hasEmailValidated = activeCheck.rows.some(row => row.column_name === 'email_validated');
-      } catch (e) {
-        console.log('[Customer Data API] Could not check is_active/email_validated');
-      }
+    
+    // Check if is_active and email_validated columns exist
+    let hasIsActive = false;
+    let hasEmailValidated = false;
+    try {
+      const activeCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' 
+        AND column_name IN ('is_active', 'email_validated')
+      `);
+      hasIsActive = activeCheck.rows.some(row => row.column_name === 'is_active');
+      hasEmailValidated = activeCheck.rows.some(row => row.column_name === 'email_validated');
+    } catch (e) {
+      console.log('[Customer Data API] Could not check is_active/email_validated');
+    }
 
+    if (useUsersTable) {
       // Use users table (post-migration) - Include ALL variables used in dashboard
       // Add transaction counts, upload counts, and first transaction date for cohort analysis
       const selectFields = `
@@ -165,7 +167,17 @@ export async function GET(request: NextRequest) {
         WHERE u.email != $1
         ORDER BY u.completed_at DESC NULLS LAST, u.created_at DESC
       `, [ADMIN_EMAIL]);
-    } else {
+      
+      console.log(`[Customer Data API] Found ${result.rows.length} users in users table`);
+      
+      // If no results from users table with onboarding data, check onboarding_responses
+      if (result.rows.length === 0 || result.rows.every((row: any) => !row.completed_at && !row.emotional_state && !row.motivation)) {
+        console.log('[Customer Data API] No onboarding data in users table, checking onboarding_responses');
+        useUsersTable = false; // Force fallback to onboarding_responses
+      }
+    }
+    
+    if (!useUsersTable) {
       // Fallback to onboarding_responses table (pre-migration)
       // Check which columns exist in onboarding_responses
       try {
@@ -210,7 +222,7 @@ export async function GET(request: NextRequest) {
           NULL as first_transaction_date
         `;
 
-        // Only return users who have onboarding_responses (the fallback is for when users table doesn't have onboarding data)
+        // Get data from onboarding_responses table (when users table doesn't have onboarding data)
         result = await pool.query(`
           SELECT ${selectFields}
           FROM users u
@@ -220,7 +232,7 @@ export async function GET(request: NextRequest) {
           ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
         `, [ADMIN_EMAIL]);
       } else {
-        // Fallback to legacy onboarding_responses table (pre-migration)
+        // Fallback to legacy onboarding_responses table (pre-migration, no L0 PII)
         const selectFields = `
           u.id as user_id,
           u.email,
@@ -248,7 +260,7 @@ export async function GET(request: NextRequest) {
           NULL as first_transaction_date
         `;
 
-        // Only return users who have onboarding_responses (the fallback is for when users table doesn't have onboarding data)
+        // Get data from onboarding_responses table
         result = await pool.query(`
           SELECT ${selectFields}
           FROM users u
@@ -259,9 +271,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    console.log(`[Customer Data API] Returning ${result.rows.length} customer records`);
+    
     return NextResponse.json({ 
       success: true,
-      customerData: result.rows 
+      customerData: result.rows,
+      source: useUsersTable ? 'users' : 'onboarding_responses',
+      count: result.rows.length
     }, { status: 200 });
 
   } catch (error: any) {

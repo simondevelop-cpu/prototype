@@ -116,11 +116,12 @@ export async function GET(request: NextRequest) {
       const weekKey = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
       // Total users (cumulative up to end of week)
+      // Use DATE_TRUNC to ensure we're comparing dates correctly
       const totalUsersQuery = `
         SELECT COUNT(*) as count
         FROM users u
         WHERE u.email != $${adminEmailParamIndex}
-          AND u.created_at <= $${paramIndex}
+          AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex}::timestamp)
           ${filterConditions}
       `;
       const totalUsersResult = await pool.query(totalUsersQuery, [...filterParams, weekEnd]);
@@ -153,13 +154,13 @@ export async function GET(request: NextRequest) {
         // user_events table doesn't exist, WAU = 0
       }
 
-      // New users per week
+      // New users per week - use DATE_TRUNC to ensure proper date comparison
       const newUsersQuery = `
         SELECT COUNT(*) as count
         FROM users u
         WHERE u.email != $${adminEmailParamIndex}
-          AND u.created_at >= $${paramIndex}
-          AND u.created_at <= $${paramIndex + 1}
+          AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::timestamp)
+          AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::timestamp)
           ${filterConditions}
       `;
       const newUsersResult = await pool.query(newUsersQuery, [...filterParams, weekStart, weekEnd]);
