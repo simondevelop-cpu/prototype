@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { invalidatePatternCache } from '@/lib/categorization-engine';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import CheckboxDropdown from '@/components/CheckboxDropdown';
 
 type TabName = 'inbox' | 'categories' | 'insights' | 'analytics' | 'accounts' | 'health';
 
