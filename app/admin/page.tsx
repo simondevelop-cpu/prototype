@@ -930,16 +930,6 @@ export default function AdminDashboard() {
           >
             👥 Customer Data
           </button>
-          <button
-            onClick={() => setAnalyticsSubTab('macro-data')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              analyticsSubTab === 'macro-data'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            📈 Macro Data
-          </button>
         </div>
 
         {/* Content */}
