@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN users u ON e.user_id = u.id
       LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
       WHERE (u.email != $1 OR u.email IS NULL)
-      ORDER BY e.created_at DESC
+      ORDER BY e.event_timestamp DESC
       LIMIT 1000
     `, [ADMIN_EMAIL]);
     

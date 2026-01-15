@@ -255,7 +255,7 @@ export async function GET(request: NextRequest) {
       SELECT 
         DATE_TRUNC('week', u.created_at) as signup_week,
         -- Onboarding and data coverage
-        COUNT(*) FILTER (WHERE u.completed_at IS NOT NULL) as onboarding_completed,
+        COUNT(DISTINCT u.id) FILTER (WHERE u.completed_at IS NOT NULL) as onboarding_completed,
         COUNT(DISTINCT t.user_id) FILTER (WHERE t.id IS NOT NULL) as uploaded_first_statement,
         COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 2 THEN upload_counts.user_id END) as uploaded_two_statements,
         COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 3 THEN upload_counts.user_id END) as uploaded_three_plus_statements,
