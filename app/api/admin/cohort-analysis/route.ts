@@ -364,8 +364,10 @@ export async function GET(request: NextRequest) {
         -- Time to achieve (in days) - excluding NULLs
         AVG(EXTRACT(EPOCH FROM (u.completed_at - u.created_at)) / 86400) FILTER (WHERE u.completed_at IS NOT NULL) as avg_time_to_onboard_days,
         -- First upload metrics split by first day vs after first day
+        -- "First day" means the same calendar day (DATE() comparison)
         COUNT(DISTINCT CASE WHEN first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) = DATE(u.created_at) THEN u.id END) as users_uploaded_first_day,
-        AVG(EXTRACT(EPOCH FROM (first_upload.first_transaction_date - u.created_at)) / 86400) FILTER (WHERE first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) = DATE(u.created_at)) as avg_time_to_first_upload_first_day_days,
+        -- For first day uploads, calculate time in minutes directly (not days) since it's always < 24 hours
+        AVG(EXTRACT(EPOCH FROM (first_upload.first_transaction_date - u.created_at)) / 60) FILTER (WHERE first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) = DATE(u.created_at)) as avg_time_to_first_upload_first_day_minutes,
         COUNT(DISTINCT CASE WHEN first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) > DATE(u.created_at) THEN u.id END) as users_uploaded_after_first_day,
         AVG(EXTRACT(EPOCH FROM (first_upload.first_transaction_date - u.created_at)) / 86400) FILTER (WHERE first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) > DATE(u.created_at)) as avg_time_to_first_upload_after_first_day_days,
         -- Engagement signals

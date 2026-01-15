@@ -306,13 +306,16 @@ export async function GET(request: NextRequest) {
       }
 
       // New transactions uploaded (in the week) - apply data coverage filter if specified
+      // filterParams length tells us how many params are already in the array
+      // weekStart and weekEnd will be at positions filterParams.length and filterParams.length+1
+      const newTransactionsParamIndex = filterParams.length;
       let newTransactionsQuery = `
         SELECT COUNT(*) as count
         FROM transactions t
         JOIN users u ON u.id = t.user_id
         WHERE u.email != $${adminEmailParamIndex}
-          AND t.created_at >= $${paramIndex}::timestamp
-          AND t.created_at <= $${paramIndex + 1}::timestamp
+          AND t.created_at >= $${newTransactionsParamIndex + 1}::timestamp
+          AND t.created_at <= $${newTransactionsParamIndex + 2}::timestamp
           ${filterConditions}
       `;
       let newTransactions = 0;
@@ -357,7 +360,10 @@ export async function GET(request: NextRequest) {
           newTransactions = parseInt(filteredResult.rows[0]?.count) || 0;
         }
       } else {
-        const newTransactionsResult = await pool.query(newTransactionsQuery, [...filterParams, weekStart, weekEnd]);
+        // filterParams already includes ADMIN_EMAIL and any filter params
+        // weekStart and weekEnd will be at positions paramIndex and paramIndex+1
+        const newTransactionsParams = [...filterParams, weekStart.toISOString(), weekEnd.toISOString()];
+        const newTransactionsResult = await pool.query(newTransactionsQuery, newTransactionsParams);
         newTransactions = parseInt(newTransactionsResult.rows[0]?.count) || 0;
       }
       
