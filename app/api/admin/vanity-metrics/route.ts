@@ -192,15 +192,15 @@ export async function GET(request: NextRequest) {
 
       // Total users (cumulative up to end of week)
       // Use DATE_TRUNC to ensure we're comparing dates correctly
-      // Note: If cohorts filter is applied, this will only count users from those cohorts
+      // Note: Cohort filter does NOT filter users - it only controls which columns are displayed
       const totalUsersQuery = `
         SELECT COUNT(*) as count
         FROM users u
         WHERE u.email != $${adminEmailParamIndex}
-          AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex}::timestamp)
+          AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex}::date)
           ${filterConditions}
       `;
-      const totalUsersResult = await pool.query(totalUsersQuery, [...filterParams, weekEnd]);
+      const totalUsersResult = await pool.query(totalUsersQuery, [...filterParams, weekEnd.toISOString().split('T')[0]]);
       let totalUsers = parseInt(totalUsersResult.rows[0]?.count) || 0;
       
       if (i === 0) {
