@@ -26,37 +26,40 @@ export async function setupTestDatabase(): Promise<TestDatabase> {
   });
 
   // Register DATE_TRUNC function for pg-mem
-  // pg-mem needs a single function that handles all overloads
+  // pg-mem v2.7.0 requires explicit overload registration
+  // We need to register it for each type combination
+  const dateTruncDay = (part: string, date: any) => {
+    const d = date instanceof Date ? new Date(date) : new Date(date);
+    if (part === 'day') {
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+    if (part === 'week') {
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      d.setDate(diff);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+    return d;
+  };
+  
+  // Register without explicit args/returns - pg-mem will infer from usage
   db.public.registerFunction({
     name: 'date_trunc',
-    implementation: (part: string, date: any) => {
-      // Handle Date objects, strings, and pg-mem's internal date types
-      let d: Date;
-      if (date instanceof Date) {
-        d = new Date(date);
-      } else if (typeof date === 'string') {
-        d = new Date(date);
-      } else if (date && typeof date === 'object' && 'getTime' in date) {
-        d = new Date(date.getTime());
-      } else {
-        d = new Date(date);
-      }
-      
-      if (part === 'week') {
-        // PostgreSQL week starts on Monday, but we adjust to Sunday for display
-        const day = d.getDay();
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
-        d.setDate(diff);
-        d.setHours(0, 0, 0, 0);
-        return d;
-      }
-      if (part === 'day') {
-        d.setHours(0, 0, 0, 0);
-        return d;
-      }
-      return d;
-    },
+    implementation: dateTruncDay,
   });
+  
+  // Also try registering with explicit signature for timestamptz
+  try {
+    db.public.registerFunction({
+      name: 'date_trunc',
+      args: [{ type: 'text' }, { type: 'timestamptz' }],
+      implementation: dateTruncDay,
+    });
+  } catch (e) {
+    // If registration fails, continue - single registration might work
+  }
 
   // Register EXTRACT function
   db.public.registerFunction({
