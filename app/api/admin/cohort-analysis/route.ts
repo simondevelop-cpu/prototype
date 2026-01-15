@@ -208,11 +208,23 @@ export async function GET(request: NextRequest) {
     
     signupWeeks.forEach((weekDate: any) => {
       if (weekDate) {
+        // DATE_TRUNC('week', ...) in PostgreSQL returns Monday as start of week
+        // Convert to JavaScript Date and adjust to Sunday for display
         const weekStart = new Date(weekDate);
-        // Adjust to start of week (Sunday) for display
+        // PostgreSQL DATE_TRUNC week starts Monday (day 1), JavaScript Sunday is day 0
+        // If weekStart is Monday, we need to go back 1 day to get Sunday
         const dayOfWeek = weekStart.getDay();
         const adjustedWeekStart = new Date(weekStart);
-        adjustedWeekStart.setDate(weekStart.getDate() - dayOfWeek);
+        // Adjust: if Monday (1), go back 1 day to Sunday (0)
+        // If Sunday (0), no change needed
+        // If Tuesday-Saturday (2-6), go back to previous Sunday
+        if (dayOfWeek === 0) {
+          // Already Sunday, use as-is
+        } else {
+          // Go back to previous Sunday
+          adjustedWeekStart.setDate(weekStart.getDate() - dayOfWeek);
+        }
+        adjustedWeekStart.setHours(0, 0, 0, 0);
         const weekLabel = `w/c ${adjustedWeekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
         weeksSet.add(weekLabel);
       }

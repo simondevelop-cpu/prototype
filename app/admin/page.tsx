@@ -92,6 +92,7 @@ export default function AdminDashboard() {
     totalAccounts: true,
     validatedEmails: false,
     intentCategories: [] as string[],
+    selectedCohorts: [] as string[], // Empty array means all cohorts selected by default
   });
   const [vanityFilters, setVanityFilters] = useState({
     totalAccounts: true,
@@ -1040,6 +1041,15 @@ export default function AdminDashboard() {
                     disabled={intentCategoriesLoading}
                   />
                 </div>
+                <div className="min-w-[200px]">
+                  <CheckboxDropdown
+                    label="Cohorts"
+                    options={cohortData?.weeks || []}
+                    selected={cohortFilters.selectedCohorts.length === 0 ? (cohortData?.weeks || []) : cohortFilters.selectedCohorts}
+                    onChange={(selected) => setCohortFilters({ ...cohortFilters, selectedCohorts: selected })}
+                    placeholder="Select cohorts... (default: all)"
+                  />
+                </div>
                 <button
                   onClick={fetchCohortAnalysis}
                   disabled={cohortLoading}
@@ -1050,11 +1060,19 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Cohort Analysis - Activation Table */}
-            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              <div className="p-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Activation - Number Completed Onboarding Steps</h3>
-              </div>
+            {/* Combined Cohort Analysis Table */}
+            {(() => {
+              // Get weeks to display - if selectedCohorts is empty, show all weeks
+              const allWeeks = cohortData?.weeks || [];
+              const displayWeeks = cohortFilters.selectedCohorts.length === 0 
+                ? allWeeks 
+                : cohortFilters.selectedCohorts.filter((w: string) => allWeeks.includes(w));
+              
+              return (
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="p-4 border-b border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-900">Onboarding and engagement KPIs by signup week cohort (each column is a different cohort)</h3>
+                  </div>
               {cohortLoading ? (
                 <div className="text-center py-12">
                   <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
@@ -1065,18 +1083,8 @@ export default function AdminDashboard() {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Number of users completed by onboarding step / Number of users by activity completed</th>
+                        {displayWeeks.map((week: string) => (
                           <th key={week} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                             {week}
                           </th>
@@ -1084,9 +1092,15 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
+                      {/* Activation Section */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Activation - Number Completed Onboarding Steps
+                        </td>
+                      </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Starting Onboarding</td>
-                        {(cohortData?.weeks || []).map((week: string) => (
+                        {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countStartingOnboarding || 0}
                           </td>
@@ -1094,17 +1108,7 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Emotional Calibration</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
+                        {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countDropOffStep1 || 0}
                           </td>
@@ -1112,17 +1116,7 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Financial Context</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
+                        {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countDropOffStep2 || 0}
                           </td>
@@ -1130,17 +1124,7 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Motivation</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
+                        {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countDropOffStep3 || 0}
                           </td>
@@ -1148,17 +1132,7 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Acquisition Source</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
+                        {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countDropOffStep4 || 0}
                           </td>
@@ -1166,17 +1140,7 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Insight Preferences</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
+                        {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countDropOffStep5 || 0}
                           </td>
@@ -1184,17 +1148,7 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Account Profile</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
+                        {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countDropOffStep7 || 0}
                           </td>
@@ -1202,7 +1156,7 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Completed Onboarding</td>
-                        {(cohortData?.weeks || []).map((week: string) => (
+                        {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countCompletedOnboarding || 0}
                           </td>
@@ -1210,7 +1164,7 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg Time to Onboard (days)</td>
-                        {(cohortData?.weeks || []).map((week: string) => (
+                        {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.avgTimeToOnboardDays || '-'}
                           </td>
@@ -1220,268 +1174,10 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               )}
-            </div>
+                </div>
+              );
+            })()}
 
-            {/* Cohort Analysis - Engagement Table */}
-            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              <div className="p-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Engagement - Activities Completed by Signup Week</h3>
-              </div>
-              {cohortLoading ? (
-                <div className="text-center py-12">
-                  <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
-                          <th key={week} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
-                            {week}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 bg-white">
-                      {/* Onboarding and Data Coverage Section */}
-                      <tr className="bg-gray-50">
-                        <td colSpan={((cohortData?.weeks?.length || 12) + 1)} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
-                          Onboarding and Data Coverage
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Onboarding Completed</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.onboardingCompleted || 0}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded First Statement</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.uploadedFirstStatement || 0}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded Two Statements</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.uploadedTwoStatements || 0}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded Three+ Statements</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.uploadedThreePlusStatements || 0}
-                          </td>
-                        ))}
-                      </tr>
-                      {/* Time to Achieve Section */}
-                      <tr className="bg-gray-50">
-                        <td colSpan={((cohortData?.weeks?.length || 12) + 1)} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
-                          Time to Achieve (days, excluding users who haven't completed)
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to Onboard</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.avgTimeToOnboardDays || '-'}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to First Upload</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadDays || '-'}
-                          </td>
-                        ))}
-                      </tr>
-                      {/* Engagement Signals Section */}
-                      <tr className="bg-gray-50">
-                        <td colSpan={((cohortData?.weeks?.length || 12) + 1)} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
-                          Engagement Signals
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg Transactions per User (of those who uploaded)</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.avgTransactionsPerUser || '-'}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Users with Transactions</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.usersWithTransactions || 0}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2+ unique days</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.hasUserEventsTable 
-                              ? (cohortData?.engagement?.[week]?.loggedInTwoPlusDays || 0)
-                              : <span className="text-gray-400 italic">Requires user_events table</span>}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg days logged in per month (2+ days)</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.hasUserEventsTable 
-                              ? (cohortData?.engagement?.[week]?.avgDaysLoggedInPerMonth || '-')
-                              : <span className="text-gray-400 italic">Requires user_events table</span>}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2+ unique months</td>
-                        {(cohortData?.weeks && cohortData.weeks.length > 0 
-                          ? cohortData.weeks 
-                          : Array.from({ length: 12 }, (_, i) => {
-                          const now = new Date();
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weekStart = new Date(currentWeekStart);
-                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                        })).map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.hasUserEventsTable 
-                              ? (cohortData?.engagement?.[week]?.loggedInTwoPlusMonths || 0)
-                              : <span className="text-gray-400 italic">Requires user_events table</span>}
-                          </td>
-                        ))}
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
 
             {/* Engagement Chart - Number of Days Logged In */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
