@@ -216,11 +216,11 @@ export async function GET(request: NextRequest) {
           FROM users u
           LEFT JOIN transactions t ON t.user_id = u.id
           WHERE u.email != $${adminEmailParamIndex}
-            AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex}::timestamp)
+            AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex}::date)
             ${filterConditions}
           GROUP BY u.id
         `;
-        const usersWithCoverage = await pool.query(usersWithCoverageQuery, [...filterParams, weekEnd]);
+        const usersWithCoverage = await pool.query(usersWithCoverageQuery, [...filterParams, weekEnd.toISOString().split('T')[0]]);
         totalUsers = usersWithCoverage.rows.filter((user: any) => {
           const txCount = parseInt(user.tx_count) || 0;
           if (filters.dataCoverage!.includes('1 upload') && txCount >= 1) return true;
@@ -262,11 +262,11 @@ export async function GET(request: NextRequest) {
         SELECT COUNT(*) as count
         FROM users u
         WHERE u.email != $${adminEmailParamIndex}
-          AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::timestamp)
-          AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::timestamp)
+          AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
+          AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
           ${filterConditions}
       `;
-      const newUsersResult = await pool.query(newUsersQuery, [...filterParams, weekStart, weekEnd]);
+      const newUsersResult = await pool.query(newUsersQuery, [...filterParams, weekStart.toISOString().split('T')[0], weekEnd.toISOString().split('T')[0]]);
       let newUsers = parseInt(newUsersResult.rows[0]?.count) || 0;
 
       // Apply data coverage filter to new users if specified
@@ -276,12 +276,12 @@ export async function GET(request: NextRequest) {
           FROM users u
           LEFT JOIN transactions t ON t.user_id = u.id
           WHERE u.email != $${adminEmailParamIndex}
-            AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::timestamp)
-            AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::timestamp)
+            AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
+            AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
             ${filterConditions}
           GROUP BY u.id
         `;
-        const newUsersWithCoverage = await pool.query(newUsersWithCoverageQuery, [...filterParams, weekStart, weekEnd]);
+        const newUsersWithCoverage = await pool.query(newUsersWithCoverageQuery, [...filterParams, weekStart.toISOString().split('T')[0], weekEnd.toISOString().split('T')[0]]);
         newUsers = newUsersWithCoverage.rows.filter((user: any) => {
           const txCount = parseInt(user.tx_count) || 0;
           if (filters.dataCoverage!.includes('1 upload') && txCount >= 1) return true;
