@@ -120,18 +120,41 @@ export async function GET(request: NextRequest) {
       paramIndex++;
     }
 
-    // Calculate signup weeks (12 weeks back from current week)
-    const now = new Date();
-    const currentWeekStart = new Date(now);
-    currentWeekStart.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
-    currentWeekStart.setHours(0, 0, 0, 0);
-
-    const weeks: string[] = [];
-    for (let i = 11; i >= 0; i--) {
-      const weekStart = new Date(currentWeekStart);
-      weekStart.setDate(currentWeekStart.getDate() - (i * 7));
-      const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-      weeks.push(weekLabel);
+    // Execute queries first to get actual signup weeks from data
+    const activationResult = await pool.query(activationQuery, filterParams);
+    
+    // Extract weeks from query results and build weeks array
+    const signupWeeks = activationResult.rows.map((row: any) => row.signup_week);
+    const weeksSet = new Set<string>();
+    
+    signupWeeks.forEach((weekDate: any) => {
+      if (weekDate) {
+        const weekStart = new Date(weekDate);
+        const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        weeksSet.add(weekLabel);
+      }
+    });
+    
+    // Sort weeks (most recent first)
+    const weeks = Array.from(weeksSet).sort((a, b) => {
+      const dateA = new Date(a.replace('w/c ', ''));
+      const dateB = new Date(b.replace('w/c ', ''));
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    // If no weeks from data, fall back to last 12 weeks
+    if (weeks.length === 0) {
+      const now = new Date();
+      const currentWeekStart = new Date(now);
+      currentWeekStart.setDate(now.getDate() - now.getDay());
+      currentWeekStart.setHours(0, 0, 0, 0);
+      
+      for (let i = 11; i >= 0; i--) {
+        const weekStart = new Date(currentWeekStart);
+        weekStart.setDate(currentWeekStart.getDate() - (i * 7));
+        const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        weeks.push(weekLabel);
+      }
     }
 
     // Get activation metrics (onboarding steps) - from appropriate table

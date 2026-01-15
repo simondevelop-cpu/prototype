@@ -54,12 +54,18 @@ export async function GET(request: NextRequest) {
       }, { status: 200 });
     }
 
+    // Check how many events exist total
+    const countCheck = await pool.query(`SELECT COUNT(*) as count FROM user_events`);
+    const totalEvents = parseInt(countCheck.rows[0]?.count || '0', 10);
+    console.log('[Events Data API] Found', totalEvents, 'total events in user_events table');
+
     // Fetch all user events with user information (only first name, no email or last name)
+    // Use COALESCE to handle cases where l0_pii_users doesn't have data
     const result = await pool.query(`
       SELECT 
         e.id,
         e.user_id,
-        p.first_name,
+        COALESCE(p.first_name, 'Unknown') as first_name,
         e.event_type,
         e.event_data,
         e.created_at,
@@ -67,10 +73,12 @@ export async function GET(request: NextRequest) {
       FROM user_events e
       LEFT JOIN users u ON e.user_id = u.id
       LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
-      WHERE u.email != $1
+      WHERE (u.email != $1 OR u.email IS NULL)
       ORDER BY e.created_at DESC
       LIMIT 1000
     `, [ADMIN_EMAIL]);
+    
+    console.log('[Events Data API] Query returned', result.rows.length, 'events after filtering');
 
     // Group events by type for summary
     const eventsByType = result.rows.reduce((acc: any, event: any) => {
