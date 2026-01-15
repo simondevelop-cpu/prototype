@@ -176,6 +176,7 @@ export default function AdminDashboard() {
         validatedEmails: cohortFilters.validatedEmails.toString(),
         intentCategories: cohortFilters.intentCategories.join(','),
         cohorts: cohortFilters.selectedCohorts.join(','),
+        dataCoverage: cohortFilters.dataCoverage.join(','),
       });
       const response = await fetch(`/api/admin/cohort-analysis?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` }
