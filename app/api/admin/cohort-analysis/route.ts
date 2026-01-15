@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       intentCategories: url.searchParams.get('intentCategories')?.split(',').filter(Boolean) || [],
     };
 
-    // Check if users table has onboarding columns (schema-adaptive)
+    // Check if migration is complete - users table must have onboarding columns
     const schemaCheck = await pool.query(`
       SELECT column_name 
       FROM information_schema.columns 
@@ -57,8 +57,18 @@ export async function GET(request: NextRequest) {
       AND column_name IN ('completed_at', 'motivation', 'is_active', 'email_validated')
     `);
     
-    const useUsersTable = schemaCheck.rows.some(row => row.column_name === 'completed_at');
+    const hasCompletedAt = schemaCheck.rows.some(row => row.column_name === 'completed_at');
+    const hasMotivation = schemaCheck.rows.some(row => row.column_name === 'motivation');
     const hasEmailValidated = schemaCheck.rows.some(row => row.column_name === 'email_validated');
+    
+    if (!hasCompletedAt || !hasMotivation) {
+      return NextResponse.json({
+        success: false,
+        error: 'Migration not complete',
+        message: 'Onboarding data migration has not been completed. Please run the migration at /api/admin/migrate-merge-onboarding first.',
+        migrationRequired: true
+      }, { status: 400 });
+    }
 
     // Build filter conditions
     let filterConditions = '';
@@ -89,9 +99,9 @@ export async function GET(request: NextRequest) {
       weeks.push(weekLabel);
     }
 
-    // Get activation metrics (onboarding steps)
+    // Get activation metrics (onboarding steps) - ONLY from users table (post-migration)
     // Track all steps: 1=Emotional Calibration, 2=Financial Context, 3=Motivation, 4=Acquisition Source, 5=Insight Preferences, 6=Email Verification, 7=Account Profile
-    const activationQuery = useUsersTable ? `
+    const activationQuery = `
       SELECT 
         DATE_TRUNC('week', u.created_at) as signup_week,
         COUNT(*) FILTER (WHERE u.created_at IS NOT NULL) as count_starting_onboarding,
@@ -104,23 +114,6 @@ export async function GET(request: NextRequest) {
         COUNT(*) FILTER (WHERE u.last_step = 7 AND u.completed_at IS NULL) as count_drop_off_step_7,
         COUNT(*) FILTER (WHERE u.completed_at IS NOT NULL) as count_completed_onboarding,
         AVG(EXTRACT(EPOCH FROM (u.completed_at - u.created_at)) / 86400) FILTER (WHERE u.completed_at IS NOT NULL) as avg_time_to_onboard_days
-      FROM users u
-      WHERE u.email != $${paramIndex}
-        ${filterConditions}
-      GROUP BY DATE_TRUNC('week', u.created_at)
-      ORDER BY signup_week DESC
-      LIMIT 12
-    ` : `
-      SELECT 
-        DATE_TRUNC('week', u.created_at) as signup_week,
-        COUNT(*) as count_starting_onboarding,
-        0 as count_drop_off_step_1,
-        0 as count_drop_off_step_2,
-        COUNT(*) FILTER (WHERE EXISTS (
-          SELECT 1 FROM onboarding_responses o 
-          WHERE o.user_id = u.id AND o.completed_at IS NOT NULL
-        )) as count_completed_onboarding,
-        NULL as avg_time_to_onboard_days
       FROM users u
       WHERE u.email != $${paramIndex}
         ${filterConditions}
@@ -161,8 +154,8 @@ export async function GET(request: NextRequest) {
       // Column doesn't exist
     }
 
-    // Enhanced Engagement query with more metrics
-    const engagementQuery = useUsersTable ? `
+    // Enhanced Engagement query with more metrics - ONLY from users table (post-migration)
+    const engagementQuery = `
       SELECT 
         DATE_TRUNC('week', u.created_at) as signup_week,
         -- Onboarding and data coverage
@@ -199,27 +192,6 @@ export async function GET(request: NextRequest) {
       GROUP BY DATE_TRUNC('week', u.created_at)
       ORDER BY signup_week DESC
       LIMIT 12
-    ` : `
-      SELECT 
-        DATE_TRUNC('week', u.created_at) as signup_week,
-        COUNT(*) FILTER (WHERE EXISTS (
-          SELECT 1 FROM onboarding_responses o 
-          WHERE o.user_id = u.id AND o.completed_at IS NOT NULL
-        )) as onboarding_completed,
-        COUNT(DISTINCT t.user_id) FILTER (WHERE t.id IS NOT NULL) as uploaded_first_statement,
-        0 as uploaded_two_statements,
-        0 as uploaded_three_plus_statements,
-        NULL as avg_time_to_onboard_days,
-        NULL as avg_time_to_first_upload_days,
-        NULL as avg_transactions_per_user,
-        0 as users_with_transactions
-      FROM users u
-      LEFT JOIN transactions t ON t.user_id = u.id
-      WHERE u.email != $${paramIndex}
-        ${filterConditions}
-      GROUP BY DATE_TRUNC('week', u.created_at)
-      ORDER BY signup_week DESC
-      LIMIT 12
     `;
 
     // Check if user_events table exists for engagement metrics
@@ -239,7 +211,7 @@ export async function GET(request: NextRequest) {
 
     // Get user_events data if table exists
     let userEventsData: any = {};
-    if (hasUserEventsTable && useUsersTable) {
+    if (hasUserEventsTable) {
       try {
         // Calculate login metrics per week
         const eventsQuery = `

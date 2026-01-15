@@ -33,68 +33,45 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Schema-adaptive: Check if onboarding columns exist in users table (post-migration)
-    // Also check if there's actual data in users table, otherwise fall back to onboarding_responses
-    let useUsersTable = false;
+    // Check if migration is complete - users table must have onboarding columns
+    // If not migrated, we should NOT use onboarding_responses - migration must be run first
+    let hasCompletedAt = false;
     let hasLastStep = false;
     let hasAcquisitionOther = false;
+    let hasIsActive = false;
+    let hasEmailValidated = false;
+    
     try {
       const schemaCheck = await pool.query(`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'users' 
-        AND column_name IN ('completed_at', 'last_step', 'acquisition_other')
+        AND column_name IN ('completed_at', 'last_step', 'acquisition_other', 'is_active', 'email_validated', 'motivation', 'emotional_state')
       `);
-      const hasCompletedAtColumn = schemaCheck.rows.some(row => row.column_name === 'completed_at');
+      hasCompletedAt = schemaCheck.rows.some(row => row.column_name === 'completed_at');
       hasLastStep = schemaCheck.rows.some(row => row.column_name === 'last_step');
       hasAcquisitionOther = schemaCheck.rows.some(row => row.column_name === 'acquisition_other');
+      hasIsActive = schemaCheck.rows.some(row => row.column_name === 'is_active');
+      hasEmailValidated = schemaCheck.rows.some(row => row.column_name === 'email_validated');
       
-        // Check if users table has actual onboarding data (not just columns)
-        // Check for ANY onboarding fields, not just completed_at
-        if (hasCompletedAtColumn) {
-          const dataCheck = await pool.query(`
-            SELECT COUNT(*) as count
-            FROM users
-            WHERE (completed_at IS NOT NULL 
-              OR emotional_state IS NOT NULL 
-              OR motivation IS NOT NULL
-              OR financial_context IS NOT NULL)
-            AND email != $1
-          `, [ADMIN_EMAIL]);
-          const usersWithData = parseInt(dataCheck.rows[0]?.count || '0', 10);
-        
-        // Also check if onboarding_responses has data
-        const onboardingCheck = await pool.query(`
-          SELECT COUNT(*) as count
-          FROM onboarding_responses
-        `);
-        const onboardingCount = parseInt(onboardingCheck.rows[0]?.count || '0', 10);
-        
-        // Use users table only if it has data, otherwise prefer onboarding_responses if it has data
-        if (usersWithData > 0) {
-          useUsersTable = true;
-          console.log(`[Customer Data API] Found ${usersWithData} users with onboarding data in users table`);
-        } else if (onboardingCount > 0) {
-          useUsersTable = false; // Use onboarding_responses instead
-          console.log(`[Customer Data API] Users table has columns but no data (${usersWithData} users), using onboarding_responses (${onboardingCount} records)`);
-        } else {
-          useUsersTable = true; // Use users table structure even if empty
-          console.log('[Customer Data API] No data in either table, using users table structure');
-        }
-        
-        console.log('[Customer Data API] Schema and data check:', { 
-          useUsersTable, 
-          hasLastStep, 
-          hasAcquisitionOther,
-          usersWithData,
-          onboardingCount
-        });
+      if (!hasCompletedAt || !schemaCheck.rows.some(row => row.column_name === 'motivation')) {
+        return NextResponse.json({ 
+          success: false,
+          error: 'Migration not complete',
+          message: 'Onboarding data migration has not been completed. Please run the migration at /api/admin/migrate-merge-onboarding first.',
+          migrationRequired: true
+        }, { status: 400 });
       }
     } catch (e) {
-      console.log('[Customer Data API] Could not check schema, using fallback:', e);
+      console.error('[Customer Data API] Error checking migration status:', e);
+      return NextResponse.json({ 
+        success: false,
+        error: 'Could not verify migration status',
+        details: e instanceof Error ? e.message : 'Unknown error'
+      }, { status: 500 });
     }
 
-    // Check if l0_pii_users table exists (migration status)
+    // Check if l0_pii_users table exists (for PII isolation)
     let useL0PII = false;
     try {
       const l0Check = await pool.query(`
@@ -104,186 +81,94 @@ export async function GET(request: NextRequest) {
       `);
       useL0PII = l0Check.rows.length > 0;
     } catch (e) {
-      console.log('[Customer Data API] Could not check for l0_pii_users, using legacy tables');
+      console.log('[Customer Data API] Could not check for l0_pii_users');
     }
 
-    // Fetch all customer data - check BOTH users table AND onboarding_responses
-    // This ensures we get data regardless of migration status
+    // Fetch all customer data from users table ONLY (post-migration)
     let result;
-    
-    // Check if is_active and email_validated columns exist
-    let hasIsActive = false;
-    let hasEmailValidated = false;
-    try {
-      const activeCheck = await pool.query(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'users' 
-        AND column_name IN ('is_active', 'email_validated')
-      `);
-      hasIsActive = activeCheck.rows.some(row => row.column_name === 'is_active');
-      hasEmailValidated = activeCheck.rows.some(row => row.column_name === 'email_validated');
-    } catch (e) {
-      console.log('[Customer Data API] Could not check is_active/email_validated');
-    }
+    // Use users table ONLY (post-migration) - Include ALL variables used in dashboard
+    // Add transaction counts, upload counts, and first transaction date for cohort analysis
+    const selectFields = useL0PII ? `
+      u.id as user_id,
+      COALESCE(p.email, u.email) as email,
+      p.first_name,
+      p.last_name,
+      p.date_of_birth,
+      p.recovery_phone,
+      p.province_region,
+      u.emotional_state,
+      u.financial_context,
+      u.motivation,
+      u.motivation_other,
+      u.acquisition_source,
+      ${hasAcquisitionOther ? 'u.acquisition_other,' : ''}
+      u.insight_preferences,
+      u.insight_other,
+      ${hasLastStep ? 'u.last_step,' : ''}
+      ${hasIsActive ? 'u.is_active,' : 'true as is_active,'}
+      ${hasEmailValidated ? 'u.email_validated,' : 'false as email_validated,'}
+      u.completed_at,
+      u.created_at,
+      u.updated_at,
+      COALESCE(transaction_stats.transaction_count, 0) as transaction_count,
+      COALESCE(transaction_stats.upload_session_count, 0) as upload_session_count,
+      transaction_stats.first_transaction_date
+    ` : `
+      u.id as user_id,
+      u.email,
+      NULL as first_name,
+      NULL as last_name,
+      NULL as date_of_birth,
+      NULL as recovery_phone,
+      NULL as province_region,
+      u.emotional_state,
+      u.financial_context,
+      u.motivation,
+      u.motivation_other,
+      u.acquisition_source,
+      ${hasAcquisitionOther ? 'u.acquisition_other,' : ''}
+      u.insight_preferences,
+      u.insight_other,
+      ${hasLastStep ? 'u.last_step,' : ''}
+      ${hasIsActive ? 'u.is_active,' : 'true as is_active,'}
+      ${hasEmailValidated ? 'u.email_validated,' : 'false as email_validated,'}
+      u.completed_at,
+      u.created_at,
+      u.updated_at,
+      COALESCE(transaction_stats.transaction_count, 0) as transaction_count,
+      COALESCE(transaction_stats.upload_session_count, 0) as upload_session_count,
+      transaction_stats.first_transaction_date
+    `;
 
-    if (useUsersTable) {
-      // Use users table (post-migration) - Include ALL variables used in dashboard
-      // Add transaction counts, upload counts, and first transaction date for cohort analysis
-      const selectFields = `
-        u.id as user_id,
-        COALESCE(p.email, u.email) as email,
-        p.first_name,
-        p.last_name,
-        p.date_of_birth,
-        p.recovery_phone,
-        p.province_region,
-        u.emotional_state,
-        u.financial_context,
-        u.motivation,
-        u.motivation_other,
-        u.acquisition_source,
-        ${hasAcquisitionOther ? 'u.acquisition_other,' : ''}
-        u.insight_preferences,
-        u.insight_other,
-        ${hasLastStep ? 'u.last_step,' : ''}
-        ${hasIsActive ? 'u.is_active,' : 'true as is_active,'}
-        ${hasEmailValidated ? 'u.email_validated,' : 'false as email_validated,'}
-        u.completed_at,
-        u.created_at,
-        u.updated_at,
-        COALESCE(transaction_stats.transaction_count, 0) as transaction_count,
-        COALESCE(transaction_stats.upload_session_count, 0) as upload_session_count,
-        transaction_stats.first_transaction_date
-      `;
+    const fromClause = useL0PII 
+      ? `FROM users u
+         LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL`
+      : `FROM users u`;
 
-      result = await pool.query(`
-        SELECT ${selectFields}
-        FROM users u
-        LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
-        LEFT JOIN (
-          SELECT 
-            user_id,
-            COUNT(DISTINCT id) as transaction_count,
-            COUNT(DISTINCT upload_session_id) FILTER (WHERE upload_session_id IS NOT NULL) as upload_session_count,
-            MIN(created_at) as first_transaction_date
-          FROM transactions
-          GROUP BY user_id
-        ) transaction_stats ON transaction_stats.user_id = u.id
-        WHERE u.email != $1
-        ORDER BY u.completed_at DESC NULLS LAST, u.created_at DESC
-      `, [ADMIN_EMAIL]);
-      
-      console.log(`[Customer Data API] Found ${result.rows.length} users in users table`);
-      
-      // If no results from users table with onboarding data, check onboarding_responses
-      if (result.rows.length === 0 || result.rows.every((row: any) => !row.completed_at && !row.emotional_state && !row.motivation)) {
-        console.log('[Customer Data API] No onboarding data in users table, checking onboarding_responses');
-        useUsersTable = false; // Force fallback to onboarding_responses
-      }
-    }
-    
-    if (!useUsersTable) {
-      // Fallback to onboarding_responses table (pre-migration)
-      // Check which columns exist in onboarding_responses
-      try {
-        const schemaCheck = await pool.query(`
-          SELECT column_name 
-          FROM information_schema.columns 
-          WHERE table_name = 'onboarding_responses' 
-          AND column_name IN ('last_step', 'acquisition_other')
-        `);
-        hasLastStep = schemaCheck.rows.some(row => row.column_name === 'last_step');
-        hasAcquisitionOther = schemaCheck.rows.some(row => row.column_name === 'acquisition_other');
-      } catch (e) {
-        console.log('[Customer Data API] Could not check onboarding_responses schema');
-      }
+    result = await pool.query(`
+      SELECT ${selectFields}
+      ${fromClause}
+      LEFT JOIN (
+        SELECT 
+          user_id,
+          COUNT(DISTINCT id) as transaction_count,
+          COUNT(DISTINCT upload_session_id) FILTER (WHERE upload_session_id IS NOT NULL) as upload_session_count,
+          MIN(created_at) as first_transaction_date
+        FROM transactions
+        GROUP BY user_id
+      ) transaction_stats ON transaction_stats.user_id = u.id
+      WHERE u.email != $1
+      ORDER BY u.completed_at DESC NULLS LAST, u.created_at DESC
+    `, [ADMIN_EMAIL]);
 
-      if (useL0PII) {
-        // Use L0 PII table for compliance (PII isolation) with onboarding_responses
-        const selectFields = `
-          u.id as user_id,
-          COALESCE(p.email, u.email) as email,
-          p.first_name,
-          p.last_name,
-          p.date_of_birth,
-          p.recovery_phone,
-          p.province_region,
-          o.emotional_state,
-          o.financial_context,
-          o.motivation,
-          o.motivation_other,
-          o.acquisition_source,
-          ${hasAcquisitionOther ? 'o.acquisition_other,' : ''}
-          o.insight_preferences,
-          o.insight_other,
-          ${hasLastStep ? 'o.last_step,' : ''}
-          false as is_active,
-          false as email_validated,
-          o.completed_at,
-          COALESCE(p.created_at, u.created_at) as created_at,
-          COALESCE(p.updated_at, o.updated_at) as updated_at,
-          0 as transaction_count,
-          0 as upload_session_count,
-          NULL as first_transaction_date
-        `;
-
-        // Get data from onboarding_responses table (when users table doesn't have onboarding data)
-        result = await pool.query(`
-          SELECT ${selectFields}
-          FROM users u
-          LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
-          INNER JOIN onboarding_responses o ON o.user_id = u.id
-          WHERE u.email != $1
-          ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
-        `, [ADMIN_EMAIL]);
-      } else {
-        // Fallback to legacy onboarding_responses table (pre-migration, no L0 PII)
-        const selectFields = `
-          u.id as user_id,
-          u.email,
-          o.first_name,
-          o.last_name,
-          o.date_of_birth,
-          o.recovery_phone,
-          o.province_region,
-          o.emotional_state,
-          o.financial_context,
-          o.motivation,
-          o.motivation_other,
-          o.acquisition_source,
-          ${hasAcquisitionOther ? 'o.acquisition_other,' : ''}
-          o.insight_preferences,
-          o.insight_other,
-          ${hasLastStep ? 'o.last_step,' : ''}
-          false as is_active,
-          false as email_validated,
-          o.completed_at,
-          o.created_at,
-          o.updated_at,
-          0 as transaction_count,
-          0 as upload_session_count,
-          NULL as first_transaction_date
-        `;
-
-        // Get data from onboarding_responses table
-        result = await pool.query(`
-          SELECT ${selectFields}
-          FROM users u
-          INNER JOIN onboarding_responses o ON o.user_id = u.id
-          WHERE u.email != $1
-          ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
-        `, [ADMIN_EMAIL]);
-      }
-    }
-
-    console.log(`[Customer Data API] Returning ${result.rows.length} customer records`);
+    console.log(`[Customer Data API] Returning ${result.rows.length} customer records from users table (post-migration)`);
     
     return NextResponse.json({ 
       success: true,
       customerData: result.rows,
-      source: useUsersTable ? 'users' : 'onboarding_responses',
-      count: result.rows.length
+      source: 'users',
+      count: result.rows.length,
+      migrationComplete: true
     }, { status: 200 });
 
   } catch (error: any) {
