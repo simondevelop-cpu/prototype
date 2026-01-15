@@ -191,9 +191,11 @@ export async function GET(request: NextRequest) {
     
     // Log total users before filtering for debugging
     // Build params array correctly - ADMIN_EMAIL is first, then filter params
-    const totalUsersCheckParams = filterParams.length > 0 
-      ? [ADMIN_EMAIL, ...filterParams] 
-      : [ADMIN_EMAIL];
+    // Note: filterParams doesn't include ADMIN_EMAIL yet at this point
+    const totalUsersCheckParams: any[] = [ADMIN_EMAIL];
+    if (filterParams.length > 0) {
+      totalUsersCheckParams.push(...filterParams);
+    }
     const totalUsersCheck = await pool.query(`
       SELECT COUNT(*) as count
       FROM users u
@@ -229,7 +231,8 @@ export async function GET(request: NextRequest) {
       if (i === 0) {
         console.log(`[Vanity Metrics] Week ${weekKey}: Total users before data coverage filter:`, totalUsers);
         console.log(`[Vanity Metrics] Week ${weekKey}: Filter conditions:`, filterConditions);
-        console.log(`[Vanity Metrics] Week ${weekKey}: Filter params:`, filterParams);
+        console.log(`[Vanity Metrics] Week ${weekKey}: Filter params count:`, filterParams.length);
+        console.log(`[Vanity Metrics] Week ${weekKey}: Query params:`, [...filterParams, weekEnd.toISOString().split('T')[0]].length);
       }
       
       // Apply data coverage filter to total users if specified
