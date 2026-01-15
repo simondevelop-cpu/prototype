@@ -202,11 +202,10 @@ export async function GET(request: NextRequest) {
       console.log('[Cohort Analysis] Could not check distinct weeks:', e);
     }
     
-    // Extract weeks from query results and build weeks array
-    const signupWeeks = activationResult.rows.map((row: any) => row.signup_week);
+    // Extract weeks from activation query results first
     const weeksSet = new Set<string>();
     
-    signupWeeks.forEach((weekDate: any) => {
+    allSignupWeeks.forEach((weekDate: any) => {
       if (weekDate) {
         // DATE_TRUNC('week', ...) in PostgreSQL returns Monday as start of week
         // Convert to JavaScript Date and adjust to Sunday for display

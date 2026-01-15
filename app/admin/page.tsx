@@ -1170,6 +1170,124 @@ export default function AdminDashboard() {
                           </td>
                         ))}
                       </tr>
+                      {/* Engagement Section */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Engagement - Activities Completed by Signup Week
+                        </td>
+                      </tr>
+                      {/* Onboarding and Data Coverage Section */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Onboarding and Data Coverage
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Onboarding Completed</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.onboardingCompleted || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded First Statement</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.uploadedFirstStatement || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded Two Statements</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.uploadedTwoStatements || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded Three+ Statements</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.uploadedThreePlusStatements || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      {/* Time to Achieve Section */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Time to Achieve (days, excluding users who haven't completed)
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to Onboard</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.avgTimeToOnboardDays || '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to First Upload</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadDays || '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      {/* Engagement Signals Section */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Engagement Signals
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg Transactions per User (of those who uploaded)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.avgTransactionsPerUser || '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Users with Transactions</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.usersWithTransactions || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2+ unique days</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.loggedInTwoPlusDays || 0)
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg days logged in per month (2+ days)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.avgDaysLoggedInPerMonth || '-')
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2+ unique months</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.loggedInTwoPlusMonths || 0)
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                          </td>
+                        ))}
+                      </tr>
                     </tbody>
                   </table>
                 </div>
