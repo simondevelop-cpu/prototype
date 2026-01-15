@@ -210,36 +210,24 @@ export async function GET(request: NextRequest) {
     let unmigratedUsers: any[] = [];
     if (hasCompletedAt) {
       try {
+        // More thorough check: Find users with ANY onboarding_responses entry where users table has NULL
         const unmigratedCheck = await pool.query(`
-          SELECT 
+          SELECT DISTINCT
             u.id,
             u.email,
-            o.motivation as onboarding_motivation,
+            COALESCE(o.motivation, 'NULL') as onboarding_motivation,
             o.completed_at as onboarding_completed_at,
-            u.motivation as users_motivation,
-            u.completed_at as users_completed_at
+            CASE WHEN u.motivation IS NULL THEN 'NULL' ELSE u.motivation END as users_motivation,
+            u.completed_at as users_completed_at,
+            (
+              SELECT COUNT(*) 
+              FROM onboarding_responses o2 
+              WHERE o2.user_id = u.id
+            ) as total_onboarding_entries
           FROM users u
-          INNER JOIN (
-            SELECT DISTINCT ON (user_id)
-              user_id,
-              motivation,
-              completed_at,
-              created_at
-            FROM onboarding_responses
-            ORDER BY user_id, created_at DESC
-          ) o ON u.id = o.user_id
+          INNER JOIN onboarding_responses o ON u.id = o.user_id
           WHERE u.motivation IS NULL
-            AND (
-              o.motivation IS NOT NULL 
-              OR o.completed_at IS NOT NULL
-              OR EXISTS (
-                SELECT 1 FROM onboarding_responses o2
-                WHERE o2.user_id = u.id
-                  AND (o2.emotional_state IS NOT NULL 
-                       OR o2.financial_context IS NOT NULL
-                       OR o2.insight_preferences IS NOT NULL)
-              )
-            )
+          GROUP BY u.id, u.email, u.motivation, u.completed_at, o.motivation, o.completed_at
           ORDER BY u.id
           LIMIT 10
         `);
