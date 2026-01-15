@@ -321,12 +321,14 @@ export async function GET(request: NextRequest) {
       let newTransactions = 0;
       
       // Total transactions uploaded (cumulative up to end of week) - apply data coverage filter if specified
+      // weekEnd will be at position filterParams.length
+      const totalTransactionsParamIndex = filterParams.length;
       let totalTransactionsQuery = `
         SELECT COUNT(*) as count
         FROM transactions t
         JOIN users u ON u.id = t.user_id
         WHERE u.email != $${adminEmailParamIndex}
-          AND t.created_at <= $${paramIndex}::timestamp
+          AND t.created_at <= $${totalTransactionsParamIndex + 1}::timestamp
           ${filterConditions}
       `;
       let totalTransactions = 0;
