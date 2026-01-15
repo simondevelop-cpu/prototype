@@ -239,6 +239,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Enhanced Engagement query with more metrics - from appropriate table
+    // Build upload_counts subquery based on schema
+    const uploadCountsSubquery = hasUploadSession ? `
+      SELECT user_id, COUNT(DISTINCT upload_session_id) as upload_count
+      FROM transactions
+      WHERE upload_session_id IS NOT NULL
+      GROUP BY user_id
+    ` : `
+      SELECT user_id, 0 as upload_count
+      FROM transactions
+      GROUP BY user_id
+    `;
+    
     const engagementQuery = useUsersTable ? `
       SELECT 
         DATE_TRUNC('week', u.created_at) as signup_week,
@@ -256,10 +268,7 @@ export async function GET(request: NextRequest) {
       FROM users u
       LEFT JOIN transactions t ON t.user_id = u.id
       LEFT JOIN (
-        SELECT user_id, COUNT(DISTINCT upload_session_id) as upload_count
-        FROM transactions
-        WHERE upload_session_id IS NOT NULL
-        GROUP BY user_id
+        ${uploadCountsSubquery}
       ) upload_counts ON upload_counts.user_id = u.id
       LEFT JOIN (
         SELECT user_id, MIN(created_at) as first_transaction_date

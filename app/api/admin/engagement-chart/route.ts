@@ -77,6 +77,21 @@ export async function GET(request: NextRequest) {
       // Table doesn't exist
     }
 
+    // Check if transactions table has upload_session_id
+    let hasUploadSessionId = false;
+    try {
+      const uploadCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'transactions' 
+        AND column_name = 'upload_session_id'
+        LIMIT 1
+      `);
+      hasUploadSessionId = uploadCheck.rows.length > 0;
+    } catch (e) {
+      // Column doesn't exist
+    }
+
     // Build filter conditions
     let filterConditions = '';
     const filterParams: any[] = [];
@@ -140,16 +155,22 @@ export async function GET(request: NextRequest) {
     filterParams.push(ADMIN_EMAIL);
 
     // Get user data with signup date and intent
+    const uploadCountSubquery = hasUploadSessionId ? `
+      SELECT COUNT(DISTINCT upload_session_id)
+      FROM transactions t
+      WHERE t.user_id = u.id
+        AND t.upload_session_id IS NOT NULL
+    ` : `
+      0
+    `;
+    
     const usersQuery = useUsersTable ? `
       SELECT 
         u.id,
         u.created_at as signup_date,
         u.motivation as intent_type,
         (
-          SELECT COUNT(DISTINCT upload_session_id)
-          FROM transactions t
-          WHERE t.user_id = u.id
-            AND t.upload_session_id IS NOT NULL
+          ${uploadCountSubquery}
         ) as upload_count
       FROM users u
       WHERE u.email != $${paramIndex}
