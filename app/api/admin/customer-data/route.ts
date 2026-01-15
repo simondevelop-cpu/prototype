@@ -33,15 +33,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Check if migration is complete - users table must have onboarding columns
-    // If not migrated, we should NOT use onboarding_responses - migration must be run first
+    // Check where data actually exists - be flexible and check both tables
     let hasCompletedAt = false;
     let hasLastStep = false;
     let hasAcquisitionOther = false;
     let hasIsActive = false;
     let hasEmailValidated = false;
+    let useUsersTable = false;
+    let onboardingResponsesExists = false;
     
     try {
+      // Check users table schema
       const schemaCheck = await pool.query(`
         SELECT column_name 
         FROM information_schema.columns 
@@ -54,19 +56,56 @@ export async function GET(request: NextRequest) {
       hasIsActive = schemaCheck.rows.some(row => row.column_name === 'is_active');
       hasEmailValidated = schemaCheck.rows.some(row => row.column_name === 'email_validated');
       
-      if (!hasCompletedAt || !schemaCheck.rows.some(row => row.column_name === 'motivation')) {
+      // Check if onboarding_responses table exists
+      const onboardingTableCheck = await pool.query(`
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'onboarding_responses'
+        LIMIT 1
+      `);
+      onboardingResponsesExists = onboardingTableCheck.rows.length > 0;
+      
+      // Check where data actually exists
+      if (hasCompletedAt) {
+        const usersDataCheck = await pool.query(`
+          SELECT COUNT(*) as count
+          FROM users
+          WHERE (completed_at IS NOT NULL 
+            OR motivation IS NOT NULL 
+            OR emotional_state IS NOT NULL)
+          AND email != $1
+        `, [ADMIN_EMAIL]);
+        const usersWithData = parseInt(usersDataCheck.rows[0]?.count || '0', 10);
+        useUsersTable = usersWithData > 0;
+        
+        // If users table has columns but no data, check onboarding_responses
+        if (!useUsersTable && onboardingResponsesExists) {
+          const onboardingDataCheck = await pool.query(`
+            SELECT COUNT(*) as count
+            FROM onboarding_responses
+          `);
+          const onboardingCount = parseInt(onboardingDataCheck.rows[0]?.count || '0', 10);
+          if (onboardingCount > 0) {
+            console.log('[Customer Data API] Users table has columns but no data, using onboarding_responses');
+            useUsersTable = false; // Use onboarding_responses
+          }
+        }
+      } else if (onboardingResponsesExists) {
+        // No migration yet, use onboarding_responses
+        useUsersTable = false;
+      } else {
+        // No tables with data
         return NextResponse.json({ 
-          success: false,
-          error: 'Migration not complete',
-          message: 'Onboarding data migration has not been completed. Please run the migration at /api/admin/migrate-merge-onboarding first.',
-          migrationRequired: true
-        }, { status: 400 });
+          success: true,
+          customerData: [],
+          message: 'No onboarding data found. Please ensure migration has been run or onboarding_responses table exists.',
+          source: 'none'
+        }, { status: 200 });
       }
     } catch (e) {
-      console.error('[Customer Data API] Error checking migration status:', e);
+      console.error('[Customer Data API] Error checking data location:', e);
       return NextResponse.json({ 
         success: false,
-        error: 'Could not verify migration status',
+        error: 'Could not determine data location',
         details: e instanceof Error ? e.message : 'Unknown error'
       }, { status: 500 });
     }
@@ -86,9 +125,13 @@ export async function GET(request: NextRequest) {
 
     // Fetch all customer data from users table ONLY (post-migration)
     let result;
-    // Use users table ONLY (post-migration) - Include ALL variables used in dashboard
-    // Add transaction counts, upload counts, and first transaction date for cohort analysis
-    const selectFields = useL0PII ? `
+    // Use appropriate table based on where data exists
+    let result;
+    
+    if (useUsersTable) {
+      // Use users table (post-migration) - Include ALL variables used in dashboard
+      // Add transaction counts, upload counts, and first transaction date for cohort analysis
+      const selectFields = useL0PII ? `
       u.id as user_id,
       COALESCE(p.email, u.email) as email,
       p.first_name,
@@ -160,15 +203,114 @@ export async function GET(request: NextRequest) {
       WHERE u.email != $1
       ORDER BY u.completed_at DESC NULLS LAST, u.created_at DESC
     `, [ADMIN_EMAIL]);
+      
+      console.log(`[Customer Data API] Returning ${result.rows.length} customer records from users table`);
+    } else {
+      // Use onboarding_responses table (pre-migration or data not migrated yet)
+      console.log('[Customer Data API] Using onboarding_responses table');
+      
+      // Check onboarding_responses schema
+      let onboardingHasLastStep = false;
+      let onboardingHasAcquisitionOther = false;
+      try {
+        const onboardingSchemaCheck = await pool.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'onboarding_responses' 
+          AND column_name IN ('last_step', 'acquisition_other')
+        `);
+        onboardingHasLastStep = onboardingSchemaCheck.rows.some(row => row.column_name === 'last_step');
+        onboardingHasAcquisitionOther = onboardingSchemaCheck.rows.some(row => row.column_name === 'acquisition_other');
+      } catch (e) {
+        console.log('[Customer Data API] Could not check onboarding_responses schema');
+      }
+      
+      const selectFields = useL0PII ? `
+        u.id as user_id,
+        COALESCE(p.email, u.email) as email,
+        p.first_name,
+        p.last_name,
+        p.date_of_birth,
+        p.recovery_phone,
+        p.province_region,
+        o.emotional_state,
+        o.financial_context,
+        o.motivation,
+        o.motivation_other,
+        o.acquisition_source,
+        ${onboardingHasAcquisitionOther ? 'o.acquisition_other,' : ''}
+        o.insight_preferences,
+        o.insight_other,
+        ${onboardingHasLastStep ? 'o.last_step,' : ''}
+        false as is_active,
+        false as email_validated,
+        o.completed_at,
+        COALESCE(p.created_at, u.created_at) as created_at,
+        COALESCE(p.updated_at, o.updated_at) as updated_at,
+        COALESCE(transaction_stats.transaction_count, 0) as transaction_count,
+        COALESCE(transaction_stats.upload_session_count, 0) as upload_session_count,
+        transaction_stats.first_transaction_date
+      ` : `
+        u.id as user_id,
+        u.email,
+        o.first_name,
+        o.last_name,
+        o.date_of_birth,
+        o.recovery_phone,
+        o.province_region,
+        o.emotional_state,
+        o.financial_context,
+        o.motivation,
+        o.motivation_other,
+        o.acquisition_source,
+        ${onboardingHasAcquisitionOther ? 'o.acquisition_other,' : ''}
+        o.insight_preferences,
+        o.insight_other,
+        ${onboardingHasLastStep ? 'o.last_step,' : ''}
+        false as is_active,
+        false as email_validated,
+        o.completed_at,
+        o.created_at,
+        o.updated_at,
+        COALESCE(transaction_stats.transaction_count, 0) as transaction_count,
+        COALESCE(transaction_stats.upload_session_count, 0) as upload_session_count,
+        transaction_stats.first_transaction_date
+      `;
 
-    console.log(`[Customer Data API] Returning ${result.rows.length} customer records from users table (post-migration)`);
+      const fromClause = useL0PII 
+        ? `FROM users u
+           LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
+           INNER JOIN onboarding_responses o ON o.user_id = u.id`
+        : `FROM users u
+           INNER JOIN onboarding_responses o ON o.user_id = u.id`;
+
+      result = await pool.query(`
+        SELECT ${selectFields}
+        ${fromClause}
+        LEFT JOIN (
+          SELECT 
+            user_id,
+            COUNT(DISTINCT id) as transaction_count,
+            COUNT(DISTINCT upload_session_id) FILTER (WHERE upload_session_id IS NOT NULL) as upload_session_count,
+            MIN(created_at) as first_transaction_date
+          FROM transactions
+          GROUP BY user_id
+        ) transaction_stats ON transaction_stats.user_id = u.id
+        WHERE u.email != $1
+        ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
+      `, [ADMIN_EMAIL]);
+      
+      console.log(`[Customer Data API] Returning ${result.rows.length} customer records from onboarding_responses table`);
+    }
+
+    console.log(`[Customer Data API] Returning ${result.rows.length} customer records`);
     
     return NextResponse.json({ 
       success: true,
       customerData: result.rows,
-      source: 'users',
+      source: useUsersTable ? 'users' : 'onboarding_responses',
       count: result.rows.length,
-      migrationComplete: true
+      migrationComplete: useUsersTable
     }, { status: 200 });
 
   } catch (error: any) {

@@ -80,25 +80,45 @@ export async function GET(request: NextRequest) {
     const adminEmailParamIndex = paramIndex;
     paramIndex++;
 
-    // Generate weeks starting from w/c Nov 2, 2025 to now
-    const now = new Date();
-    // Nov 2, 2025 is a Sunday, so week starts from Nov 2
-    const nov2Start = new Date(2025, 10, 2); // Month 10 = November, day 2
-    nov2Start.setHours(0, 0, 0, 0);
+    // Find the earliest user creation date to start from
+    const earliestUserCheck = await pool.query(`
+      SELECT MIN(created_at) as earliest_date
+      FROM users
+      WHERE email != $1
+    `, [ADMIN_EMAIL]);
+    
+    const earliestDateStr = earliestUserCheck.rows[0]?.earliest_date;
+    let weekStartDate: Date;
+    
+    if (earliestDateStr) {
+      // Start from the earliest user's creation date (rounded to start of week)
+      weekStartDate = new Date(earliestDateStr);
+      // Round to start of week (Sunday)
+      const dayOfWeek = weekStartDate.getDay();
+      weekStartDate.setDate(weekStartDate.getDate() - dayOfWeek);
+      weekStartDate.setHours(0, 0, 0, 0);
+    } else {
+      // Fallback: if no users, start from 12 weeks ago
+      weekStartDate = new Date();
+      weekStartDate.setDate(weekStartDate.getDate() - (12 * 7));
+      weekStartDate.setDate(weekStartDate.getDate() - weekStartDate.getDay()); // Round to Sunday
+      weekStartDate.setHours(0, 0, 0, 0);
+    }
 
-    // Calculate weeks from Nov 2, 2025 to current week
+    // Calculate weeks from earliest user to current week
+    const now = new Date();
     const currentWeekStart = new Date(now);
     currentWeekStart.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
     currentWeekStart.setHours(0, 0, 0, 0);
 
     // Calculate number of weeks
-    const weeksDiff = Math.ceil((currentWeekStart.getTime() - nov2Start.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    const weeksDiff = Math.ceil((currentWeekStart.getTime() - weekStartDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
     const numWeeks = Math.max(1, weeksDiff + 1); // At least 1 week
 
     const weeks: string[] = [];
     for (let i = 0; i < numWeeks; i++) {
-      const weekStart = new Date(nov2Start);
-      weekStart.setDate(nov2Start.getDate() + (i * 7));
+      const weekStart = new Date(weekStartDate);
+      weekStart.setDate(weekStartDate.getDate() + (i * 7));
       const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
       weeks.push(weekLabel);
     }
@@ -107,8 +127,8 @@ export async function GET(request: NextRequest) {
     const metrics: { [week: string]: any } = {};
 
     for (let i = 0; i < numWeeks; i++) {
-      const weekStart = new Date(nov2Start);
-      weekStart.setDate(nov2Start.getDate() + (i * 7));
+      const weekStart = new Date(weekStartDate);
+      weekStart.setDate(weekStartDate.getDate() + (i * 7));
       weekStart.setHours(0, 0, 0, 0);
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 6);

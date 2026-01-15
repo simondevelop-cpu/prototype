@@ -1,6 +1,7 @@
 /**
- * Migration Status Checker
- * Checks if L0/L1/L2 tables exist and shows migration status
+ * Migration Status Diagnostic API
+ * Checks where onboarding data actually exists and migration status
+ * No authentication required for diagnostic purposes (or we can add it)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -9,83 +10,149 @@ import { Pool } from 'pg';
 export const dynamic = 'force-dynamic';
 
 const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
+  connectionString: process.env.POSTGRES_URL,
 });
 
 export async function GET(request: NextRequest) {
   try {
-    const tables = {
-      'l0_pii_users': false,
-      'l0_user_tokenization': false,
-      'l0_category_list': false,
-      'l0_privacy_metadata': false,
-      'l1_transaction_facts': false,
-      'l1_customer_facts': false,
-      'l1_file_ingestion': false,
-      'l2_transactions_view': false,
+    const diagnostics: any = {
+      timestamp: new Date().toISOString(),
+      tables: {},
+      migration: {},
+      dataLocation: {},
+      recommendations: []
     };
 
-    const counts: Record<string, number> = {};
-    const errors: string[] = [];
+    // Check if users table has onboarding columns
+    const usersSchemaCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' 
+      AND column_name IN ('completed_at', 'motivation', 'emotional_state', 'financial_context', 'last_step', 'is_active', 'email_validated')
+    `);
+    
+    const usersColumns = usersSchemaCheck.rows.map(row => row.column_name);
+    diagnostics.tables.users = {
+      exists: true,
+      hasOnboardingColumns: usersColumns.length > 0,
+      columns: usersColumns
+    };
 
-    // Check if tables exist and get counts
-    for (const tableName of Object.keys(tables)) {
-      try {
-        const result = await pool.query(`
-          SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_schema = 'public' 
-            AND table_name = $1
-          )
-        `, [tableName]);
-        
-        tables[tableName as keyof typeof tables] = result.rows[0].exists;
-        
-        if (result.rows[0].exists) {
-          // Get row count
-          const countResult = await pool.query(`SELECT COUNT(*) as count FROM ${tableName}`);
-          counts[tableName] = parseInt(countResult.rows[0].count);
-        }
-      } catch (error: any) {
-        errors.push(`${tableName}: ${error.message}`);
+    // Check if onboarding_responses table exists
+    const onboardingTableCheck = await pool.query(`
+      SELECT 1 FROM information_schema.tables 
+      WHERE table_name = 'onboarding_responses'
+      LIMIT 1
+    `);
+    
+    diagnostics.tables.onboarding_responses = {
+      exists: onboardingTableCheck.rows.length > 0
+    };
+
+    // Count data in users table
+    if (usersColumns.length > 0) {
+      const usersDataCheck = await pool.query(`
+        SELECT 
+          COUNT(*) as total_users,
+          COUNT(CASE WHEN completed_at IS NOT NULL THEN 1 END) as users_with_completed_at,
+          COUNT(CASE WHEN motivation IS NOT NULL THEN 1 END) as users_with_motivation,
+          COUNT(CASE WHEN emotional_state IS NOT NULL THEN 1 END) as users_with_emotional_state,
+          COUNT(CASE WHEN financial_context IS NOT NULL THEN 1 END) as users_with_financial_context,
+          COUNT(CASE WHEN completed_at IS NOT NULL OR motivation IS NOT NULL OR emotional_state IS NOT NULL THEN 1 END) as users_with_any_onboarding_data
+        FROM users
+        WHERE email != 'admin@canadianinsights.ca'
+      `);
+      
+      diagnostics.dataLocation.users = usersDataCheck.rows[0];
+      
+      // Get sample user creation dates to check vanity metrics issue
+      const sampleDates = await pool.query(`
+        SELECT 
+          id,
+          email,
+          created_at,
+          completed_at,
+          motivation
+        FROM users
+        WHERE email != 'admin@canadianinsights.ca'
+        ORDER BY created_at
+        LIMIT 20
+      `);
+      
+      diagnostics.dataLocation.userSampleDates = sampleDates.rows.map((row: any) => ({
+        id: row.id,
+        email: row.email?.substring(0, 20) + '...',
+        created_at: row.created_at,
+        completed_at: row.completed_at,
+        motivation: row.motivation
+      }));
+    }
+
+    // Count data in onboarding_responses table
+    if (diagnostics.tables.onboarding_responses.exists) {
+      const onboardingDataCheck = await pool.query(`
+        SELECT 
+          COUNT(*) as total_records,
+          COUNT(DISTINCT user_id) as unique_users,
+          COUNT(CASE WHEN completed_at IS NOT NULL THEN 1 END) as records_with_completed_at,
+          COUNT(CASE WHEN motivation IS NOT NULL THEN 1 END) as records_with_motivation
+        FROM onboarding_responses
+      `);
+      
+      diagnostics.dataLocation.onboarding_responses = onboardingDataCheck.rows[0];
+      
+      // Check if there are users with onboarding_responses but no data in users table
+      if (usersColumns.length > 0) {
+        const unmigratedCheck = await pool.query(`
+          SELECT COUNT(DISTINCT o.user_id) as count
+          FROM onboarding_responses o
+          LEFT JOIN users u ON u.id = o.user_id
+          WHERE u.motivation IS NULL 
+            AND o.motivation IS NOT NULL
+        `);
+        diagnostics.migration.unmigratedUsers = parseInt(unmigratedCheck.rows[0]?.count || '0', 10);
       }
     }
 
-    // Check old tables for comparison
-    const oldTableCounts: Record<string, number> = {};
-    try {
-      const usersResult = await pool.query('SELECT COUNT(*) as count FROM users');
-      oldTableCounts.users = parseInt(usersResult.rows[0].count);
-    } catch (e: any) {
-      errors.push(`users table: ${e.message}`);
-    }
+    // Determine migration status
+    const hasUsersColumns = usersColumns.length > 0;
+    const usersHasData = diagnostics.dataLocation.users?.users_with_any_onboarding_data > 0;
+    const onboardingHasData = diagnostics.dataLocation.onboarding_responses?.total_records > 0;
+    
+    diagnostics.migration = {
+      columnsExist: hasUsersColumns,
+      usersTableHasData: usersHasData,
+      onboardingResponsesHasData: onboardingHasData,
+      migrationNeeded: hasUsersColumns && !usersHasData && onboardingHasData,
+      migrationComplete: hasUsersColumns && usersHasData,
+      dataInBothTables: usersHasData && onboardingHasData
+    };
 
-    try {
-      const txResult = await pool.query('SELECT COUNT(*) as count FROM transactions');
-      oldTableCounts.transactions = parseInt(txResult.rows[0].count);
-    } catch (e: any) {
-      errors.push(`transactions table: ${e.message}`);
+    // Generate recommendations
+    if (!hasUsersColumns) {
+      diagnostics.recommendations.push('Run migration to add onboarding columns to users table');
+    } else if (hasUsersColumns && !usersHasData && onboardingHasData) {
+      diagnostics.recommendations.push('Migration columns exist but data not migrated. Run migration to copy data from onboarding_responses to users table.');
+    } else if (hasUsersColumns && usersHasData && onboardingHasData) {
+      diagnostics.recommendations.push('Data exists in both tables. Migration appears complete. Consider deleting onboarding_responses table.');
+    } else if (hasUsersColumns && usersHasData && !onboardingHasData) {
+      diagnostics.recommendations.push('Migration complete. Safe to delete onboarding_responses table.');
     }
-
-    const allTablesExist = Object.values(tables).every(exists => exists);
-    const hasData = Object.values(counts).some(count => count > 0);
 
     return NextResponse.json({
-      migrated: allTablesExist && hasData,
-      tablesExist: allTablesExist,
-      hasData,
-      tables,
-      counts,
-      oldTableCounts,
-      errors: errors.length > 0 ? errors : undefined,
+      success: true,
+      diagnostics
     }, { status: 200 });
 
   } catch (error: any) {
     console.error('[Migration Status] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to check migration status', details: error.message },
+      { 
+        success: false,
+        error: 'Failed to check migration status', 
+        details: error.message 
+      },
       { status: 500 }
     );
   }
 }
-
