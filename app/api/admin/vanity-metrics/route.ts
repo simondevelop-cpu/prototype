@@ -358,7 +358,7 @@ export async function GET(request: NextRequest) {
               AND t.created_at >= $2::timestamp
               AND t.created_at <= $3::timestamp
           `;
-          const filteredResult = await pool.query(filteredNewTransactionsQuery, [userIds, weekStart, weekEnd]);
+          const filteredResult = await pool.query(filteredNewTransactionsQuery, [userIds, weekStart.toISOString(), weekEnd.toISOString()]);
           newTransactions = parseInt(filteredResult.rows[0]?.count) || 0;
         }
       } else {
