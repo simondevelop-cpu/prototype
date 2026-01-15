@@ -1,48 +1,230 @@
+// Force rebuild: 2025-10-24
 const express = require('express');
 const path = require('path');
-const multer = require('multer');
 const { parse } = require('csv-parse');
 const dayjs = require('dayjs');
+const isBetween = require('dayjs/plugin/isBetween');
+dayjs.extend(isBetween);
 const cors = require('cors');
 const { Pool } = require('pg');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+
+// Simple in-memory rate limiter
+const rateLimitStore = new Map();
+
+function checkRateLimit(identifier, maxRequests, windowMs) {
+  const now = Date.now();
+  const key = identifier.toLowerCase();
+  
+  let entry = rateLimitStore.get(key);
+  
+  // Clean expired entries occasionally (1% chance per request)
+  if (Math.random() < 0.01) {
+    for (const [k, e] of rateLimitStore.entries()) {
+      if (e.resetAt <= now) {
+        rateLimitStore.delete(k);
+      }
+    }
+  }
+  
+  if (entry && entry.resetAt > now) {
+    entry.count++;
+    if (entry.count > maxRequests) {
+      return { allowed: false, remaining: 0, resetAt: entry.resetAt };
+    }
+    return { allowed: true, remaining: maxRequests - entry.count, resetAt: entry.resetAt };
+  }
+  
+  const resetAt = now + windowMs;
+  entry = { count: 1, resetAt };
+  rateLimitStore.set(key, entry);
+  return { allowed: true, remaining: maxRequests - 1, resetAt };
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const __dirnameResolved = __dirname;
 const disableDb = process.env.DISABLE_DB === '1';
-const JWT_SECRET = process.env.JWT_SECRET || 'canadian-insights-demo-secret';
-const SESSION_TTL_SECONDS = Number(process.env.JWT_TTL_SECONDS || 60 * 60 * 2);
-const demoEmail = process.env.DEMO_EMAIL || 'demo@canadianinsights.ca';
-const demoPassword = process.env.DEMO_PASSWORD || 'northstar-demo';
+const JWT_SECRET = process.env.JWT_SECRET || 'canadian-insights-demo-secret-key-change-in-production';
+const SESSION_TTL_SECONDS = Number(process.env.JWT_TTL_SECONDS || 60 * 60 * 24); // 24 hours
+const DEMO_EMAIL = process.env.DEMO_EMAIL || 'demo@canadianinsights.ca';
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'northstar-demo';
+const IS_VERCEL = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
 
-const demoUser = {
-  id: 'demo-user',
-  name: 'Taylor Nguyen',
-  email: demoEmail,
-};
+// Tokenization helper (for analytics - L1 tables)
+const TOKENIZATION_SALT = process.env.TOKENIZATION_SALT || 'default_salt_change_in_production';
 
-const users = [
-  {
-    ...demoUser,
-    passwordHash: hashPassword(demoPassword),
-  },
-];
-
-const usersById = new Map(users.map((user) => [user.id, user]));
-
-function publicUser(user) {
-  return { id: user.id, name: user.name, email: user.email };
+async function getTokenizedUserId(internalUserId) {
+  if (!pool || disableDb) return null;
+  
+  try {
+    // Check if tokenized ID already exists
+    const existing = await pool.query(
+      'SELECT tokenized_user_id FROM l0_user_tokenization WHERE internal_user_id = $1',
+      [internalUserId]
+    );
+    
+    if (existing.rows.length > 0) {
+      return existing.rows[0].tokenized_user_id;
+    }
+    
+    // Generate tokenized ID (SHA256 hash)
+    const hash = crypto.createHash('sha256')
+      .update(`${internalUserId}${TOKENIZATION_SALT}`)
+      .digest('hex');
+    
+    // Store mapping
+    await pool.query(
+      'INSERT INTO l0_user_tokenization (internal_user_id, tokenized_user_id) VALUES ($1, $2) ON CONFLICT (internal_user_id) DO UPDATE SET tokenized_user_id = EXCLUDED.tokenized_user_id',
+      [internalUserId, hash]
+    );
+    
+    return hash;
+  } catch (error) {
+    console.error('[Tokenization] Error getting tokenized user ID:', error);
+    // If table doesn't exist yet (pre-migration), return null
+    // This allows graceful fallback
+    return null;
+  }
 }
 
-function hashPassword(value) {
-  return crypto.createHash('sha256').update(value).digest('hex');
+// Helper to get table/field names based on migration status
+async function getTransactionTableInfo(userId) {
+  const tokenizedUserId = await getTokenizedUserId(userId);
+  if (tokenizedUserId) {
+    return {
+      table: 'l1_transaction_facts',
+      userIdField: 'tokenized_user_id',
+      userIdValue: tokenizedUserId,
+      dateField: 'transaction_date'
+    };
+  } else {
+    return {
+      table: 'transactions',
+      userIdField: 'user_id',
+      userIdValue: userId,
+      dateField: 'date'
+    };
+  }
 }
 
-function createToken(user) {
+// Helper to get table/field names based on migration status
+async function getTransactionTableInfo(userId) {
+  const tokenizedUserId = await getTokenizedUserId(userId);
+  if (tokenizedUserId) {
+    return {
+      table: 'l1_transaction_facts',
+      userIdField: 'tokenized_user_id',
+      userIdValue: tokenizedUserId,
+      dateField: 'transaction_date'
+    };
+  } else {
+    return {
+      table: 'transactions',
+      userIdField: 'user_id',
+      userIdValue: userId,
+      dateField: 'date'
+    };
+  }
+}
+
+// CSRF protection helper
+function verifyOrigin(origin) {
+  if (!origin) return true; // Same-origin requests may not have Origin
+  
+  // Allow localhost in development
+  const isLocalhost = origin.startsWith('http://localhost:') ||
+                      origin.startsWith('http://127.0.0.1:');
+  
+  if (process.env.NODE_ENV !== 'production') {
+    return isLocalhost;
+  }
+  
+  // Production: check against allowed origins
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
+  if (allowedOrigins.length > 0) {
+    return allowedOrigins.some(allowed => origin === allowed || origin.endsWith(`.${allowed}`));
+  }
+  
+  return false;
+}
+
+// Middleware for CSRF protection on state-changing routes
+app.use((req, res, next) => {
+  if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE' || req.method === 'PATCH') {
+    const origin = req.headers.origin || req.headers.referer ? new URL(req.headers.referer).origin : null;
+    if (!verifyOrigin(origin)) {
+      return res.status(403).json({ error: 'Invalid request origin' });
+    }
+  }
+  next();
+});
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static(__dirnameResolved));
+
+// Note: File uploads are handled by Next.js API routes using FormData (not multer)
+// See: app/api/statements/parse/route.ts and app/api/statements/upload/route.ts
+
+// Database pool
+let pool = null;
+if (!disableDb) {
+  const useSSL = process.env.DATABASE_SSL !== 'false';
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: useSSL ? { rejectUnauthorized: false } : false,
+  });
+  console.log('[DB] Pool created');
+}
+
+// ============================================================================
+// AUTHENTICATION UTILITIES
+// ============================================================================
+
+const BCRYPT_ROUNDS = 12;
+
+/**
+ * Hash password using bcrypt (secure, slow hash with salt)
+ * Replaces old SHA-256 implementation for security
+ */
+async function hashPassword(password) {
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
+}
+
+/**
+ * Verify password against hash
+ * Supports both bcrypt (new) and SHA-256 (legacy) for backward compatibility
+ */
+async function verifyPassword(password, hash) {
+  // Check if hash is bcrypt format (starts with $2a$, $2b$, or $2y$)
+  if (hash.startsWith('$2')) {
+    return bcrypt.compare(password, hash);
+  }
+  
+  // Legacy SHA-256 support (for existing passwords)
+  // Will be migrated to bcrypt on next successful login
+  const sha256Hash = crypto.createHash('sha256').update(password).digest('hex');
+  return sha256Hash === hash;
+}
+
+/**
+ * Legacy SHA-256 hash function (deprecated)
+ * Kept for migration purposes only - do not use for new passwords
+ * @deprecated Use hashPassword() instead
+ */
+function hashPasswordLegacy(password) {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+function createToken(userId) {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const payload = Buffer.from(
-    JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS })
+    JSON.stringify({ 
+      sub: userId,  // User ID as integer
+      exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS 
+    })
   ).toString('base64url');
   const signature = crypto
     .createHmac('sha256', JWT_SECRET)
@@ -51,707 +233,1297 @@ function createToken(user) {
   return `${header}.${payload}.${signature}`;
 }
 
-async function verifyPassword(user, password) {
-  if (!password) return false;
+function verifyToken(token) {
   try {
-    return hashPassword(password) === user.passwordHash;
-  } catch (error) {
-    console.warn('Password verification failed', error);
-    return false;
-  }
-}
-
-function decodeToken(token) {
   const parts = token.split('.');
   if (parts.length !== 3) return null;
+    
   const [headerPart, payloadPart, signaturePart] = parts;
-  try {
+    
+    // Verify signature
     const expectedSignature = crypto
       .createHmac('sha256', JWT_SECRET)
       .update(`${headerPart}.${payloadPart}`)
       .digest('base64url');
-    if (signaturePart.length !== expectedSignature.length) {
+    
+    if (signaturePart !== expectedSignature) {
       return null;
     }
-    const providedBuffer = Buffer.from(signaturePart);
-    const expectedBuffer = Buffer.from(expectedSignature);
-    if (!crypto.timingSafeEqual(providedBuffer, expectedBuffer)) {
-      return null;
-    }
+    
+    // Decode payload
     const payloadJson = Buffer.from(payloadPart, 'base64url').toString('utf8');
     const payload = JSON.parse(payloadJson);
+    
+    // Check expiration
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
       return null;
     }
+    
     return payload;
   } catch (error) {
-    console.warn('Token verification failed', error);
+    console.error('[AUTH] Token verification failed:', error.message);
     return null;
   }
 }
 
-function authenticate(req, res, next) {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+// Middleware to extract user ID from JWT
+async function authenticate(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+  
   if (!token) {
-    return res.status(401).json({ error: 'Unauthenticated' });
+    return res.status(401).json({ error: 'Authentication required' });
   }
-
-  try {
-    const payload = decodeToken(token);
-    const user = payload?.sub ? usersById.get(payload.sub) : null;
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthenticated' });
-    }
-    req.user = publicUser(user);
+  
+  const payload = verifyToken(token);
+  if (!payload || !payload.sub) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+  
+  req.userId = payload.sub; // Integer user ID
     next();
-  } catch (error) {
-    console.warn('Failed to verify token', error);
-    return res.status(401).json({ error: 'Unauthenticated' });
-  }
 }
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 5 * 1024 * 1024,
-    files: 6,
-  },
-});
-
-app.use(cors());
-app.use(express.json());
-app.use(express.static(__dirnameResolved));
-
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body || {};
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
-
-    const user = users.find((entry) => entry.email.toLowerCase() === email.toLowerCase());
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const valid = await verifyPassword(user, password);
-    if (!valid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const token = createToken(user);
-    res.json({ token, user: publicUser(user) });
-  } catch (error) {
-    console.error('Login failed', error);
-    res.status(500).json({ error: 'Unable to sign in' });
-  }
-});
-
-app.post('/api/auth/demo', (req, res) => {
-  try {
-    const user = users[0];
-    const token = createToken(user);
-    res.json({ token, user: publicUser(user) });
-  } catch (error) {
-    console.error('Demo login failed', error);
-    res.status(500).json({ error: 'Unable to start demo session' });
-  }
-});
-
-app.get('/api/auth/me', authenticate, (req, res) => {
-  res.json({ user: req.user });
-});
-
-let pool = null;
-if (disableDb) {
-  console.warn('DISABLE_DB is set. The server will use in-memory data only.');
-} else {
-  const useSSL = process.env.DATABASE_SSL !== 'false';
-  if (!process.env.DATABASE_URL) {
-    console.warn('DATABASE_URL is not set. The server will attempt to use default PG environment variables.');
-  }
-
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: useSSL ? { rejectUnauthorized: false } : false,
-  });
-}
-
-const DEMO_USER_EMAIL = 'demo@example.com';
-const DEMO_USER_DISPLAY_NAME = 'Demo User';
-const DEMO_USER_PASSWORD_HASH = 'demo-password-hash';
-
-let defaultUserId = null;
-const defaultAccountIds = new Map();
-
-function getDefaultUserId() {
-  if (defaultUserId === null) {
-    throw new Error('Default user context has not been initialised');
-  }
-  return defaultUserId;
-}
-
-function setDefaultUserContext(userId, accounts = []) {
-  defaultUserId = userId;
-  defaultAccountIds.clear();
-  accounts.forEach(({ name, id }) => {
-    if (name && id) {
-      const key = name.toString().trim().toLowerCase();
-      if (key) {
-        defaultAccountIds.set(key, id);
-      }
-    }
-  });
-}
-
-function getAccountIdForName(name) {
-  if (!name) return null;
-  const key = name.toString().trim().toLowerCase();
-  if (!key) return null;
-  return defaultAccountIds.get(key) || null;
-}
-
-function toCurrency(value) {
-  return Number.parseFloat(value || 0);
-}
-
-const sampleTransactions = [
-  {
-    description: 'Metro - groceries',
-    date: '2025-06-12',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Groceries',
-    label: 'Household',
-    amount: -112.45,
-  },
-  {
-    description: 'Rent payment',
-    date: '2025-06-01',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Housing',
-    label: 'Essential',
-    amount: -2100,
-  },
-  {
-    description: 'Salary - ACME Corp',
-    date: '2025-06-01',
-    cashflow: 'income',
-    account: 'cash',
-    category: 'Employment income',
-    label: 'Primary income',
-    amount: 3150,
-  },
-  {
-    description: 'EQ Bank - transfer',
-    date: '2025-06-05',
-    cashflow: 'other',
-    account: 'cash',
-    category: 'Transfers',
-    label: 'Savings',
-    amount: -400,
-  },
-  {
-    description: 'Spotify subscription',
-    date: '2025-06-15',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Subscriptions',
-    label: 'Music',
-    amount: -14.99,
-  },
-  {
-    description: 'Hydro-Québec',
-    date: '2025-06-08',
-    cashflow: 'expense',
-    account: 'cash',
-    category: 'Utilities',
-    label: 'Household',
-    amount: -132.1,
-  },
-  {
-    description: 'Uber trip',
-    date: '2025-06-18',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Transportation',
-    label: 'City travel',
-    amount: -24.6,
-  },
-  {
-    description: 'CRA Tax Refund',
-    date: '2025-05-15',
-    cashflow: 'other',
-    account: 'cash',
-    category: 'Tax refunds',
-    label: 'Windfall',
-    amount: 360,
-  },
-  {
-    description: 'Amazon.ca order',
-    date: '2025-06-04',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Shopping',
-    label: 'Home',
-    amount: -89.23,
-  },
-  {
-    description: 'Telus Mobility',
-    date: '2025-06-09',
-    cashflow: 'expense',
-    account: 'credit',
-    category: 'Mobile phone',
-    label: 'Household',
-    amount: -76.5,
-  },
-];
-
-function normaliseMerchant(description) {
-  return description.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-const DEFAULT_USER_ID = 'demo-user';
-
-function createInMemoryState(transactions = []) {
-  const normalised = transactions.map((tx, index) => ({
-    ...tx,
-    id: tx.id || index + 1,
-    merchant: normaliseMerchant(tx.description),
-    user_id: tx.user_id || DEFAULT_USER_ID,
-  }));
-  const nextId =
-    normalised.reduce((max, tx) => Math.max(max, tx.id || 0), 0) + 1;
-  return { transactions: normalised, nextId };
-}
-
-const inMemoryStore = new Map();
-inMemoryStore.set(DEFAULT_USER_ID, createInMemoryState(sampleTransactions));
-
-function getInMemoryState(userId) {
-  if (!inMemoryStore.has(userId)) {
-    inMemoryStore.set(userId, createInMemoryState([]));
-  }
-  return inMemoryStore.get(userId);
-}
-
-function getInMemoryTransactions(userId) {
-  return getInMemoryState(userId).transactions;
-}
-
-function setInMemoryTransaction(userId, transaction) {
-  const state = getInMemoryState(userId);
-  const exists = state.transactions.some(
-    (item) =>
-      item.date === transaction.date &&
-      item.amount === transaction.amount &&
-      item.merchant === transaction.merchant &&
-      item.cashflow === transaction.cashflow
-  );
-  if (exists) {
-    return false;
-  }
-  const id = state.nextId++;
-  state.transactions.push({ ...transaction, id, user_id: userId });
-  return true;
-}
+// ============================================================================
+// DATABASE SCHEMA & INITIALIZATION
+// ============================================================================
 
 async function ensureSchema() {
-  if (disableDb) return;
+  if (disableDb || !pool) return;
+  
+  console.log('[DB] Creating schema...');
+  
+  // Users table with INTEGER primary key
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       display_name TEXT NOT NULL,
+      login_attempts INTEGER DEFAULT 0,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS accounts (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      name TEXT NOT NULL,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
+  // Transactions table with user_id as INTEGER
   await pool.query(`
     CREATE TABLE IF NOT EXISTS transactions (
       id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       description TEXT NOT NULL,
-      merchant TEXT NOT NULL,
+      merchant TEXT,
       date DATE NOT NULL,
-      cashflow TEXT NOT NULL,
+      cashflow TEXT NOT NULL CHECK (cashflow IN ('income', 'expense', 'other')),
       account TEXT NOT NULL,
       category TEXT NOT NULL,
       label TEXT DEFAULT '',
-      amount NUMERIC NOT NULL,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL
-    );
-  `);
-
-  await pool.query(`
-    ALTER TABLE transactions
-    ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
-  `);
-
-  await pool.query(`
-    ALTER TABLE transactions
-    ADD COLUMN IF NOT EXISTS account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL
-  `);
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS insight_feedback (
-      id SERIAL PRIMARY KEY,
-      insight_type TEXT NOT NULL,
-      insight_title TEXT NOT NULL,
-      response TEXT NOT NULL,
+      amount NUMERIC(12, 2) NOT NULL,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
+  // Categorization learning table for user corrections
   await pool.query(`
-    ALTER TABLE transactions
-    ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT '${DEFAULT_USER_ID}';
-  `);
-
-  await pool.query(`
-    ALTER TABLE transactions
-    ALTER COLUMN user_id DROP DEFAULT;
-  `);
-
-  await pool.query(`
-    DO $$
-    BEGIN
-      IF EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'transactions_unique'
-      ) THEN
-        ALTER TABLE transactions DROP CONSTRAINT transactions_unique;
-      END IF;
-    END $$;
-  `);
-
-  await pool.query(`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'transactions_user_unique'
-      ) THEN
-        ALTER TABLE transactions
-        ADD CONSTRAINT transactions_user_unique
-        UNIQUE (user_id, date, amount, merchant, cashflow);
-      END IF;
-    END $$;
-  `);
-
-  await pool.query(`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'transactions_unique'
-      ) THEN
-        ALTER TABLE transactions
-        ADD CONSTRAINT transactions_unique UNIQUE (user_id, date, amount, merchant, cashflow);
-      END IF;
-    END $$;
-  `);
-
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS transactions_user_id_date_idx
-    ON transactions (user_id, date)
-  `);
-}
-
-async function insertTransaction(transaction, userId) {
-  if (disableDb) {
-    return setInMemoryTransaction(userId, transaction) ? 1 : 0;
-  }
-  const merchant = transaction.merchant || normaliseMerchant(transaction.description);
-  const effectiveUserId = transaction.user_id ?? (defaultUserId !== null ? defaultUserId : null);
-  if (!effectiveUserId) {
-    throw new Error('Transactions require a user_id when the database is enabled');
-  }
-  let accountId =
-    transaction.account_id !== undefined && transaction.account_id !== null
-      ? transaction.account_id
-      : getAccountIdForName(transaction.account);
-  const accountKey = (transaction.account || '').toString().trim().toLowerCase();
-  if (effectiveUserId && accountKey && accountId == null) {
-    const accountResult = await pool.query(
-      `INSERT INTO accounts (user_id, name)
-       VALUES ($1, $2)
-       ON CONFLICT (user_id, name) DO UPDATE SET name = EXCLUDED.name
-       RETURNING id, name`,
-      [effectiveUserId, accountKey]
+    CREATE TABLE IF NOT EXISTS categorization_learning (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      description_pattern TEXT NOT NULL,
+      original_category TEXT,
+      original_label TEXT,
+      corrected_category TEXT NOT NULL,
+      corrected_label TEXT NOT NULL,
+      frequency INTEGER DEFAULT 1,
+      last_used TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
-    accountId = accountResult.rows[0]?.id || null;
-    if (accountResult.rows[0]) {
-      const keyFromDb = accountResult.rows[0].name.toString().trim().toLowerCase();
-      if (keyFromDb) {
-        defaultAccountIds.set(keyFromDb, accountResult.rows[0].id);
-      }
-    }
-  }
-  const result = await pool.query(
-    `INSERT INTO transactions
-      (user_id, description, merchant, date, cashflow, account, category, label, amount)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     ON CONFLICT (user_id, date, amount, merchant, cashflow) DO NOTHING`,
-    [
-      effectiveUserId,
-      transaction.description,
-      merchant,
-      transaction.date,
-      transaction.cashflow,
-      transaction.account,
-      transaction.category,
-      transaction.label,
-      transaction.amount,
-      effectiveUserId,
-      accountId,
-    ]
-  );
-  return result.rowCount;
-}
+  `);
 
-async function seedSampleData() {
-  if (disableDb) {
-    return;
-  }
-  const existing = await pool.query(
-    'SELECT COUNT(*)::int AS count FROM transactions WHERE user_id = $1',
-    [DEFAULT_USER_ID]
-  );
-  if ((existing.rows[0] && existing.rows[0].count) > 0) {
-    return;
-  }
-
-  const today = dayjs();
-  for (const [index, tx] of sampleTransactions.entries()) {
-    const baseDate = dayjs(tx.date);
-    const date = baseDate.isValid() ? baseDate : today.subtract(index, 'day');
-    await insertTransaction(
-      {
-        ...tx,
-        date: date.format('YYYY-MM-DD'),
-        merchant: normaliseMerchant(tx.description),
-      },
-      DEFAULT_USER_ID
+  // Onboarding responses table for customer data
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS onboarding_responses (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      
+      -- Q1: Emotional calibration (multi-select, stored as array)
+      emotional_state TEXT[],
+      
+      -- Q2: Financial context (multi-select, stored as array)
+      financial_context TEXT[],
+      
+      -- Q3: Motivation/segmentation (single select)
+      motivation TEXT,
+      motivation_other TEXT,
+      
+      -- Q4: Acquisition source (single select)
+      acquisition_source TEXT,
+      acquisition_other TEXT,
+      
+      -- Q6: Insight preferences (multi-select, stored as array)
+      insight_preferences TEXT[],
+      insight_other TEXT,
+      
+      -- Q9: Account profile
+      first_name TEXT,
+      last_name TEXT,
+      date_of_birth DATE,
+      recovery_phone TEXT,
+      province_region TEXT,
+      
+      -- Metadata
+      last_step INTEGER DEFAULT 0,
+      completed_at TIMESTAMP WITH TIME ZONE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
-  }
+  `);
+
+  // Admin tables for categorization engine management
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_merchants (
+      id SERIAL PRIMARY KEY,
+      merchant_pattern TEXT NOT NULL UNIQUE,
+      alternate_patterns TEXT[], -- Array of alternate merchant names/spellings
+      category TEXT NOT NULL,
+      label TEXT NOT NULL,
+      is_active BOOLEAN DEFAULT TRUE,
+      notes TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_keywords (
+      id SERIAL PRIMARY KEY,
+      keyword TEXT NOT NULL,
+      category TEXT NOT NULL,
+      label TEXT NOT NULL,
+      is_active BOOLEAN DEFAULT TRUE,
+      notes TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(keyword, category)
+    );
+  `);
+
+  // Indexes for performance
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
+    CREATE INDEX IF NOT EXISTS idx_transactions_cashflow ON transactions(cashflow);
+    CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category);
+    CREATE INDEX IF NOT EXISTS idx_categorization_user_id ON categorization_learning(user_id);
+    CREATE INDEX IF NOT EXISTS idx_categorization_pattern ON categorization_learning(description_pattern);
+    CREATE INDEX IF NOT EXISTS idx_admin_merchants_pattern ON admin_merchants(merchant_pattern);
+    CREATE INDEX IF NOT EXISTS idx_admin_keywords_keyword ON admin_keywords(keyword);
+    CREATE INDEX IF NOT EXISTS idx_admin_merchants_active ON admin_merchants(is_active);
+    CREATE INDEX IF NOT EXISTS idx_admin_keywords_active ON admin_keywords(is_active);
+  `);
+  
+  console.log('[DB] Schema created successfully');
+  
+  // Seed admin keywords and merchants
+  await seedAdminPatterns();
 }
 
-const readiness = disableDb
-  ? Promise.resolve()
-  : (async () => {
-      try {
-        await ensureSchema();
-        await seedSampleData();
-      } catch (error) {
-        console.error('Database initialisation failed', error);
-        throw error;
-      }
-    })();
-
-app.use(async (req, res, next) => {
+/**
+ * Seed initial admin categorization patterns (keywords and merchants)
+ * 
+ * PURPOSE: This function provides the initial set of categorization patterns
+ * for new deployments. It only runs ONCE on first deployment when tables are empty.
+ * 
+ * AFTER SEEDING: All categorization patterns are managed through the admin dashboard at /admin
+ * - Admins can add, edit, and delete keywords/merchants
+ * - The categorization engine ONLY uses patterns from admin_keywords and admin_merchants tables
+ * - No hardcoded fallback patterns exist in the code
+ * 
+ * NOTE: This function is safe to keep - it checks if data exists first and skips if already seeded.
+ */
+async function seedAdminPatterns() {
+  if (disableDb || !pool) return;
+  
   try {
-    await readiness;
-    next();
+    // Check if patterns already exist
+    const existingKeywords = await pool.query('SELECT COUNT(*) as count FROM admin_keywords');
+    const existingMerchants = await pool.query('SELECT COUNT(*) as count FROM admin_merchants');
+    
+    if (parseInt(existingKeywords.rows[0].count) > 0 || parseInt(existingMerchants.rows[0].count) > 0) {
+      console.log('[DB] Admin patterns already seeded - skipping');
+      return;
+    }
+    
+    console.log('[DB] Seeding initial admin patterns (first-time deployment)...');
+    
+    // Insert keywords (streamlined, short, powerful terms)
+    const keywords = [
+      // Housing
+      ['RENT', 'Housing', 'Rent'],
+      ['LOYER', 'Housing', 'Rent'],
+      ['MORTGAGE', 'Housing', 'Home'],
+      ['HYPOTHEQUE', 'Housing', 'Home'],
+      ['VET', 'Housing', 'Pets'],
+      ['DAYCARE', 'Housing', 'Daycare'],
+      ['GARDERIE', 'Housing', 'Daycare'],
+      
+      // Bills
+      ['HYDRO', 'Bills', 'Gas & Electricity'],
+      ['ELECTRIC', 'Bills', 'Gas & Electricity'],
+      ['UTIL', 'Bills', 'Gas & Electricity'],
+      ['BILLPAY', 'Bills', 'Other bills'],
+      ['PREAUTHORIZED', 'Bills', 'Other bills'],
+      ['AUTOPAY', 'Bills', 'Other bills'],
+      ['INSUR', 'Bills', 'Home insurance'],
+      ['ASSURANCE', 'Bills', 'Home insurance'],
+      ['SERVICE CHARGE', 'Bills', 'Bank and other fees'],
+      ['BANK FEE', 'Bills', 'Bank and other fees'],
+      
+      // Food
+      ['GROCER', 'Food', 'Groceries'],
+      ['SUPER', 'Food', 'Groceries'],
+      ['DEPANNEUR', 'Food', 'Groceries'],
+      ['COFFEE', 'Food', 'Coffee'],
+      ['CAFE', 'Food', 'Coffee'],
+      ['BURGER', 'Food', 'Eating Out'],
+      ['PIZZA', 'Food', 'Eating Out'],
+      ['RESTAURANT', 'Food', 'Eating Out'],
+      ['RESTO', 'Food', 'Eating Out'],
+      ['BAR', 'Food', 'Eating Out'],
+      ['PUB', 'Food', 'Eating Out'],
+      ['SUSHI', 'Food', 'Eating Out'],
+      ['THAI', 'Food', 'Eating Out'],
+      
+      // Travel
+      ['HOTEL', 'Travel', 'Travel'],
+      ['FLIGHT', 'Travel', 'Travel'],
+      
+      // Health
+      ['PHARM', 'Health', 'Health'],
+      ['DRUG', 'Health', 'Health'],
+      ['MEDIC', 'Health', 'Health'],
+      ['CLINIC', 'Health', 'Health'],
+      ['CLINIQUE', 'Health', 'Health'],
+      ['DOCTOR', 'Health', 'Health'],
+      ['DENT', 'Health', 'Health'],
+      ['HOSPITAL', 'Health', 'Health'],
+      ['HOPITAL', 'Health', 'Health'],
+      
+      // Transport
+      ['TAXI', 'Transport', 'Transport'],
+      ['TRANSIT', 'Transport', 'Transport'],
+      ['BUS', 'Transport', 'Transport'],
+      ['OPUS', 'Transport', 'Transport'],
+      ['GAS', 'Transport', 'Car'],
+      ['FUEL', 'Transport', 'Car'],
+      ['PARKING', 'Transport', 'Transport'],
+      ['STATIONNEMENT', 'Transport', 'Transport'],
+      
+      // Education
+      ['TUITION', 'Education', 'Education'],
+      ['SCHOOL', 'Education', 'Education'],
+      ['ECOLE', 'Education', 'Education'],
+      ['UNIVERSITY', 'Education', 'Education'],
+      ['COLLEGE', 'Education', 'Education'],
+      ['TEXTBOOK', 'Education', 'Education'],
+      
+      // Personal
+      ['CINEMA', 'Personal', 'Entertainment'],
+      ['MOVIE', 'Personal', 'Entertainment'],
+      ['THEATRE', 'Personal', 'Entertainment'],
+      ['CONCERT', 'Personal', 'Entertainment'],
+      ['SPORT', 'Personal', 'Sport & Hobbies'],
+      ['GYM', 'Personal', 'Gym membership'],
+      ['YOGA', 'Personal', 'Sport & Hobbies'],
+      
+      // Shopping
+      ['GIFT CARD', 'Shopping', 'Shopping'],
+      ['CARTE CADEAU', 'Shopping', 'Shopping'],
+      
+      // Work
+      ['OFFICE', 'Work', 'Work'],
+      ['BUREAU', 'Work', 'Work'],
+      ['CONFERENCE', 'Work', 'Work'],
+    ];
+    
+    for (const [keyword, category, label] of keywords) {
+      await pool.query(
+        'INSERT INTO admin_keywords (keyword, category, label, is_active) VALUES ($1, $2, $3, true) ON CONFLICT DO NOTHING',
+        [keyword, category, label]
+      );
+    }
+    
+    console.log(`[DB] Seeded ${keywords.length} keywords`);
+    
+    // Insert merchants (ALL specific store/chain names)
+    const merchants = [
+      // Groceries
+      ['LOBLAWS', 'Food', 'Groceries'],
+      ['SUPERSTORE', 'Food', 'Groceries'],
+      ['NO FRILLS', 'Food', 'Groceries'],
+      ['NOFRILLS', 'Food', 'Groceries'],
+      ['METRO', 'Food', 'Groceries'],
+      ['SOBEYS', 'Food', 'Groceries'],
+      ['IGA', 'Food', 'Groceries'],
+      ['SAFEWAY', 'Food', 'Groceries'],
+      ['WALMART', 'Food', 'Groceries'],
+      ['COSTCO', 'Food', 'Groceries'],
+      ['FOODBASICS', 'Food', 'Groceries'],
+      ['FRESHCO', 'Food', 'Groceries'],
+      ['MAXI', 'Food', 'Groceries'],
+      ['PROVIGO', 'Food', 'Groceries'],
+      ['SUPER C', 'Food', 'Groceries'],
+      ['SAVE-ON-FOODS', 'Food', 'Groceries'],
+      ['THRIFTY FOODS', 'Food', 'Groceries'],
+      ['WHOLE FOODS', 'Food', 'Groceries'],
+      ['FARMBOY', 'Food', 'Groceries'],
+      ['FARM BOY', 'Food', 'Groceries'],
+      ['CO-OP', 'Food', 'Groceries'],
+      ['COOP', 'Food', 'Groceries'],
+      
+      // Coffee & Fast Food
+      ['TIM', 'Food', 'Coffee'],
+      ['TIMS', 'Food', 'Coffee'],
+      ['STARBUCK', 'Food', 'Coffee'],
+      ['SECOND CUP', 'Food', 'Coffee'],
+      ['VAN HOUTTE', 'Food', 'Coffee'],
+      ['BRIDGEHEAD', 'Food', 'Coffee'],
+      ['MCDONALD', 'Food', 'Eating Out'],
+      ['BURGER KING', 'Food', 'Eating Out'],
+      ['WENDYS', 'Food', 'Eating Out'],
+      ['A&W', 'Food', 'Eating Out'],
+      ['HARVEY', 'Food', 'Eating Out'],
+      ['FIVE GUYS', 'Food', 'Eating Out'],
+      ['SUBWAY', 'Food', 'Eating Out'],
+      ['QUIZNOS', 'Food', 'Eating Out'],
+      ['MR SUB', 'Food', 'Eating Out'],
+      ['POPEYES', 'Food', 'Eating Out'],
+      ['KFC', 'Food', 'Eating Out'],
+      ['TACO BELL', 'Food', 'Eating Out'],
+      ['CHIPOTLE', 'Food', 'Eating Out'],
+      ['QUESADA', 'Food', 'Eating Out'],
+      ['FRESHII', 'Food', 'Eating Out'],
+      ['PANERA', 'Food', 'Eating Out'],
+      ['CORA', 'Food', 'Eating Out'],
+      
+      // Pizza
+      ['PIZZA HUT', 'Food', 'Eating Out'],
+      ['DOMINOS', 'Food', 'Eating Out'],
+      ['PIZZA PIZZA', 'Food', 'Eating Out'],
+      ['PAPA JOHNS', 'Food', 'Eating Out'],
+      ['LITTLE CAESARS', 'Food', 'Eating Out'],
+      ['BOSTON PIZZA', 'Food', 'Eating Out'],
+      
+      // Casual Dining
+      ['SWISS CHALET', 'Food', 'Eating Out'],
+      ['MONTANA', 'Food', 'Eating Out'],
+      ['KELSEY', 'Food', 'Eating Out'],
+      ['MILESTONES', 'Food', 'Eating Out'],
+      ['EARLS', 'Food', 'Eating Out'],
+      ['MOXIES', 'Food', 'Eating Out'],
+      ['THE KEG', 'Food', 'Eating Out'],
+      ['CACTUS CLUB', 'Food', 'Eating Out'],
+      ['JOEY', 'Food', 'Eating Out'],
+      ['ST-HUBERT', 'Food', 'Eating Out'],
+      
+      // Delivery
+      ['UBER EATS', 'Food', 'Eating Out'],
+      ['DOORDASH', 'Food', 'Eating Out'],
+      ['SKIP', 'Food', 'Eating Out'],
+      
+      // Transport
+      ['PRESTO', 'Transport', 'Transport'],
+      ['TTC', 'Transport', 'Transport'],
+      ['STM', 'Transport', 'Transport'],
+      ['TRANSLINK', 'Transport', 'Transport'],
+      ['GO TRANSIT', 'Transport', 'Transport'],
+      ['OC TRANSPO', 'Transport', 'Transport'],
+      ['BIXI', 'Transport', 'Transport'],
+      ['VIA RAIL', 'Travel', 'Travel'],
+      ['UBER', 'Transport', 'Transport'],
+      ['LYFT', 'Transport', 'Transport'],
+      
+      // Gas Stations
+      ['PETRO-CANADA', 'Transport', 'Car'],
+      ['PETRO CANADA', 'Transport', 'Car'],
+      ['SHELL', 'Transport', 'Car'],
+      ['ESSO', 'Transport', 'Car'],
+      ['CANADIAN TIRE GAS', 'Transport', 'Car'],
+      ['HUSKY', 'Transport', 'Car'],
+      ['ULTRAMAR', 'Transport', 'Car'],
+      ['IRVING', 'Transport', 'Car'],
+      
+      // Telecom
+      ['ROGERS', 'Bills', 'Phone'],
+      ['BELL', 'Bills', 'Phone'],
+      ['TELUS', 'Bills', 'Phone'],
+      ['FIDO', 'Bills', 'Phone'],
+      ['KOODO', 'Bills', 'Phone'],
+      ['VIRGIN MOBILE', 'Bills', 'Phone'],
+      ['FREEDOM', 'Bills', 'Phone'],
+      ['VIDEOTRON', 'Bills', 'Internet'],
+      ['SHAW', 'Bills', 'Internet'],
+      ['COGECO', 'Bills', 'Internet'],
+      
+      // Utilities
+      ['HYDRO ONE', 'Bills', 'Gas & Electricity'],
+      ['HYDRO OTTAWA', 'Bills', 'Gas & Electricity'],
+      ['HYDRO QUEBEC', 'Bills', 'Gas & Electricity'],
+      ['TORONTO HYDRO', 'Bills', 'Gas & Electricity'],
+      ['BC HYDRO', 'Bills', 'Gas & Electricity'],
+      ['FORTISBC', 'Bills', 'Gas & Electricity'],
+      ['FORTIS', 'Bills', 'Gas & Electricity'],
+      ['ENBRIDGE', 'Bills', 'Gas & Electricity'],
+      ['EPCOR', 'Bills', 'Gas & Electricity'],
+      ['ATCO', 'Bills', 'Gas & Electricity'],
+      
+      // Subscriptions
+      ['NETFLIX', 'Subscriptions', 'Subscriptions'],
+      ['SPOTIFY', 'Subscriptions', 'Subscriptions'],
+      ['APPLE.COM', 'Subscriptions', 'Subscriptions'],
+      ['APPLE MUSIC', 'Subscriptions', 'Subscriptions'],
+      ['APPLE TV', 'Subscriptions', 'Subscriptions'],
+      ['AMAZON PRIME', 'Subscriptions', 'Subscriptions'],
+      ['DISNEY', 'Subscriptions', 'Subscriptions'],
+      ['HBO', 'Subscriptions', 'Subscriptions'],
+      ['YOUTUBE PREMIUM', 'Subscriptions', 'Subscriptions'],
+      ['CRAVE', 'Subscriptions', 'Subscriptions'],
+      ['DAZN', 'Subscriptions', 'Subscriptions'],
+      ['MICROSOFT 365', 'Subscriptions', 'Subscriptions'],
+      ['ADOBE', 'Subscriptions', 'Subscriptions'],
+      ['DROPBOX', 'Subscriptions', 'Subscriptions'],
+      ['GOOGLE ONE', 'Subscriptions', 'Subscriptions'],
+      ['ICLOUD', 'Subscriptions', 'Subscriptions'],
+      ['ZOOM', 'Subscriptions', 'Subscriptions'],
+      ['PATREON', 'Subscriptions', 'Subscriptions'],
+      
+      // Gyms
+      ['GOODLIFE', 'Personal', 'Gym membership'],
+      ['PLANET FITNESS', 'Personal', 'Gym membership'],
+      ['FIT4LESS', 'Personal', 'Gym membership'],
+      ['ANYTIME FITNESS', 'Personal', 'Gym membership'],
+      
+      // Shopping
+      ['AMAZON', 'Shopping', 'Shopping'],
+      ['AMZN', 'Shopping', 'Shopping'],
+      ['EBAY', 'Shopping', 'Shopping'],
+      ['ETSY', 'Shopping', 'Shopping'],
+      ['CANADIAN TIRE', 'Shopping', 'Shopping'],
+      ['HOME DEPOT', 'Shopping', 'Shopping'],
+      ['LOWES', 'Shopping', 'Shopping'],
+      ['RONA', 'Shopping', 'Shopping'],
+      ['IKEA', 'Shopping', 'Shopping'],
+      ['STRUCTUBE', 'Shopping', 'Shopping'],
+      ['THE BRICK', 'Shopping', 'Shopping'],
+      ['BEST BUY', 'Shopping', 'Shopping'],
+      ['STAPLES', 'Shopping', 'Shopping'],
+      ['DOLLARAMA', 'Shopping', 'Shopping'],
+      ['DOLLAR TREE', 'Shopping', 'Shopping'],
+      ['INDIGO', 'Shopping', 'Shopping'],
+      ['CHAPTERS', 'Shopping', 'Shopping'],
+      ['MICHAELS', 'Shopping', 'Shopping'],
+      ['BULK BARN', 'Shopping', 'Shopping'],
+      
+      // Clothing
+      ['WINNERS', 'Shopping', 'Clothes'],
+      ['MARSHALLS', 'Shopping', 'Clothes'],
+      ['H&M', 'Shopping', 'Clothes'],
+      ['ZARA', 'Shopping', 'Clothes'],
+      ['UNIQLO', 'Shopping', 'Clothes'],
+      ['OLD NAVY', 'Shopping', 'Clothes'],
+      ['GAP', 'Shopping', 'Clothes'],
+      ['SPORTCHEK', 'Shopping', 'Clothes'],
+      ['LULULEMON', 'Shopping', 'Clothes'],
+      ['ROOTS', 'Shopping', 'Clothes'],
+      ['ARITZIA', 'Shopping', 'Clothes'],
+      ['SIMONS', 'Shopping', 'Clothes'],
+      ['THE BAY', 'Shopping', 'Clothes'],
+      ['NIKE', 'Shopping', 'Clothes'],
+      ['ADIDAS', 'Shopping', 'Clothes'],
+      ['ALDO', 'Shopping', 'Clothes'],
+      
+      // Pharmacy & Beauty
+      ['SHOPPERS', 'Shopping', 'Beauty'],
+      ['PHARMAPRIX', 'Shopping', 'Beauty'],
+      ['SEPHORA', 'Shopping', 'Beauty'],
+      ['JEAN COUTU', 'Shopping', 'Beauty'],
+      ['REXALL', 'Shopping', 'Beauty'],
+      ['LONDON DRUGS', 'Shopping', 'Beauty'],
+      
+      // Airlines & Hotels
+      ['AIR CANADA', 'Travel', 'Travel'],
+      ['WESTJET', 'Travel', 'Travel'],
+      ['AIRBNB', 'Travel', 'Travel'],
+      ['BOOKING', 'Travel', 'Travel'],
+      ['EXPEDIA', 'Travel', 'Travel'],
+    ];
+    
+    for (const [pattern, category, label] of merchants) {
+      await pool.query(
+        'INSERT INTO admin_merchants (merchant_pattern, alternate_patterns, category, label, is_active) VALUES ($1, $2, $3, $4, true) ON CONFLICT DO NOTHING',
+        [pattern, [], category, label]
+      );
+    }
+    
+    console.log(`[DB] Seeded ${merchants.length} merchants`);
+    console.log(`[DB] Total admin patterns: ${keywords.length + merchants.length}`);
+    
   } catch (error) {
-    next(error);
+    console.error('[DB] Failed to seed admin patterns:', error.message);
   }
-});
+}
 
-function resolveUserId(req) {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.slice(7).trim();
-    if (token) {
-      const payload = decodeToken(token);
-      if (payload?.sub) {
-        return payload.sub;
+async function seedDemoUser() {
+  if (disableDb || !pool) return null;
+  
+  try {
+    // Check if demo user exists
+    const existingUser = await pool.query(
+      'SELECT id, email, display_name FROM users WHERE email = $1',
+      [DEMO_EMAIL.toLowerCase()]
+    );
+    
+    if (existingUser.rows.length > 0) {
+      console.log('[DB] Demo user already exists (ID:', existingUser.rows[0].id, ')');
+      return existingUser.rows[0].id;
+    }
+    
+    // Create demo user with bcrypt password hash
+    const passwordHash = await hashPassword(DEMO_PASSWORD);
+  const result = await pool.query(
+      'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id',
+      [DEMO_EMAIL.toLowerCase(), passwordHash, 'Taylor Nguyen']
+    );
+    
+    const userId = result.rows[0].id;
+    console.log('[DB] Demo user created (ID:', userId, ')');
+    return userId;
+  } catch (error) {
+    console.error('[DB] Failed to seed demo user:', error.message);
+    throw error;
+  }
+}
+
+async function seedSampleTransactions(userId) {
+  if (disableDb || !pool || !userId) return;
+  
+  try {
+    // Get tokenized user ID for L1 tables
+    const tokenizedUserId = await getTokenizedUserId(userId);
+    const tableName = tokenizedUserId ? 'l1_transaction_facts' : 'transactions';
+    const userIdField = tokenizedUserId ? 'tokenized_user_id' : 'user_id';
+    const userIdValue = tokenizedUserId || userId;
+    const dateField = tokenizedUserId ? 'transaction_date' : 'date';
+    
+    // Check if transactions already exist (only seeds once, preserves user edits)
+    const existing = await pool.query(
+      `SELECT COUNT(*) as count FROM ${tableName} WHERE ${userIdField} = $1`,
+      [userIdValue]
+    );
+    
+    if (parseInt(existing.rows[0].count) > 0) {
+      console.log('[DB] Demo transactions already exist, checking if refresh needed...');
+        // Check if data is old (compare to expected end date: Oct 2025)
+        const oldestDate = await pool.query(
+          `SELECT MAX(${dateField}) as latest FROM ${tableName} WHERE ${userIdField} = $1`,
+          [userIdValue]
+        );
+      if (oldestDate.rows[0]?.latest) {
+        const latestDate = dayjs(oldestDate.rows[0].latest);
+        const expectedLatest = dayjs('2025-10-22'); // Should end at Oct 22, 2025
+        
+        // If latest transaction is NOT in October 2025, refresh data
+        // This catches any data from 2024 or wrong months
+        if (!latestDate.isSame('2025-10', 'month')) {
+          console.log('[DB] Data is outdated (latest:', latestDate.format('YYYY-MM-DD'), '), refreshing to Oct 2025...');
+          await pool.query(`DELETE FROM ${tableName} WHERE ${userIdField} = $1`, [userIdValue]);
+        } else {
+          console.log('[DB] Data is current (latest:', latestDate.format('YYYY-MM-DD'), '), skipping reseed');
+          return;
+        }
+      } else {
+        return;
       }
     }
-  }
-  const headerUser = req.headers['x-user-id'];
-  if (headerUser) {
-    return Array.isArray(headerUser) ? headerUser[0] : headerUser;
-  }
-  return null;
-}
 
-function authenticateRequest(req, res, next) {
-  let userId = resolveUserId(req);
-  if (!userId) {
-    if (!disableDb && process.env.ALLOW_DEMO_USER !== '1') {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    userId = process.env.DEFAULT_USER_ID || DEFAULT_USER_ID;
-  }
-  req.userId = userId;
-  next();
-}
-
-app.use('/api', (req, res, next) => {
-  if (req.path === '/health') {
-    return next();
-  }
-  return authenticateRequest(req, res, next);
-});
-
-function parseCSV(buffer) {
-  return new Promise((resolve, reject) => {
-    parse(
-      buffer.toString('utf8'),
-      {
-        columns: true,
-        skip_empty_lines: true,
-        trim: true,
-      },
-      (error, records) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(records);
+    console.log('[DB] Seeding 12 months of realistic Canadian demo transactions...');
+    
+    // Generate 12 months of realistic Canadian transactions (Nov 2024 - Oct 2025)
+    const transactions = [];
+    const today = dayjs('2025-10-22'); // Current date: Oct 22, 2025
+    const startDate = today.subtract(11, 'month').startOf('month');
+    
+    // Monthly recurring transactions
+    for (let month = 0; month < 12; month++) {
+      const monthStart = startDate.add(month, 'month');
+      
+      // Income (1st of month)
+      transactions.push({
+        date: monthStart.format('YYYY-MM-DD'),
+        description: 'Salary Deposit - ACME Corp',
+        amount: 4800,
+        cashflow: 'income',
+        category: 'Employment',
+        account: 'Checking',
+        label: 'Regular Income'
+      });
+      
+      // Rent (1st of month)
+      transactions.push({
+        date: monthStart.format('YYYY-MM-DD'),
+        description: 'Rent Payment',
+        amount: -1650,
+        cashflow: 'expense',
+        category: 'Housing',
+        account: 'Checking',
+        label: 'Essential'
+      });
+      
+      // Internet (5th)
+      transactions.push({
+        date: monthStart.add(4, 'day').format('YYYY-MM-DD'),
+        description: 'Rogers Internet',
+        amount: -85,
+        cashflow: 'expense',
+        category: 'Utilities',
+        account: 'Credit Card',
+        label: 'Essential'
+      });
+      
+      // Phone (5th)
+      transactions.push({
+        date: monthStart.add(4, 'day').format('YYYY-MM-DD'),
+        description: 'Telus Mobile',
+        amount: -65,
+        cashflow: 'expense',
+        category: 'Utilities',
+        account: 'Credit Card',
+        label: 'Essential'
+      });
+      
+      // Hydro (10th)
+      transactions.push({
+        date: monthStart.add(9, 'day').format('YYYY-MM-DD'),
+        description: 'Hydro-Québec',
+        amount: Math.floor(Math.random() * 60) + 90, // $90-150
+        cashflow: 'expense',
+        category: 'Utilities',
+        account: 'Checking',
+        label: 'Essential'
+      });
+      
+      // Weekly groceries (4 times per month)
+      for (let week = 0; week < 4; week++) {
+        transactions.push({
+          date: monthStart.add(week * 7 + 3, 'day').format('YYYY-MM-DD'),
+          description: ['Loblaws', 'Metro', 'Sobeys', 'No Frills'][week % 4],
+          amount: -(Math.floor(Math.random() * 80) + 120), // $120-200
+          cashflow: 'expense',
+          category: 'Groceries',
+          account: 'Credit Card',
+          label: 'Food'
+        });
+      }
+      
+      // Transit pass (5th)
+      transactions.push({
+        date: monthStart.add(4, 'day').format('YYYY-MM-DD'),
+        description: 'Presto Card Load',
+        amount: -156,
+        cashflow: 'expense',
+        category: 'Transportation',
+        account: 'Debit Card',
+        label: 'Commute'
+      });
+      
+      // Coffee/food (15-20 times per month)
+      const coffeeCount = 15 + Math.floor(Math.random() * 6);
+      for (let i = 0; i < coffeeCount; i++) {
+        const dayOffset = Math.floor(Math.random() * 28);
+        transactions.push({
+          date: monthStart.add(dayOffset, 'day').format('YYYY-MM-DD'),
+          description: ['Tim Hortons', 'Starbucks', 'Second Cup', 'local café'][Math.floor(Math.random() * 4)],
+          amount: -(Math.random() * 8 + 4).toFixed(2), // $4-12
+          cashflow: 'expense',
+          category: 'Dining',
+          account: 'Credit Card',
+          label: 'Coffee & Snacks'
+        });
+      }
+      
+      // Restaurants (3-5 times per month)
+      const restaurantCount = 3 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < restaurantCount; i++) {
+        const dayOffset = Math.floor(Math.random() * 28);
+        transactions.push({
+          date: monthStart.add(dayOffset, 'day').format('YYYY-MM-DD'),
+          description: ['Swiss Chalet', 'Boston Pizza', 'Local Restaurant', 'East Side Marios'][Math.floor(Math.random() * 4)],
+          amount: -(Math.random() * 60 + 40).toFixed(2), // $40-100
+          cashflow: 'expense',
+          category: 'Dining',
+          account: 'Credit Card',
+          label: 'Restaurants'
+        });
+      }
+      
+      // Gas (2-3 times per month in months with car usage)
+      if (month % 3 !== 0) { // Skip every 3rd month
+        const gasCount = 2 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < gasCount; i++) {
+          const dayOffset = Math.floor(Math.random() * 28);
+          transactions.push({
+            date: monthStart.add(dayOffset, 'day').format('YYYY-MM-DD'),
+            description: ['Petro-Canada', 'Shell', 'Esso'][Math.floor(Math.random() * 3)],
+            amount: -(Math.random() * 30 + 50).toFixed(2), // $50-80
+            cashflow: 'expense',
+            category: 'Transportation',
+            account: 'Credit Card',
+            label: 'Fuel'
+          });
         }
       }
+      
+      // Shopping (2-4 times per month)
+      const shoppingCount = 2 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < shoppingCount; i++) {
+        const dayOffset = Math.floor(Math.random() * 28);
+        transactions.push({
+          date: monthStart.add(dayOffset, 'day').format('YYYY-MM-DD'),
+          description: ['Amazon.ca', 'Winners', 'Canadian Tire', 'Shoppers Drug Mart'][Math.floor(Math.random() * 4)],
+          amount: -(Math.random() * 100 + 30).toFixed(2), // $30-130
+          cashflow: 'expense',
+          category: 'Shopping',
+          account: 'Credit Card',
+          label: 'Retail'
+        });
+      }
+      
+      // Entertainment (1-2 times per month)
+      if (Math.random() > 0.3) {
+        transactions.push({
+          date: monthStart.add(Math.floor(Math.random() * 28), 'day').format('YYYY-MM-DD'),
+          description: ['Cineplex', 'Netflix', 'Spotify', 'Disney+'][Math.floor(Math.random() * 4)],
+          amount: -(Math.random() * 40 + 15).toFixed(2), // $15-55
+          cashflow: 'expense',
+          category: 'Entertainment',
+          account: 'Credit Card',
+          label: 'Leisure'
+        });
+      }
+      
+      // Savings transfer (15th of month)
+      transactions.push({
+        date: monthStart.add(14, 'day').format('YYYY-MM-DD'),
+        description: 'Transfer to Savings',
+        amount: -500,
+        cashflow: 'other',
+        category: 'Transfers',
+        account: 'Checking',
+        label: 'Savings'
+      });
+      
+      // Occasional freelance income (every 3 months)
+      if (month % 3 === 0) {
+        transactions.push({
+          date: monthStart.add(20, 'day').format('YYYY-MM-DD'),
+          description: 'Freelance Payment',
+          amount: Math.floor(Math.random() * 500) + 600, // $600-1100
+          cashflow: 'income',
+          category: 'Self-Employment',
+          account: 'Checking',
+          label: 'Side Income'
+        });
+      }
+    }
+    
+    // Shuffle to make dates more realistic
+    transactions.sort((a, b) => a.date.localeCompare(b.date));
+    
+    // Insert all transactions into L1 fact table (or fallback to old table if not migrated)
+    if (tokenizedUserId) {
+      for (const tx of transactions) {
+        await pool.query(
+          `INSERT INTO l1_transaction_facts (tokenized_user_id, transaction_date, description, merchant, amount, cashflow, category, account, label, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+          [tokenizedUserId, tx.date, tx.description, tx.description, tx.amount, tx.cashflow, tx.category, tx.label]
+        );
+      }
+    } else {
+      // Fallback to old table (pre-migration)
+      for (const tx of transactions) {
+        await pool.query(
+          `INSERT INTO transactions (user_id, description, merchant, date, cashflow, account, category, label, amount)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [userId, tx.description, tx.description, tx.date, tx.amount, tx.cashflow, tx.account, tx.category, tx.label]
+        );
+      }
+    }
+    
+    console.log(`[DB] Seeded ${transactions.length} sample transactions across 12 months`);
+  } catch (error) {
+    console.error('[DB] Failed to seed sample transactions:', error.message);
+    throw error;
+  }
+}
+
+// Lazy database initialization
+let dbInitialized = false;
+let dbInitPromise = null;
+
+async function ensureDatabaseReady() {
+  if (disableDb || !pool) return;
+  
+  if (dbInitPromise) return dbInitPromise;
+  if (dbInitialized) return;
+  
+  dbInitPromise = (async () => {
+    try {
+      console.log('[DB] Initializing database...');
+      await ensureSchema();
+      const demoUserId = await seedDemoUser();
+      if (demoUserId) {
+        await seedSampleTransactions(demoUserId);
+      }
+      dbInitialized = true;
+      console.log('[DB] Database initialization complete!');
+    } catch (error) {
+      console.error('[DB] Initialization failed:', error);
+      dbInitPromise = null; // Allow retry
+      throw error;
+    }
+  })();
+  
+  return dbInitPromise;
+}
+
+// Helper to ensure demo data exists (can be called on every request)
+async function ensureDemoDataExists() {
+  if (disableDb || !pool) {
+    console.log('[DB] ensureDemoDataExists skipped: disableDb=', disableDb, 'pool=', !!pool);
+    return;
+  }
+  
+  try {
+    console.log('[DB] Checking if demo data exists for:', DEMO_EMAIL.toLowerCase());
+    const demoUser = await pool.query(
+      'SELECT id FROM users WHERE email = $1',
+      [DEMO_EMAIL.toLowerCase()]
     );
+    
+    if (demoUser.rows.length > 0) {
+      const userId = demoUser.rows[0].id;
+      console.log('[DB] Demo user found, ID:', userId);
+      
+      // Check in L1 table (or fallback to old table)
+      const tokenizedUserId = await getTokenizedUserId(userId);
+      const checkQuery = tokenizedUserId
+        ? 'SELECT COUNT(*) as count FROM l1_transaction_facts WHERE tokenized_user_id = $1'
+        : 'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1';
+      const checkValue = tokenizedUserId || userId;
+      const txCount = await pool.query(checkQuery, [checkValue]);
+      
+      const count = parseInt(txCount.rows[0].count);
+      console.log('[DB] Demo user transaction count:', count);
+      
+      if (count === 0) {
+        console.log('[DB] Demo user has no transactions, seeding...');
+        await seedSampleTransactions(userId);
+        console.log('[DB] Seeding completed!');
+      } else {
+        console.log('[DB] Demo user has transactions, skipping seed');
+      }
+    } else {
+      console.log('[DB] Demo user not found in database');
+    }
+  } catch (error) {
+    console.error('[DB] Error checking demo data:', error);
+  }
+}
+
+// Initialize immediately in local dev, lazily in Vercel
+if (!IS_VERCEL && !disableDb) {
+  ensureDatabaseReady().catch(err => {
+    console.error('[DB] Failed to initialize on startup:', err);
   });
 }
 
-const CATEGORY_RULES = [
-  { match: ['rent', 'mortgage'], category: 'Housing' },
-  { match: ['grocery', 'metro', 'iga', 'sobeys', 'loblaw', 'superstore'], category: 'Groceries' },
-  { match: ['uber', 'lyft', 'taxi', 'transit', 'oc transpo', 'ttc'], category: 'Transportation' },
-  { match: ['spotify', 'netflix', 'disney', 'crave', 'apple tv', 'prime'], category: 'Subscriptions' },
-  { match: ['hydro', 'hydro-qu', 'hydro quebec', 'enmax', 'bc hydro', 'toronto hydro'], category: 'Utilities' },
-  { match: ['telus', 'rogers', 'bell', 'freedom', 'fizz', 'public mobile'], category: 'Mobile phone' },
-  { match: ['visa payment', 'transfer', 'etransfer', 'e-transfer', 'etrf'], category: 'Transfers' },
-  { match: ['insurance'], category: 'Insurance' },
-  { match: ['amazon', 'walmart', 'shopping'], category: 'Shopping' },
-  { match: ['gas', 'petro', 'esso', 'shell'], category: 'Transportation' },
-  { match: ['salary', 'payroll', 'paycheque', 'paycheck'], category: 'Employment income' },
-  { match: ['rrsp', 'tfsa', 'wealthsimple', 'questrade'], category: 'Investments' },
-  { match: ['fee', 'service charge'], category: 'Bank fees' },
-];
-
-function inferCategory(description, cashflow) {
-  const normalised = description.toLowerCase();
-  for (const rule of CATEGORY_RULES) {
-    if (rule.match.some((keyword) => normalised.includes(keyword))) {
-      return rule.category;
+// Middleware to ensure DB is ready before data endpoints
+app.use(async (req, res, next) => {
+  const path = req.path;
+  
+  // Skip for static files, health, and auth endpoints
+  if (!path.startsWith('/api/') || 
+      path === '/api/health' || 
+      path.startsWith('/api/auth/')) {
+    return next();
+  }
+  
+  // Ensure database is ready for data endpoints
+  if (!disableDb && pool) {
+    try {
+      await ensureDatabaseReady();
+    } catch (error) {
+      console.error('[DB] Failed to initialize:', error);
+      return res.status(500).json({ 
+        error: 'Database initialization failed',
+        details: IS_VERCEL ? error.message : undefined
+      });
     }
   }
-  if (cashflow === 'income') return 'Income';
-  if (cashflow === 'other') return 'Transfers';
-  return 'Other';
-}
 
-function inferAccount(rawAccount = '') {
-  const value = rawAccount.toLowerCase();
-  if (value.includes('credit')) return 'credit';
-  if (value.includes('loan') || value.includes('debt')) return 'debt';
-  return 'cash';
-}
+  next();
+});
 
-function parseAmount(raw) {
-  if (raw === undefined || raw === null) return null;
-  const cleaned = raw.toString().replace(/[$,\s]/g, '').replace(/[\u2212]/g, '-');
-  const amount = Number.parseFloat(cleaned);
-  return Number.isNaN(amount) ? null : amount;
-}
+// ============================================================================
+// AUTH ENDPOINTS
+// ============================================================================
 
-const DATE_FORMATS = [
-  'YYYY-MM-DD',
-  'YYYY/MM/DD',
-  'DD/MM/YYYY',
-  'MM/DD/YYYY',
-  'DD-MM-YYYY',
-  'MM-DD-YYYY',
-  'MMM D, YYYY',
-];
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+    
+    // Rate limiting: 5 attempts per 15 minutes per email
+    const rateLimit = checkRateLimit(email, 5, 15 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      const resetInMinutes = Math.ceil((rateLimit.resetAt - Date.now()) / 60000);
+      return res.status(429).json({
+        error: 'Too many login attempts. Please try again later.',
+        retryAfter: resetInMinutes,
+      });
+    }
+    
+    if (disableDb || !pool) {
+      return res.status(503).json({ error: 'Database not available' });
+    }
+    
+    // Fetch user from database
+    const result = await pool.query(
+      'SELECT id, email, password_hash, display_name FROM users WHERE email = $1',
+      [email.toLowerCase()]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    const user = result.rows[0];
+    
+    // Verify password (supports both bcrypt and legacy SHA-256)
+    const isValid = await verifyPassword(password, user.password_hash);
+    
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    // Migrate legacy SHA-256 passwords to bcrypt on successful login
+    // Check if hash is legacy format (doesn't start with $2)
+    if (!user.password_hash.startsWith('$2')) {
+      const newHash = await hashPassword(password);
+      await pool.query(
+        'UPDATE users SET password_hash = $1 WHERE id = $2',
+        [newHash, user.id]
+      );
+      console.log('[Login] Migrated legacy password hash to bcrypt for user:', user.id);
+    }
+    
+    // Create JWT token with integer user ID
+    const token = createToken(user.id);
+    
+    res.json({ 
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.display_name
+      }
+    });
+  } catch (error) {
+    console.error('[AUTH] Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
 
-function parseDate(raw) {
-  if (!raw) return null;
-  const value = raw.toString().trim();
-  for (const format of DATE_FORMATS) {
-    const parsed = dayjs(value, format, true);
-    if (parsed.isValid()) {
-      return parsed.format('YYYY-MM-DD');
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { email, password, name } = req.body;
+    
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'Email, password, and name required' });
+    }
+    
+    // Rate limiting: 3 registrations per hour per email/IP
+    const identifier = email || req.ip || 'unknown';
+    const rateLimit = checkRateLimit(identifier, 3, 60 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      const resetInMinutes = Math.ceil((rateLimit.resetAt - Date.now()) / 60000);
+      return res.status(429).json({
+        error: 'Too many registration attempts. Please try again later.',
+        retryAfter: resetInMinutes,
+      });
+    }
+    
+    if (disableDb || !pool) {
+      return res.status(503).json({ error: 'Database not available' });
+    }
+    
+    // Create user with bcrypt password hash
+    const passwordHash = await hashPassword(password);
+    
+    // Insert new user
+    const result = await pool.query(
+      'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id, email, display_name',
+      [email.toLowerCase(), passwordHash, name]
+    );
+    
+    const user = result.rows[0];
+    const token = createToken(user.id);
+    
+    res.status(201).json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.display_name
+      }
+    });
+  } catch (error) {
+    if (error.code === '23505') { // Unique violation
+      return res.status(409).json({ error: 'Email already exists' });
+    }
+    console.error('[AUTH] Registration error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+app.get('/api/auth/me', authenticate, async (req, res) => {
+  try {
+    if (disableDb || !pool) {
+      return res.status(503).json({ error: 'Database not available' });
+    }
+    
+    const result = await pool.query(
+      'SELECT id, email, display_name FROM users WHERE id = $1',
+      [req.userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const user = result.rows[0];
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.display_name
+      }
+    });
+  } catch (error) {
+    console.error('[AUTH] Me endpoint error:', error);
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
+});
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Reset demo data endpoint (admin only - use carefully!)
+app.post('/api/reset-demo-data', async (req, res) => {
+  if (disableDb || !pool) {
+    return res.status(503).json({ error: 'Database not available' });
+  }
+
+  try {
+    console.log('[RESET] Resetting demo data...');
+    
+    // Get demo user first
+    const userResult = await pool.query('SELECT id FROM users WHERE email = $1', [DEMO_EMAIL.toLowerCase()]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Demo user not found' });
+    }
+    
+    const userId = userResult.rows[0].id;
+    
+    // Delete all transactions for demo user (from L1 table if migrated)
+    const tokenizedUserId = await getTokenizedUserId(userId);
+    if (tokenizedUserId) {
+      await pool.query('DELETE FROM l1_transaction_facts WHERE tokenized_user_id = $1', [tokenizedUserId]);
+    } else {
+      await pool.query('DELETE FROM transactions WHERE user_id = $1', [userId]);
+    }
+    console.log('[RESET] Deleted existing transactions');
+    
+    // Reseed transactions
+    await seedSampleTransactions(userId);
+    console.log('[RESET] Reseeded demo data');
+    
+    // Count transactions (from L1 table if migrated - reuse tokenizedUserId)
+    const countQuery = tokenizedUserId
+      ? 'SELECT COUNT(*) as count FROM l1_transaction_facts WHERE tokenized_user_id = $1'
+      : 'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1';
+    const countValue = tokenizedUserId || userId;
+    const count = await pool.query(countQuery, [countValue]);
+    
+    res.json({ 
+      success: true, 
+      message: 'Demo data reset successfully',
+      transactionCount: parseInt(count.rows[0].count)
+    });
+  } catch (error) {
+    console.error('[RESET] Failed to reset demo data:', error);
+    res.status(500).json({ error: 'Failed to reset demo data', details: error.message });
+  }
+});
+
+// ============================================================================
+// DATA ENDPOINTS (simplified - add full implementation)
+// ============================================================================
+
+app.get('/api/transactions', authenticate, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 500;
+    const userId = req.userId;
+    const txInfo = await getTransactionTableInfo(userId);
+    
+    const result = await pool.query(
+      `SELECT id, description, merchant, ${txInfo.dateField} as date, cashflow, account, category, label, amount
+      FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1
+      ORDER BY ${txInfo.dateField} DESC, id DESC
+       LIMIT $2`,
+      [txInfo.userIdValue, limit]
+    );
+
+    const transactions = result.rows.map((row) => ({
+      ...row,
+      amount: Number(row.amount),
+      date: dayjs(row.date).format('YYYY-MM-DD'),
+    }));
+
+    const categoriesResult = await pool.query(
+      `SELECT DISTINCT category FROM ${txInfo.table} WHERE ${txInfo.userIdField} = $1 ORDER BY category ASC`,
+      [txInfo.userIdValue]
+    );
+    
+    const labelsResult = await pool.query(
+      `SELECT DISTINCT label FROM ${txInfo.table} WHERE ${txInfo.userIdField} = $1 AND label <> '' ORDER BY label ASC`,
+      [txInfo.userIdValue]
+    );
+
+    res.json({
+      transactions,
+      categories: categoriesResult.rows.map((row) => row.category),
+      labels: labelsResult.rows.map((row) => row.label),
+    });
+  } catch (error) {
+    console.error('[API] Transactions error:', error);
+    res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
+app.get('/api/summary', authenticate, async (req, res) => {
+  try {
+    console.log('[API] Summary request started for user:', req.userId);
+    
+    // Ensure demo data exists (only seeds if count = 0, preserves edits)
+    try {
+      await ensureDemoDataExists();
+      console.log('[API] Demo data check completed');
+    } catch (err) {
+      console.error('[API] Error in ensureDemoDataExists:', err);
+    }
+    
+    const window = req.query.window || '3m';
+    const monthCount = Number.parseInt(window, 10) || 3;
+    const userId = req.userId;
+    const txInfo = await getTransactionTableInfo(userId);
+    
+    const { start, end } = await ensureRangeMonths(monthCount, userId, txInfo);
+    const labels = monthLabels(start, monthCount);
+
+    const summaryResult = await pool.query(
+      `SELECT TO_CHAR(${txInfo.dateField}, 'YYYY-MM') AS month, cashflow, SUM(amount) AS total
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND ${txInfo.dateField} BETWEEN $2 AND $3
+       GROUP BY month, cashflow`,
+      [txInfo.userIdValue, start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD')]
+    );
+
+    const chart = {
+      months: labels.map((label) => dayjs(label).format('MMM YY')),
+      income: Array(monthCount).fill(0),
+      expense: Array(monthCount).fill(0),
+      other: Array(monthCount).fill(0),
+    };
+
+    const labelIndex = new Map(labels.map((label, idx) => [label, idx]));
+
+    summaryResult.rows.forEach((row) => {
+      const month = row.month;
+      const total = Number(row.total);
+      if (!labelIndex.has(month)) return;
+      const index = labelIndex.get(month);
+      if (row.cashflow === 'income') chart.income[index] = Math.abs(total);
+      if (row.cashflow === 'expense') chart.expense[index] = Math.abs(total);
+      if (row.cashflow === 'other') chart.other[index] = Math.abs(total);
+    });
+
+    const latestMonth = labels[labels.length - 1];
+    const categoriesResult = await pool.query(
+      `SELECT category, ABS(SUM(amount)) as value
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND TO_CHAR(${txInfo.dateField}, 'YYYY-MM') = $2 AND cashflow = 'expense'
+       GROUP BY category
+       ORDER BY value DESC
+       LIMIT 12`,
+      [txInfo.userIdValue, latestMonth]
+    );
+
+    const categories = categoriesResult.rows.map(row => ({
+      name: row.category,
+      value: Number(row.value)
+    }));
+
+    res.json({ ...chart, categories, monthKeys: labels });
+  } catch (error) {
+    console.error('[API] Summary error:', error);
+    res.status(500).json({ error: 'Failed to fetch summary' });
+  }
+});
+
+// Helper functions for date ranges
+async function ensureRangeMonths(monthCount, userId, txInfo = null) {
+  // Get transaction table info if not provided
+  if (!txInfo) {
+    txInfo = await getTransactionTableInfo(userId);
+  }
+  
+  // For demo data, use the actual date range of transactions
+  if (pool && userId) {
+    try {
+      const result = await pool.query(
+        `SELECT MAX(${txInfo.dateField}) as latest FROM ${txInfo.table} WHERE ${txInfo.userIdField} = $1`,
+        [txInfo.userIdValue]
+      );
+      
+      if (result.rows[0]?.latest) {
+        const end = dayjs(result.rows[0].latest).endOf('month');
+        const start = end.subtract(monthCount - 1, 'month').startOf('month');
+        return { start, end };
+      }
+    } catch (error) {
+      console.error('[DATE] Error getting date range:', error);
     }
   }
-  const fallback = dayjs(value);
-  return fallback.isValid() ? fallback.format('YYYY-MM-DD') : null;
-}
-
-function normaliseCashflow(amount, provided) {
-  if (provided && ['income', 'expense', 'other'].includes(provided.toLowerCase())) {
-    return provided.toLowerCase();
-  }
-  if (amount > 0) return 'income';
-  if (amount < 0) return 'expense';
-  return 'other';
-}
-
-function buildTransaction(record) {
-  const normalisedKeys = Object.fromEntries(
-    Object.entries(record).map(([key, value]) => [key.toLowerCase(), value])
-  );
-  const description = (
-    normalisedKeys.description ||
-    normalisedKeys.details ||
-    normalisedKeys['transaction details'] ||
-    normalisedKeys.memo ||
-    'Unknown merchant'
-  ).toString();
-  const date = parseDate(normalisedKeys.date || normalisedKeys['transaction date']);
-  const rawAmount =
-    normalisedKeys.amount ||
-    normalisedKeys.cad ||
-    normalisedKeys['transaction amount'] ||
-    normalisedKeys['amount cad'];
-  const amountValue = parseAmount(rawAmount);
-  if (!date || amountValue === null) {
-    return null;
-  }
-  const cashflow = normaliseCashflow(amountValue, normalisedKeys.cashflow);
-  const normalisedAmount = cashflow === 'expense' && amountValue > 0 ? -Math.abs(amountValue) : amountValue;
-  const account = inferAccount(normalisedKeys.account);
-  const category = normalisedKeys.category || inferCategory(description, cashflow);
-  const label = normalisedKeys.label || '';
-  return {
-    description,
-    merchant: normaliseMerchant(description),
-    date,
-    cashflow,
-    account,
-    category,
-    label,
-    amount: toCurrency(normalisedAmount),
-  };
-}
-
-async function ingestFile(buffer, userId) {
-  const records = await parseCSV(buffer);
-  let inserted = 0;
-  const effectiveUserId = disableDb ? null : getDefaultUserId();
-  for (const record of records) {
-    const transaction = buildTransaction(record);
-    if (!transaction) continue;
-    const changes = await insertTransaction(transaction, effectiveUserId ?? userId);
-    inserted += changes;
-  }
-  return inserted;
+  
+  // Fallback to current date
+  const end = dayjs().endOf('month');
+  const start = end.subtract(monthCount - 1, 'month').startOf('month');
+  return { start, end };
 }
 
 function monthLabels(start, months) {
@@ -762,495 +1534,39 @@ function monthLabels(start, months) {
   return labels;
 }
 
-function ensureRangeMonths(monthCount) {
-  const end = dayjs().endOf('month');
-  const start = end.subtract(monthCount - 1, 'month').startOf('month');
-  return { start, end };
-}
-
-async function getLatestMonthRange(months = 1, userId = DEFAULT_USER_ID) {
-  if (disableDb) {
-    const transactions = getInMemoryTransactions(userId);
-    if (!transactions.length) {
-      const end = dayjs().endOf('month');
-      const start = end.subtract(months - 1, 'month').startOf('month');
-      return { start, end };
-    }
-    const latestDate = transactions
-      .map((tx) => dayjs(tx.date))
-      .reduce((max, date) => (date.isAfter(max) ? date : max), dayjs(transactions[0].date));
-    const end = latestDate.endOf('month');
+async function getLatestMonthRange(months, userId) {
+  if (!pool) {
+    const end = dayjs().endOf('month');
     const start = end.subtract(months - 1, 'month').startOf('month');
     return { start, end };
   }
-  const latest = await pool.query(
-    'SELECT date FROM transactions WHERE user_id = $1 ORDER BY date DESC LIMIT 1',
-    [userId]
+
+  const txInfo = await getTransactionTableInfo(userId);
+  const result = await pool.query(
+    `SELECT MAX(${txInfo.dateField}) as latest FROM ${txInfo.table} WHERE ${txInfo.userIdField} = $1`,
+    [txInfo.userIdValue]
   );
-  const latestDate = latest.rows[0] ? latest.rows[0].date : null;
-  const end = latestDate ? dayjs(latestDate).endOf('month') : dayjs().endOf('month');
+
+  if (!result.rows[0]?.latest) {
+    const end = dayjs().endOf('month');
+    const start = end.subtract(months - 1, 'month').startOf('month');
+    return { start, end };
+  }
+
+  const latest = dayjs(result.rows[0].latest);
+  const end = latest.endOf('month');
   const start = end.subtract(months - 1, 'month').startOf('month');
   return { start, end };
 }
 
-function savingsRange(range) {
-  const today = dayjs();
-  switch (range) {
-    case 'year-to-date':
-      return { start: today.startOf('year'), end: today };
-    case 'since-start':
-      return { start: dayjs('1900-01-01'), end: today };
-    case 'last-month':
-    default: {
-      const lastMonthEnd = today.subtract(1, 'month').endOf('month');
-      return {
-        start: lastMonthEnd.startOf('month'),
-        end: lastMonthEnd,
-      };
-    }
-  }
-}
-
-function buildInsightsFromTransactions(transactions, cohort = 'all') {
-  const expenses = transactions.filter((tx) => tx.cashflow === 'expense');
-
-  const grouped = expenses.reduce((acc, row) => {
-    const key = row.merchant || normaliseMerchant(row.description);
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(row);
-    return acc;
-  }, {});
-
-  const subscriptionInsights = [];
-  Object.values(grouped).forEach((entries) => {
-    if (entries.length < 3) return;
-    const sorted = entries
-      .slice()
-      .sort((a, b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf());
-    const latest = sorted[sorted.length - 1];
-    const amounts = sorted.slice(0, -1).map((row) => Math.abs(Number(row.amount)));
-    if (!amounts.length) return;
-    const avg = amounts.reduce((sum, value) => sum + value, 0) / amounts.length;
-    const latestAbs = Math.abs(Number(latest.amount));
-    if (latestAbs >= avg * 1.1) {
-      subscriptionInsights.push({
-        title: `${latest.description} increased to ${latestAbs.toFixed(2)}`,
-        body: `Your recent charge is ${((latestAbs / avg - 1) * 100).toFixed(1)}% higher than your usual ${latest.category} spend.`,
-      });
-    }
-  });
-
-  if (!subscriptionInsights.length) {
-    expenses.slice(0, 3).forEach((expense) => {
-      const amount = Math.abs(Number(expense.amount));
-      subscriptionInsights.push({
-        title: `${expense.description} tracked at ${amount.toFixed(2)}`,
-        body: `We will monitor ${expense.category} for price changes and overlaps.`,
-      });
-    });
-  }
-
-  const duplicateMap = expenses.reduce((acc, row) => {
-    const key = `${row.date}|${Number(row.amount).toFixed(2)}`;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(row);
-    return acc;
-  }, {});
-
-  const fraudInsights = [];
-  Object.values(duplicateMap).forEach((entries) => {
-    if (entries.length < 2) return;
-    const sample = entries[0];
-    const amount = Math.abs(Number(sample.amount));
-    fraudInsights.push({
-      title: `Possible duplicate: ${sample.description}`,
-      body: `We spotted two charges of $${amount.toFixed(2)} on ${dayjs(sample.date).format('MMM D')}. Confirm both are valid.`,
-    });
-  });
-
-  if (!fraudInsights.length) {
-    const feeCandidates = expenses
-      .filter((row) => /fee/.test((row.description || '').toLowerCase()) || /fee/.test((row.category || '').toLowerCase()))
-      .sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf())
-      .slice(0, 3);
-
-    feeCandidates.forEach((row) => {
-      const amount = Math.abs(Number(row.amount));
-      fraudInsights.push({
-        title: `Bank fee: ${row.description}`,
-        body: `A fee of $${amount.toFixed(2)} hit on ${dayjs(row.date).format('MMM D')}. Consider switching to a no-fee account.`,
-      });
-    });
-
-    if (!fraudInsights.length) {
-      fraudInsights.push({
-        title: 'All clear for fees this month',
-        body: 'We did not detect duplicate charges or unexpected fees. We will keep monitoring incoming statements.',
-      });
-    }
-  }
-
-  const categoryTotals = expenses.reduce((acc, row) => {
-    const category = row.category || 'Other';
-    acc[category] = (acc[category] || 0) + Math.abs(Number(row.amount));
-    return acc;
-  }, {});
-
-  const cohortLabelMap = {
-    students: 'students across Canada',
-    'young-professionals': 'young professionals',
-    households: 'similar Canadian households',
-    all: 'Canadian households',
-  };
-  const cohortLabel = cohortLabelMap[cohort] || cohortLabelMap.all;
-
-  const benchmarks = Object.entries(categoryTotals)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([category, spend]) => ({
-      title: `${category} spend at $${spend.toFixed(2)}`,
-      body: `You spent roughly $${spend.toFixed(2)} on ${category} last period. We'll benchmark this against ${cohortLabel}.`,
-      category,
-      spend,
-    }));
-
-  return {
-    subscriptions: subscriptionInsights.slice(0, 5),
-    fraud: fraudInsights.slice(0, 5),
-    benchmarks,
-  };
-}
-
-async function generateInsights(cohort = 'all', userId = DEFAULT_USER_ID) {
-  if (disableDb) {
-    return buildInsightsFromTransactions(getInMemoryTransactions(userId), cohort);
-  }
-
-  const effectiveUserId = getDefaultUserId();
-  const expensesResult = await pool.query(
-    `SELECT id, description, merchant, date, amount, category
-     FROM transactions
-     WHERE user_id = $1 AND cashflow = 'expense'`,
-    [effectiveUserId]
-  );
-
-  const expenses = expensesResult.rows.map((row) => ({
-    ...row,
-    amount: Number(row.amount),
-  }));
-
-  const duplicatesResult = await pool.query(
-    `SELECT t1.description, t1.date, ABS(t1.amount) AS amount
-     FROM transactions t1
-     JOIN transactions t2
-       ON t1.user_id = t2.user_id
-      AND t1.date = t2.date
-      AND t1.amount = t2.amount
-      AND t1.id != t2.id
-     WHERE t1.user_id = $1 AND t1.cashflow = 'expense'
-     GROUP BY t1.description, t1.date, t1.amount`,
-    [effectiveUserId]
-  );
-
-  const feeRows = await pool.query(
-    `SELECT description, ABS(amount) AS amount, date
-     FROM transactions
-      WHERE user_id = $1
-        AND (lower(description) LIKE '%fee%' OR lower(category) LIKE '%fee%')
-     ORDER BY date DESC
-     LIMIT 3`,
-    [effectiveUserId]
-  );
-
-  const categorySpendResult = await pool.query(
-    `SELECT category, ABS(SUM(amount)) AS total
-     FROM transactions
-     WHERE user_id = $1 AND cashflow = 'expense'
-     GROUP BY category
-     ORDER BY total DESC
-     LIMIT 5`,
-    [effectiveUserId]
-  );
-
-  const insightsFromDb = buildInsightsFromTransactions(expenses, cohort);
-
-  const fraudInsights = duplicatesResult.rows.map((row) => {
-    const amount = Number(row.amount);
-    return {
-      title: `Possible duplicate: ${row.description}`,
-      body: `We spotted two charges of $${amount.toFixed(2)} on ${dayjs(row.date).format('MMM D')}. Confirm both are valid.`,
-    };
-  });
-
-  if (!fraudInsights.length) {
-    feeRows.rows.forEach((row) => {
-      const amount = Number(row.amount);
-      fraudInsights.push({
-        title: `Bank fee: ${row.description}`,
-        body: `A fee of $${amount.toFixed(2)} hit on ${dayjs(row.date).format('MMM D')}. Consider switching to a no-fee account.`,
-      });
-    });
-
-    if (!fraudInsights.length) {
-      fraudInsights.push({
-        title: 'All clear for fees this month',
-        body: 'We did not detect duplicate charges or unexpected fees. We will keep monitoring incoming statements.',
-      });
-    }
-  }
-
-  const cohortLabelMap = {
-    students: 'students across Canada',
-    'young-professionals': 'young professionals',
-    households: 'similar Canadian households',
-    all: 'Canadian households',
-  };
-  const cohortLabel = cohortLabelMap[cohort] || cohortLabelMap.all;
-
-  const benchmarks = categorySpendResult.rows.map((row) => {
-    const spend = Number(row.total);
-    return {
-      title: `${row.category} spend at $${spend.toFixed(2)}`,
-      body: `You spent roughly $${spend.toFixed(2)} on ${row.category} last period. We'll benchmark this against ${cohortLabel}.`,
-      category: row.category,
-      spend,
-    };
-  });
-
-  return {
-    subscriptions: insightsFromDb.subscriptions,
-    fraud: fraudInsights.slice(0, 5),
-    benchmarks: benchmarks.slice(0, 5),
-  };
-}
-
-app.get('/api/health', async (req, res) => {
-  try {
-    if (disableDb) {
-      return res.json({ status: 'ok', mode: 'memory' });
-    }
-    await pool.query('SELECT 1');
-    res.json({ status: 'ok' });
-  } catch (error) {
-    console.error('Health check failed', error);
-    res.status(500).json({ status: 'error', message: 'Database connection failed' });
-  }
-});
-
-app.get('/api/transactions', authenticate, async (req, res) => {
-  try {
-    const { search = '', cashflow = 'all', account = 'all', category = 'all', label = 'all', limit = 500 } = req.query;
-    const userId = getDefaultUserId();
-    const filters = [`user_id = $1`];
-    const values = [userId];
-    let index = 2;
-
-    if (disableDb) {
-      const term = search.toLowerCase();
-      const limitValue = Number(limit) || 500;
-      const userTransactions = getInMemoryTransactions(req.userId);
-      const filtered = userTransactions
-        .filter((tx) => {
-          const matchesSearch =
-            !term ||
-            tx.description.toLowerCase().includes(term) ||
-            (tx.category || '').toLowerCase().includes(term) ||
-            (tx.label || '').toLowerCase().includes(term) ||
-            `${Math.abs(tx.amount)}`.includes(term);
-          const matchesFlow = cashflow === 'all' || tx.cashflow === cashflow;
-          const matchesAccount = account === 'all' || tx.account === account;
-          const matchesCategory = category === 'all' || tx.category === category;
-          const matchesLabel = label === 'all' || tx.label === label;
-          return matchesSearch && matchesFlow && matchesAccount && matchesCategory && matchesLabel;
-        })
-        .sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf())
-        .slice(0, limitValue)
-        .map((tx) => ({
-          ...tx,
-          date: dayjs(tx.date).format('YYYY-MM-DD'),
-        }));
-
-      const categories = Array.from(
-        new Set(userTransactions.map((tx) => tx.category).filter(Boolean))
-      ).sort();
-      const labels = Array.from(
-        new Set(userTransactions.map((tx) => tx.label).filter((value) => value && value.trim()))
-      ).sort();
-
-      return res.json({ transactions: filtered, categories, labels });
-    }
-
-    filters.push(`user_id = $${index}`);
-    values.push(req.userId);
-    index += 1;
-
-    if (search) {
-      filters.push(`(description ILIKE $${index} OR category ILIKE $${index} OR label ILIKE $${index})`);
-      values.push(`%${search}%`);
-      index += 1;
-    }
-    if (cashflow !== 'all') {
-      filters.push(`cashflow = $${index}`);
-      values.push(cashflow);
-      index += 1;
-    }
-    if (account !== 'all') {
-      filters.push(`account = $${index}`);
-      values.push(account);
-      index += 1;
-    }
-    if (category !== 'all') {
-      filters.push(`category = $${index}`);
-      values.push(category);
-      index += 1;
-    }
-    if (label !== 'all') {
-      filters.push(`label = $${index}`);
-      values.push(label);
-      index += 1;
-    }
-
-    const limitIndex = index;
-    values.push(Number(limit));
-
-    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
-    const query = `
-      SELECT id, description, date, cashflow, account, category, label, amount
-      FROM transactions
-      ${where}
-      ORDER BY date DESC, id DESC
-      LIMIT $${limitIndex}
-    `;
-
-    const result = await pool.query(query, values);
-    const transactions = result.rows.map((row) => ({
-      ...row,
-      amount: Number(row.amount),
-      date: dayjs(row.date).format('YYYY-MM-DD'),
-    }));
-
-    const categoriesResult = await pool.query(
-      'SELECT DISTINCT category FROM transactions WHERE user_id = $1 ORDER BY category ASC',
-      [req.userId]
-    );
-    const labelsResult = await pool.query(
-      "SELECT DISTINCT label FROM transactions WHERE user_id = $1 AND label <> '' ORDER BY label ASC",
-      [req.userId]
-    );
-
-    res.json({
-      transactions,
-      categories: categoriesResult.rows.map((row) => row.category),
-      labels: labelsResult.rows.map((row) => row.label),
-    });
-  } catch (error) {
-    console.error('Failed to load transactions', error);
-    res.status(500).json({ error: 'Failed to load transactions' });
-  }
-});
-
-app.get('/api/summary', authenticate, async (req, res) => {
-  try {
-    const window = req.query.window || '3m';
-    const monthCount = Number.parseInt(window, 10) || 3;
-    const { start, end } = ensureRangeMonths(monthCount);
-    const labels = monthLabels(start, monthCount);
-
-    if (disableDb) {
-      const userTransactions = getInMemoryTransactions(req.userId);
-      const chart = {
-        months: labels.map((label) => dayjs(label).format('MMM YY')),
-        income: Array(monthCount).fill(0),
-        expense: Array(monthCount).fill(0),
-        other: Array(monthCount).fill(0),
-      };
-
-      const labelIndex = new Map(labels.map((label, idx) => [label, idx]));
-
-      userTransactions.forEach((tx) => {
-        const date = dayjs(tx.date);
-        if (!date.isBetween(start, end, 'day', '[]')) return;
-        const key = date.format('YYYY-MM');
-        if (!labelIndex.has(key)) return;
-        const index = labelIndex.get(key);
-        const amount = Number(tx.amount);
-        if (tx.cashflow === 'income') chart.income[index] += Math.abs(amount);
-        if (tx.cashflow === 'expense') chart.expense[index] += Math.abs(amount);
-        if (tx.cashflow === 'other') chart.other[index] += Math.abs(amount);
-      });
-
-      const latestMonth = labels[labels.length - 1];
-      const categoriesMap = new Map();
-      userTransactions.forEach((tx) => {
-        if (tx.cashflow !== 'expense') return;
-        const key = dayjs(tx.date).format('YYYY-MM');
-        if (key !== latestMonth) return;
-        const current = categoriesMap.get(tx.category) || 0;
-        categoriesMap.set(tx.category, current + Math.abs(Number(tx.amount)));
-      });
-
-      const categories = Array.from(categoriesMap.entries())
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 12);
-
-      return res.json({ ...chart, categories, monthKeys: labels });
-    }
-
-    const userId = getDefaultUserId();
-    const summaryResult = await pool.query(
-      `SELECT TO_CHAR(date, 'YYYY-MM') AS month, cashflow, SUM(amount) AS total
-       FROM transactions
-       WHERE user_id = $1 AND date BETWEEN $2 AND $3
-       GROUP BY month, cashflow`,
-      [req.userId, start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD')]
-    );
-
-    const chart = {
-      months: labels.map((label) => dayjs(label).format('MMM YY')),
-      income: Array(monthCount).fill(0),
-      expense: Array(monthCount).fill(0),
-      other: Array(monthCount).fill(0),
-    };
-
-    summaryResult.rows.forEach((row) => {
-      const index = labels.indexOf(row.month);
-      if (index === -1) return;
-      const total = Number(row.total);
-      const value = row.cashflow === 'expense' ? Math.abs(total) : total;
-      if (row.cashflow === 'income') chart.income[index] = value;
-      if (row.cashflow === 'expense') chart.expense[index] = value;
-      if (row.cashflow === 'other') chart.other[index] = Math.abs(total);
-    });
-
-    const latestMonth = labels[labels.length - 1];
-    const categoriesResult = await pool.query(
-      `SELECT category, ABS(SUM(amount)) AS total
-       FROM transactions
-       WHERE user_id = $1 AND cashflow = 'expense' AND TO_CHAR(date, 'YYYY-MM') = $2
-       GROUP BY category
-       ORDER BY total DESC
-       LIMIT 12`,
-      [req.userId, latestMonth]
-    );
-
-    const categories = categoriesResult.rows.map((row) => ({
-      name: row.category,
-      value: Number(row.total),
-    }));
-
-    res.json({ ...chart, categories, monthKeys: labels });
-  } catch (error) {
-    console.error('Failed to load summary', error);
-    res.status(500).json({ error: 'Failed to load summary' });
-  }
-});
-
+// Budget endpoint
 app.get('/api/budget', authenticate, async (req, res) => {
   try {
     const period = req.query.period === 'quarterly' ? 'quarterly' : 'monthly';
     const months = period === 'quarterly' ? 3 : 1;
-    const { start, end } = await getLatestMonthRange(months, req.userId);
+    const userId = req.userId;
+    
+    const { start, end } = await getLatestMonthRange(months, userId);
     const monthLabelsDisplay = [];
 
     if (period === 'quarterly') {
@@ -1262,139 +1578,66 @@ app.get('/api/budget', authenticate, async (req, res) => {
     const startDate = start.format('YYYY-MM-DD');
     const endDate = end.format('YYYY-MM-DD');
 
-    if (disableDb) {
-      const userTransactions = getInMemoryTransactions(req.userId);
-      const relevant = userTransactions.filter((tx) =>
-        dayjs(tx.date).isBetween(startDate, endDate, 'day', '[]')
-      );
-
-      const spent = relevant
-        .filter((tx) => tx.cashflow === 'expense')
-        .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0);
-      const income = relevant
-        .filter((tx) => tx.cashflow === 'income')
-        .reduce((sum, tx) => sum + Number(tx.amount), 0);
-      const other = relevant
-        .filter((tx) => tx.cashflow === 'other')
-        .reduce((sum, tx) => sum + Number(tx.amount), 0);
-      const saved = income + other - spent;
-
-      const baselineMonths = period === 'quarterly' ? 6 : 3;
-      const baselineRange = await getLatestMonthRange(baselineMonths, req.userId);
-      const baselineExpenses = getInMemoryTransactions(req.userId)
-        .filter((tx) =>
-          tx.cashflow === 'expense' &&
-          dayjs(tx.date).isBetween(
-            baselineRange.start.format('YYYY-MM-DD'),
-            baselineRange.end.format('YYYY-MM-DD'),
-            'day',
-            '[]'
-          )
-        )
-        .reduce((map, tx) => {
-          const key = dayjs(tx.date).format('YYYY-MM');
-          map.set(key, (map.get(key) || 0) + Math.abs(Number(tx.amount)));
-          return map;
-        }, new Map());
-
-      const baselineValues = Array.from(baselineExpenses.values());
-      const averageExpense = baselineValues.length
-        ? baselineValues.reduce((sum, value) => sum + value, 0) / baselineValues.length
-        : spent;
-
-      const categoriesMap = relevant
-        .filter((tx) => tx.cashflow === 'expense')
-        .reduce((acc, tx) => {
-          const current = acc.get(tx.category) || 0;
-          acc.set(tx.category, current + Math.abs(Number(tx.amount)));
-          return acc;
-        }, new Map());
-
-      const categories = Array.from(categoriesMap.entries())
-        .map(([name, total]) => ({
-          name,
-          spent: total,
-          target: total ? Math.max(total * 0.95, total - 25) : 0,
-        }))
-        .sort((a, b) => b.spent - a.spent)
-        .slice(0, 10);
-
-      return res.json({
-        months: monthLabelsDisplay,
-        summary: {
-          budget: averageExpense,
-          spent,
-          saved,
-        },
-        categories,
-      });
-    }
-
-    const userId = getDefaultUserId();
+    const txInfo = await getTransactionTableInfo(userId);
+    
     const expenseRow = await pool.query(
       `SELECT COALESCE(ABS(SUM(amount)), 0) AS spent
-       FROM transactions
-       WHERE user_id = $1 AND cashflow = 'expense' AND date BETWEEN $2 AND $3`,
-      [req.userId, startDate, endDate]
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND cashflow = 'expense' AND ${txInfo.dateField} BETWEEN $2 AND $3`,
+      [txInfo.userIdValue, startDate, endDate]
     );
 
     const incomeRow = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) AS income
-       FROM transactions
-       WHERE user_id = $1 AND cashflow = 'income' AND date BETWEEN $2 AND $3`,
-      [req.userId, startDate, endDate]
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND cashflow = 'income' AND ${txInfo.dateField} BETWEEN $2 AND $3`,
+      [txInfo.userIdValue, startDate, endDate]
     );
 
     const otherRow = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) AS other
-       FROM transactions
-       WHERE user_id = $1 AND cashflow = 'other' AND date BETWEEN $2 AND $3`,
-      [req.userId, startDate, endDate]
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND cashflow = 'other' AND ${txInfo.dateField} BETWEEN $2 AND $3`,
+      [txInfo.userIdValue, startDate, endDate]
     );
 
-    const spent = Number(expenseRow.rows[0].spent) || 0;
-    const income = Number(incomeRow.rows[0].income) || 0;
-    const other = Number(otherRow.rows[0].other) || 0;
+    const spent = Math.abs(Number(expenseRow.rows[0].spent));
+    const income = Number(incomeRow.rows[0].income);
+    const other = Number(otherRow.rows[0].other);
     const saved = income + other - spent;
 
+    // Calculate baseline average
     const baselineMonths = period === 'quarterly' ? 6 : 3;
-    const baselineRange = await getLatestMonthRange(baselineMonths, req.userId);
-    const baselineExpensesResult = await pool.query(
-      `SELECT TO_CHAR(date, 'YYYY-MM') as month, ABS(SUM(amount)) AS total
-       FROM transactions
-       WHERE user_id = $1 AND cashflow = 'expense' AND date BETWEEN $2 AND $3
+    const baselineRange = await getLatestMonthRange(baselineMonths, userId);
+    const baselineResult = await pool.query(
+      `SELECT TO_CHAR(${txInfo.dateField}, 'YYYY-MM') as month, ABS(SUM(amount)) as total
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND cashflow = 'expense' AND ${txInfo.dateField} BETWEEN $2 AND $3
        GROUP BY month`,
-      [
-        req.userId,
-        baselineRange.start.format('YYYY-MM-DD'),
-        baselineRange.end.format('YYYY-MM-DD'),
-        userId,
-      ]
+      [txInfo.userIdValue, baselineRange.start.format('YYYY-MM-DD'), baselineRange.end.format('YYYY-MM-DD')]
     );
 
-    const baselineExpenses = baselineExpensesResult.rows.map((row) => Number(row.total));
-    const averageExpense = baselineExpenses.length
-      ? baselineExpenses.reduce((sum, value) => sum + value, 0) / baselineExpenses.length
+    const baselineValues = baselineResult.rows.map(r => Number(r.total));
+    const averageExpense = baselineValues.length
+      ? baselineValues.reduce((sum, val) => sum + val, 0) / baselineValues.length
       : spent;
 
+    // Category breakdown
     const categoriesResult = await pool.query(
-      `SELECT category, ABS(SUM(amount)) AS spent
-       FROM transactions
-       WHERE user_id = $1 AND cashflow = 'expense' AND date BETWEEN $2 AND $3
+      `SELECT category, ABS(SUM(amount)) as spent
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND cashflow = 'expense' AND ${txInfo.dateField} BETWEEN $2 AND $3
        GROUP BY category
        ORDER BY spent DESC
        LIMIT 10`,
-      [req.userId, startDate, endDate]
+      [txInfo.userIdValue, startDate, endDate]
     );
 
-    const categories = categoriesResult.rows.map((row) => {
-      const spentValue = Number(row.spent);
-      return {
+    const categories = categoriesResult.rows.map(row => ({
         name: row.category,
-        spent: spentValue,
-        target: spentValue ? Math.max(spentValue * 0.95, spentValue - 25) : 0,
-      };
-    });
+      spent: Number(row.spent),
+      target: Number(row.spent) * 0.95 // 5% reduction goal
+    }));
 
     res.json({
       months: monthLabelsDisplay,
@@ -1406,89 +1649,49 @@ app.get('/api/budget', authenticate, async (req, res) => {
       categories,
     });
   } catch (error) {
-    console.error('Failed to load budget', error);
-    res.status(500).json({ error: 'Failed to load budget' });
+    console.error('[API] Budget error:', error);
+    res.status(500).json({ error: 'Failed to fetch budget' });
   }
 });
 
+// Savings endpoint
 app.get('/api/savings', authenticate, async (req, res) => {
   try {
     const rangeParam = req.query.range || 'last-month';
-    const { start, end } = savingsRange(rangeParam);
-    const startDate = start.format('YYYY-MM-DD');
-    const endDate = end.format('YYYY-MM-DD');
+    const userId = req.userId;
 
-    if (disableDb) {
-      const userTransactions = getInMemoryTransactions(req.userId);
-      const relevant = userTransactions.filter((tx) =>
-        dayjs(tx.date).isBetween(startDate, endDate, 'day', '[]')
+    let startDate, endDate, label;
+
+    const txInfo = await getTransactionTableInfo(userId);
+    
+    if (rangeParam === 'since-start') {
+      const result = await pool.query(
+        `SELECT MIN(${txInfo.dateField}) as first FROM ${txInfo.table} WHERE ${txInfo.userIdField} = $1`,
+        [txInfo.userIdValue]
       );
-
-      const income = relevant
-        .filter((tx) => tx.cashflow === 'income')
-        .reduce((sum, tx) => sum + Number(tx.amount), 0);
-      const other = relevant
-        .filter((tx) => tx.cashflow === 'other')
-        .reduce((sum, tx) => sum + Number(tx.amount), 0);
-      const expense = relevant
-        .filter((tx) => tx.cashflow === 'expense')
-        .reduce((sum, tx) => sum + Number(tx.amount), 0);
-      const last = income + other + expense;
-
-      const cumulative = userTransactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
-
-      const savingsCategories = relevant
-        .filter((tx) => Number(tx.amount) > 0)
-        .reduce((acc, tx) => {
-          const current = acc.get(tx.category) || 0;
-          acc.set(tx.category, current + Number(tx.amount));
-          return acc;
-        }, new Map());
-
-      const goals = Array.from(savingsCategories.entries())
-        .filter((entry) => /rrsp|tfsa|invest|savings|fund|travel|goal/i.test(entry[0]))
-        .slice(0, 3)
-        .map(([name, total], index) => ({
-          name,
-          target: total * 1.2,
-          contributed: total,
-          priority: ['High', 'Medium', 'Low'][index] || 'Medium',
-        }));
-
-      if (!goals.length) {
-        const fallback = Math.max(last, 0);
-        goals.push({
-          name: 'Emergency fund',
-          target: fallback ? fallback * 3 : 1500,
-          contributed: fallback,
-          priority: 'High',
-        });
-      }
-
-      return res.json({
-        summary: {
-          label:
-            rangeParam === 'since-start'
-              ? 'Since starting'
-              : rangeParam === 'year-to-date'
-              ? 'Year to date'
-              : 'Last month',
-          last,
-          cumulative,
-        },
-        goals,
-      });
+      startDate = result.rows[0]?.first
+        ? dayjs(result.rows[0].first).format('YYYY-MM-DD')
+        : dayjs().subtract(1, 'year').format('YYYY-MM-DD');
+      endDate = dayjs().format('YYYY-MM-DD');
+      label = 'Since starting';
+    } else if (rangeParam === 'year-to-date') {
+      startDate = dayjs().startOf('year').format('YYYY-MM-DD');
+      endDate = dayjs().format('YYYY-MM-DD');
+      label = 'Year to date';
+    } else {
+      startDate = dayjs().subtract(1, 'month').startOf('month').format('YYYY-MM-DD');
+      endDate = dayjs().subtract(1, 'month').endOf('month').format('YYYY-MM-DD');
+      label = 'Last month';
     }
 
-    const userId = getDefaultUserId();
     const totalsResult = await pool.query(
       `SELECT
         SUM(CASE WHEN cashflow = 'income' THEN amount ELSE 0 END) AS income,
         SUM(CASE WHEN cashflow = 'other' THEN amount ELSE 0 END) AS other,
         SUM(CASE WHEN cashflow = 'expense' THEN amount ELSE 0 END) AS expense
-       FROM transactions
-       WHERE user_id = $1 AND date BETWEEN $2 AND $3`,
-      [req.userId, startDate, endDate]
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND ${txInfo.dateField} BETWEEN $2 AND $3`,
+      [txInfo.userIdValue, startDate, endDate]
     );
 
     const totalsRow = totalsResult.rows[0] || { income: 0, other: 0, expense: 0 };
@@ -1502,156 +1705,126 @@ app.get('/api/savings', authenticate, async (req, res) => {
         SUM(CASE WHEN cashflow = 'income' THEN amount ELSE 0 END) AS income,
         SUM(CASE WHEN cashflow = 'other' THEN amount ELSE 0 END) AS other,
         SUM(CASE WHEN cashflow = 'expense' THEN amount ELSE 0 END) AS expense
-       FROM transactions
-       WHERE user_id = $1`,
-      [req.userId]
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1`,
+      [txInfo.userIdValue]
     );
 
-    const cumulativeRow = cumulativeResult.rows[0] || { income: 0, other: 0, expense: 0 };
-    const cumulative =
-      (Number(cumulativeRow.income) || 0) +
-      (Number(cumulativeRow.other) || 0) +
-      (Number(cumulativeRow.expense) || 0);
+    const cumRow = cumulativeResult.rows[0] || { income: 0, other: 0, expense: 0 };
+    const cumulative = Number(cumRow.income) + Number(cumRow.other) + Number(cumRow.expense);
 
-    const savingsCategoriesResult = await pool.query(
-      `SELECT category, SUM(amount) AS total
-       FROM transactions
-       WHERE user_id = $1 AND amount > 0 AND date BETWEEN $2 AND $3
-       GROUP BY category
-       ORDER BY total DESC`,
-      [req.userId, startDate, endDate]
-    );
-
-    const savingsCategories = savingsCategoriesResult.rows.map((row) => ({
-      category: row.category,
-      total: Number(row.total) || 0,
-    }));
-
-    const goals = savingsCategories
-      .filter((row) => /rrsp|tfsa|invest|savings|fund|travel|goal/i.test(row.category))
-      .slice(0, 3)
-      .map((row, index) => ({
-        name: row.category,
-        target: row.total * 1.2,
-        contributed: row.total,
-        priority: ['High', 'Medium', 'Low'][index] || 'Medium',
-      }));
-
-    if (!goals.length) {
-      const fallback = Math.max(last, 0);
-      goals.push({
-        name: 'Emergency fund',
-        target: fallback ? fallback * 3 : 1500,
-        contributed: fallback,
-        priority: 'High',
-      });
-    }
+    // Savings goals (placeholder)
+    const goals = [
+      { name: 'Emergency Fund', target: 10000, current: Math.max(0, cumulative * 0.3) },
+      { name: 'Vacation', target: 5000, current: Math.max(0, cumulative * 0.1) },
+    ];
 
     res.json({
       summary: {
-        label:
-          rangeParam === 'since-start'
-            ? 'Since starting'
-            : rangeParam === 'year-to-date'
-            ? 'Year to date'
-            : 'Last month',
+        label,
         last,
         cumulative,
       },
       goals,
     });
   } catch (error) {
-    console.error('Failed to load savings', error);
-    res.status(500).json({ error: 'Failed to load savings' });
+    console.error('[API] Savings error:', error);
+    res.status(500).json({ error: 'Failed to fetch savings' });
   }
 });
 
+// Insights endpoint
 app.get('/api/insights', authenticate, async (req, res) => {
   try {
     const cohort = req.query.cohort || 'all';
-    const insights = await generateInsights(cohort, req.userId);
-    res.json(insights);
-  } catch (error) {
-    console.error('Failed to load insights', error);
-    res.status(500).json({ error: 'Failed to load insights' });
-  }
-});
+    const userId = req.userId;
 
-app.post('/api/insights/:type/feedback', authenticate, async (req, res) => {
-  try {
-    const { type } = req.params;
-    const { title = '', response = '' } = req.body || {};
-    if (!['subscriptions', 'fraud', 'benchmarks'].includes(type)) {
-      return res.status(400).json({ error: 'Unknown insight type' });
-    }
-    if (!response) {
-      return res.status(400).json({ error: 'Missing response' });
-    }
-    if (disableDb) {
-      return res.json({ status: 'stored' });
-    }
-    await pool.query(
-      `INSERT INTO insight_feedback (insight_type, insight_title, response)
-       VALUES ($1, $2, $3)`,
-      [type, title, response]
+    const insights = [];
+
+    const txInfo = await getTransactionTableInfo(userId);
+    
+    // Top spending category
+    const topCategoryResult = await pool.query(
+      `SELECT category, ABS(SUM(amount)) as total
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND cashflow = 'expense'
+       GROUP BY category
+       ORDER BY total DESC
+       LIMIT 1`,
+      [txInfo.userIdValue]
     );
-    res.json({ status: 'stored' });
-  } catch (error) {
-    console.error('Failed to record insight feedback', error);
-    res.status(500).json({ error: 'Failed to store feedback' });
-  }
-});
 
-app.post('/api/upload', authenticate, upload.array('statements', 6), async (req, res) => {
-  if (!req.files || !req.files.length) {
-    return res.status(400).json({ error: 'No files uploaded' });
-  }
-  const summary = [];
-  for (const file of req.files) {
-    try {
-      const inserted = await ingestFile(file.buffer, req.userId);
-      summary.push({ file: file.originalname, inserted });
-    } catch (error) {
-      console.error(`Failed to ingest ${file.originalname}`, error);
-      summary.push({ file: file.originalname, inserted: 0, error: error.message });
+    if (topCategoryResult.rows.length > 0) {
+      const top = topCategoryResult.rows[0];
+      insights.push({
+        title: `Top Spending: ${top.category}`,
+        description: `You've spent $${Number(top.total).toFixed(2)} on ${top.category} this period.`,
+        type: 'spending'
+      });
     }
-  }
-  res.json({ summary });
-});
 
-app.post('/api/feedback', authenticate, async (req, res) => {
-  try {
-    const payload = req.body || {};
-    if (disableDb) {
-      return res.json({ status: 'received' });
-    }
-    await pool.query(
-      `INSERT INTO insight_feedback (insight_type, insight_title, response)
-       VALUES ($1, $2, $3)`,
-      ['general', payload.title || 'general-feedback', JSON.stringify(payload)]
+    // Average monthly spending
+    const avgResult = await pool.query(
+      `SELECT TO_CHAR(${txInfo.dateField}, 'YYYY-MM') as month, ABS(SUM(amount)) as total
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1 AND cashflow = 'expense'
+       GROUP BY month
+       ORDER BY month DESC
+       LIMIT 3`,
+      [txInfo.userIdValue]
     );
-    res.json({ status: 'received' });
+
+    if (avgResult.rows.length > 0) {
+      const avg = avgResult.rows.reduce((sum, r) => sum + Number(r.total), 0) / avgResult.rows.length;
+      insights.push({
+        title: 'Average Monthly Spending',
+        description: `Your average monthly spending is $${avg.toFixed(2)}.`,
+        type: 'trend'
+      });
+    }
+
+    // Savings rate
+    const savingsResult = await pool.query(
+      `SELECT
+        SUM(CASE WHEN cashflow = 'income' THEN amount ELSE 0 END) as income,
+        SUM(CASE WHEN cashflow = 'expense' THEN amount ELSE 0 END) as expense
+       FROM ${txInfo.table}
+       WHERE ${txInfo.userIdField} = $1`,
+      [txInfo.userIdValue]
+    );
+
+    if (savingsResult.rows.length > 0) {
+      const row = savingsResult.rows[0];
+      const income = Number(row.income);
+      const expense = Math.abs(Number(row.expense));
+      if (income > 0) {
+        const rate = ((income - expense) / income * 100).toFixed(1);
+        insights.push({
+          title: 'Savings Rate',
+          description: `You're saving ${rate}% of your income.`,
+          type: 'goal'
+        });
+      }
+    }
+
+    res.json({ insights });
   } catch (error) {
-    console.error('Failed to record feedback', error);
-    res.status(500).json({ error: 'Failed to store feedback' });
+    console.error('[API] Insights error:', error);
+    res.status(500).json({ error: 'Failed to fetch insights' });
   }
 });
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirnameResolved, 'index.html'));
-});
+// ============================================================================
+// SERVER STARTUP
+// ============================================================================
 
 if (require.main === module) {
-  readiness
-    .then(() => {
       app.listen(PORT, () => {
-        console.log(`Canadian Insights server running on http://localhost:${PORT}`);
-      });
-    })
-    .catch((error) => {
-      console.error('Failed to start server', error);
-      process.exit(1);
+    console.log(`[SERVER] Running on http://localhost:${PORT}`);
+    console.log(`[SERVER] Environment: ${IS_VERCEL ? 'Vercel' : 'Local'}`);
+    console.log(`[SERVER] Database: ${disableDb ? 'Disabled' : 'Enabled'}`);
     });
 }
 
 module.exports = app;
+

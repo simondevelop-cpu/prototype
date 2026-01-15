@@ -1876,6 +1876,7 @@ export default function AdminDashboard() {
           </div>
         )}
         
+<<<<<<< HEAD
         {analyticsSubTab === 'data-details' && (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="p-6 border-b border-gray-200">
@@ -2071,7 +2072,6 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-        
         
         {analyticsSubTab === 'customer-data' && (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">

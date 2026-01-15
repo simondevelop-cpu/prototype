@@ -9,6 +9,11 @@ node_modules/
 dist/
 .build/
 
+# Next.js
+.next/
+out/
+next-env.d.ts
+
 # OS
 .DS_Store
 

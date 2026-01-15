@@ -1,0 +1,54 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { Pool } from 'pg';
+import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '@/lib/admin-constants';
+
+export const dynamic = 'force-dynamic';
+
+const pool = new Pool({
+  connectionString: process.env.POSTGRES_URL,
+});
+
+// CREATE new keyword
+export async function POST(request: NextRequest) {
+  try {
+    // Check admin authentication
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+    
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    if (decoded.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
+    
+    const { keyword, category, label } = await request.json();
+    
+    const result = await pool.query(
+      `INSERT INTO admin_keywords (keyword, category, label, is_active)
+       VALUES ($1, $2, $3, true)
+       RETURNING *`,
+      [keyword, category, label]
+    );
+    
+    return NextResponse.json({ success: true, keyword: result.rows[0] }, { status: 201 });
+  } catch (error: any) {
+    console.error('Error creating keyword:', error);
+    
+    // Handle duplicate key error
+    if (error.code === '23505') {
+      return NextResponse.json(
+        { error: 'Keyword already exists for this category' },
+        { status: 409 }
+      );
+    }
+    
+    return NextResponse.json(
+      { error: 'Failed to create keyword', details: error.message },
+      { status: 500 }
+    );
+  }
+}
