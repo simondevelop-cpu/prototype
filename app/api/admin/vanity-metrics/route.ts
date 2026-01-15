@@ -194,6 +194,12 @@ export async function GET(request: NextRequest) {
       const totalUsersResult = await pool.query(totalUsersQuery, [...filterParams, weekEnd]);
       let totalUsers = parseInt(totalUsersResult.rows[0]?.count) || 0;
       
+      if (i === 0) {
+        console.log(`[Vanity Metrics] Week ${weekKey}: Total users before data coverage filter:`, totalUsers);
+        console.log(`[Vanity Metrics] Week ${weekKey}: Filter conditions:`, filterConditions);
+        console.log(`[Vanity Metrics] Week ${weekKey}: Filter params:`, filterParams);
+      }
+      
       // Apply data coverage filter to total users if specified
       if (filters.dataCoverage && filters.dataCoverage.length > 0 && totalUsers > 0) {
         const usersWithCoverageQuery = `
