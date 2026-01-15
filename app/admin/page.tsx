@@ -889,16 +889,6 @@ export default function AdminDashboard() {
           >
             📈 Macro Data
           </button>
-          <button
-            onClick={() => setAnalyticsSubTab('app-health')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              analyticsSubTab === 'app-health'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            💚 App Health
-          </button>
         </div>
 
         {/* Content */}
@@ -1341,29 +1331,15 @@ export default function AdminDashboard() {
                     />
                     Validated Emails
                   </label>
-                  <div className="flex flex-col">
-                    <label className="text-xs text-gray-600 mb-1">Intent Categories:</label>
-                    <select
-                      multiple
-                      value={vanityFilters.intentCategories}
-                      onChange={(e) => {
-                        const selected = Array.from(e.target.selectedOptions, option => option.value);
-                        setVanityFilters({ ...vanityFilters, intentCategories: selected });
-                      }}
-                      className="text-sm border border-gray-300 rounded px-2 py-1 min-w-[200px] max-h-32"
-                      size={Math.min(intentCategories.length || 1, 6)}
-                    >
-                      {intentCategoriesLoading ? (
-                        <option>Loading...</option>
-                      ) : intentCategories.length > 0 ? (
-                        intentCategories.map((cat) => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))
-                      ) : (
-                        <option>No categories found</option>
-                      )}
-                    </select>
-                    <span className="text-xs text-gray-500 mt-1">Hold Cmd/Ctrl to select multiple</span>
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Intent Categories"
+                      options={intentCategoriesLoading ? [] : intentCategories}
+                      selected={vanityFilters.intentCategories}
+                      onChange={(selected) => setVanityFilters({ ...vanityFilters, intentCategories: selected })}
+                      placeholder={intentCategoriesLoading ? 'Loading...' : 'Select intent categories...'}
+                      disabled={intentCategoriesLoading}
+                    />
                   </div>
                   <button
                     onClick={fetchVanityMetrics}
