@@ -59,17 +59,40 @@ export async function GET(request: NextRequest) {
     const totalEvents = parseInt(countCheck.rows[0]?.count || '0', 10);
     console.log('[Events Data API] Found', totalEvents, 'total events in user_events table');
 
+    // Check what columns exist in user_events table
+    let hasEventData = false;
+    let hasMetadata = false;
+    try {
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'user_events' 
+        AND column_name IN ('event_data', 'metadata')
+      `);
+      hasEventData = columnCheck.rows.some(row => row.column_name === 'event_data');
+      hasMetadata = columnCheck.rows.some(row => row.column_name === 'metadata');
+      console.log('[Events Data API] Schema check - hasEventData:', hasEventData, 'hasMetadata:', hasMetadata);
+    } catch (e) {
+      console.log('[Events Data API] Could not check schema');
+    }
+
+    // Build select fields based on what columns exist
+    // Note: user_events table has event_timestamp (not created_at) and metadata (not event_data)
+    const eventFields = [
+      'e.id',
+      'e.user_id',
+      `COALESCE(p.first_name, 'Unknown') as first_name`,
+      'e.event_type',
+      hasEventData ? 'e.event_data' : 'NULL as event_data',
+      hasMetadata ? 'e.metadata' : 'NULL as metadata',
+      'COALESCE(e.event_timestamp, e.created_at) as created_at' // Use event_timestamp if available
+    ].join(',\n        ');
+
     // Fetch all user events with user information (only first name, no email or last name)
     // Use COALESCE to handle cases where l0_pii_users doesn't have data
     const result = await pool.query(`
       SELECT 
-        e.id,
-        e.user_id,
-        COALESCE(p.first_name, 'Unknown') as first_name,
-        e.event_type,
-        e.event_data,
-        e.created_at,
-        e.metadata
+        ${eventFields}
       FROM user_events e
       LEFT JOIN users u ON e.user_id = u.id
       LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL

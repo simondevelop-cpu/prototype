@@ -1084,8 +1084,10 @@ export default function AdminDashboard() {
                     <tbody className="divide-y divide-gray-200 bg-white">
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Starting Onboarding</td>
-                        {Array.from({ length: 12 }, () => (
-                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                        {(cohortData?.weeks || []).map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countStartingOnboarding || 0}
+                          </td>
                         ))}
                       </tr>
                       <tr>
