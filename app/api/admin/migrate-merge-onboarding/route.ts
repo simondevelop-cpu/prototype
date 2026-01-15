@@ -244,8 +244,29 @@ export async function GET(request: NextRequest) {
           LIMIT 10
         `);
         unmigratedUsers = unmigratedCheck.rows;
+        console.log(`[Migration Status] Found ${unmigratedUsers.length} unmigrated users with data to migrate`);
       } catch (e) {
         console.log('[Migration Status] Could not check unmigrated users:', e);
+      }
+      
+      // Also check: Are there users with onboarding_responses but ALL NULL values?
+      try {
+        const allNullCheck = await pool.query(`
+          SELECT 
+            COUNT(DISTINCT o.user_id) as count
+          FROM onboarding_responses o
+          INNER JOIN users u ON u.id = o.user_id
+          WHERE u.motivation IS NULL
+            AND o.motivation IS NULL
+            AND o.completed_at IS NULL
+            AND o.emotional_state IS NULL
+            AND o.financial_context IS NULL
+            AND o.insight_preferences IS NULL
+        `);
+        const allNullCount = parseInt(allNullCheck.rows[0]?.count) || 0;
+        console.log(`[Migration Status] Found ${allNullCount} users with onboarding_responses but all NULL values (nothing to migrate)`);
+      } catch (e) {
+        // Ignore
       }
     }
 
