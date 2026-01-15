@@ -35,42 +35,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Check if users table has motivation column (schema-adaptive)
-    const schemaCheck = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'users' 
-      AND column_name = 'motivation'
-    `);
-    
-    const hasMotivation = schemaCheck.rows.length > 0;
-
-    if (!hasMotivation) {
-      // Fallback to onboarding_responses table
-      const result = await pool.query(`
-        SELECT DISTINCT motivation
-        FROM onboarding_responses
-        WHERE motivation IS NOT NULL
-        ORDER BY motivation
-      `);
-      return NextResponse.json({
-        success: true,
-        categories: result.rows.map(row => row.motivation).filter(Boolean),
-      }, { status: 200 });
-    }
-
-    // Get unique motivation values from users table
-    const result = await pool.query(`
-      SELECT DISTINCT motivation
-      FROM users
-      WHERE motivation IS NOT NULL
-        AND email != $1
-      ORDER BY motivation
-    `, [ADMIN_EMAIL]);
+    // Always return all 6 intent categories from the onboarding questionnaire
+    // These are the standard options regardless of what data exists in the database
+    const allIntentCategories = [
+      "Just exploring",
+      "Get organized (see where my money goes, combine accounts)",
+      "Improve my finances (spend smarter, save more, get back on track)",
+      "Plan ahead (for a goal, trip, event or the next year)",
+      "Discover smarter, AI-powered insights",
+      "Something else"
+    ];
 
     return NextResponse.json({
       success: true,
-      categories: result.rows.map(row => row.motivation).filter(Boolean),
+      categories: allIntentCategories,
     }, { status: 200 });
 
   } catch (error: any) {

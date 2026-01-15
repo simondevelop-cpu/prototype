@@ -210,17 +210,12 @@ export async function GET(request: NextRequest) {
           NULL as first_transaction_date
         `;
 
+        // Only return users who have onboarding_responses (the fallback is for when users table doesn't have onboarding data)
         result = await pool.query(`
           SELECT ${selectFields}
           FROM users u
           LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
-          LEFT JOIN LATERAL (
-            SELECT *
-            FROM onboarding_responses
-            WHERE user_id = u.id
-            ORDER BY created_at DESC
-            LIMIT 1
-          ) o ON true
+          INNER JOIN onboarding_responses o ON o.user_id = u.id
           WHERE u.email != $1
           ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
         `, [ADMIN_EMAIL]);
@@ -253,16 +248,11 @@ export async function GET(request: NextRequest) {
           NULL as first_transaction_date
         `;
 
+        // Only return users who have onboarding_responses (the fallback is for when users table doesn't have onboarding data)
         result = await pool.query(`
           SELECT ${selectFields}
           FROM users u
-          LEFT JOIN LATERAL (
-            SELECT *
-            FROM onboarding_responses
-            WHERE user_id = u.id
-            ORDER BY created_at DESC
-            LIMIT 1
-          ) o ON true
+          INNER JOIN onboarding_responses o ON o.user_id = u.id
           WHERE u.email != $1
           ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
         `, [ADMIN_EMAIL]);

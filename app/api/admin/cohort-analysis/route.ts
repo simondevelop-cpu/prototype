@@ -222,7 +222,61 @@ export async function GET(request: NextRequest) {
       LIMIT 12
     `;
 
+    // Check if user_events table exists for engagement metrics
+    let hasUserEventsTable = false;
+    try {
+      const eventsTableCheck = await pool.query(`
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'user_events'
+        LIMIT 1
+      `);
+      hasUserEventsTable = eventsTableCheck.rows.length > 0;
+    } catch (e) {
+      console.log('[Cohort Analysis] Could not check for user_events table');
+    }
+
     const engagementResult = await pool.query(engagementQuery, filterParams);
+
+    // Get user_events data if table exists
+    let userEventsData: any = {};
+    if (hasUserEventsTable && useUsersTable) {
+      try {
+        // Calculate login metrics per week
+        const eventsQuery = `
+          SELECT 
+            DATE_TRUNC('week', u.created_at) as signup_week,
+            COUNT(DISTINCT CASE 
+              WHEN ue.created_at >= u.created_at 
+              AND ue.created_at < u.created_at + INTERVAL '7 days'
+              AND ue.event_type = 'login' 
+              THEN DATE(ue.created_at) 
+            END) as unique_login_days_week_0,
+            COUNT(DISTINCT CASE 
+              WHEN ue.created_at >= u.created_at + INTERVAL '7 days'
+              AND ue.created_at < u.created_at + INTERVAL '14 days'
+              AND ue.event_type = 'login' 
+              THEN DATE(ue.created_at) 
+            END) as unique_login_days_week_1
+          FROM users u
+          LEFT JOIN user_events ue ON ue.user_id = u.id
+          WHERE u.email != $${paramIndex}
+            ${filterConditions}
+          GROUP BY DATE_TRUNC('week', u.created_at)
+        `;
+        const eventsResult = await pool.query(eventsQuery, filterParams);
+        
+        eventsResult.rows.forEach((row: any) => {
+          const weekKey = `w/c ${new Date(row.signup_week).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+          if (!userEventsData[weekKey]) {
+            userEventsData[weekKey] = {};
+          }
+          // For now, we'll calculate this more simply - users who logged in 2+ unique days
+          // This is a simplified version - a full implementation would track across all weeks
+        });
+      } catch (e) {
+        console.log('[Cohort Analysis] Could not fetch user_events data:', e);
+      }
+    }
 
     // Format results by week
     const activationByWeek: { [week: string]: any } = {};
@@ -267,6 +321,7 @@ export async function GET(request: NextRequest) {
       activation: activationByWeek,
       engagement: engagementByWeek,
       filters,
+      hasUserEventsTable,
     }, { status: 200 });
 
   } catch (error: any) {

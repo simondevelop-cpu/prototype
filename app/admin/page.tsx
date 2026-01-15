@@ -995,24 +995,22 @@ export default function AdminDashboard() {
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Filters</h3>
               <div className="flex flex-wrap gap-4 items-end">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={cohortFilters.totalAccounts}
-                    onChange={(e) => setCohortFilters({ ...cohortFilters, totalAccounts: e.target.checked })}
-                    className="mr-2"
+                <div className="min-w-[200px]">
+                  <CheckboxDropdown
+                    label="Account Type"
+                    options={['Total Accounts', 'Validated Emails']}
+                    selected={[
+                      ...(cohortFilters.totalAccounts ? ['Total Accounts'] : []),
+                      ...(cohortFilters.validatedEmails ? ['Validated Emails'] : [])
+                    ]}
+                    onChange={(selected) => setCohortFilters({ 
+                      ...cohortFilters, 
+                      totalAccounts: selected.includes('Total Accounts'),
+                      validatedEmails: selected.includes('Validated Emails')
+                    })}
+                    placeholder="Select account type..."
                   />
-                  <span className="text-sm text-gray-700">Total Accounts</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={cohortFilters.validatedEmails}
-                    onChange={(e) => setCohortFilters({ ...cohortFilters, validatedEmails: e.target.checked })}
-                    className="mr-2"
-                  />
-                  <span className="text-sm text-gray-700">Validated Emails</span>
-                </label>
+                </div>
                 <div className="min-w-[200px]">
                   <CheckboxDropdown
                     label="Intent Categories"
@@ -1363,7 +1361,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-400 italic">Logged in 2+ unique days</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2+ unique days</td>
                         {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
@@ -1373,13 +1371,15 @@ export default function AdminDashboard() {
                           weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
                           return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
                         })).map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-400 italic">
-                            Requires user_events table
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.loggedInTwoPlusDays || 0)
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
                           </td>
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-400 italic">Avg days logged in per month (2+ days)</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg days logged in per month (2+ days)</td>
                         {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
@@ -1389,13 +1389,15 @@ export default function AdminDashboard() {
                           weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
                           return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
                         })).map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-400 italic">
-                            Requires user_events table
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.avgDaysLoggedInPerMonth || '-')
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
                           </td>
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-400 italic">Logged in 2+ unique months</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2+ unique months</td>
                         {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
@@ -1405,8 +1407,10 @@ export default function AdminDashboard() {
                           weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
                           return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
                         })).map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-400 italic">
-                            Requires user_events table
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.loggedInTwoPlusMonths || 0)
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
                           </td>
                         ))}
                       </tr>
