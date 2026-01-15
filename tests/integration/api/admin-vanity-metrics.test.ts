@@ -4,31 +4,42 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
-import { GET } from '@/app/api/admin/vanity-metrics/route';
 import { setupTestDatabase, generateAdminToken, createTestUser, createTestTransactions, createTestUserEvents, createAdminRequest } from '@/tests/helpers/admin-test-helpers';
 import type { TestDatabase } from '@/tests/helpers/admin-test-helpers';
-import { Pool } from 'pg';
 
-// Mock pg Pool to use our test database
+// Mock pg Pool BEFORE importing the route handler
 vi.mock('pg', async () => {
   const actual = await vi.importActual<typeof import('pg')>('pg');
   return {
     ...actual,
-    Pool: vi.fn(),
+    Pool: vi.fn().mockImplementation(() => {
+      // Return a mock pool that will be replaced in beforeAll
+      return {
+        query: vi.fn(),
+        connect: vi.fn(),
+        end: vi.fn(),
+      };
+    }),
   };
 });
+
+// Import route handler AFTER mocking
+import { GET } from '@/app/api/admin/vanity-metrics/route';
+import { Pool } from 'pg';
 
 describe('Admin Vanity Metrics API', () => {
   let testDb: TestDatabase;
   let adminToken: string;
-  let originalPool: any;
 
   beforeAll(async () => {
     testDb = await setupTestDatabase();
     adminToken = generateAdminToken();
     
-    // Mock Pool constructor to return our test pool
+    // Replace the Pool mock implementation with our test pool
     (Pool as any).mockImplementation(() => testDb.pool);
+    
+    // Clear the module cache to force re-import with new mock
+    vi.resetModules();
   });
 
   afterAll(async () => {
@@ -77,7 +88,8 @@ describe('Admin Vanity Metrics API', () => {
       const userId = await createTestUser(testDb.pool, { email: 'user1@test.com' });
       const request = createAdminRequest('http://localhost/api/admin/vanity-metrics', adminToken);
       
-      const response = await GET(request);
+      const routeModule = await import('@/app/api/admin/vanity-metrics/route');
+      const response = await routeModule.GET(request);
       
       expect(response.status).toBe(200);
       const data = await response.json();
@@ -95,7 +107,8 @@ describe('Admin Vanity Metrics API', () => {
       await createTestUser(testDb.pool, { email: 'user2@test.com', createdAt: week2 });
       
       const request = createAdminRequest('http://localhost/api/admin/vanity-metrics', adminToken);
-      const response = await GET(request);
+      const routeModule = await import('@/app/api/admin/vanity-metrics/route');
+      const response = await routeModule.GET(request);
       const data = await response.json();
       
       expect(response.status).toBe(200);
@@ -118,7 +131,8 @@ describe('Admin Vanity Metrics API', () => {
       await createTestUser(testDb.pool, { email: 'user2@test.com', createdAt: week2 });
       
       const request = createAdminRequest('http://localhost/api/admin/vanity-metrics', adminToken);
-      const response = await GET(request);
+      const routeModule = await import('@/app/api/admin/vanity-metrics/route');
+      const response = await routeModule.GET(request);
       const data = await response.json();
       
       expect(response.status).toBe(200);
@@ -130,7 +144,8 @@ describe('Admin Vanity Metrics API', () => {
       await createTestTransactions(testDb.pool, userId, 5);
       
       const request = createAdminRequest('http://localhost/api/admin/vanity-metrics', adminToken);
-      const response = await GET(request);
+      const routeModule = await import('@/app/api/admin/vanity-metrics/route');
+      const response = await routeModule.GET(request);
       const data = await response.json();
       
       expect(response.status).toBe(200);
@@ -180,7 +195,8 @@ describe('Admin Vanity Metrics API', () => {
       await createTestUser(testDb.pool, { email: 'user1@test.com', createdAt: week1 });
       
       const request = createAdminRequest('http://localhost/api/admin/vanity-metrics', adminToken);
-      const response = await GET(request);
+      const routeModule = await import('@/app/api/admin/vanity-metrics/route');
+      const response = await routeModule.GET(request);
       const data = await response.json();
       
       expect(response.status).toBe(200);
