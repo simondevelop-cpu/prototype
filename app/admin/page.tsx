@@ -1394,7 +1394,6 @@ export default function AdminDashboard() {
           </div>
         )}
         {analyticsSubTab === 'macro-data' && renderPlaceholder('Macro Data')}
-        {analyticsSubTab === 'app-health' && renderPlaceholder('App Health')}
         
         {analyticsSubTab === 'customer-data' && (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
