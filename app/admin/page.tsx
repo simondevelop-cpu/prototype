@@ -1066,7 +1066,9 @@ export default function AdminDashboard() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1092,7 +1094,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Emotional Calibration</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1108,7 +1112,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Financial Context</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1124,7 +1130,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Motivation</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1140,7 +1148,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Acquisition Source</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1156,7 +1166,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Insight Preferences</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1172,7 +1184,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Account Profile</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1188,14 +1202,18 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Completed Onboarding</td>
-                        {Array.from({ length: 12 }, () => (
-                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                        {(cohortData?.weeks || []).map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countCompletedOnboarding || 0}
+                          </td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg Time to Onboard (days)</td>
-                        {Array.from({ length: 12 }, () => (
-                          <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">-</td>
+                        {(cohortData?.weeks || []).map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.avgTimeToOnboardDays || '-'}
+                          </td>
                         ))}
                       </tr>
                     </tbody>
@@ -1219,7 +1237,9 @@ export default function AdminDashboard() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1243,7 +1263,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Onboarding Completed</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1259,7 +1281,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded First Statement</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1275,7 +1299,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded Two Statements</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1291,7 +1317,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded Three+ Statements</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1313,7 +1341,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to Onboard</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1329,7 +1359,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to First Upload</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1351,7 +1383,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg Transactions per User (of those who uploaded)</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1367,7 +1401,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Users with Transactions</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1383,7 +1419,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2+ unique days</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1401,7 +1439,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg days logged in per month (2+ days)</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -1419,7 +1459,9 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2+ unique months</td>
-                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks && cohortData.weeks.length > 0 
+                          ? cohortData.weeks 
+                          : Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
