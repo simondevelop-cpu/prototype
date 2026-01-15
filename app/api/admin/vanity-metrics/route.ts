@@ -305,8 +305,8 @@ export async function GET(request: NextRequest) {
         }).length;
       }
 
-      // Total transactions uploaded (in the week) - apply data coverage filter if specified
-      let transactionsQuery = `
+      // New transactions uploaded (in the week) - apply data coverage filter if specified
+      let newTransactionsQuery = `
         SELECT COUNT(*) as count
         FROM transactions t
         JOIN users u ON u.id = t.user_id
@@ -315,8 +315,20 @@ export async function GET(request: NextRequest) {
           AND t.created_at <= $${paramIndex + 1}::timestamp
           ${filterConditions}
       `;
+      let newTransactions = 0;
+      
+      // Total transactions uploaded (cumulative up to end of week) - apply data coverage filter if specified
+      let totalTransactionsQuery = `
+        SELECT COUNT(*) as count
+        FROM transactions t
+        JOIN users u ON u.id = t.user_id
+        WHERE u.email != $${adminEmailParamIndex}
+          AND t.created_at <= $${paramIndex}::timestamp
+          ${filterConditions}
+      `;
       let totalTransactions = 0;
       
+      // Calculate new transactions (in the week)
       if (filters.dataCoverage && filters.dataCoverage.length > 0) {
         // Get users matching data coverage criteria
         const usersWithCoverageQuery = `
@@ -334,19 +346,51 @@ export async function GET(request: NextRequest) {
         const usersWithCoverage = await pool.query(usersWithCoverageQuery, filterParams);
         const userIds = usersWithCoverage.rows.map((r: any) => r.id);
         if (userIds.length > 0) {
-          const filteredTransactionsQuery = `
+          const filteredNewTransactionsQuery = `
             SELECT COUNT(*) as count
             FROM transactions t
             WHERE t.user_id = ANY($1::int[])
               AND t.created_at >= $2::timestamp
               AND t.created_at <= $3::timestamp
           `;
-          const filteredResult = await pool.query(filteredTransactionsQuery, [userIds, weekStart, weekEnd]);
+          const filteredResult = await pool.query(filteredNewTransactionsQuery, [userIds, weekStart, weekEnd]);
+          newTransactions = parseInt(filteredResult.rows[0]?.count) || 0;
+        }
+      } else {
+        const newTransactionsResult = await pool.query(newTransactionsQuery, [...filterParams, weekStart, weekEnd]);
+        newTransactions = parseInt(newTransactionsResult.rows[0]?.count) || 0;
+      }
+      
+      // Calculate total transactions (cumulative)
+      if (filters.dataCoverage && filters.dataCoverage.length > 0) {
+        // Get users matching data coverage criteria
+        const usersWithCoverageQuery = `
+          SELECT DISTINCT u.id
+          FROM users u
+          LEFT JOIN transactions t2 ON t2.user_id = u.id
+          WHERE u.email != $${adminEmailParamIndex}
+            ${filterConditions}
+          GROUP BY u.id
+          HAVING 
+            ${filters.dataCoverage.includes('1 upload') ? 'COUNT(DISTINCT t2.id) >= 1' : 'false'}
+            ${filters.dataCoverage.includes('2 uploads') ? 'OR COUNT(DISTINCT t2.id) >= 2' : ''}
+            ${filters.dataCoverage.includes('3+ uploads') ? 'OR COUNT(DISTINCT t2.id) >= 3' : ''}
+        `;
+        const usersWithCoverage = await pool.query(usersWithCoverageQuery, filterParams);
+        const userIds = usersWithCoverage.rows.map((r: any) => r.id);
+        if (userIds.length > 0) {
+          const filteredTotalTransactionsQuery = `
+            SELECT COUNT(*) as count
+            FROM transactions t
+            WHERE t.user_id = ANY($1::int[])
+              AND t.created_at <= $2::timestamp
+          `;
+          const filteredResult = await pool.query(filteredTotalTransactionsQuery, [userIds, weekEnd]);
           totalTransactions = parseInt(filteredResult.rows[0]?.count) || 0;
         }
       } else {
-        const transactionsResult = await pool.query(transactionsQuery, [...filterParams, weekStart, weekEnd]);
-        totalTransactions = parseInt(transactionsResult.rows[0]?.count) || 0;
+        const totalTransactionsResult = await pool.query(totalTransactionsQuery, [...filterParams, weekEnd]);
+        totalTransactions = parseInt(totalTransactionsResult.rows[0]?.count) || 0;
       }
 
       // Total unique banks uploaded (in the week)

@@ -363,7 +363,11 @@ export async function GET(request: NextRequest) {
         COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 3 THEN upload_counts.user_id END) as uploaded_three_plus_statements,
         -- Time to achieve (in days) - excluding NULLs
         AVG(EXTRACT(EPOCH FROM (u.completed_at - u.created_at)) / 86400) FILTER (WHERE u.completed_at IS NOT NULL) as avg_time_to_onboard_days,
-        AVG(EXTRACT(EPOCH FROM (first_upload.first_transaction_date - u.created_at)) / 86400) FILTER (WHERE first_upload.first_transaction_date IS NOT NULL) as avg_time_to_first_upload_days,
+        -- First upload metrics split by first day vs after first day
+        COUNT(DISTINCT CASE WHEN first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) = DATE(u.created_at) THEN u.id END) as users_uploaded_first_day,
+        AVG(EXTRACT(EPOCH FROM (first_upload.first_transaction_date - u.created_at)) / 86400) FILTER (WHERE first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) = DATE(u.created_at)) as avg_time_to_first_upload_first_day_days,
+        COUNT(DISTINCT CASE WHEN first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) > DATE(u.created_at) THEN u.id END) as users_uploaded_after_first_day,
+        AVG(EXTRACT(EPOCH FROM (first_upload.first_transaction_date - u.created_at)) / 86400) FILTER (WHERE first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) > DATE(u.created_at)) as avg_time_to_first_upload_after_first_day_days,
         -- Engagement signals
         AVG(transaction_counts.tx_count) FILTER (WHERE transaction_counts.tx_count > 0) as avg_transactions_per_user,
         COUNT(DISTINCT CASE WHEN transaction_counts.tx_count > 0 THEN u.id END) as users_with_transactions
@@ -531,8 +535,11 @@ export async function GET(request: NextRequest) {
         uploadedThreePlusStatements: parseInt(row.uploaded_three_plus_statements) || 0,
         // Time to achieve (in minutes - converted from days)
         avgTimeToOnboardMinutes: row.avg_time_to_onboard_days ? Math.round(parseFloat(row.avg_time_to_onboard_days) * 1440) : null,
-        avgTimeToFirstUploadMinutes: row.avg_time_to_first_upload_days ? Math.round(parseFloat(row.avg_time_to_first_upload_days) * 1440) : null,
-        avgTimeToFirstUploadDays: row.avg_time_to_first_upload_days ? parseFloat(row.avg_time_to_first_upload_days).toFixed(1) : null,
+        // First upload metrics split by first day vs after first day
+        usersUploadedFirstDay: parseInt(row.users_uploaded_first_day) || 0,
+        avgTimeToFirstUploadFirstDayMinutes: row.avg_time_to_first_upload_first_day_days ? Math.round(parseFloat(row.avg_time_to_first_upload_first_day_days) * 1440) : null,
+        usersUploadedAfterFirstDay: parseInt(row.users_uploaded_after_first_day) || 0,
+        avgTimeToFirstUploadAfterFirstDayDays: row.avg_time_to_first_upload_after_first_day_days ? parseFloat(row.avg_time_to_first_upload_after_first_day_days).toFixed(1) : null,
         // Engagement signals
         avgTransactionsPerUser: row.avg_transactions_per_user ? parseFloat(row.avg_transactions_per_user).toFixed(1) : null,
         usersWithTransactions: parseInt(row.users_with_transactions) || 0,

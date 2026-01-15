@@ -1262,21 +1262,37 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average time to first upload (minutes)</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Number of users who uploaded on the first day</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToFirstUploadMinutes !== undefined 
-                              ? cohortData?.engagement?.[week]?.avgTimeToFirstUploadMinutes 
+                            {cohortData?.engagement?.[week]?.usersUploadedFirstDay || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average time to first upload, who uploaded on their first day (minutes)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadFirstDayMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToFirstUploadFirstDayMinutes !== undefined 
+                              ? cohortData?.engagement?.[week]?.avgTimeToFirstUploadFirstDayMinutes 
                               : '-'}
                           </td>
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average time to first upload (days)</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Number of users who uploaded after the first day</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadDays !== null && cohortData?.engagement?.[week]?.avgTimeToFirstUploadDays !== undefined 
-                              ? cohortData?.engagement?.[week]?.avgTimeToFirstUploadDays 
+                            {cohortData?.engagement?.[week]?.usersUploadedAfterFirstDay || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average time to first upload, who uploaded after the first day (days)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadAfterFirstDayDays !== null && cohortData?.engagement?.[week]?.avgTimeToFirstUploadAfterFirstDayDays !== undefined 
+                              ? cohortData?.engagement?.[week]?.avgTimeToFirstUploadAfterFirstDayDays 
                               : '-'}
                           </td>
                         ))}
