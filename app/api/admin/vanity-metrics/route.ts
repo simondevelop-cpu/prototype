@@ -1,17 +1,14 @@
 /**
  * Vanity Metrics API
  * Returns weekly metrics (Total users, WAU, New users, Transactions, Unique banks)
- * Weekly from beginning of November to now
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
+import { ADMIN_EMAIL, JWT_SECRET } from '@/lib/admin-constants';
 
 export const dynamic = 'force-dynamic';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const ADMIN_EMAIL = 'admin@canadianinsights.ca';
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,
@@ -62,15 +59,10 @@ export async function GET(request: NextRequest) {
         // If it contains parentheses and commas, it's likely a single value that was incorrectly sent
         // We'll check the database to see if this exact string matches any motivation value
         if (intentCategoriesParam.includes('(') && intentCategoriesParam.includes(',')) {
-          // Likely a single value with commas - treat as single value
           intentCategories = [intentCategoriesParam.trim()].filter(Boolean);
-          console.log('[Vanity Metrics] Treating intent category as single value (contains commas):', intentCategoriesParam);
         } else if (intentCategoriesParam.includes(',')) {
-          // Multiple values separated by commas (old format)
           intentCategories = intentCategoriesParam.split(',').map(s => s.trim()).filter(Boolean);
-          console.warn('[Vanity Metrics] Using comma delimiter - values with commas may be incorrectly split');
         } else {
-          // Single value, no delimiter
           intentCategories = [intentCategoriesParam.trim()].filter(Boolean);
         }
       }
@@ -83,9 +75,6 @@ export async function GET(request: NextRequest) {
       cohorts: url.searchParams.get('cohorts')?.split(',').filter(Boolean) || [],
       dataCoverage: url.searchParams.get('dataCoverage')?.split(',').filter(Boolean) || [],
     };
-    
-    console.log('[Vanity Metrics] Raw intentCategories param:', url.searchParams.get('intentCategories'));
-    console.log('[Vanity Metrics] Parsed intentCategories:', intentCategories);
 
     // Check if users table has required columns (schema-adaptive)
     const schemaCheck = await pool.query(`
@@ -103,35 +92,17 @@ export async function GET(request: NextRequest) {
     const filterParams: any[] = [];
     let paramIndex = 1;
 
-    console.log('[Vanity Metrics] Received filters:', {
-      totalAccounts: filters.totalAccounts,
-      validatedEmails: filters.validatedEmails,
-      intentCategories: filters.intentCategories,
-      cohorts: filters.cohorts,
-      dataCoverage: filters.dataCoverage,
-      hasEmailValidated,
-      hasMotivation
-    });
-
-    // Note: totalAccounts = true means show all accounts (no filter)
-    // totalAccounts = false means don't show anything (shouldn't happen, but handle it)
-    // validatedEmails = true means only show validated emails
     if (filters.validatedEmails && hasEmailValidated) {
       filterConditions += ` AND u.email_validated = true`;
-      console.log('[Vanity Metrics] Applied validatedEmails filter');
     }
 
     if (filters.intentCategories && filters.intentCategories.length > 0 && hasMotivation) {
       filterConditions += ` AND u.motivation = ANY($${paramIndex}::text[])`;
       filterParams.push(filters.intentCategories);
-      console.log('[Vanity Metrics] Applied intentCategories filter:', filters.intentCategories);
       paramIndex++;
     }
 
-    // Note: Cohort filter in vanity metrics should NOT filter users in the WHERE clause
-    // It should only control which week columns are displayed in the frontend
-    // Users should be counted across all weeks, but only selected week columns are shown
-    // So we don't add cohort filter to filterConditions here - it's handled in the weeks array filtering
+    // Cohort filter only controls which week columns are displayed, not which users are counted
 
     filterParams.push(ADMIN_EMAIL);
     const adminEmailParamIndex = paramIndex;
@@ -186,10 +157,6 @@ export async function GET(request: NextRequest) {
     const weeks = filters.cohorts && filters.cohorts.length > 0
       ? allWeeks.filter(week => filters.cohorts!.includes(week))
       : allWeeks;
-    
-    console.log('[Vanity Metrics] All weeks:', allWeeks);
-    console.log('[Vanity Metrics] Filtered weeks:', weeks);
-    console.log('[Vanity Metrics] Cohort filter:', filters.cohorts);
 
     // Get metrics for each week (only for weeks that should be displayed)
     const metrics: { [week: string]: any } = {};
@@ -215,13 +182,6 @@ export async function GET(request: NextRequest) {
       `;
       const totalUsersResult = await pool.query(totalUsersQuery, [...filterParams, weekEnd.toISOString().split('T')[0]]);
       let totalUsers = parseInt(totalUsersResult.rows[0]?.count) || 0;
-      
-      if (i === 0) {
-        console.log(`[Vanity Metrics] Week ${weekKey}: Total users before data coverage filter:`, totalUsers);
-        console.log(`[Vanity Metrics] Week ${weekKey}: Filter conditions:`, filterConditions);
-        console.log(`[Vanity Metrics] Week ${weekKey}: Filter params count:`, filterParams.length);
-        console.log(`[Vanity Metrics] Week ${weekKey}: Query params:`, [...filterParams, weekEnd.toISOString().split('T')[0]].length);
-      }
       
       // Apply data coverage filter to total users if specified
       if (filters.dataCoverage && filters.dataCoverage.length > 0 && totalUsers > 0) {
@@ -515,9 +475,6 @@ export async function GET(request: NextRequest) {
         filteredMetrics[week] = metrics[week];
       }
     });
-    
-    console.log('[Vanity Metrics] Returning', Object.keys(filteredMetrics).length, 'weeks of metrics');
-    console.log('[Vanity Metrics] Sample metric (first week):', filteredMetrics[weeks[0]]);
     
     return NextResponse.json({
       success: true,

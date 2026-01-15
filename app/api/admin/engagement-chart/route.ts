@@ -1,18 +1,14 @@
 /**
  * Engagement Chart API
- * Returns data for Chart A: Engagement - number of days logged in
- * Y-axis: Total number of unique days a user has logged in per week
- * X-axis: Week starting from first day a user signed up (going out 12 weeks)
+ * Returns data for engagement chart showing unique login days per week
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
+import { ADMIN_EMAIL, JWT_SECRET } from '@/lib/admin-constants';
 
 export const dynamic = 'force-dynamic';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const ADMIN_EMAIL = 'admin@canadianinsights.ca';
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,

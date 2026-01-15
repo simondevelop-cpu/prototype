@@ -6,11 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
+import { ADMIN_EMAIL, JWT_SECRET } from '@/lib/admin-constants';
 
 export const dynamic = 'force-dynamic';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const ADMIN_EMAIL = 'admin@canadianinsights.ca';
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,
@@ -223,40 +221,6 @@ export async function GET(request: NextRequest) {
     // Execute activation query to get actual signup weeks from data
     const activationResult = await pool.query(activationQuery, filterParams);
     
-    console.log('[Cohort Analysis] Activation query returned', activationResult.rows.length, 'weeks');
-    console.log('[Cohort Analysis] Raw signup weeks from query:', activationResult.rows.map((r: any) => ({
-      week: r.signup_week,
-      formatted: formatWeekLabel(r.signup_week),
-      count: r.count_starting_onboarding,
-      completed: r.count_completed_onboarding
-    })));
-    
-    // Also get distinct signup weeks from users table for comparison
-    try {
-      const distinctWeeksCheck = await pool.query(`
-        SELECT 
-          DATE_TRUNC('week', created_at) as signup_week,
-          COUNT(*) as user_count,
-          COUNT(completed_at) as completed_count,
-          MIN(created_at) as earliest,
-          MAX(created_at) as latest
-        FROM users
-        WHERE email != $1
-        GROUP BY DATE_TRUNC('week', created_at)
-        ORDER BY signup_week DESC
-      `, [ADMIN_EMAIL]);
-      console.log('[Cohort Analysis] Distinct signup weeks from users table:', distinctWeeksCheck.rows.map((r: any) => ({
-        week: r.signup_week,
-        formatted: formatWeekLabel(r.signup_week),
-        user_count: r.user_count,
-        completed_count: r.completed_count,
-        earliest: r.earliest,
-        latest: r.latest
-      })));
-    } catch (e) {
-      console.log('[Cohort Analysis] Could not check distinct weeks:', e);
-    }
-    
     // Extract weeks from activation query results
     const weeksSet = new Set<string>();
     activationResult.rows.forEach((row: any) => {
@@ -295,7 +259,6 @@ export async function GET(request: NextRequest) {
     
     // If no weeks from data, fall back to last 12 weeks
     if (weeks.length === 0) {
-      console.log('[Cohort Analysis] No weeks from data, using fallback');
       const now = new Date();
       const currentWeekStart = new Date(now);
       currentWeekStart.setDate(now.getDate() - now.getDay());
@@ -308,8 +271,6 @@ export async function GET(request: NextRequest) {
         weeks.push(weekLabel);
       }
     }
-    
-    console.log('[Cohort Analysis] Using', weeks.length, 'weeks:', weeks);
 
     // Get engagement metrics
     // Check if user_events table exists
@@ -426,19 +387,13 @@ export async function GET(request: NextRequest) {
       `);
       hasUserEventsTable = eventsTableCheck.rows.length > 0;
     } catch (e) {
-      console.log('[Cohort Analysis] Could not check for user_events table');
+      // Table doesn't exist
     }
 
     // Execute engagement query and extract weeks
     let engagementResult;
     try {
       engagementResult = await pool.query(engagementQuery, filterParams);
-      console.log('[Cohort Analysis] Engagement query returned', engagementResult.rows.length, 'weeks');
-      console.log('[Cohort Analysis] Raw engagement weeks from query:', engagementResult.rows.map((r: any) => ({
-        week: r.signup_week,
-        formatted: formatWeekLabel(r.signup_week),
-        onboarding_completed: r.onboarding_completed
-      })));
       
       // Extract weeks from engagement query results
       engagementResult.rows.forEach((row: any) => {
@@ -484,11 +439,9 @@ export async function GET(request: NextRequest) {
           if (!userEventsData[weekKey]) {
             userEventsData[weekKey] = {};
           }
-          // For now, we'll calculate this more simply - users who logged in 2 or more unique days
-          // This is a simplified version - a full implementation would track across all weeks
         });
       } catch (e) {
-        console.log('[Cohort Analysis] Could not fetch user_events data:', e);
+        // Could not fetch user_events data
       }
     }
 
