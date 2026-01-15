@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Schema-adaptive: Check if onboarding columns exist in users table (post-migration)
+    // Also check if there's actual data in users table, otherwise fall back to onboarding_responses
     let useUsersTable = false;
     let hasLastStep = false;
     let hasAcquisitionOther = false;
@@ -44,12 +45,47 @@ export async function GET(request: NextRequest) {
         WHERE table_name = 'users' 
         AND column_name IN ('completed_at', 'last_step', 'acquisition_other')
       `);
-      useUsersTable = schemaCheck.rows.some(row => row.column_name === 'completed_at');
+      const hasCompletedAtColumn = schemaCheck.rows.some(row => row.column_name === 'completed_at');
       hasLastStep = schemaCheck.rows.some(row => row.column_name === 'last_step');
       hasAcquisitionOther = schemaCheck.rows.some(row => row.column_name === 'acquisition_other');
-      console.log('[Customer Data API] Schema check:', { useUsersTable, hasLastStep, hasAcquisitionOther });
+      
+      // Check if users table has actual onboarding data (not just columns)
+      if (hasCompletedAtColumn) {
+        const dataCheck = await pool.query(`
+          SELECT COUNT(*) as count
+          FROM users
+          WHERE completed_at IS NOT NULL
+          AND email != $1
+        `, [ADMIN_EMAIL]);
+        const usersWithData = parseInt(dataCheck.rows[0]?.count || '0', 10);
+        
+        // Also check if onboarding_responses has data
+        const onboardingCheck = await pool.query(`
+          SELECT COUNT(*) as count
+          FROM onboarding_responses
+        `);
+        const onboardingCount = parseInt(onboardingCheck.rows[0]?.count || '0', 10);
+        
+        // Use users table only if it has data, otherwise prefer onboarding_responses if it has data
+        if (usersWithData > 0) {
+          useUsersTable = true;
+        } else if (onboardingCount > 0) {
+          useUsersTable = false; // Use onboarding_responses instead
+          console.log('[Customer Data API] Users table has columns but no data, using onboarding_responses');
+        } else {
+          useUsersTable = true; // Use users table structure even if empty
+        }
+        
+        console.log('[Customer Data API] Schema and data check:', { 
+          useUsersTable, 
+          hasLastStep, 
+          hasAcquisitionOther,
+          usersWithData,
+          onboardingCount
+        });
+      }
     } catch (e) {
-      console.log('[Customer Data API] Could not check schema, using fallback');
+      console.log('[Customer Data API] Could not check schema, using fallback:', e);
     }
 
     // Check if l0_pii_users table exists (migration status)
@@ -148,6 +184,7 @@ export async function GET(request: NextRequest) {
       if (useL0PII) {
         // Use L0 PII table for compliance (PII isolation) with onboarding_responses
         const selectFields = `
+          u.id as user_id,
           COALESCE(p.email, u.email) as email,
           p.first_name,
           p.last_name,
@@ -163,9 +200,14 @@ export async function GET(request: NextRequest) {
           o.insight_preferences,
           o.insight_other,
           ${hasLastStep ? 'o.last_step,' : ''}
+          false as is_active,
+          false as email_validated,
           o.completed_at,
           COALESCE(p.created_at, u.created_at) as created_at,
-          COALESCE(p.updated_at, o.updated_at) as updated_at
+          COALESCE(p.updated_at, o.updated_at) as updated_at,
+          0 as transaction_count,
+          0 as upload_session_count,
+          NULL as first_transaction_date
         `;
 
         result = await pool.query(`
@@ -185,6 +227,7 @@ export async function GET(request: NextRequest) {
       } else {
         // Fallback to legacy onboarding_responses table (pre-migration)
         const selectFields = `
+          u.id as user_id,
           u.email,
           o.first_name,
           o.last_name,
@@ -200,9 +243,14 @@ export async function GET(request: NextRequest) {
           o.insight_preferences,
           o.insight_other,
           ${hasLastStep ? 'o.last_step,' : ''}
+          false as is_active,
+          false as email_validated,
           o.completed_at,
           o.created_at,
-          o.updated_at
+          o.updated_at,
+          0 as transaction_count,
+          0 as upload_session_count,
+          NULL as first_transaction_date
         `;
 
         result = await pool.query(`

@@ -45,7 +45,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabName>('monitoring');
   const [monitoringSubTab, setMonitoringSubTab] = useState<MonitoringSubTab>('accounts');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
-  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'vanity-metrics'>('cohort-analysis');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'vanity-metrics'>('cohort-analysis');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
   const [stats, setStats] = useState<any>(null);
@@ -72,6 +72,10 @@ export default function AdminDashboard() {
   // State for Customer Data tab
   const [customerData, setCustomerData] = useState<any[]>([]);
   const [customerDataLoading, setCustomerDataLoading] = useState(false);
+  
+  // State for Events Data tab
+  const [eventsData, setEventsData] = useState<any[]>([]);
+  const [eventsDataLoading, setEventsDataLoading] = useState(false);
   
   // State for App Health tab
   const [healthData, setHealthData] = useState<any>(null);
@@ -117,6 +121,23 @@ export default function AdminDashboard() {
       console.error('Error fetching customer data:', error);
     } finally {
       setCustomerDataLoading(false);
+    }
+  };
+
+  // Fetch events data function
+  const fetchEventsData = async () => {
+    setEventsDataLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch('/api/admin/events-data', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setEventsData(data.eventsData || []);
+    } catch (error) {
+      console.error('Error fetching events data:', error);
+    } finally {
+      setEventsDataLoading(false);
     }
   };
 
@@ -277,6 +298,13 @@ export default function AdminDashboard() {
     }
   }, [activeTab, viewType, authenticated]);
 
+  // Fetch events data when Events Data tab is active
+  useEffect(() => {
+    if (activeTab === 'analytics' && analyticsSubTab === 'events-data' && authenticated) {
+      fetchEventsData();
+    }
+  }, [activeTab, analyticsSubTab, authenticated]);
+
   // Fetch customer data when Analytics → Customer Data tab is active
   useEffect(() => {
     if (activeTab === 'analytics' && analyticsSubTab === 'customer-data' && authenticated) {
@@ -427,7 +455,7 @@ export default function AdminDashboard() {
     
     // Flatten all items into a single array with category
     const allItems = Object.entries(currentData).flatMap(([category, items]) =>
-      items.map(item => ({ ...item, category }))
+      (items as any[]).map(item => ({ ...item, category }))
     );
     
     // Get unique values for filters
@@ -937,6 +965,16 @@ export default function AdminDashboard() {
             }`}
           >
             👥 Customer Data
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('events-data')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'events-data'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            📋 Events Data
           </button>
           <button
             onClick={() => setAnalyticsSubTab('vanity-metrics')}
@@ -1907,6 +1945,109 @@ export default function AdminDashboard() {
                     No customer data available yet
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+        
+        {analyticsSubTab === 'events-data' && (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Events Data</h2>
+                <p className="text-gray-600 mt-1">User events and activity tracking from user_events table</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={fetchEventsData}
+                  disabled={eventsDataLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  <svg className={`w-4 h-4 ${eventsDataLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh Data
+                </button>
+              </div>
+            </div>
+
+            {eventsDataLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-600 mt-4">Loading events data...</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Data</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metadata</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created At</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {eventsData.length > 0 ? (
+                      eventsData.map((event) => (
+                        <tr key={event.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm text-gray-600 font-mono">{event.id}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600 font-mono">{event.user_id}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{event.email || '-'}</td>
+                          <td className="px-6 py-4 text-sm">
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                              {event.event_type || 'unknown'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                            {event.event_data ? (
+                              <pre className="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-32">
+                                {typeof event.event_data === 'string' 
+                                  ? event.event_data 
+                                  : JSON.stringify(event.event_data, null, 2)}
+                              </pre>
+                            ) : (
+                              <span className="text-gray-400 italic">null</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                            {event.metadata ? (
+                              <pre className="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-32">
+                                {typeof event.metadata === 'string' 
+                                  ? event.metadata 
+                                  : JSON.stringify(event.metadata, null, 2)}
+                              </pre>
+                            ) : (
+                              <span className="text-gray-400 italic">null</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            {event.created_at 
+                              ? new Date(event.created_at).toLocaleString()
+                              : <span className="text-gray-400 italic">null</span>}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                          <div className="flex flex-col items-center">
+                            <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            <p className="text-lg font-medium mb-2">No events data available</p>
+                            <p className="text-sm text-gray-400">
+                              Events will appear here once the user_events table is created and events are logged.
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
