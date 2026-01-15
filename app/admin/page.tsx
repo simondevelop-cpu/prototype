@@ -94,18 +94,22 @@ export default function AdminDashboard() {
     intentCategories: [] as string[],
     selectedCohorts: [] as string[], // Empty array means all cohorts selected by default
   });
+  const [engagementChartData, setEngagementChartData] = useState<any>(null);
+  const [engagementChartLoading, setEngagementChartLoading] = useState(false);
+  const [chartFilters, setChartFilters] = useState({
+    totalAccounts: true,
+    validatedEmails: false,
+    intentCategories: [] as string[],
+    cohorts: [] as string[],
+    dataCoverage: [] as string[],
+    userIds: [] as number[],
+  });
   const [vanityFilters, setVanityFilters] = useState({
     totalAccounts: true,
     validatedEmails: false,
     intentCategories: [] as string[],
-  });
-  const [engagementChartData, setEngagementChartData] = useState<any>(null);
-  const [engagementChartLoading, setEngagementChartLoading] = useState(false);
-  const [chartFilters, setChartFilters] = useState({
     cohorts: [] as string[],
-    intentCategories: [] as string[],
     dataCoverage: [] as string[],
-    userIds: [] as number[],
   });
 
   // Fetch customer data function (used by Refresh button and initial load)
@@ -215,6 +219,8 @@ export default function AdminDashboard() {
     try {
       const token = localStorage.getItem('admin_token');
       const params = new URLSearchParams({
+        totalAccounts: chartFilters.totalAccounts.toString(),
+        validatedEmails: chartFilters.validatedEmails.toString(),
         cohorts: chartFilters.cohorts.join(','),
         intentCategories: chartFilters.intentCategories.join(','),
         dataCoverage: chartFilters.dataCoverage.join(','),
@@ -1083,7 +1089,7 @@ export default function AdminDashboard() {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Number of users completed by onboarding step / Number of users by activity completed</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
                         {displayWeeks.map((week: string) => (
                           <th key={week} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                             {week}
@@ -1095,7 +1101,7 @@ export default function AdminDashboard() {
                       {/* Activation Section */}
                       <tr className="bg-gray-50">
                         <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
-                          Activation - Number Completed Onboarding Steps
+                          Number of users by onboarding step completed
                         </td>
                       </tr>
                       <tr>
@@ -1163,23 +1169,19 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg Time to Onboard (days)</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg Time to Onboard (minutes)</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.activation?.[week]?.avgTimeToOnboardDays || '-'}
+                            {cohortData?.activation?.[week]?.avgTimeToOnboardMinutes !== null && cohortData?.activation?.[week]?.avgTimeToOnboardMinutes !== undefined 
+                              ? cohortData?.activation?.[week]?.avgTimeToOnboardMinutes 
+                              : '-'}
                           </td>
                         ))}
                       </tr>
                       {/* Engagement Section */}
                       <tr className="bg-gray-50">
                         <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
-                          Engagement - Activities Completed by Signup Week
-                        </td>
-                      </tr>
-                      {/* Onboarding and Data Coverage Section */}
-                      <tr className="bg-gray-50">
-                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
-                          Onboarding and Data Coverage
+                          Number of users by activity completed
                         </td>
                       </tr>
                       <tr>
@@ -1217,14 +1219,16 @@ export default function AdminDashboard() {
                       {/* Time to Achieve Section */}
                       <tr className="bg-gray-50">
                         <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
-                          Time to Achieve (days, excluding users who haven't completed)
+                          Time to Achieve (minutes, excluding users who haven't completed)
                         </td>
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to Onboard</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.avgTimeToOnboardDays || '-'}
+                            {cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes !== undefined 
+                              ? cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes 
+                              : '-'}
                           </td>
                         ))}
                       </tr>
@@ -1232,7 +1236,9 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to First Upload</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadDays || '-'}
+                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToFirstUploadMinutes !== undefined 
+                              ? cohortData?.engagement?.[week]?.avgTimeToFirstUploadMinutes 
+                              : '-'}
                           </td>
                         ))}
                       </tr>
@@ -1308,38 +1314,59 @@ export default function AdminDashboard() {
               
               {/* Chart Filters */}
               <div className="p-4 bg-gray-50 border-b border-gray-200">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <CheckboxDropdown
-                    label="Cohorts"
-                    options={cohortData?.weeks || []}
-                    selected={chartFilters.cohorts}
-                    onChange={(selected) => setChartFilters({ ...chartFilters, cohorts: selected })}
-                    placeholder="Select cohorts..."
-                  />
-                  <CheckboxDropdown
-                    label="Intent"
-                    options={intentCategoriesLoading ? [] : intentCategories}
-                    selected={chartFilters.intentCategories}
-                    onChange={(selected) => setChartFilters({ ...chartFilters, intentCategories: selected })}
-                    placeholder={intentCategoriesLoading ? 'Loading...' : 'Select intent...'}
-                    disabled={intentCategoriesLoading}
-                  />
-                  <CheckboxDropdown
-                    label="Data Coverage"
-                    options={['1 upload', '2 uploads', '3+ uploads']}
-                    selected={chartFilters.dataCoverage}
-                    onChange={(selected) => setChartFilters({ ...chartFilters, dataCoverage: selected })}
-                    placeholder="Select data coverage..."
-                  />
-                  <div className="flex items-end">
-                    <button
-                      onClick={fetchEngagementChart}
-                      disabled={engagementChartLoading}
-                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
-                    >
-                      {engagementChartLoading ? 'Loading...' : 'Refresh Chart'}
-                    </button>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Filters</h3>
+                <div className="flex flex-wrap gap-4 items-end">
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Account Type"
+                      options={['Total Accounts', 'Validated Emails']}
+                      selected={[
+                        ...(chartFilters.totalAccounts ? ['Total Accounts'] : []),
+                        ...(chartFilters.validatedEmails ? ['Validated Emails'] : [])
+                      ]}
+                      onChange={(selected) => setChartFilters({ 
+                        ...chartFilters, 
+                        totalAccounts: selected.includes('Total Accounts'),
+                        validatedEmails: selected.includes('Validated Emails')
+                      })}
+                      placeholder="Select account type..."
+                    />
                   </div>
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Intent Categories"
+                      options={intentCategoriesLoading ? [] : intentCategories}
+                      selected={chartFilters.intentCategories}
+                      onChange={(selected) => setChartFilters({ ...chartFilters, intentCategories: selected })}
+                      placeholder={intentCategoriesLoading ? 'Loading...' : 'Select intent categories...'}
+                      disabled={intentCategoriesLoading}
+                    />
+                  </div>
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Cohorts"
+                      options={cohortData?.weeks || []}
+                      selected={chartFilters.cohorts.length === 0 ? (cohortData?.weeks || []) : chartFilters.cohorts}
+                      onChange={(selected) => setChartFilters({ ...chartFilters, cohorts: selected })}
+                      placeholder="Select cohorts... (default: all)"
+                    />
+                  </div>
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Data Coverage"
+                      options={['1 upload', '2 uploads', '3+ uploads']}
+                      selected={chartFilters.dataCoverage}
+                      onChange={(selected) => setChartFilters({ ...chartFilters, dataCoverage: selected })}
+                      placeholder="Select data coverage..."
+                    />
+                  </div>
+                  <button
+                    onClick={fetchEngagementChart}
+                    disabled={engagementChartLoading}
+                    className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                  >
+                    {engagementChartLoading ? 'Loading...' : 'Refresh Chart'}
+                  </button>
                 </div>
               </div>
 
@@ -1387,32 +1414,53 @@ export default function AdminDashboard() {
                         }}
                       />
                       <Legend />
-                      {engagementChartData.userLines.map((userLine: any, idx: number) => {
-                        // Transform weeks data for chart
-                        const chartData = userLine.weeks.map((w: any) => ({
-                          week: w.week,
-                          loginDays: w.loginDays,
-                          userId: userLine.userId,
-                          cohortWeek: userLine.cohortWeek,
-                          intentType: userLine.intentType,
-                          dataCoverage: userLine.dataCoverage,
-                        }));
+                      {(() => {
+                        // Create unified week structure - ensure weeks 0-11 appear only once on X-axis
+                        const allWeeks = Array.from({ length: 12 }, (_, i) => i);
                         
-                        const color = `hsl(${(idx * 137.5) % 360}, 70%, 50%)`;
+                        // Transform data so each user line has data for all weeks 0-11
+                        const transformedLines = engagementChartData.userLines.map((userLine: any, idx: number) => {
+                          const weekMap = new Map(userLine.weeks.map((w: any) => [w.week, w.loginDays]));
+                          const chartData = allWeeks.map(weekNum => ({
+                            week: weekNum,
+                            [`user_${userLine.userId}`]: weekMap.get(weekNum) || 0,
+                            userId: userLine.userId,
+                            cohortWeek: userLine.cohortWeek,
+                            intentType: userLine.intentType,
+                            dataCoverage: userLine.dataCoverage,
+                          }));
+                          
+                          const color = `hsl(${(idx * 137.5) % 360}, 70%, 50%)`;
+                          return {
+                            userId: userLine.userId,
+                            dataKey: `user_${userLine.userId}`,
+                            color,
+                            name: `User ${userLine.userId}`,
+                            data: chartData,
+                          };
+                        });
+                        
+                        // Use first line's data for X-axis (all have same week structure)
+                        const xAxisData = transformedLines[0]?.data || [];
+                        
                         return (
-                          <Line
-                            key={userLine.userId}
-                            type="monotone"
-                            dataKey="loginDays"
-                            data={chartData}
-                            stroke={color}
-                            strokeWidth={2}
-                            dot={{ r: 4 }}
-                            name={`User ${userLine.userId}`}
-                            connectNulls
-                          />
+                          <>
+                            {transformedLines.map((line: any) => (
+                              <Line
+                                key={line.userId}
+                                type="monotone"
+                                dataKey={line.dataKey}
+                                data={xAxisData}
+                                stroke={line.color}
+                                strokeWidth={2}
+                                dot={{ r: 4 }}
+                                name={line.name}
+                                connectNulls
+                              />
+                            ))}
+                          </>
                         );
-                      })}
+                      })()}
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -1434,27 +1482,25 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             {/* Vanity Metrics Table */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-900">Vanity Metrics</h3>
-                <div className="flex gap-2 items-end">
-                  <label className="flex items-center text-sm">
-                    <input
-                      type="checkbox"
-                      checked={vanityFilters.totalAccounts}
-                      onChange={(e) => setVanityFilters({ ...vanityFilters, totalAccounts: e.target.checked })}
-                      className="mr-2"
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Vanity Metrics</h3>
+                <div className="flex flex-wrap gap-4 items-end">
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Account Type"
+                      options={['Total Accounts', 'Validated Emails']}
+                      selected={[
+                        ...(vanityFilters.totalAccounts ? ['Total Accounts'] : []),
+                        ...(vanityFilters.validatedEmails ? ['Validated Emails'] : [])
+                      ]}
+                      onChange={(selected) => setVanityFilters({ 
+                        ...vanityFilters, 
+                        totalAccounts: selected.includes('Total Accounts'),
+                        validatedEmails: selected.includes('Validated Emails')
+                      })}
+                      placeholder="Select account type..."
                     />
-                    Total Accounts
-                  </label>
-                  <label className="flex items-center text-sm">
-                    <input
-                      type="checkbox"
-                      checked={vanityFilters.validatedEmails}
-                      onChange={(e) => setVanityFilters({ ...vanityFilters, validatedEmails: e.target.checked })}
-                      className="mr-2"
-                    />
-                    Validated Emails
-                  </label>
+                  </div>
                   <div className="min-w-[200px]">
                     <CheckboxDropdown
                       label="Intent Categories"
@@ -1465,10 +1511,28 @@ export default function AdminDashboard() {
                       disabled={intentCategoriesLoading}
                     />
                   </div>
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Cohorts"
+                      options={cohortData?.weeks || []}
+                      selected={vanityFilters.cohorts.length === 0 ? (cohortData?.weeks || []) : vanityFilters.cohorts}
+                      onChange={(selected) => setVanityFilters({ ...vanityFilters, cohorts: selected })}
+                      placeholder="Select cohorts... (default: all)"
+                    />
+                  </div>
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Data Coverage"
+                      options={['1 upload', '2 uploads', '3+ uploads']}
+                      selected={vanityFilters.dataCoverage}
+                      onChange={(selected) => setVanityFilters({ ...vanityFilters, dataCoverage: selected })}
+                      placeholder="Select data coverage..."
+                    />
+                  </div>
                   <button
                     onClick={fetchVanityMetrics}
                     disabled={vanityLoading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                    className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
                   >
                     {vanityLoading ? 'Loading...' : 'Refresh'}
                   </button>

@@ -167,12 +167,26 @@ export async function GET(request: NextRequest) {
 
     filterParams.push(ADMIN_EMAIL);
     
+    // Helper function to format week consistently (adjust PostgreSQL Monday-start to Sunday-start for display)
+    const formatWeekLabel = (weekDate: any): string => {
+      if (!weekDate) return '';
+      const weekStart = new Date(weekDate);
+      const dayOfWeek = weekStart.getDay();
+      const adjustedWeekStart = new Date(weekStart);
+      if (dayOfWeek !== 0) {
+        adjustedWeekStart.setDate(weekStart.getDate() - dayOfWeek);
+      }
+      adjustedWeekStart.setHours(0, 0, 0, 0);
+      return `w/c ${adjustedWeekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    };
+    
     // Execute activation query to get actual signup weeks from data
     const activationResult = await pool.query(activationQuery, filterParams);
     
     console.log('[Cohort Analysis] Activation query returned', activationResult.rows.length, 'weeks');
     console.log('[Cohort Analysis] Raw signup weeks from query:', activationResult.rows.map((r: any) => ({
       week: r.signup_week,
+      formatted: formatWeekLabel(r.signup_week),
       count: r.count_starting_onboarding,
       completed: r.count_completed_onboarding
     })));
@@ -193,6 +207,7 @@ export async function GET(request: NextRequest) {
       `, [ADMIN_EMAIL]);
       console.log('[Cohort Analysis] Distinct signup weeks from users table:', distinctWeeksCheck.rows.map((r: any) => ({
         week: r.signup_week,
+        formatted: formatWeekLabel(r.signup_week),
         user_count: r.user_count,
         completed_count: r.completed_count,
         earliest: r.earliest,
@@ -202,31 +217,11 @@ export async function GET(request: NextRequest) {
       console.log('[Cohort Analysis] Could not check distinct weeks:', e);
     }
     
-    // Extract weeks from activation query results first
-    const signupWeeks = activationResult.rows.map((row: any) => row.signup_week);
+    // Extract weeks from activation query results
     const weeksSet = new Set<string>();
-    
-    signupWeeks.forEach((weekDate: any) => {
-      if (weekDate) {
-        // DATE_TRUNC('week', ...) in PostgreSQL returns Monday as start of week
-        // Convert to JavaScript Date and adjust to Sunday for display
-        const weekStart = new Date(weekDate);
-        // PostgreSQL DATE_TRUNC week starts Monday (day 1), JavaScript Sunday is day 0
-        // If weekStart is Monday, we need to go back 1 day to get Sunday
-        const dayOfWeek = weekStart.getDay();
-        const adjustedWeekStart = new Date(weekStart);
-        // Adjust: if Monday (1), go back 1 day to Sunday (0)
-        // If Sunday (0), no change needed
-        // If Tuesday-Saturday (2-6), go back to previous Sunday
-        if (dayOfWeek === 0) {
-          // Already Sunday, use as-is
-        } else {
-          // Go back to previous Sunday
-          adjustedWeekStart.setDate(weekStart.getDate() - dayOfWeek);
-        }
-        adjustedWeekStart.setHours(0, 0, 0, 0);
-        const weekLabel = `w/c ${adjustedWeekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-        weeksSet.add(weekLabel);
+    activationResult.rows.forEach((row: any) => {
+      if (row.signup_week) {
+        weeksSet.add(formatWeekLabel(row.signup_week));
       }
     });
     
@@ -367,7 +362,27 @@ export async function GET(request: NextRequest) {
       console.log('[Cohort Analysis] Could not check for user_events table');
     }
 
-    const engagementResult = await pool.query(engagementQuery, filterParams);
+    // Execute engagement query and extract weeks
+    let engagementResult;
+    try {
+      engagementResult = await pool.query(engagementQuery, filterParams);
+      console.log('[Cohort Analysis] Engagement query returned', engagementResult.rows.length, 'weeks');
+      console.log('[Cohort Analysis] Raw engagement weeks from query:', engagementResult.rows.map((r: any) => ({
+        week: r.signup_week,
+        formatted: formatWeekLabel(r.signup_week),
+        onboarding_completed: r.onboarding_completed
+      })));
+      
+      // Extract weeks from engagement query results
+      engagementResult.rows.forEach((row: any) => {
+        if (row.signup_week) {
+          weeksSet.add(formatWeekLabel(row.signup_week));
+        }
+      });
+    } catch (error: any) {
+      console.error('[Cohort Analysis] Error fetching engagement data:', error);
+      engagementResult = { rows: [] };
+    }
 
     // Get user_events data if table exists
     let userEventsData: any = {};
@@ -415,7 +430,7 @@ export async function GET(request: NextRequest) {
     const engagementByWeek: { [week: string]: any } = {};
 
     activationResult.rows.forEach((row: any) => {
-      const weekKey = `w/c ${new Date(row.signup_week).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+      const weekKey = formatWeekLabel(row.signup_week);
       activationByWeek[weekKey] = {
         countStartingOnboarding: parseInt(row.count_starting_onboarding) || 0,
         countDropOffStep1: parseInt(row.count_drop_off_step_1) || 0,
@@ -426,21 +441,22 @@ export async function GET(request: NextRequest) {
         countDropOffStep6: parseInt(row.count_drop_off_step_6) || 0,
         countDropOffStep7: parseInt(row.count_drop_off_step_7) || 0,
         countCompletedOnboarding: parseInt(row.count_completed_onboarding) || 0,
-        avgTimeToOnboardDays: row.avg_time_to_onboard_days ? parseFloat(row.avg_time_to_onboard_days).toFixed(1) : null,
+        // Convert days to minutes (multiply by 1440 minutes per day)
+        avgTimeToOnboardMinutes: row.avg_time_to_onboard_days ? Math.round(parseFloat(row.avg_time_to_onboard_days) * 1440) : null,
       };
     });
 
     engagementResult.rows.forEach((row: any) => {
-      const weekKey = `w/c ${new Date(row.signup_week).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+      const weekKey = formatWeekLabel(row.signup_week);
       engagementByWeek[weekKey] = {
         // Onboarding and data coverage
         onboardingCompleted: parseInt(row.onboarding_completed) || 0,
         uploadedFirstStatement: parseInt(row.uploaded_first_statement) || 0,
         uploadedTwoStatements: parseInt(row.uploaded_two_statements) || 0,
         uploadedThreePlusStatements: parseInt(row.uploaded_three_plus_statements) || 0,
-        // Time to achieve (in days)
-        avgTimeToOnboardDays: row.avg_time_to_onboard_days ? parseFloat(row.avg_time_to_onboard_days).toFixed(1) : null,
-        avgTimeToFirstUploadDays: row.avg_time_to_first_upload_days ? parseFloat(row.avg_time_to_first_upload_days).toFixed(1) : null,
+        // Time to achieve (in minutes - converted from days)
+        avgTimeToOnboardMinutes: row.avg_time_to_onboard_days ? Math.round(parseFloat(row.avg_time_to_onboard_days) * 1440) : null,
+        avgTimeToFirstUploadMinutes: row.avg_time_to_first_upload_days ? Math.round(parseFloat(row.avg_time_to_first_upload_days) * 1440) : null,
         // Engagement signals
         avgTransactionsPerUser: row.avg_transactions_per_user ? parseFloat(row.avg_transactions_per_user).toFixed(1) : null,
         usersWithTransactions: parseInt(row.users_with_transactions) || 0,
