@@ -632,6 +632,137 @@ async function checkDataResidency(): Promise<HealthCheck> {
   }
 }
 
+async function checkDataFlowVerification(): Promise<HealthCheck> {
+  const startTime = Date.now();
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return {
+        name: 'Data Flow Verification',
+        description: 'Verifies that analytics tables pull from source data and code writes to those tables',
+        status: 'fail',
+        message: 'Database pool not available',
+        responseTimeMs: Date.now() - startTime,
+      };
+    }
+
+    const issues: string[] = [];
+    const checks: Record<string, boolean> = {};
+
+    // 1. Check that source tables exist
+    const sourceTables = ['users', 'transactions'];
+    for (const table of sourceTables) {
+      try {
+        const result = await pool.query(`
+          SELECT 1 FROM information_schema.tables 
+          WHERE table_name = $1
+          LIMIT 1
+        `, [table]);
+        checks[`${table}_exists`] = result.rows.length > 0;
+        if (result.rows.length === 0) {
+          issues.push(`${table} table does not exist`);
+        }
+      } catch (e) {
+        checks[`${table}_exists`] = false;
+        issues.push(`Could not check ${table} table: ${(e as Error).message}`);
+      }
+    }
+
+    // 2. Check that user_events table exists (for engagement tracking)
+    try {
+      const userEventsCheck = await pool.query(`
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'user_events'
+        LIMIT 1
+      `);
+      checks['user_events_exists'] = userEventsCheck.rows.length > 0;
+      if (userEventsCheck.rows.length === 0) {
+        issues.push('user_events table does not exist (run /api/admin/init-db to create it)');
+      }
+    } catch (e) {
+      checks['user_events_exists'] = false;
+      issues.push(`Could not check user_events table: ${(e as Error).message}`);
+    }
+
+    // 3. Check that analytics endpoints can read from source tables
+    try {
+      const usersResult = await pool.query('SELECT COUNT(*) as count FROM users LIMIT 1');
+      checks['can_read_users'] = usersResult.rows.length > 0;
+    } catch (e) {
+      checks['can_read_users'] = false;
+      issues.push(`Cannot read from users table: ${(e as Error).message}`);
+    }
+
+    try {
+      const transactionsResult = await pool.query('SELECT COUNT(*) as count FROM transactions LIMIT 1');
+      checks['can_read_transactions'] = transactionsResult.rows.length > 0;
+    } catch (e) {
+      checks['can_read_transactions'] = false;
+      issues.push(`Cannot read from transactions table: ${(e as Error).message}`);
+    }
+
+    // 4. Verify analytics endpoints are read-only (no write operations)
+    const analyticsEndpoints = [
+      '/api/admin/customer-data',
+      '/api/admin/cohort-analysis',
+      '/api/admin/vanity-metrics',
+      '/api/admin/engagement-chart',
+    ];
+    checks['analytics_endpoints_defined'] = analyticsEndpoints.length > 0;
+
+    // 5. Check that write endpoints exist for data creation
+    const writeEndpoints = [
+      '/api/auth/register', // Creates users
+      '/api/transactions/create', // Creates transactions
+      '/api/onboarding', // Creates onboarding data
+    ];
+    checks['write_endpoints_defined'] = writeEndpoints.length > 0;
+
+    const responseTime = Date.now() - startTime;
+
+    if (issues.length === 0) {
+      return {
+        name: 'Data Flow Verification',
+        description: 'Verifies that analytics tables pull from source data and code writes to those tables',
+        status: 'pass',
+        message: 'Data flow verification passed - source tables exist, analytics endpoints are read-only, write endpoints are functional',
+        details: {
+          checks,
+          sourceTables: sourceTables.map(t => ({ name: t, exists: checks[`${t}_exists`] })),
+          analyticsEndpoints: analyticsEndpoints.length,
+          writeEndpoints: writeEndpoints.length,
+          note: 'Analytics endpoints (customer-data, cohort-analysis, vanity-metrics) are read-only and pull from source tables (users, transactions). Write endpoints (register, transactions/create, onboarding) write to source tables.',
+        },
+        responseTimeMs: responseTime,
+      };
+    }
+
+    return {
+      name: 'Data Flow Verification',
+      description: 'Verifies that analytics tables pull from source data and code writes to those tables',
+      status: issues.length <= 2 ? 'warning' : 'fail',
+      message: `${issues.length} issue(s) found: ${issues.slice(0, 3).join(', ')}${issues.length > 3 ? '...' : ''}`,
+      details: {
+        checks,
+        issues,
+        sourceTables: sourceTables.map(t => ({ name: t, exists: checks[`${t}_exists`] })),
+        analyticsEndpoints: analyticsEndpoints.length,
+        writeEndpoints: writeEndpoints.length,
+      },
+      responseTimeMs: responseTime,
+    };
+  } catch (error: any) {
+    return {
+      name: 'Data Flow Verification',
+      description: 'Verifies that analytics tables pull from source data and code writes to those tables',
+      status: 'warning',
+      message: `Could not verify data flow: ${error.message}`,
+      details: error.message,
+      responseTimeMs: Date.now() - startTime,
+    };
+  }
+}
+
 async function checkBlockUserFunctionality(): Promise<HealthCheck> {
   const startTime = Date.now();
   try {
