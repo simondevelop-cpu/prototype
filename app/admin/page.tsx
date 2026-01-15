@@ -1161,56 +1161,28 @@ export default function AdminDashboard() {
               {/* Chart Filters */}
               <div className="p-4 bg-gray-50 border-b border-gray-200">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Cohorts:</label>
-                    <select
-                      multiple
-                      value={chartFilters.cohorts}
-                      onChange={(e) => {
-                        const selected = Array.from(e.target.selectedOptions, option => option.value);
-                        setChartFilters({ ...chartFilters, cohorts: selected });
-                      }}
-                      className="text-sm border border-gray-300 rounded px-2 py-1 w-full max-h-24 overflow-y-auto"
-                      size={Math.min(cohortData?.weeks?.length || 1, 4)}
-                    >
-                      {cohortData?.weeks?.map((week: string) => (
-                        <option key={week} value={week}>{week}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Intent:</label>
-                    <select
-                      multiple
-                      value={chartFilters.intentCategories}
-                      onChange={(e) => {
-                        const selected = Array.from(e.target.selectedOptions, option => option.value);
-                        setChartFilters({ ...chartFilters, intentCategories: selected });
-                      }}
-                      className="text-sm border border-gray-300 rounded px-2 py-1 w-full max-h-24 overflow-y-auto"
-                      size={Math.min(intentCategories.length || 1, 4)}
-                    >
-                      {intentCategories.map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Data Coverage:</label>
-                    <select
-                      multiple
-                      value={chartFilters.dataCoverage}
-                      onChange={(e) => {
-                        const selected = Array.from(e.target.selectedOptions, option => option.value);
-                        setChartFilters({ ...chartFilters, dataCoverage: selected });
-                      }}
-                      className="text-sm border border-gray-300 rounded px-2 py-1 w-full"
-                    >
-                      <option value="1 upload">1 upload</option>
-                      <option value="2 uploads">2 uploads</option>
-                      <option value="3+ uploads">3+ uploads</option>
-                    </select>
-                  </div>
+                  <CheckboxDropdown
+                    label="Cohorts"
+                    options={cohortData?.weeks || []}
+                    selected={chartFilters.cohorts}
+                    onChange={(selected) => setChartFilters({ ...chartFilters, cohorts: selected })}
+                    placeholder="Select cohorts..."
+                  />
+                  <CheckboxDropdown
+                    label="Intent"
+                    options={intentCategoriesLoading ? [] : intentCategories}
+                    selected={chartFilters.intentCategories}
+                    onChange={(selected) => setChartFilters({ ...chartFilters, intentCategories: selected })}
+                    placeholder={intentCategoriesLoading ? 'Loading...' : 'Select intent...'}
+                    disabled={intentCategoriesLoading}
+                  />
+                  <CheckboxDropdown
+                    label="Data Coverage"
+                    options={['1 upload', '2 uploads', '3+ uploads']}
+                    selected={chartFilters.dataCoverage}
+                    onChange={(selected) => setChartFilters({ ...chartFilters, dataCoverage: selected })}
+                    placeholder="Select data coverage..."
+                  />
                   <div className="flex items-end">
                     <button
                       onClick={fetchEngagementChart}
