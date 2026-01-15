@@ -123,6 +123,20 @@ export async function GET(request: NextRequest) {
       console.log('[Customer Data API] Could not check for l0_pii_users');
     }
 
+    // Check if transactions table has upload_session_id column
+    let hasUploadSessionId = false;
+    try {
+      const uploadSessionCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'transactions' 
+        AND column_name = 'upload_session_id'
+      `);
+      hasUploadSessionId = uploadSessionCheck.rows.length > 0;
+    } catch (e) {
+      console.log('[Customer Data API] Could not check for upload_session_id column');
+    }
+
     // Use appropriate table based on where data exists
     let result;
     
@@ -332,17 +346,30 @@ export async function GET(request: NextRequest) {
         : `FROM users u
            INNER JOIN onboarding_responses o ON o.user_id = u.id`;
 
+      // Build transaction stats subquery based on schema
+      const transactionStatsQuery = hasUploadSessionId ? `
+        SELECT 
+          user_id,
+          COUNT(DISTINCT id) as transaction_count,
+          COUNT(DISTINCT upload_session_id) FILTER (WHERE upload_session_id IS NOT NULL) as upload_session_count,
+          MIN(created_at) as first_transaction_date
+        FROM transactions
+        GROUP BY user_id
+      ` : `
+        SELECT 
+          user_id,
+          COUNT(DISTINCT id) as transaction_count,
+          0 as upload_session_count,
+          MIN(created_at) as first_transaction_date
+        FROM transactions
+        GROUP BY user_id
+      `;
+
       result = await pool.query(`
         SELECT ${selectFields}
         ${fromClause}
         LEFT JOIN (
-          SELECT 
-            user_id,
-            COUNT(DISTINCT id) as transaction_count,
-            COUNT(DISTINCT upload_session_id) FILTER (WHERE upload_session_id IS NOT NULL) as upload_session_count,
-            MIN(created_at) as first_transaction_date
-          FROM transactions
-          GROUP BY user_id
+          ${transactionStatsQuery}
         ) transaction_stats ON transaction_stats.user_id = u.id
         WHERE u.email != $1
         ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
