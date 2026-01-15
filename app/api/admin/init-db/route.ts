@@ -85,6 +85,34 @@ async function initializeTables() {
     `);
     console.log('[DB Init] ✅ categorization_learning table created');
     
+    // Create user_events table for login and dashboard access tracking
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_events (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        event_type TEXT NOT NULL,
+        event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        metadata JSONB,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    console.log('[DB Init] ✅ user_events table created');
+    
+    // Create indexes for user_events table
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_user_events_user_id ON user_events(user_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_user_events_type ON user_events(event_type)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_user_events_timestamp ON user_events(event_timestamp)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_user_events_user_type ON user_events(user_id, event_type)
+    `);
+    console.log('[DB Init] ✅ user_events indexes created');
+    
     // Create onboarding_responses table
     await client.query(`
       CREATE TABLE IF NOT EXISTS onboarding_responses (

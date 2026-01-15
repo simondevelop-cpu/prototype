@@ -76,6 +76,35 @@ export async function POST(request: NextRequest) {
     }
 
     const user = userResult.rows[0];
+
+    // Check if user is blocked (is_active = false)
+    // Schema-adaptive: check if is_active column exists
+    let isActive = true;
+    try {
+      const activeCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' 
+        AND column_name = 'is_active'
+      `);
+      if (activeCheck.rows.length > 0) {
+        const userActiveCheck = await pool.query(
+          'SELECT is_active FROM users WHERE id = $1',
+          [user.id]
+        );
+        isActive = userActiveCheck.rows[0]?.is_active !== false; // Default to true if NULL
+      }
+    } catch (e) {
+      // Column doesn't exist or error - default to allowing login
+      console.log('[Login] Could not check is_active, allowing login');
+    }
+
+    if (!isActive) {
+      return NextResponse.json(
+        { error: 'Account has been disabled. Please contact support.' },
+        { status: 403 }
+      );
+    }
     
     // Verify password (supports both bcrypt and legacy SHA-256)
     const isValid = await verifyPassword(password, user.password_hash);

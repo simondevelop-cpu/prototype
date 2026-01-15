@@ -51,18 +51,51 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user has completed onboarding
-    const result = await pool.query(
-      `SELECT 
-        COUNT(DISTINCT CASE WHEN completed_at IS NOT NULL THEN id END) as completed_count,
-        MAX(last_step) as last_step
-       FROM onboarding_responses 
-       WHERE user_id = $1`,
-      [userId]
-    );
+    // Schema-adaptive: Check if onboarding columns exist in users table (post-migration)
+    let hasCompletedAtInUsers = false;
+    try {
+      const schemaCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' 
+        AND column_name = 'completed_at'
+      `);
+      hasCompletedAtInUsers = schemaCheck.rows.length > 0;
+    } catch (e) {
+      console.log('[Onboarding Status API] Could not check schema, using fallback');
+    }
 
-    const completedCount = parseInt(result.rows[0]?.completed_count) || 0;
-    const lastStep = parseInt(result.rows[0]?.last_step) || 0;
-    const hasCompleted = completedCount > 0;
+    let hasCompleted = false;
+    let lastStep = 0;
+
+    if (hasCompletedAtInUsers) {
+      // Use users table (post-migration)
+      const result = await pool.query(
+        `SELECT completed_at, last_step
+         FROM users 
+         WHERE id = $1`,
+        [userId]
+      );
+      
+      if (result.rows.length > 0) {
+        hasCompleted = result.rows[0].completed_at !== null;
+        lastStep = parseInt(result.rows[0]?.last_step || '0') || 0;
+      }
+    } else {
+      // Fallback to onboarding_responses table (pre-migration)
+      const result = await pool.query(
+        `SELECT 
+          COUNT(DISTINCT CASE WHEN completed_at IS NOT NULL THEN id END) as completed_count,
+          MAX(last_step) as last_step
+         FROM onboarding_responses 
+         WHERE user_id = $1`,
+        [userId]
+      );
+      
+      const completedCount = parseInt(result.rows[0]?.completed_count) || 0;
+      lastStep = parseInt(result.rows[0]?.last_step) || 0;
+      hasCompleted = completedCount > 0;
+    }
 
     return NextResponse.json({ 
       hasCompleted,

@@ -108,17 +108,44 @@ export async function GET(request: NextRequest) {
       transactions = txResult.rows;
     }
 
-    // Get onboarding responses
-    const onboardingResult = await pool.query(`
-      SELECT emotional_state, financial_context, motivation, motivation_other,
-             acquisition_source, insight_preferences, insight_other,
-             completed_at, created_at, updated_at
-      FROM onboarding_responses
-      WHERE user_id = $1
-      ORDER BY created_at DESC
-      LIMIT 1
-    `, [userId]);
-    const onboarding = onboardingResult.rows.length > 0 ? onboardingResult.rows[0] : null;
+    // Get onboarding responses - Schema-adaptive: check if columns exist in users table
+    let onboarding: any = null;
+    try {
+      const schemaCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' 
+        AND column_name = 'completed_at'
+      `);
+      const useUsersTable = schemaCheck.rows.length > 0;
+
+      if (useUsersTable) {
+        // Use users table (post-migration)
+        const onboardingResult = await pool.query(`
+          SELECT emotional_state, financial_context, motivation, motivation_other,
+                 acquisition_source, acquisition_other, insight_preferences, insight_other,
+                 last_step, completed_at, updated_at
+          FROM users
+          WHERE id = $1
+        `, [userId]);
+        onboarding = onboardingResult.rows.length > 0 ? onboardingResult.rows[0] : null;
+      } else {
+        // Fallback to onboarding_responses table (pre-migration)
+        const onboardingResult = await pool.query(`
+          SELECT emotional_state, financial_context, motivation, motivation_other,
+                 acquisition_source, insight_preferences, insight_other,
+                 completed_at, created_at, updated_at
+          FROM onboarding_responses
+          WHERE user_id = $1
+          ORDER BY created_at DESC
+          LIMIT 1
+        `, [userId]);
+        onboarding = onboardingResult.rows.length > 0 ? onboardingResult.rows[0] : null;
+      }
+    } catch (error: any) {
+      console.error('[Account Export] Error fetching onboarding data:', error);
+      // Continue without onboarding data if there's an error
+    }
 
     // Compile export data
     const exportData = {

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pg from 'pg';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '@/lib/admin-constants';
 
 const { Pool } = pg;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // Initialize database connection
 const pool = new Pool({
