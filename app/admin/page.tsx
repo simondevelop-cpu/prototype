@@ -230,23 +230,25 @@ export default function AdminDashboard() {
   }, [viewType, activeTab, authenticated]);
 
   // Fetch users when Accounts tab is active
+  // Fetch users function (used by Accounts tab and block button)
+  const fetchUsers = async () => {
+    setAccountsLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch('/api/admin/users', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setUsers(data.users || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setAccountsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'accounts' && authenticated) {
-      const fetchUsers = async () => {
-        setAccountsLoading(true);
-        try {
-          const token = localStorage.getItem('admin_token');
-          const response = await fetch('/api/admin/users', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const data = await response.json();
-          setUsers(data.users || []);
-        } catch (error) {
-          console.error('Error fetching users:', error);
-        } finally {
-          setAccountsLoading(false);
-        }
-      };
       fetchUsers();
     }
   }, [activeTab, authenticated]);
@@ -812,17 +814,20 @@ export default function AdminDashboard() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email Address</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Login Attempts</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Validated Email</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registered</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {users.map((user, index) => (
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-900">{users.length - index}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600 font-mono">{user.id}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{user.login_attempts || 0}</td>
                     <td className="px-6 py-4 text-sm">
@@ -837,6 +842,44 @@ export default function AdminDashboard() {
                     <td className="px-6 py-4 text-sm text-gray-600">{user.email_validated ? 'True' : 'False'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {new Date(user.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      <button
+                        onClick={async () => {
+                          const newStatus = !user.is_active;
+                          try {
+                            const token = localStorage.getItem('admin_token');
+                            const response = await fetch('/api/admin/users/block', {
+                              method: 'POST',
+                              headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({
+                                userId: user.id,
+                                isActive: newStatus,
+                              }),
+                            });
+                            const data = await response.json();
+                            if (response.ok) {
+                              // Refresh users list
+                              fetchUsers();
+                            } else {
+                              alert(`Failed to ${newStatus ? 'enable' : 'block'} user: ${data.error}`);
+                            }
+                          } catch (error) {
+                            console.error('Error blocking user:', error);
+                            alert('Error updating user status');
+                          }
+                        }}
+                        className={`px-3 py-1 rounded text-xs font-medium ${
+                          user.is_active
+                            ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                            : 'bg-green-100 text-green-800 hover:bg-green-200'
+                        } transition-colors`}
+                      >
+                        {user.is_active ? 'Block' : 'Enable'}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -960,16 +1003,15 @@ export default function AdminDashboard() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
-                        {Array.from({ length: 12 }, (_, i) => {
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
                           const now = new Date();
                           const currentWeekStart = new Date(now);
                           currentWeekStart.setDate(now.getDate() - now.getDay());
                           currentWeekStart.setHours(0, 0, 0, 0);
                           const weekStart = new Date(currentWeekStart);
                           weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
-                          const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-                          return weekLabel;
-                        }).map((week: string) => (
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
                           <th key={week} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                             {week}
                           </th>
@@ -1022,13 +1064,21 @@ export default function AdminDashboard() {
                 <div className="text-center py-12">
                   <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
                 </div>
-              ) : cohortData ? (
+              ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
-                        {cohortData.weeks?.map((week: string) => (
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
                           <th key={week} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                             {week}
                           </th>
@@ -1038,89 +1088,161 @@ export default function AdminDashboard() {
                     <tbody className="divide-y divide-gray-200 bg-white">
                       {/* Onboarding and Data Coverage Section */}
                       <tr className="bg-gray-50">
-                        <td colSpan={(cohortData.weeks?.length || 0) + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                        <td colSpan={((cohortData?.weeks?.length || 12) + 1)} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
                           Onboarding and Data Coverage
                         </td>
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Onboarding Completed</td>
-                        {cohortData.weeks?.map((week: string) => (
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData.engagement?.[week]?.onboardingCompleted || 0}
+                            {cohortData?.engagement?.[week]?.onboardingCompleted || 0}
                           </td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded First Statement</td>
-                        {cohortData.weeks?.map((week: string) => (
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData.engagement?.[week]?.uploadedFirstStatement || 0}
+                            {cohortData?.engagement?.[week]?.uploadedFirstStatement || 0}
                           </td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded Two Statements</td>
-                        {cohortData.weeks?.map((week: string) => (
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData.engagement?.[week]?.uploadedTwoStatements || 0}
+                            {cohortData?.engagement?.[week]?.uploadedTwoStatements || 0}
                           </td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded Three+ Statements</td>
-                        {cohortData.weeks?.map((week: string) => (
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData.engagement?.[week]?.uploadedThreePlusStatements || 0}
+                            {cohortData?.engagement?.[week]?.uploadedThreePlusStatements || 0}
                           </td>
                         ))}
                       </tr>
                       {/* Time to Achieve Section */}
                       <tr className="bg-gray-50">
-                        <td colSpan={(cohortData.weeks?.length || 0) + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                        <td colSpan={((cohortData?.weeks?.length || 12) + 1)} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
                           Time to Achieve (days, excluding users who haven't completed)
                         </td>
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to Onboard</td>
-                        {cohortData.weeks?.map((week: string) => (
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData.engagement?.[week]?.avgTimeToOnboardDays || '-'}
+                            {cohortData?.engagement?.[week]?.avgTimeToOnboardDays || '-'}
                           </td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to First Upload</td>
-                        {cohortData.weeks?.map((week: string) => (
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData.engagement?.[week]?.avgTimeToFirstUploadDays || '-'}
+                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadDays || '-'}
                           </td>
                         ))}
                       </tr>
                       {/* Engagement Signals Section */}
                       <tr className="bg-gray-50">
-                        <td colSpan={(cohortData.weeks?.length || 0) + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                        <td colSpan={((cohortData?.weeks?.length || 12) + 1)} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
                           Engagement Signals
                         </td>
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg Transactions per User (of those who uploaded)</td>
-                        {cohortData.weeks?.map((week: string) => (
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData.engagement?.[week]?.avgTransactionsPerUser || '-'}
+                            {cohortData?.engagement?.[week]?.avgTransactionsPerUser || '-'}
                           </td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Users with Transactions</td>
-                        {cohortData.weeks?.map((week: string) => (
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData.engagement?.[week]?.usersWithTransactions || 0}
+                            {cohortData?.engagement?.[week]?.usersWithTransactions || 0}
                           </td>
                         ))}
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-400 italic">Logged in 2+ unique days</td>
-                        {cohortData.weeks?.map((week: string) => (
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-400 italic">
                             Requires user_events table
                           </td>
@@ -1128,7 +1250,15 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-400 italic">Avg days logged in per month (2+ days)</td>
-                        {cohortData.weeks?.map((week: string) => (
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-400 italic">
                             Requires user_events table
                           </td>
@@ -1136,7 +1266,15 @@ export default function AdminDashboard() {
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-400 italic">Logged in 2+ unique months</td>
-                        {cohortData.weeks?.map((week: string) => (
+                        {(cohortData?.weeks || Array.from({ length: 12 }, (_, i) => {
+                          const now = new Date();
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weekStart = new Date(currentWeekStart);
+                          weekStart.setDate(currentWeekStart.getDate() - ((11 - i) * 7));
+                          return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                        })).map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-400 italic">
                             Requires user_events table
                           </td>
@@ -1144,10 +1282,6 @@ export default function AdminDashboard() {
                       </tr>
                     </tbody>
                   </table>
-                </div>
-              ) : (
-                <div className="text-center py-12 text-gray-500">
-                  No engagement data available.
                 </div>
               )}
             </div>
@@ -1479,6 +1613,7 @@ export default function AdminDashboard() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Name</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Name</th>
@@ -1489,6 +1624,8 @@ export default function AdminDashboard() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acquisition</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Insights Wanted</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Insight Suggestions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email Validated</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Is Active</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Created</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Onboarding Completed</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Onboarding Status</th>
@@ -1496,7 +1633,8 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
                     {customerData.map((user) => (
-                      <tr key={user.email} className="hover:bg-gray-50">
+                      <tr key={user.user_id || user.id || user.email} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-600 font-mono">{user.user_id || user.id || '-'}</td>
                         <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {user.first_name || <span className="text-gray-400 italic">null</span>}
@@ -1532,6 +1670,12 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
                           {user.insight_other || <span className="text-gray-400 italic">null</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.email_validated ? <span className="text-green-600 font-medium">True</span> : <span className="text-gray-400">False</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {user.is_active !== false ? <span className="text-green-600 font-medium">True</span> : <span className="text-red-600 font-medium">False</span>}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {user.created_at 

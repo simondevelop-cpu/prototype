@@ -68,8 +68,25 @@ export async function GET(request: NextRequest) {
     // Fetch all customer data - use users table if migrated, fallback to onboarding_responses
     let result;
     if (useUsersTable) {
-      // Use users table (post-migration) - Simplified: read from users directly
+      // Check if is_active and email_validated columns exist
+      let hasIsActive = false;
+      let hasEmailValidated = false;
+      try {
+        const activeCheck = await pool.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'users' 
+          AND column_name IN ('is_active', 'email_validated')
+        `);
+        hasIsActive = activeCheck.rows.some(row => row.column_name === 'is_active');
+        hasEmailValidated = activeCheck.rows.some(row => row.column_name === 'email_validated');
+      } catch (e) {
+        console.log('[Customer Data API] Could not check is_active/email_validated');
+      }
+
+      // Use users table (post-migration) - Include ALL variables used in dashboard
       const selectFields = `
+        u.id as user_id,
         COALESCE(p.email, u.email) as email,
         p.first_name,
         p.last_name,
@@ -85,6 +102,8 @@ export async function GET(request: NextRequest) {
         u.insight_preferences,
         u.insight_other,
         ${hasLastStep ? 'u.last_step,' : ''}
+        ${hasIsActive ? 'u.is_active,' : 'true as is_active,'}
+        ${hasEmailValidated ? 'u.email_validated,' : 'false as email_validated,'}
         u.completed_at,
         u.created_at,
         u.updated_at

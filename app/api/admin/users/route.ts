@@ -57,12 +57,38 @@ export async function GET(request: NextRequest) {
       console.log('[Users API] Could not check schema');
     }
 
+    // Check if is_active and email_validated columns exist
+    let hasIsActive = false;
+    let hasEmailValidated = false;
+    try {
+      const activeCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' 
+        AND column_name IN ('is_active', 'email_validated')
+      `);
+      hasIsActive = activeCheck.rows.some(row => row.column_name === 'is_active');
+      hasEmailValidated = activeCheck.rows.some(row => row.column_name === 'email_validated');
+    } catch (e) {
+      console.log('[Users API] Could not check is_active/email_validated columns');
+    }
+
     // Fetch all users with transaction count, onboarding completion, and login attempts
     const selectFields = hasLoginAttempts 
       ? 'u.id, u.email, u.created_at, COALESCE(u.login_attempts, 0) as login_attempts'
       : 'u.id, u.email, u.created_at, 0 as login_attempts';
     
-    const groupByFields = hasLoginAttempts
+    const activeFields = hasIsActive && hasEmailValidated
+      ? ', COALESCE(u.is_active, true) as is_active, COALESCE(u.email_validated, false) as email_validated'
+      : hasIsActive
+      ? ', COALESCE(u.is_active, true) as is_active, false as email_validated'
+      : hasEmailValidated
+      ? ', true as is_active, COALESCE(u.email_validated, false) as email_validated'
+      : ', true as is_active, false as email_validated';
+    
+    const groupByFields = hasLoginAttempts && hasIsActive && hasEmailValidated
+      ? 'u.id, u.email, u.created_at, u.login_attempts, u.is_active, u.email_validated'
+      : hasLoginAttempts
       ? 'u.id, u.email, u.created_at, u.login_attempts'
       : 'u.id, u.email, u.created_at';
 
@@ -71,15 +97,16 @@ export async function GET(request: NextRequest) {
       // Use users table (post-migration) - Single source of truth
       result = await pool.query(`
         SELECT 
-          ${selectFields},
+          ${selectFields}${activeFields},
           COUNT(DISTINCT t.id) as transaction_count,
           MAX(t.created_at) as last_activity,
           COUNT(DISTINCT CASE WHEN u.completed_at IS NOT NULL THEN u.id END) as completed_onboarding_count
         FROM users u
         LEFT JOIN transactions t ON u.id = t.user_id
-        GROUP BY ${groupByFields}
+        WHERE u.email != $1
+        GROUP BY ${groupByFields}${hasIsActive && hasEmailValidated ? ', u.is_active, u.email_validated' : ''}
         ORDER BY u.created_at DESC
-      `);
+      `, [ADMIN_EMAIL]);
     } else {
       // Fallback to onboarding_responses table (pre-migration)
       result = await pool.query(`
