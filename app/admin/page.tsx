@@ -45,7 +45,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabName>('monitoring');
   const [monitoringSubTab, setMonitoringSubTab] = useState<MonitoringSubTab>('accounts');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
-  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'vanity-metrics'>('cohort-analysis');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'vanity-metrics' | 'bug-reports' | 'user-feedback'>('cohort-analysis');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
   const [stats, setStats] = useState<any>(null);
@@ -1031,6 +1031,26 @@ export default function AdminDashboard() {
           >
             📈 Vanity Metrics
           </button>
+          <button
+            onClick={() => setAnalyticsSubTab('bug-reports')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'bug-reports'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            🐛 Bug Reports
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('user-feedback')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'user-feedback'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            💬 User Feedback
+          </button>
         </div>
 
         {/* Content */}
@@ -1124,7 +1144,7 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Starting Onboarding</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Count starting onboarding</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countStartingOnboarding || 0}
@@ -1132,7 +1152,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Emotional Calibration</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop off: emotional calibration</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countDropOffStep1 || 0}
@@ -1140,7 +1160,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Financial Context</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop off: financial context</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countDropOffStep2 || 0}
@@ -1148,7 +1168,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Motivation</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop off: motivation</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countDropOffStep3 || 0}
@@ -1156,7 +1176,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Acquisition Source</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop off: acquisition source</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countDropOffStep4 || 0}
@@ -1164,7 +1184,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Insight Preferences</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop off: insight preferences</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countDropOffStep5 || 0}
@@ -1172,7 +1192,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop Off: Account Profile</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop off: account profile</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countDropOffStep7 || 0}
@@ -1180,7 +1200,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Completed Onboarding</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Count completed onboarding</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.countCompletedOnboarding || 0}
@@ -1188,7 +1208,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg Time to Onboard (minutes)</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg time to onboard (minutes)</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.activation?.[week]?.avgTimeToOnboardMinutes !== null && cohortData?.activation?.[week]?.avgTimeToOnboardMinutes !== undefined 
@@ -1204,7 +1224,7 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Onboarding Completed</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Onboarding completed</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.engagement?.[week]?.onboardingCompleted || 0}
@@ -1212,7 +1232,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded First Statement</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded first statement</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.engagement?.[week]?.uploadedFirstStatement || 0}
@@ -1220,7 +1240,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded Two Statements</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded two statements</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.engagement?.[week]?.uploadedTwoStatements || 0}
@@ -1228,7 +1248,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded Three+ Statements</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded three+ statements</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.engagement?.[week]?.uploadedThreePlusStatements || 0}
@@ -1242,7 +1262,7 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to Onboard</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to onboard</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes !== undefined 
@@ -1252,7 +1272,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to First Upload</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to first upload</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.engagement?.[week]?.avgTimeToFirstUploadMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToFirstUploadMinutes !== undefined 
@@ -1268,7 +1288,7 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg Transactions per User (of those who uploaded)</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg transactions per user (of those who uploaded)</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.engagement?.[week]?.avgTransactionsPerUser || '-'}
@@ -1276,7 +1296,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Users with Transactions</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Users with transactions</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.engagement?.[week]?.usersWithTransactions || 0}
@@ -1313,6 +1333,16 @@ export default function AdminDashboard() {
                           </td>
                         ))}
                       </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average number of unique months users have logged in, of those who have logged in more than one unique month</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.avgUniqueMonthsLoggedIn || '-')
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                          </td>
+                        ))}
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -1325,7 +1355,7 @@ export default function AdminDashboard() {
             {/* Engagement Chart - Number of Days Logged In */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Engagement - Number of Days Logged In</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Unique days logged in per week from first day signed up</h3>
                 <p className="text-sm text-gray-600 mt-1">
                   Y-axis: Total unique days logged in per week | X-axis: Week from signup (12 weeks)
                 </p>
@@ -1438,11 +1468,8 @@ export default function AdminDashboard() {
                         type="number"
                         domain={[0, 11]}
                         ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]}
-                        label={{ value: 'Week from Signup', position: 'insideBottom', offset: -5 }}
                       />
-                      <YAxis 
-                        label={{ value: 'Unique Login Days', angle: -90, position: 'insideLeft' }}
-                      />
+                      <YAxis />
                       <Tooltip 
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
@@ -1600,7 +1627,7 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total Users</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total users</td>
                         {vanityData?.weeks?.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {vanityData.metrics?.[week]?.totalUsers || 0}
@@ -1627,7 +1654,7 @@ export default function AdminDashboard() {
                         })()}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Weekly Active Users</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Weekly active users</td>
                         {vanityData?.weeks?.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {vanityData.metrics?.[week]?.weeklyActiveUsers || 0}
@@ -1654,7 +1681,7 @@ export default function AdminDashboard() {
                         })()}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">New Users per Week</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">New users per week</td>
                         {vanityData?.weeks?.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {vanityData.metrics?.[week]?.newUsers || 0}
@@ -1681,7 +1708,7 @@ export default function AdminDashboard() {
                         })()}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total Transactions Uploaded</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total transactions uploaded</td>
                         {vanityData?.weeks?.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {vanityData.metrics?.[week]?.totalTransactionsUploaded || 0}
@@ -1708,7 +1735,34 @@ export default function AdminDashboard() {
                         })()}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total Unique Banks Uploaded</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total transactions recategorised</td>
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.totalTransactionsRecategorised || 0}
+                          </td>
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total unique banks uploaded</td>
                         {vanityData?.weeks?.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {vanityData.metrics?.[week]?.totalUniqueBanksUploaded || 0}

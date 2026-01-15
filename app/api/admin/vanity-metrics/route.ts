@@ -55,19 +55,24 @@ export async function GET(request: NextRequest) {
       // URLSearchParams.get() already decodes %7C to |
       if (intentCategoriesParam.includes('|')) {
         intentCategories = intentCategoriesParam.split('|').map(s => s.trim()).filter(Boolean);
-      } else if (intentCategoriesParam.includes(',')) {
-        // Fallback to comma for backward compatibility, but warn if values might contain commas
-        intentCategories = intentCategoriesParam.split(',').map(s => s.trim()).filter(Boolean);
-        // Check if any value contains a comma (which would indicate incorrect splitting)
-        const hasCommasInValues = intentCategories.some(cat => 
-          cat.includes('(') && cat.includes(')') && !cat.includes('|')
-        );
-        if (hasCommasInValues) {
-          console.warn('[Vanity Metrics] Intent categories may have been incorrectly split on commas. Consider using pipe delimiter.');
-        }
       } else {
-        // Single value, no delimiter
-        intentCategories = [intentCategoriesParam.trim()].filter(Boolean);
+        // No pipe delimiter - could be:
+        // 1. Single value (might contain commas)
+        // 2. Multiple values separated by commas (old format)
+        // If it contains parentheses and commas, it's likely a single value that was incorrectly sent
+        // We'll check the database to see if this exact string matches any motivation value
+        if (intentCategoriesParam.includes('(') && intentCategoriesParam.includes(',')) {
+          // Likely a single value with commas - treat as single value
+          intentCategories = [intentCategoriesParam.trim()].filter(Boolean);
+          console.log('[Vanity Metrics] Treating intent category as single value (contains commas):', intentCategoriesParam);
+        } else if (intentCategoriesParam.includes(',')) {
+          // Multiple values separated by commas (old format)
+          intentCategories = intentCategoriesParam.split(',').map(s => s.trim()).filter(Boolean);
+          console.warn('[Vanity Metrics] Using comma delimiter - values with commas may be incorrectly split');
+        } else {
+          // Single value, no delimiter
+          intentCategories = [intentCategoriesParam.trim()].filter(Boolean);
+        }
       }
     }
     
