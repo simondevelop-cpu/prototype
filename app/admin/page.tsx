@@ -116,9 +116,28 @@ export default function AdminDashboard() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('[Customer Data] API error:', data);
+        if (data.migrationRequired) {
+          alert(`Migration required: ${data.message || 'Please run the migration first.'}`);
+        } else {
+          alert(`Error fetching customer data: ${data.error || 'Unknown error'}`);
+        }
+        setCustomerData([]);
+        return;
+      }
+      
+      console.log('[Customer Data] Received data:', {
+        count: data.customerData?.length || 0,
+        source: data.source,
+        migrationComplete: data.migrationComplete
+      });
+      
       setCustomerData(data.customerData || []);
     } catch (error) {
       console.error('Error fetching customer data:', error);
+      setCustomerData([]);
     } finally {
       setCustomerDataLoading(false);
     }

@@ -186,6 +186,8 @@ export async function GET(request: NextRequest) {
          LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL`
       : `FROM users u`;
 
+    console.log('[Customer Data API] Querying users table, useL0PII:', useL0PII, 'hasLastStep:', hasLastStep, 'hasAcquisitionOther:', hasAcquisitionOther);
+    
     result = await pool.query(`
       SELECT ${selectFields}
       ${fromClause}
@@ -202,7 +204,16 @@ export async function GET(request: NextRequest) {
       ORDER BY u.completed_at DESC NULLS LAST, u.created_at DESC
     `, [ADMIN_EMAIL]);
       
-      console.log(`[Customer Data API] Returning ${result.rows.length} customer records from users table`);
+    console.log(`[Customer Data API] Query returned ${result.rows.length} customer records from users table`);
+    if (result.rows.length > 0) {
+      console.log('[Customer Data API] Sample record:', {
+        user_id: result.rows[0].user_id,
+        email: result.rows[0].email?.substring(0, 30),
+        has_motivation: !!result.rows[0].motivation,
+        has_emotional_state: !!result.rows[0].emotional_state,
+        has_completed_at: !!result.rows[0].completed_at
+      });
+    }
     } else {
       // Use onboarding_responses table (pre-migration or data not migrated yet)
       console.log('[Customer Data API] Using onboarding_responses table');
