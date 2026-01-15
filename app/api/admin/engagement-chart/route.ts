@@ -19,6 +19,8 @@ const pool = new Pool({
 });
 
 interface ChartFilters {
+  totalAccounts?: boolean;
+  validatedEmails?: boolean;
   cohorts?: string[]; // Signup weeks to include
   intentCategories?: string[];
   dataCoverage?: string[]; // ['1 upload', '2 uploads', '3+ uploads']
@@ -47,6 +49,8 @@ export async function GET(request: NextRequest) {
     // Parse query parameters
     const url = new URL(request.url);
     const filters: ChartFilters = {
+      totalAccounts: url.searchParams.get('totalAccounts') === 'true',
+      validatedEmails: url.searchParams.get('validatedEmails') === 'true',
       cohorts: url.searchParams.get('cohorts')?.split(',').filter(Boolean) || [],
       intentCategories: url.searchParams.get('intentCategories')?.split(',').filter(Boolean) || [],
       dataCoverage: url.searchParams.get('dataCoverage')?.split(',').filter(Boolean) || [],
@@ -58,11 +62,12 @@ export async function GET(request: NextRequest) {
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_name = 'users' 
-      AND column_name IN ('completed_at', 'motivation')
+      AND column_name IN ('completed_at', 'motivation', 'email_validated')
     `);
     
     const useUsersTable = schemaCheck.rows.some(row => row.column_name === 'completed_at');
     const hasMotivation = schemaCheck.rows.some(row => row.column_name === 'motivation');
+    const hasEmailValidated = schemaCheck.rows.some(row => row.column_name === 'email_validated');
 
     // Check if user_events table exists
     let hasUserEvents = false;
@@ -96,6 +101,11 @@ export async function GET(request: NextRequest) {
     let filterConditions = '';
     const filterParams: any[] = [];
     let paramIndex = 1;
+
+    // Note: totalAccounts = true means show all accounts (no filter)
+    if (filters.validatedEmails && hasEmailValidated) {
+      filterConditions += ` AND u.email_validated = true`;
+    }
 
     if (filters.userIds && filters.userIds.length > 0) {
       filterConditions += ` AND u.id = ANY($${paramIndex})`;

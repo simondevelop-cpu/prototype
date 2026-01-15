@@ -20,6 +20,7 @@ interface CohortFilters {
   totalAccounts?: boolean;
   validatedEmails?: boolean;
   intentCategories?: string[];
+  cohorts?: string[];
 }
 
 export async function GET(request: NextRequest) {
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
       totalAccounts: url.searchParams.get('totalAccounts') === 'true',
       validatedEmails: url.searchParams.get('validatedEmails') === 'true',
       intentCategories: url.searchParams.get('intentCategories')?.split(',').filter(Boolean) || [],
+      cohorts: url.searchParams.get('cohorts')?.split(',').filter(Boolean) || [],
     };
 
     // Check where data actually exists - be flexible
@@ -118,6 +120,42 @@ export async function GET(request: NextRequest) {
       filterConditions += ` AND u.motivation = ANY($${paramIndex})`;
       filterParams.push(filters.intentCategories);
       paramIndex++;
+    }
+
+    // Filter by cohorts (signup weeks) - only filter users if cohorts are specified
+    if (filters.cohorts && filters.cohorts.length > 0) {
+      const cohortDates = filters.cohorts.map(cohort => {
+        const match = cohort.match(/w\/c (\d+) (\w+) (\d+)/);
+        if (match) {
+          const day = parseInt(match[1]);
+          const monthName = match[2];
+          const year = parseInt(match[3]);
+          const monthMap: { [key: string]: number } = {
+            'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+            'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+          };
+          const month = monthMap[monthName] ?? 0;
+          return new Date(year, month, day);
+        }
+        return null;
+      }).filter(Boolean) as Date[];
+      
+      if (cohortDates.length > 0) {
+        const dateConditions = cohortDates.map((date, idx) => {
+          const weekStart = new Date(date);
+          weekStart.setDate(date.getDate() - date.getDay());
+          weekStart.setHours(0, 0, 0, 0);
+          return `(DATE_TRUNC('week', u.created_at) = DATE_TRUNC('week', $${paramIndex + idx}::timestamp))`;
+        }).join(' OR ');
+        filterConditions += ` AND (${dateConditions})`;
+        cohortDates.forEach(date => {
+          const weekStart = new Date(date);
+          weekStart.setDate(date.getDate() - date.getDay());
+          weekStart.setHours(0, 0, 0, 0);
+          filterParams.push(weekStart);
+          paramIndex++;
+        });
+      }
     }
 
     // Get activation metrics (onboarding steps) - from appropriate table

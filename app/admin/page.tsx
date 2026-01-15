@@ -174,6 +174,7 @@ export default function AdminDashboard() {
         totalAccounts: cohortFilters.totalAccounts.toString(),
         validatedEmails: cohortFilters.validatedEmails.toString(),
         intentCategories: cohortFilters.intentCategories.join(','),
+        cohorts: cohortFilters.selectedCohorts.join(','),
       });
       const response = await fetch(`/api/admin/cohort-analysis?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -1416,51 +1417,48 @@ export default function AdminDashboard() {
                         }}
                       />
                       <Legend />
-                      {engagementChartData.userLines.map((userLine: any, idx: number) => {
-                        // Transform weeks data for chart - ensure weeks 0-11 are properly structured
-                        const chartData = userLine.weeks
-                          .sort((a: any, b: any) => a.week - b.week) // Ensure weeks are sorted
-                          .map((w: any) => ({
-                            week: w.week,
-                            loginDays: w.loginDays,
-                            userId: userLine.userId,
-                            cohortWeek: userLine.cohortWeek,
-                            intentType: userLine.intentType,
-                            dataCoverage: userLine.dataCoverage,
-                          }));
-                        
-                        // Fill in missing weeks (0-11) with 0 if needed
+                      {(() => {
+                        // Create unified data structure - all lines share same x-axis (weeks 0-11)
                         const allWeeks = Array.from({ length: 12 }, (_, i) => i);
-                        const weekMap = new Map(chartData.map((d: any) => [d.week, d]));
-                        const completeChartData = allWeeks.map(weekNum => {
-                          if (weekMap.has(weekNum)) {
-                            return weekMap.get(weekNum);
-                          }
-                          return {
-                            week: weekNum,
-                            loginDays: 0,
-                            userId: userLine.userId,
-                            cohortWeek: userLine.cohortWeek,
-                            intentType: userLine.intentType,
-                            dataCoverage: userLine.dataCoverage,
-                          };
+                        
+                        // Build a map of week -> user data for each user
+                        const userDataByWeek = new Map<number, Map<number, number>>();
+                        engagementChartData.userLines.forEach((userLine: any) => {
+                          const weekMap = new Map<number, number>();
+                          userLine.weeks.forEach((w: any) => {
+                            weekMap.set(w.week, w.loginDays);
+                          });
+                          userDataByWeek.set(userLine.userId, weekMap);
                         });
                         
-                        const color = `hsl(${(idx * 137.5) % 360}, 70%, 50%)`;
-                        return (
-                          <Line
-                            key={userLine.userId}
-                            type="monotone"
-                            dataKey="loginDays"
-                            data={completeChartData}
-                            stroke={color}
-                            strokeWidth={2}
-                            dot={{ r: 4 }}
-                            name={`User ${userLine.userId}`}
-                            connectNulls
-                          />
-                        );
-                      })}
+                        // Create unified data array where each entry has week and all user values
+                        const unifiedData = allWeeks.map(weekNum => {
+                          const dataPoint: any = { week: weekNum };
+                          engagementChartData.userLines.forEach((userLine: any) => {
+                            const weekMap = userDataByWeek.get(userLine.userId);
+                            dataPoint[`user_${userLine.userId}`] = weekMap?.get(weekNum) || 0;
+                          });
+                          return dataPoint;
+                        });
+                        
+                        // Render lines using unified data
+                        return engagementChartData.userLines.map((userLine: any, idx: number) => {
+                          const color = `hsl(${(idx * 137.5) % 360}, 70%, 50%)`;
+                          return (
+                            <Line
+                              key={userLine.userId}
+                              type="monotone"
+                              dataKey={`user_${userLine.userId}`}
+                              data={unifiedData}
+                              stroke={color}
+                              strokeWidth={2}
+                              dot={{ r: 4 }}
+                              name={`User ${userLine.userId}`}
+                              connectNulls
+                            />
+                          );
+                        });
+                      })()}
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
