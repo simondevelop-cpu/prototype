@@ -1173,6 +1173,165 @@ export default function AdminDashboard() {
               )}
             </div>
 
+            {/* Engagement Chart - Number of Days Logged In */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">Engagement - Number of Days Logged In</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Y-axis: Total unique days logged in per week | X-axis: Week from signup (12 weeks)
+                </p>
+              </div>
+              
+              {/* Chart Filters */}
+              <div className="p-4 bg-gray-50 border-b border-gray-200">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Cohorts:</label>
+                    <select
+                      multiple
+                      value={chartFilters.cohorts}
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.selectedOptions, option => option.value);
+                        setChartFilters({ ...chartFilters, cohorts: selected });
+                      }}
+                      className="text-sm border border-gray-300 rounded px-2 py-1 w-full max-h-24 overflow-y-auto"
+                      size={Math.min(cohortData?.weeks?.length || 1, 4)}
+                    >
+                      {cohortData?.weeks?.map((week: string) => (
+                        <option key={week} value={week}>{week}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Intent:</label>
+                    <select
+                      multiple
+                      value={chartFilters.intentCategories}
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.selectedOptions, option => option.value);
+                        setChartFilters({ ...chartFilters, intentCategories: selected });
+                      }}
+                      className="text-sm border border-gray-300 rounded px-2 py-1 w-full max-h-24 overflow-y-auto"
+                      size={Math.min(intentCategories.length || 1, 4)}
+                    >
+                      {intentCategories.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Data Coverage:</label>
+                    <select
+                      multiple
+                      value={chartFilters.dataCoverage}
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.selectedOptions, option => option.value);
+                        setChartFilters({ ...chartFilters, dataCoverage: selected });
+                      }}
+                      className="text-sm border border-gray-300 rounded px-2 py-1 w-full"
+                    >
+                      <option value="1 upload">1 upload</option>
+                      <option value="2 uploads">2 uploads</option>
+                      <option value="3+ uploads">3+ uploads</option>
+                    </select>
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      onClick={fetchEngagementChart}
+                      disabled={engagementChartLoading}
+                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                    >
+                      {engagementChartLoading ? 'Loading...' : 'Refresh Chart'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {engagementChartLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                  <p className="text-gray-600 mt-4">Loading engagement chart...</p>
+                </div>
+              ) : engagementChartData?.userLines && engagementChartData.userLines.length > 0 ? (
+                <div className="p-6">
+                  {!engagementChartData.hasUserEvents && (
+                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ <strong>Note:</strong> user_events table not found. Chart shows placeholder data (all zeros). 
+                        Login tracking data will appear once user_events table is created and login events are logged.
+                      </p>
+                    </div>
+                  )}
+                  <ResponsiveContainer width="100%" height={500}>
+                    <LineChart margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="week" 
+                        label={{ value: 'Week from Signup', position: 'insideBottom', offset: -5 }}
+                      />
+                      <YAxis 
+                        label={{ value: 'Unique Login Days', angle: -90, position: 'insideLeft' }}
+                      />
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
+                                <p className="font-semibold">Week {data.week}</p>
+                                <p className="text-sm">User ID: {data.userId}</p>
+                                <p className="text-sm">Cohort: {data.cohortWeek}</p>
+                                <p className="text-sm">Intent: {data.intentType}</p>
+                                <p className="text-sm">Data Coverage: {data.dataCoverage}</p>
+                                <p className="text-sm font-medium">Login Days: {data.loginDays}</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend />
+                      {engagementChartData.userLines.map((userLine: any, idx: number) => {
+                        // Transform weeks data for chart
+                        const chartData = userLine.weeks.map((w: any) => ({
+                          week: w.week,
+                          loginDays: w.loginDays,
+                          userId: userLine.userId,
+                          cohortWeek: userLine.cohortWeek,
+                          intentType: userLine.intentType,
+                          dataCoverage: userLine.dataCoverage,
+                        }));
+                        
+                        const color = `hsl(${(idx * 137.5) % 360}, 70%, 50%)`;
+                        return (
+                          <Line
+                            key={userLine.userId}
+                            type="monotone"
+                            dataKey="loginDays"
+                            data={chartData}
+                            stroke={color}
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            name={`User ${userLine.userId}`}
+                            connectNulls
+                          />
+                        );
+                      })}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  No engagement chart data available. Click "Refresh Chart" to load.
+                  {!engagementChartData?.hasUserEvents && (
+                    <p className="text-sm text-gray-400 mt-2">
+                      Note: Requires user_events table for login tracking data.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Vanity Metrics Table */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-4 border-b border-gray-200 flex justify-between items-center">
