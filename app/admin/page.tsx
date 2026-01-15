@@ -72,6 +72,22 @@ export default function AdminDashboard() {
   // State for App Health tab
   const [healthData, setHealthData] = useState<any>(null);
   const [healthLoading, setHealthLoading] = useState(false);
+  
+  // State for Analytics Dashboard (Cohort Analysis & Vanity Metrics)
+  const [cohortData, setCohortData] = useState<any>(null);
+  const [cohortLoading, setCohortLoading] = useState(false);
+  const [vanityData, setVanityData] = useState<any>(null);
+  const [vanityLoading, setVanityLoading] = useState(false);
+  const [cohortFilters, setCohortFilters] = useState({
+    totalAccounts: true,
+    validatedEmails: false,
+    intentCategories: [] as string[],
+  });
+  const [vanityFilters, setVanityFilters] = useState({
+    totalAccounts: true,
+    validatedEmails: false,
+    intentCategories: [] as string[],
+  });
 
   // Fetch customer data function (used by Refresh button and initial load)
   const fetchCustomerData = async () => {
@@ -87,6 +103,54 @@ export default function AdminDashboard() {
       console.error('Error fetching customer data:', error);
     } finally {
       setCustomerDataLoading(false);
+    }
+  };
+
+  // Fetch cohort analysis data
+  const fetchCohortAnalysis = async () => {
+    setCohortLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const params = new URLSearchParams({
+        totalAccounts: cohortFilters.totalAccounts.toString(),
+        validatedEmails: cohortFilters.validatedEmails.toString(),
+        intentCategories: cohortFilters.intentCategories.join(','),
+      });
+      const response = await fetch(`/api/admin/cohort-analysis?${params}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setCohortData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching cohort analysis:', error);
+    } finally {
+      setCohortLoading(false);
+    }
+  };
+
+  // Fetch vanity metrics data
+  const fetchVanityMetrics = async () => {
+    setVanityLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const params = new URLSearchParams({
+        totalAccounts: vanityFilters.totalAccounts.toString(),
+        validatedEmails: vanityFilters.validatedEmails.toString(),
+        intentCategories: vanityFilters.intentCategories.join(','),
+      });
+      const response = await fetch(`/api/admin/vanity-metrics?${params}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setVanityData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching vanity metrics:', error);
+    } finally {
+      setVanityLoading(false);
     }
   };
 
@@ -178,6 +242,14 @@ export default function AdminDashboard() {
       fetchCustomerData();
     }
   }, [activeTab, analyticsSubTab, authenticated]);
+
+  // Fetch cohort analysis when Analytics → Dashboard tab is active
+  useEffect(() => {
+    if (activeTab === 'analytics' && analyticsSubTab === 'dashboard' && authenticated) {
+      fetchCohortAnalysis();
+      fetchVanityMetrics();
+    }
+  }, [activeTab, analyticsSubTab, authenticated, cohortFilters, vanityFilters]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -773,7 +845,281 @@ export default function AdminDashboard() {
         </div>
 
         {/* Content */}
-        {analyticsSubTab === 'dashboard' && renderPlaceholder('Analytics Dashboard')}
+        {analyticsSubTab === 'dashboard' && (
+          <div className="space-y-6">
+            {/* Filters */}
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Filters</h3>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={cohortFilters.totalAccounts}
+                    onChange={(e) => setCohortFilters({ ...cohortFilters, totalAccounts: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <span className="text-sm text-gray-700">Total Accounts</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={cohortFilters.validatedEmails}
+                    onChange={(e) => setCohortFilters({ ...cohortFilters, validatedEmails: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <span className="text-sm text-gray-700">Validated Emails</span>
+                </label>
+                <button
+                  onClick={fetchCohortAnalysis}
+                  disabled={cohortLoading}
+                  className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                >
+                  {cohortLoading ? 'Loading...' : 'Refresh Data'}
+                </button>
+              </div>
+            </div>
+
+            {/* Cohort Analysis - Activation Table */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">Activation - Number Completed Onboarding Steps</h3>
+              </div>
+              {cohortLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                  <p className="text-gray-600 mt-4">Loading cohort analysis...</p>
+                </div>
+              ) : cohortData ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
+                        {cohortData.weeks?.map((week: string) => (
+                          <th key={week} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                            {week}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Starting Onboarding</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData.activation?.[week]?.countStartingOnboarding || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Drop Off Step 1</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData.activation?.[week]?.countDropOffStep1 || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Drop Off Step 2</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData.activation?.[week]?.countDropOffStep2 || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Count Completed Onboarding</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData.activation?.[week]?.countCompletedOnboarding || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg Time to Onboard (days)</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData.activation?.[week]?.avgTimeToOnboardDays || '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  No cohort data available. Click "Refresh Data" to load.
+                </div>
+              )}
+            </div>
+
+            {/* Cohort Analysis - Engagement Table */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">Engagement - Activities Completed by Signup Week</h3>
+              </div>
+              {cohortLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                </div>
+              ) : cohortData ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
+                        {cohortData.weeks?.map((week: string) => (
+                          <th key={week} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                            {week}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Onboarding Completed</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData.engagement?.[week]?.onboardingCompleted || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded First Statement</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData.engagement?.[week]?.uploadedFirstStatement || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded Two Statements</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData.engagement?.[week]?.uploadedTwoStatements || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded Three+ Statements</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData.engagement?.[week]?.uploadedThreePlusStatements || 0}
+                          </td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  No engagement data available.
+                </div>
+              )}
+            </div>
+
+            {/* Vanity Metrics Table */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-900">Vanity Metrics</h3>
+                <div className="flex gap-2">
+                  <label className="flex items-center text-sm">
+                    <input
+                      type="checkbox"
+                      checked={vanityFilters.totalAccounts}
+                      onChange={(e) => setVanityFilters({ ...vanityFilters, totalAccounts: e.target.checked })}
+                      className="mr-2"
+                    />
+                    Total Accounts
+                  </label>
+                  <label className="flex items-center text-sm">
+                    <input
+                      type="checkbox"
+                      checked={vanityFilters.validatedEmails}
+                      onChange={(e) => setVanityFilters({ ...vanityFilters, validatedEmails: e.target.checked })}
+                      className="mr-2"
+                    />
+                    Validated Emails
+                  </label>
+                  <button
+                    onClick={fetchVanityMetrics}
+                    disabled={vanityLoading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                  >
+                    {vanityLoading ? 'Loading...' : 'Refresh'}
+                  </button>
+                </div>
+              </div>
+              {vanityLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                  <p className="text-gray-600 mt-4">Loading vanity metrics...</p>
+                </div>
+              ) : vanityData ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
+                        {vanityData.months?.map((month: string) => (
+                          <th key={month} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                            {month}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total Users</td>
+                        {vanityData.months?.map((month: string) => (
+                          <td key={month} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[month]?.totalUsers || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Monthly Active Users</td>
+                        {vanityData.months?.map((month: string) => (
+                          <td key={month} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[month]?.monthlyActiveUsers || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">New Users per Month</td>
+                        {vanityData.months?.map((month: string) => (
+                          <td key={month} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[month]?.newUsers || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total Transactions Uploaded</td>
+                        {vanityData.months?.map((month: string) => (
+                          <td key={month} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[month]?.totalTransactionsUploaded || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total Unique Banks Uploaded</td>
+                        {vanityData.months?.map((month: string) => (
+                          <td key={month} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[month]?.totalUniqueBanksUploaded || 0}
+                          </td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  No vanity metrics available. Click "Refresh" to load.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {analyticsSubTab === 'macro-data' && renderPlaceholder('Macro Data')}
         {analyticsSubTab === 'app-health' && renderPlaceholder('App Health')}
         
@@ -784,16 +1130,51 @@ export default function AdminDashboard() {
                 <h2 className="text-xl font-bold text-gray-900">Customer Data</h2>
                 <p className="text-gray-600 mt-1">All user onboarding responses and profile information</p>
               </div>
-              <button
-                onClick={fetchCustomerData}
-                disabled={customerDataLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-              >
-                <svg className={`w-4 h-4 ${customerDataLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Refresh Data
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    // Export to Excel (CSV format)
+                    const headers = ['Email', 'First Name', 'Last Name', 'Province', 'Emotional State', 'Financial Context', 'Motivation', 'Acquisition', 'Insights Wanted', 'Account Created', 'Onboarding Completed', 'Onboarding Status'];
+                    const rows = customerData.map((user: any) => [
+                      user.email || '',
+                      user.first_name || '',
+                      user.last_name || '',
+                      user.province_region || '',
+                      (user.emotional_state || []).join('; '),
+                      (user.financial_context || []).join('; '),
+                      user.motivation || '',
+                      user.acquisition_source || '',
+                      (user.insight_preferences || []).join('; '),
+                      user.created_at ? new Date(user.created_at).toLocaleString() : '',
+                      user.completed_at ? new Date(user.completed_at).toLocaleString() : '',
+                      user.completed_at ? 'Completed' : user.last_step ? `Dropped after Step ${user.last_step}` : 'Not started',
+                    ]);
+                    const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `customer-data-${new Date().toISOString().split('T')[0]}.csv`;
+                    link.click();
+                  }}
+                  disabled={customerData.length === 0}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Export to Excel
+                </button>
+                <button
+                  onClick={fetchCustomerData}
+                  disabled={customerDataLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  <svg className={`w-4 h-4 ${customerDataLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh Data
+                </button>
+              </div>
             </div>
 
             {customerDataLoading ? (
