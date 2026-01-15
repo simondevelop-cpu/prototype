@@ -26,15 +26,26 @@ export async function setupTestDatabase(): Promise<TestDatabase> {
   });
 
   // Register DATE_TRUNC function for pg-mem
-  // pg-mem v2.7.0 requires explicit overload registration
-  // We need to register it for each type combination
-  const dateTruncDay = (part: string, date: any) => {
-    const d = date instanceof Date ? new Date(date) : new Date(date);
+  // pg-mem requires registering overloads with explicit type signatures
+  const dateTruncImpl = (part: string, date: any) => {
+    // Convert any date-like value to Date
+    let d: Date;
+    if (date instanceof Date) {
+      d = new Date(date);
+    } else if (typeof date === 'string') {
+      d = new Date(date);
+    } else if (date && typeof date === 'object' && 'getTime' in date) {
+      d = new Date(date.getTime());
+    } else {
+      d = new Date(String(date));
+    }
+    
     if (part === 'day') {
       d.setHours(0, 0, 0, 0);
       return d;
     }
     if (part === 'week') {
+      // PostgreSQL week starts on Monday
       const day = d.getDay();
       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
       d.setDate(diff);
@@ -44,22 +55,29 @@ export async function setupTestDatabase(): Promise<TestDatabase> {
     return d;
   };
   
-  // Register without explicit args/returns - pg-mem will infer from usage
+  // Register for timestamp with time zone (most common in our queries)
   db.public.registerFunction({
     name: 'date_trunc',
-    implementation: dateTruncDay,
+    args: [{ type: 'text' }, { type: 'timestamptz' }],
+    returns: 'timestamptz',
+    implementation: dateTruncImpl,
   });
   
-  // Also try registering with explicit signature for timestamptz
-  try {
-    db.public.registerFunction({
-      name: 'date_trunc',
-      args: [{ type: 'text' }, { type: 'timestamptz' }],
-      implementation: dateTruncDay,
-    });
-  } catch (e) {
-    // If registration fails, continue - single registration might work
-  }
+  // Register for timestamp (without time zone)
+  db.public.registerFunction({
+    name: 'date_trunc',
+    args: [{ type: 'text' }, { type: 'timestamp' }],
+    returns: 'timestamp',
+    implementation: dateTruncImpl,
+  });
+  
+  // Register for date type (used with ::date casting)
+  db.public.registerFunction({
+    name: 'date_trunc',
+    args: [{ type: 'text' }, { type: 'date' }],
+    returns: 'date',
+    implementation: dateTruncImpl,
+  });
 
   // Register EXTRACT function
   db.public.registerFunction({
