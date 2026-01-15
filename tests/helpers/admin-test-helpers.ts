@@ -25,27 +25,54 @@ export async function setupTestDatabase(): Promise<TestDatabase> {
     implementation: () => 'test',
   });
 
-  // Register DATE_TRUNC function - pg-mem handles overloads automatically
-  // We register it once and it handles both timestamp and timestamptz
+  // Register DATE_TRUNC function for pg-mem
+  // pg-mem requires explicit type handling for overloaded functions
+  const dateTruncImpl = (part: string, date: Date | string | any) => {
+    // Handle both Date objects and string dates, and handle ::date casting
+    let d: Date;
+    if (date instanceof Date) {
+      d = new Date(date);
+    } else if (typeof date === 'string') {
+      d = new Date(date);
+    } else {
+      d = new Date(date);
+    }
+    
+    if (part === 'week') {
+      // PostgreSQL week starts on Monday, but we adjust to Sunday for display
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+      d.setDate(diff);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+    if (part === 'day') {
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+    return d;
+  };
+  
+  // Register for different type combinations that pg-mem might use
   db.public.registerFunction({
     name: 'date_trunc',
-    implementation: (part: string, date: Date | string | any) => {
-      // Handle both Date objects and string dates
-      const d = date instanceof Date ? date : new Date(date);
-      if (part === 'week') {
-        // PostgreSQL week starts on Monday, but we adjust to Sunday for display
-        const day = d.getDay();
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
-        d.setDate(diff);
-        d.setHours(0, 0, 0, 0);
-        return d;
-      }
-      if (part === 'day') {
-        d.setHours(0, 0, 0, 0);
-        return d;
-      }
-      return d;
-    },
+    args: [{ type: 'text' }, { type: 'timestamp' }],
+    returns: 'timestamp',
+    implementation: dateTruncImpl,
+  });
+  
+  db.public.registerFunction({
+    name: 'date_trunc',
+    args: [{ type: 'text' }, { type: 'timestamptz' }],
+    returns: 'timestamptz',
+    implementation: dateTruncImpl,
+  });
+  
+  db.public.registerFunction({
+    name: 'date_trunc',
+    args: [{ type: 'text' }, { type: 'date' }],
+    returns: 'date',
+    implementation: dateTruncImpl,
   });
 
   // Register EXTRACT function
