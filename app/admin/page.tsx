@@ -2055,13 +2055,13 @@ export default function AdminDashboard() {
           let implementedRequirements: any[] = [];
           let documentationRequirements: any[] = [];
 
-          if (healthData.infrastructure && healthData.operational && healthData.compliance) {
-            // New API format
-            infrastructure = healthData.infrastructure.checks || [];
-            appHealth = healthData.operational.checks || [];
-            pipeda = healthData.compliance.activeTests || [];
-            implementedRequirements = healthData.compliance.implementedRequirements || [];
-            documentationRequirements = healthData.compliance.documentationRequirements || [];
+          if (healthData.infrastructure || healthData.operational || healthData.compliance) {
+            // New API format - extract from nested structure
+            infrastructure = healthData.infrastructure?.checks || [];
+            appHealth = healthData.operational?.checks || [];
+            pipeda = healthData.compliance?.activeTests || [];
+            implementedRequirements = healthData.compliance?.implementedRequirements || [];
+            documentationRequirements = healthData.compliance?.documentationRequirements || [];
           } else if (healthData.checks) {
             // Old API format - organize checks into sections
             infrastructure = healthData.checks.filter((c: any) => 
@@ -2213,7 +2213,13 @@ export default function AdminDashboard() {
                   <span>⚙️</span> App Health / Operational Correctness
                 </h3>
                 <div className="grid gap-4">
-                  {appHealth.map((check: any, index: number) => renderCheck(check, index))}
+                  {appHealth.length > 0 ? (
+                    appHealth.map((check: any, index: number) => renderCheck(check, index))
+                  ) : (
+                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center text-gray-500">
+                      No operational health checks available
+                    </div>
+                  )}
                 </div>
                 <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-sm text-blue-800">
