@@ -85,6 +85,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Use users table (post-migration) - Include ALL variables used in dashboard
+      // Add transaction counts, upload counts, and first transaction date for cohort analysis
       const selectFields = `
         u.id as user_id,
         COALESCE(p.email, u.email) as email,
@@ -106,13 +107,25 @@ export async function GET(request: NextRequest) {
         ${hasEmailValidated ? 'u.email_validated,' : 'false as email_validated,'}
         u.completed_at,
         u.created_at,
-        u.updated_at
+        u.updated_at,
+        COALESCE(transaction_stats.transaction_count, 0) as transaction_count,
+        COALESCE(transaction_stats.upload_session_count, 0) as upload_session_count,
+        transaction_stats.first_transaction_date
       `;
 
       result = await pool.query(`
         SELECT ${selectFields}
         FROM users u
         LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
+        LEFT JOIN (
+          SELECT 
+            user_id,
+            COUNT(DISTINCT id) as transaction_count,
+            COUNT(DISTINCT upload_session_id) FILTER (WHERE upload_session_id IS NOT NULL) as upload_session_count,
+            MIN(created_at) as first_transaction_date
+          FROM transactions
+          GROUP BY user_id
+        ) transaction_stats ON transaction_stats.user_id = u.id
         WHERE u.email != $1
         ORDER BY u.completed_at DESC NULLS LAST, u.created_at DESC
       `, [ADMIN_EMAIL]);
