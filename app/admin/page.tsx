@@ -198,6 +198,8 @@ export default function AdminDashboard() {
         totalAccounts: vanityFilters.totalAccounts.toString(),
         validatedEmails: vanityFilters.validatedEmails.toString(),
         intentCategories: vanityFilters.intentCategories.join(','),
+        cohorts: vanityFilters.cohorts.join(','),
+        dataCoverage: vanityFilters.dataCoverage.join(','),
       });
       const response = await fetch(`/api/admin/vanity-metrics?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -1414,53 +1416,51 @@ export default function AdminDashboard() {
                         }}
                       />
                       <Legend />
-                      {(() => {
-                        // Create unified week structure - ensure weeks 0-11 appear only once on X-axis
-                        const allWeeks = Array.from({ length: 12 }, (_, i) => i);
-                        
-                        // Transform data so each user line has data for all weeks 0-11
-                        const transformedLines = engagementChartData.userLines.map((userLine: any, idx: number) => {
-                          const weekMap = new Map(userLine.weeks.map((w: any) => [w.week, w.loginDays]));
-                          const chartData = allWeeks.map(weekNum => ({
-                            week: weekNum,
-                            [`user_${userLine.userId}`]: weekMap.get(weekNum) || 0,
+                      {engagementChartData.userLines.map((userLine: any, idx: number) => {
+                        // Transform weeks data for chart - ensure weeks 0-11 are properly structured
+                        const chartData = userLine.weeks
+                          .sort((a: any, b: any) => a.week - b.week) // Ensure weeks are sorted
+                          .map((w: any) => ({
+                            week: w.week,
+                            loginDays: w.loginDays,
                             userId: userLine.userId,
                             cohortWeek: userLine.cohortWeek,
                             intentType: userLine.intentType,
                             dataCoverage: userLine.dataCoverage,
                           }));
-                          
-                          const color = `hsl(${(idx * 137.5) % 360}, 70%, 50%)`;
+                        
+                        // Fill in missing weeks (0-11) with 0 if needed
+                        const allWeeks = Array.from({ length: 12 }, (_, i) => i);
+                        const weekMap = new Map(chartData.map((d: any) => [d.week, d]));
+                        const completeChartData = allWeeks.map(weekNum => {
+                          if (weekMap.has(weekNum)) {
+                            return weekMap.get(weekNum);
+                          }
                           return {
+                            week: weekNum,
+                            loginDays: 0,
                             userId: userLine.userId,
-                            dataKey: `user_${userLine.userId}`,
-                            color,
-                            name: `User ${userLine.userId}`,
-                            data: chartData,
+                            cohortWeek: userLine.cohortWeek,
+                            intentType: userLine.intentType,
+                            dataCoverage: userLine.dataCoverage,
                           };
                         });
                         
-                        // Use first line's data for X-axis (all have same week structure)
-                        const xAxisData = transformedLines[0]?.data || [];
-                        
+                        const color = `hsl(${(idx * 137.5) % 360}, 70%, 50%)`;
                         return (
-                          <>
-                            {transformedLines.map((line: any) => (
-                              <Line
-                                key={line.userId}
-                                type="monotone"
-                                dataKey={line.dataKey}
-                                data={xAxisData}
-                                stroke={line.color}
-                                strokeWidth={2}
-                                dot={{ r: 4 }}
-                                name={line.name}
-                                connectNulls
-                              />
-                            ))}
-                          </>
+                          <Line
+                            key={userLine.userId}
+                            type="monotone"
+                            dataKey="loginDays"
+                            data={completeChartData}
+                            stroke={color}
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            name={`User ${userLine.userId}`}
+                            connectNulls
+                          />
                         );
-                      })()}
+                      })}
                     </LineChart>
                   </ResponsiveContainer>
                 </div>

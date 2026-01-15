@@ -225,11 +225,32 @@ export async function GET(request: NextRequest) {
       }
     });
     
-    // Sort weeks (most recent first)
+    // Sort weeks (most recent first) and ensure unique
     const weeks = Array.from(weeksSet).sort((a, b) => {
-      const dateA = new Date(a.replace('w/c ', ''));
-      const dateB = new Date(b.replace('w/c ', ''));
-      return dateB.getTime() - dateA.getTime();
+      // Parse dates more carefully - handle format "DD MMM YYYY" (e.g., "20 Oct 2025")
+      const parseDate = (str: string) => {
+        const parts = str.replace('w/c ', '').trim().split(' ');
+        if (parts.length === 3) {
+          const months: { [key: string]: number } = {
+            'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+            'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+          };
+          const day = parseInt(parts[0]);
+          const month = months[parts[1]] ?? 0;
+          const year = parseInt(parts[2]);
+          return new Date(year, month, day);
+        }
+        // Fallback to standard date parsing
+        return new Date(str.replace('w/c ', ''));
+      };
+      try {
+        const dateA = parseDate(a);
+        const dateB = parseDate(b);
+        return dateB.getTime() - dateA.getTime();
+      } catch (e) {
+        // Fallback to string comparison if parsing fails
+        return b.localeCompare(a);
+      }
     });
     
     // If no weeks from data, fall back to last 12 weeks
