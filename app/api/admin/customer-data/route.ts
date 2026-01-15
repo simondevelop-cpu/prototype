@@ -49,15 +49,19 @@ export async function GET(request: NextRequest) {
       hasLastStep = schemaCheck.rows.some(row => row.column_name === 'last_step');
       hasAcquisitionOther = schemaCheck.rows.some(row => row.column_name === 'acquisition_other');
       
-      // Check if users table has actual onboarding data (not just columns)
-      if (hasCompletedAtColumn) {
-        const dataCheck = await pool.query(`
-          SELECT COUNT(*) as count
-          FROM users
-          WHERE completed_at IS NOT NULL
-          AND email != $1
-        `, [ADMIN_EMAIL]);
-        const usersWithData = parseInt(dataCheck.rows[0]?.count || '0', 10);
+        // Check if users table has actual onboarding data (not just columns)
+        // Check for ANY onboarding fields, not just completed_at
+        if (hasCompletedAtColumn) {
+          const dataCheck = await pool.query(`
+            SELECT COUNT(*) as count
+            FROM users
+            WHERE (completed_at IS NOT NULL 
+              OR emotional_state IS NOT NULL 
+              OR motivation IS NOT NULL
+              OR financial_context IS NOT NULL)
+            AND email != $1
+          `, [ADMIN_EMAIL]);
+          const usersWithData = parseInt(dataCheck.rows[0]?.count || '0', 10);
         
         // Also check if onboarding_responses has data
         const onboardingCheck = await pool.query(`
@@ -69,11 +73,13 @@ export async function GET(request: NextRequest) {
         // Use users table only if it has data, otherwise prefer onboarding_responses if it has data
         if (usersWithData > 0) {
           useUsersTable = true;
+          console.log(`[Customer Data API] Found ${usersWithData} users with onboarding data in users table`);
         } else if (onboardingCount > 0) {
           useUsersTable = false; // Use onboarding_responses instead
-          console.log('[Customer Data API] Users table has columns but no data, using onboarding_responses');
+          console.log(`[Customer Data API] Users table has columns but no data (${usersWithData} users), using onboarding_responses (${onboardingCount} records)`);
         } else {
           useUsersTable = true; // Use users table structure even if empty
+          console.log('[Customer Data API] No data in either table, using users table structure');
         }
         
         console.log('[Customer Data API] Schema and data check:', { 
