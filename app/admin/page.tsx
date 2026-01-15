@@ -881,12 +881,12 @@ export default function AdminDashboard() {
                           }
                         }}
                         className={`px-3 py-1 rounded text-xs font-medium ${
-                          user.is_active
+                          (user.is_active !== undefined ? user.is_active : true)
                             ? 'bg-green-100 text-green-800 hover:bg-green-200'
                             : 'bg-red-100 text-red-800 hover:bg-red-200'
                         } transition-colors`}
                       >
-                        {user.is_active ? 'Access Enabled' : 'Blocked'}
+                        {(user.is_active !== undefined ? user.is_active : true) ? 'Access Enabled' : 'Blocked'}
                       </button>
                     </td>
                   </tr>
@@ -2043,15 +2043,32 @@ export default function AdminDashboard() {
             'Data Residency (Law 25)',
           ];
 
-          const infrastructure = healthData.checks.filter((c: any) => 
-            infrastructureChecks.includes(c.name)
-          );
-          const appHealth = healthData.checks.filter((c: any) => 
-            appHealthChecks.includes(c.name)
-          );
-          const pipeda = healthData.checks.filter((c: any) => 
-            pipedaChecks.includes(c.name)
-          );
+          // Handle both old and new API response formats
+          let infrastructure: any[] = [];
+          let appHealth: any[] = [];
+          let pipeda: any[] = [];
+          let implementedRequirements: any[] = [];
+          let documentationRequirements: any[] = [];
+
+          if (healthData.infrastructure && healthData.operational && healthData.compliance) {
+            // New API format
+            infrastructure = healthData.infrastructure.checks || [];
+            appHealth = healthData.operational.checks || [];
+            pipeda = healthData.compliance.activeTests || [];
+            implementedRequirements = healthData.compliance.implementedRequirements || [];
+            documentationRequirements = healthData.compliance.documentationRequirements || [];
+          } else if (healthData.checks) {
+            // Old API format - organize checks into sections
+            infrastructure = healthData.checks.filter((c: any) => 
+              infrastructureChecks.includes(c.name)
+            );
+            appHealth = healthData.checks.filter((c: any) => 
+              appHealthChecks.includes(c.name)
+            );
+            pipeda = healthData.checks.filter((c: any) => 
+              pipedaChecks.includes(c.name)
+            );
+          }
 
           // PIPEDA requirements that don't need automated checks (use from API if available, otherwise use defaults)
           const pipedaNoCheck = implementedRequirements.length > 0 ? implementedRequirements : [
@@ -2082,7 +2099,7 @@ export default function AdminDashboard() {
           ];
 
           // PIPEDA requirements that need documentation/process (use from API if available, otherwise use defaults)
-          const pipedaDocumentation = documentationRequirements.length > 0 ? documentationRequirements : [
+          const pipedaDocumentation = (documentationRequirements && documentationRequirements.length > 0) ? documentationRequirements : [
             {
               name: 'Data Residency - Database Migration (Law 25)',
               status: 'warning',
