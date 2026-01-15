@@ -201,7 +201,8 @@ export async function GET(request: NextRequest) {
     }
     
     try {
-      result = await pool.query(`
+      // Log the actual query for debugging (first 500 chars)
+      const fullQuery = `
         SELECT ${selectFields}
         ${fromClause}
         LEFT JOIN (
@@ -215,19 +216,31 @@ export async function GET(request: NextRequest) {
         ) transaction_stats ON transaction_stats.user_id = u.id
         WHERE u.email != $1
         ORDER BY u.completed_at DESC NULLS LAST, u.created_at DESC
-      `, [ADMIN_EMAIL]);
+      `;
+      console.log('[Customer Data API] Query preview:', fullQuery.substring(0, 500));
+      
+      result = await pool.query(fullQuery, [ADMIN_EMAIL]);
     } catch (queryError: any) {
       console.error('[Customer Data API] Query failed:', queryError);
+      console.error('[Customer Data API] Error message:', queryError.message);
+      console.error('[Customer Data API] Error stack:', queryError.stack);
       console.error('[Customer Data API] Query details:', {
         useL0PII,
         hasLastStep,
         hasAcquisitionOther,
         hasIsActive,
         hasEmailValidated,
-        selectFieldsLength: selectFields.length,
+        selectFieldsPreview: selectFields.substring(0, 200),
         fromClause
       });
-      throw queryError;
+      
+      // Return a more helpful error
+      return NextResponse.json({
+        success: false,
+        error: 'Query execution failed',
+        message: queryError.message || 'Unknown database error',
+        details: 'Check server logs for full query details'
+      }, { status: 500 });
     }
       
     console.log(`[Customer Data API] Query returned ${result.rows.length} customer records from users table`);
