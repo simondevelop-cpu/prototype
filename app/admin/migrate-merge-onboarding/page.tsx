@@ -135,6 +135,23 @@ export default function MigrateMergeOnboarding() {
                     </div>
                   </div>
                 )}
+                {migrationStatus.dataMigration?.unmigratedUsers && migrationStatus.dataMigration.unmigratedUsers.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-orange-200">
+                    <p className="text-sm font-medium text-orange-700 mb-2">
+                      ⚠️ Found {migrationStatus.dataMigration.unmigratedUsers.length} user(s) that may need migration:
+                    </p>
+                    <div className="space-y-1 max-h-32 overflow-y-auto text-xs text-gray-600">
+                      {migrationStatus.dataMigration.unmigratedUsers.map((user: any, idx: number) => (
+                        <div key={idx}>
+                          User {user.id} ({user.email}): Has onboarding data but not migrated
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      💡 Tip: Re-running migration will attempt to migrate these users.
+                    </p>
+                  </div>
+                )}
                 <button
                   onClick={checkStatus}
                   disabled={checkingStatus}

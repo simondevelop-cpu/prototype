@@ -206,6 +206,49 @@ export async function GET(request: NextRequest) {
       totalWithOnboarding = parseInt(onboardingCheck.rows[0]?.total) || 0;
     }
 
+    // Investigate unmigrated users: Check if there are users with onboarding_responses but NULL in users table
+    let unmigratedUsers: any[] = [];
+    if (hasCompletedAt) {
+      try {
+        const unmigratedCheck = await pool.query(`
+          SELECT 
+            u.id,
+            u.email,
+            o.motivation as onboarding_motivation,
+            o.completed_at as onboarding_completed_at,
+            u.motivation as users_motivation,
+            u.completed_at as users_completed_at
+          FROM users u
+          INNER JOIN (
+            SELECT DISTINCT ON (user_id)
+              user_id,
+              motivation,
+              completed_at,
+              created_at
+            FROM onboarding_responses
+            ORDER BY user_id, created_at DESC
+          ) o ON u.id = o.user_id
+          WHERE u.motivation IS NULL
+            AND (
+              o.motivation IS NOT NULL 
+              OR o.completed_at IS NOT NULL
+              OR EXISTS (
+                SELECT 1 FROM onboarding_responses o2
+                WHERE o2.user_id = u.id
+                  AND (o2.emotional_state IS NOT NULL 
+                       OR o2.financial_context IS NOT NULL
+                       OR o2.insight_preferences IS NOT NULL)
+              )
+            )
+          ORDER BY u.id
+          LIMIT 10
+        `);
+        unmigratedUsers = unmigratedCheck.rows;
+      } catch (e) {
+        console.log('[Migration Status] Could not check unmigrated users:', e);
+      }
+    }
+
     return NextResponse.json({
       migrationCompleted: hasCompletedAt && hasMotivation && hasEmotionalState && hasIsActive && hasEmailValidated,
       columnsExist: {
@@ -218,7 +261,8 @@ export async function GET(request: NextRequest) {
       dataMigration: {
         migratedCount,
         totalWithOnboarding,
-        percentageMigrated: totalWithOnboarding > 0 ? Math.round((migratedCount / totalWithOnboarding) * 100) : 0
+        percentageMigrated: totalWithOnboarding > 0 ? Math.round((migratedCount / totalWithOnboarding) * 100) : 0,
+        unmigratedUsers: unmigratedUsers
       }
     }, { status: 200 });
 
