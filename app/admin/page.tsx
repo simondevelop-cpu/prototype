@@ -2739,8 +2739,8 @@ export default function AdminDashboard() {
               </button>
             </div>
             {/* Inbox Content */}
-            {inboxSubTab === 'bug-reports' && renderPlaceholder('Bug Reports')}
-            {inboxSubTab === 'user-feedback' && renderPlaceholder('User Feedback')}
+            {inboxSubTab === 'bug-reports' && renderPlaceholderTab('Bug Reports', 'Coming soon...', '🐛')}
+            {inboxSubTab === 'user-feedback' && renderPlaceholderTab('User Feedback', 'Coming soon...', '💬')}
           </div>
         )}
         {activeTab === 'categories' && renderCategoriesTab()}
