@@ -83,47 +83,10 @@ export async function GET(request: NextRequest) {
       paramIndex++;
     }
 
-    // Filter by cohorts (signup weeks)
-    if (filters.cohorts && filters.cohorts.length > 0) {
-      const cohortDates = filters.cohorts.map(cohort => {
-        const match = cohort.match(/w\/c (\d+) (\w+) (\d+)/);
-        if (match) {
-          const day = parseInt(match[1]);
-          const monthName = match[2];
-          const year = parseInt(match[3]);
-          const monthMap: { [key: string]: number } = {
-            'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-            'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-          };
-          const month = monthMap[monthName] ?? 0;
-          return new Date(year, month, day);
-        }
-        return null;
-      }).filter(Boolean) as Date[];
-      
-      if (cohortDates.length > 0) {
-        const dateConditions = cohortDates.map((date, idx) => {
-          const weekStart = new Date(date);
-          weekStart.setDate(date.getDate() - date.getDay());
-          weekStart.setHours(0, 0, 0, 0);
-          const weekEnd = new Date(weekStart);
-          weekEnd.setDate(weekStart.getDate() + 6);
-          weekEnd.setHours(23, 59, 59, 999);
-          return `(DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex + idx * 2}::timestamp) AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + idx * 2 + 1}::timestamp))`;
-        }).join(' OR ');
-        filterConditions += ` AND (${dateConditions})`;
-        cohortDates.forEach(date => {
-          const weekStart = new Date(date);
-          weekStart.setDate(date.getDate() - date.getDay());
-          weekStart.setHours(0, 0, 0, 0);
-          const weekEnd = new Date(weekStart);
-          weekEnd.setDate(weekStart.getDate() + 6);
-          weekEnd.setHours(23, 59, 59, 999);
-          filterParams.push(weekStart, weekEnd);
-          paramIndex += 2;
-        });
-      }
-    }
+    // Note: Cohort filter in vanity metrics should NOT filter users in the WHERE clause
+    // It should only control which week columns are displayed in the frontend
+    // Users should be counted across all weeks, but only selected week columns are shown
+    // So we don't add cohort filter to filterConditions here - it's handled in the weeks array filtering
 
     filterParams.push(ADMIN_EMAIL);
     const adminEmailParamIndex = paramIndex;
