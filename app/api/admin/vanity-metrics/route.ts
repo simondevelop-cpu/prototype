@@ -368,10 +368,21 @@ export async function GET(request: NextRequest) {
       };
     }
 
+    // Only return metrics for weeks that should be displayed
+    const filteredMetrics: { [week: string]: any } = {};
+    weeks.forEach(week => {
+      if (metrics[week]) {
+        filteredMetrics[week] = metrics[week];
+      }
+    });
+    
+    console.log('[Vanity Metrics] Returning', Object.keys(filteredMetrics).length, 'weeks of metrics');
+    console.log('[Vanity Metrics] Sample metric (first week):', filteredMetrics[weeks[0]]);
+    
     return NextResponse.json({
       success: true,
       weeks,
-      metrics,
+      metrics: filteredMetrics,
       filters,
     }, { status: 200 });
 
