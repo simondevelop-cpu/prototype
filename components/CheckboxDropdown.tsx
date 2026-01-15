@@ -80,7 +80,7 @@ export default function CheckboxDropdown({
       onChange(selected.filter(opt => !filteredOptions.includes(opt)));
     } else {
       // Select all filtered options
-      const newSelected = [...new Set([...selected, ...filteredOptions])];
+      const newSelected = Array.from(new Set([...selected, ...filteredOptions]));
       onChange(newSelected);
     }
   };
