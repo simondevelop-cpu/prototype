@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       intentCategories: url.searchParams.get('intentCategories')?.split(',').filter(Boolean) || [],
     };
 
-    // Check if migration is complete - users table must have onboarding columns
+    // Check where data actually exists - be flexible
     const schemaCheck = await pool.query(`
       SELECT column_name 
       FROM information_schema.columns 
@@ -61,13 +61,48 @@ export async function GET(request: NextRequest) {
     const hasMotivation = schemaCheck.rows.some(row => row.column_name === 'motivation');
     const hasEmailValidated = schemaCheck.rows.some(row => row.column_name === 'email_validated');
     
-    if (!hasCompletedAt || !hasMotivation) {
+    // Check if onboarding_responses exists
+    const onboardingTableCheck = await pool.query(`
+      SELECT 1 FROM information_schema.tables 
+      WHERE table_name = 'onboarding_responses'
+      LIMIT 1
+    `);
+    const onboardingResponsesExists = onboardingTableCheck.rows.length > 0;
+    
+    // Determine which table to use
+    let useUsersTable = false;
+    if (hasCompletedAt && hasMotivation) {
+      // Check if users table has data
+      const usersDataCheck = await pool.query(`
+        SELECT COUNT(*) as count
+        FROM users
+        WHERE (completed_at IS NOT NULL OR motivation IS NOT NULL)
+        AND email != $1
+      `, [ADMIN_EMAIL]);
+      const usersWithData = parseInt(usersDataCheck.rows[0]?.count || '0', 10);
+      useUsersTable = usersWithData > 0;
+      
+      // If no data in users, check onboarding_responses
+      if (!useUsersTable && onboardingResponsesExists) {
+        const onboardingDataCheck = await pool.query(`
+          SELECT COUNT(*) as count FROM onboarding_responses
+        `);
+        const onboardingCount = parseInt(onboardingDataCheck.rows[0]?.count || '0', 10);
+        if (onboardingCount > 0) {
+          useUsersTable = false; // Use onboarding_responses
+        }
+      }
+    } else if (onboardingResponsesExists) {
+      useUsersTable = false; // Use onboarding_responses
+    } else {
+      // No data source available
       return NextResponse.json({
-        success: false,
-        error: 'Migration not complete',
-        message: 'Onboarding data migration has not been completed. Please run the migration at /api/admin/migrate-merge-onboarding first.',
-        migrationRequired: true
-      }, { status: 400 });
+        success: true,
+        activation: {},
+        engagement: {},
+        weeks: [],
+        message: 'No onboarding data found. Please ensure migration has been run or onboarding_responses table exists.'
+      }, { status: 200 });
     }
 
     // Build filter conditions
@@ -99,9 +134,9 @@ export async function GET(request: NextRequest) {
       weeks.push(weekLabel);
     }
 
-    // Get activation metrics (onboarding steps) - ONLY from users table (post-migration)
+    // Get activation metrics (onboarding steps) - from appropriate table
     // Track all steps: 1=Emotional Calibration, 2=Financial Context, 3=Motivation, 4=Acquisition Source, 5=Insight Preferences, 6=Email Verification, 7=Account Profile
-    const activationQuery = `
+    const activationQuery = useUsersTable ? `
       SELECT 
         DATE_TRUNC('week', u.created_at) as signup_week,
         COUNT(*) FILTER (WHERE u.created_at IS NOT NULL) as count_starting_onboarding,
@@ -114,6 +149,28 @@ export async function GET(request: NextRequest) {
         COUNT(*) FILTER (WHERE u.last_step = 7 AND u.completed_at IS NULL) as count_drop_off_step_7,
         COUNT(*) FILTER (WHERE u.completed_at IS NOT NULL) as count_completed_onboarding,
         AVG(EXTRACT(EPOCH FROM (u.completed_at - u.created_at)) / 86400) FILTER (WHERE u.completed_at IS NOT NULL) as avg_time_to_onboard_days
+      FROM users u
+      WHERE u.email != $${paramIndex}
+        ${filterConditions}
+      GROUP BY DATE_TRUNC('week', u.created_at)
+      ORDER BY signup_week DESC
+      LIMIT 12
+    ` : `
+      SELECT 
+        DATE_TRUNC('week', u.created_at) as signup_week,
+        COUNT(*) as count_starting_onboarding,
+        0 as count_drop_off_step_1,
+        0 as count_drop_off_step_2,
+        0 as count_drop_off_step_3,
+        0 as count_drop_off_step_4,
+        0 as count_drop_off_step_5,
+        0 as count_drop_off_step_6,
+        0 as count_drop_off_step_7,
+        COUNT(*) FILTER (WHERE EXISTS (
+          SELECT 1 FROM onboarding_responses o 
+          WHERE o.user_id = u.id AND o.completed_at IS NOT NULL
+        )) as count_completed_onboarding,
+        NULL as avg_time_to_onboard_days
       FROM users u
       WHERE u.email != $${paramIndex}
         ${filterConditions}
@@ -154,8 +211,8 @@ export async function GET(request: NextRequest) {
       // Column doesn't exist
     }
 
-    // Enhanced Engagement query with more metrics - ONLY from users table (post-migration)
-    const engagementQuery = `
+    // Enhanced Engagement query with more metrics - from appropriate table
+    const engagementQuery = useUsersTable ? `
       SELECT 
         DATE_TRUNC('week', u.created_at) as signup_week,
         -- Onboarding and data coverage
@@ -187,6 +244,27 @@ export async function GET(request: NextRequest) {
         FROM transactions
         GROUP BY user_id
       ) transaction_counts ON transaction_counts.user_id = u.id
+      WHERE u.email != $${paramIndex}
+        ${filterConditions}
+      GROUP BY DATE_TRUNC('week', u.created_at)
+      ORDER BY signup_week DESC
+      LIMIT 12
+    ` : `
+      SELECT 
+        DATE_TRUNC('week', u.created_at) as signup_week,
+        COUNT(*) FILTER (WHERE EXISTS (
+          SELECT 1 FROM onboarding_responses o 
+          WHERE o.user_id = u.id AND o.completed_at IS NOT NULL
+        )) as onboarding_completed,
+        COUNT(DISTINCT t.user_id) FILTER (WHERE t.id IS NOT NULL) as uploaded_first_statement,
+        0 as uploaded_two_statements,
+        0 as uploaded_three_plus_statements,
+        NULL as avg_time_to_onboard_days,
+        NULL as avg_time_to_first_upload_days,
+        NULL as avg_transactions_per_user,
+        0 as users_with_transactions
+      FROM users u
+      LEFT JOIN transactions t ON t.user_id = u.id
       WHERE u.email != $${paramIndex}
         ${filterConditions}
       GROUP BY DATE_TRUNC('week', u.created_at)
