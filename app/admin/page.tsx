@@ -848,9 +848,15 @@ export default function AdminDashboard() {
                     <td className="px-6 py-4 text-sm">
                       <button
                         onClick={async () => {
-                          const newStatus = !user.is_active;
+                          const userId = user.id || user.user_id;
+                          const currentStatus = user.is_active !== undefined ? user.is_active : true;
+                          const newStatus = !currentStatus;
                           try {
                             const token = localStorage.getItem('admin_token');
+                            if (!token) {
+                              alert('Not authenticated. Please log in again.');
+                              return;
+                            }
                             const response = await fetch('/api/admin/users/block', {
                               method: 'POST',
                               headers: {
@@ -858,7 +864,7 @@ export default function AdminDashboard() {
                                 'Content-Type': 'application/json',
                               },
                               body: JSON.stringify({
-                                userId: user.id,
+                                userId: userId,
                                 isActive: newStatus,
                               }),
                             });
@@ -867,11 +873,11 @@ export default function AdminDashboard() {
                               // Refresh users list
                               fetchUsers();
                             } else {
-                              alert(`Failed to ${newStatus ? 'enable' : 'block'} user: ${data.error}`);
+                              alert(`Failed to ${newStatus ? 'enable' : 'block'} user: ${data.error || 'Unknown error'}`);
                             }
-                          } catch (error) {
+                          } catch (error: any) {
                             console.error('Error blocking user:', error);
-                            alert('Error updating user status');
+                            alert(`Error updating user status: ${error.message || 'Unknown error'}`);
                           }
                         }}
                         className={`px-3 py-1 rounded text-xs font-medium ${
@@ -931,6 +937,16 @@ export default function AdminDashboard() {
             }`}
           >
             👥 Customer Data
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('vanity-metrics')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'vanity-metrics'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            📈 Vanity Metrics
           </button>
         </div>
 
@@ -2037,8 +2053,8 @@ export default function AdminDashboard() {
             pipedaChecks.includes(c.name)
           );
 
-          // PIPEDA requirements that don't need automated checks
-          const pipedaNoCheck = [
+          // PIPEDA requirements that don't need automated checks (use from API if available, otherwise use defaults)
+          const pipedaNoCheck = implementedRequirements.length > 0 ? implementedRequirements : [
             {
               name: 'Password Strength Validation',
               status: 'pass',
@@ -2065,8 +2081,8 @@ export default function AdminDashboard() {
             },
           ];
 
-          // PIPEDA requirements that need documentation/process
-          const pipedaDocumentation = [
+          // PIPEDA requirements that need documentation/process (use from API if available, otherwise use defaults)
+          const pipedaDocumentation = documentationRequirements.length > 0 ? documentationRequirements : [
             {
               name: 'Data Residency - Database Migration (Law 25)',
               status: 'warning',
