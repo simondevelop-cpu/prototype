@@ -478,7 +478,7 @@ export async function GET(request: NextRequest) {
           if (!userEventsData[weekKey]) {
             userEventsData[weekKey] = {};
           }
-          // For now, we'll calculate this more simply - users who logged in 2+ unique days
+          // For now, we'll calculate this more simply - users who logged in 2 or more unique days
           // This is a simplified version - a full implementation would track across all weeks
         });
       } catch (e) {
@@ -492,8 +492,21 @@ export async function GET(request: NextRequest) {
 
     activationResult.rows.forEach((row: any) => {
       const weekKey = formatWeekLabel(row.signup_week);
+      const starting = parseInt(row.count_starting_onboarding) || 0;
+      const completed = parseInt(row.count_completed_onboarding) || 0;
+      const dropOffs = 
+        (parseInt(row.count_drop_off_step_1) || 0) +
+        (parseInt(row.count_drop_off_step_2) || 0) +
+        (parseInt(row.count_drop_off_step_3) || 0) +
+        (parseInt(row.count_drop_off_step_4) || 0) +
+        (parseInt(row.count_drop_off_step_5) || 0) +
+        (parseInt(row.count_drop_off_step_6) || 0) +
+        (parseInt(row.count_drop_off_step_7) || 0);
+      // Calculate users who started but didn't complete and weren't caught by drop-off tracking
+      const startedButNotCompleted = Math.max(0, starting - completed - dropOffs);
+      
       activationByWeek[weekKey] = {
-        countStartingOnboarding: parseInt(row.count_starting_onboarding) || 0,
+        countStartingOnboarding: starting,
         countDropOffStep1: parseInt(row.count_drop_off_step_1) || 0,
         countDropOffStep2: parseInt(row.count_drop_off_step_2) || 0,
         countDropOffStep3: parseInt(row.count_drop_off_step_3) || 0,
@@ -501,7 +514,8 @@ export async function GET(request: NextRequest) {
         countDropOffStep5: parseInt(row.count_drop_off_step_5) || 0,
         countDropOffStep6: parseInt(row.count_drop_off_step_6) || 0,
         countDropOffStep7: parseInt(row.count_drop_off_step_7) || 0,
-        countCompletedOnboarding: parseInt(row.count_completed_onboarding) || 0,
+        countCompletedOnboarding: completed,
+        countStartedButNotCompleted: startedButNotCompleted,
         // Convert days to minutes (multiply by 1440 minutes per day)
         avgTimeToOnboardMinutes: row.avg_time_to_onboard_days ? Math.round(parseFloat(row.avg_time_to_onboard_days) * 1440) : null,
       };
@@ -518,6 +532,7 @@ export async function GET(request: NextRequest) {
         // Time to achieve (in minutes - converted from days)
         avgTimeToOnboardMinutes: row.avg_time_to_onboard_days ? Math.round(parseFloat(row.avg_time_to_onboard_days) * 1440) : null,
         avgTimeToFirstUploadMinutes: row.avg_time_to_first_upload_days ? Math.round(parseFloat(row.avg_time_to_first_upload_days) * 1440) : null,
+        avgTimeToFirstUploadDays: row.avg_time_to_first_upload_days ? parseFloat(row.avg_time_to_first_upload_days).toFixed(1) : null,
         // Engagement signals
         avgTransactionsPerUser: row.avg_transactions_per_user ? parseFloat(row.avg_transactions_per_user).toFixed(1) : null,
         usersWithTransactions: parseInt(row.users_with_transactions) || 0,

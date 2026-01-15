@@ -8,6 +8,7 @@ import CheckboxDropdown from '@/components/CheckboxDropdown';
 
 type TabName = 'monitoring' | 'inbox' | 'categories' | 'insights' | 'analytics';
 type MonitoringSubTab = 'accounts' | 'health';
+type InboxSubTab = 'bug-reports' | 'user-feedback';
 
 interface Keyword {
   id: number;
@@ -45,7 +46,8 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabName>('monitoring');
   const [monitoringSubTab, setMonitoringSubTab] = useState<MonitoringSubTab>('accounts');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
-  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'vanity-metrics' | 'bug-reports' | 'user-feedback'>('cohort-analysis');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'vanity-metrics'>('cohort-analysis');
+  const [inboxSubTab, setInboxSubTab] = useState<InboxSubTab>('bug-reports');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
   const [stats, setStats] = useState<any>(null);
@@ -1031,26 +1033,6 @@ export default function AdminDashboard() {
           >
             📈 Vanity Metrics
           </button>
-          <button
-            onClick={() => setAnalyticsSubTab('bug-reports')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              analyticsSubTab === 'bug-reports'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            🐛 Bug Reports
-          </button>
-          <button
-            onClick={() => setAnalyticsSubTab('user-feedback')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              analyticsSubTab === 'user-feedback'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            💬 User Feedback
-          </button>
         </div>
 
         {/* Content */}
@@ -1258,11 +1240,11 @@ export default function AdminDashboard() {
                       {/* Time to Achieve Section */}
                       <tr className="bg-gray-50">
                         <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
-                          Time to Achieve (minutes, excluding users who haven't completed)
+                          Time to achieve (of users completing onboarding)
                         </td>
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to onboard</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to onboard (minutes)</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes !== undefined 
@@ -1272,11 +1254,21 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to first upload</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to first upload (minutes)</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.engagement?.[week]?.avgTimeToFirstUploadMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToFirstUploadMinutes !== undefined 
                               ? cohortData?.engagement?.[week]?.avgTimeToFirstUploadMinutes 
+                              : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to first upload (days)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadDays !== null && cohortData?.engagement?.[week]?.avgTimeToFirstUploadDays !== undefined 
+                              ? cohortData?.engagement?.[week]?.avgTimeToFirstUploadDays 
                               : '-'}
                           </td>
                         ))}
@@ -1304,7 +1296,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2+ unique days</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2 or more unique days</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.hasUserEventsTable 
@@ -1314,7 +1306,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg days logged in per month (2+ days)</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg days logged in per month (of those who logged in 2 or more days)</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.hasUserEventsTable 
@@ -1324,7 +1316,7 @@ export default function AdminDashboard() {
                         ))}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2+ unique months</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2 or more unique months</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.hasUserEventsTable 
@@ -2721,7 +2713,36 @@ export default function AdminDashboard() {
             {monitoringSubTab === 'health' && renderAppHealth()}
           </div>
         )}
-        {activeTab === 'inbox' && renderPlaceholderTab('Inbox', 'Manage bug reports, feature requests, and user feedback', '📥')}
+        {activeTab === 'inbox' && (
+          <div className="space-y-6">
+            {/* Inbox Sub-tabs */}
+            <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
+              <button
+                onClick={() => setInboxSubTab('bug-reports')}
+                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                  inboxSubTab === 'bug-reports'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🐛 Bug Reports
+              </button>
+              <button
+                onClick={() => setInboxSubTab('user-feedback')}
+                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                  inboxSubTab === 'user-feedback'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                💬 User Feedback
+              </button>
+            </div>
+            {/* Inbox Content */}
+            {inboxSubTab === 'bug-reports' && renderPlaceholder('Bug Reports')}
+            {inboxSubTab === 'user-feedback' && renderPlaceholder('User Feedback')}
+          </div>
+        )}
         {activeTab === 'categories' && renderCategoriesTab()}
         {activeTab === 'insights' && renderPlaceholderTab('Insights Engine', 'Automated spending insights and personalized recommendations', '🔍')}
         {activeTab === 'analytics' && renderAnalyticsTab()}

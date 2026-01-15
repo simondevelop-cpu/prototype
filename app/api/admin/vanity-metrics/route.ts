@@ -363,11 +363,94 @@ export async function GET(request: NextRequest) {
       const banksResult = await pool.query(banksQuery, [...filterParams, weekStart, weekEnd]);
       const uniqueBanks = parseInt(banksResult.rows[0]?.count) || 0;
 
+      // Monthly Active Users (MAU) - users who logged in during the month containing this week
+      let mau = 0;
+      try {
+        const eventsCheck = await pool.query(`
+          SELECT 1 FROM information_schema.tables 
+          WHERE table_name = 'user_events'
+          LIMIT 1
+        `);
+        if (eventsCheck.rows.length > 0) {
+          // Get the month start and end for this week
+          const monthStart = new Date(weekStart);
+          monthStart.setDate(1);
+          monthStart.setHours(0, 0, 0, 0);
+          const monthEnd = new Date(monthStart);
+          monthEnd.setMonth(monthEnd.getMonth() + 1);
+          monthEnd.setDate(0); // Last day of month
+          monthEnd.setHours(23, 59, 59, 999);
+          
+          const mauQuery = `
+            SELECT COUNT(DISTINCT e.user_id) as count
+            FROM user_events e
+            JOIN users u ON u.id = e.user_id
+            WHERE e.event_type = 'login'
+              AND e.event_timestamp >= $${paramIndex}::timestamp
+              AND e.event_timestamp <= $${paramIndex + 1}::timestamp
+              AND u.email != $${adminEmailParamIndex}
+              ${filterConditions}
+          `;
+          const mauResult = await pool.query(mauQuery, [monthStart, monthEnd, ...filterParams]);
+          mau = parseInt(mauResult.rows[0]?.count) || 0;
+        }
+      } catch (e) {
+        // user_events table doesn't exist, MAU = 0
+      }
+
+      // New users per month - users who signed up in the month containing this week
+      const monthStart = new Date(weekStart);
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      const monthEnd = new Date(monthStart);
+      monthEnd.setMonth(monthEnd.getMonth() + 1);
+      monthEnd.setDate(0); // Last day of month
+      monthEnd.setHours(23, 59, 59, 999);
+      
+      const newUsersPerMonthQuery = `
+        SELECT COUNT(*) as count
+        FROM users u
+        WHERE u.email != $${adminEmailParamIndex}
+          AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
+          AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
+          ${filterConditions}
+      `;
+      const newUsersPerMonthResult = await pool.query(newUsersPerMonthQuery, [...filterParams, monthStart.toISOString().split('T')[0], monthEnd.toISOString().split('T')[0]]);
+      const newUsersPerMonth = parseInt(newUsersPerMonthResult.rows[0]?.count) || 0;
+
+      // Total transactions recategorised (from categorization_learning table)
+      let totalTransactionsRecategorised = 0;
+      try {
+        const recatCheck = await pool.query(`
+          SELECT 1 FROM information_schema.tables 
+          WHERE table_name = 'categorization_learning'
+          LIMIT 1
+        `);
+        if (recatCheck.rows.length > 0) {
+          const recatQuery = `
+            SELECT COUNT(*) as count
+            FROM categorization_learning cl
+            JOIN users u ON u.id = cl.user_id
+            WHERE u.email != $${adminEmailParamIndex}
+              AND cl.created_at >= $${paramIndex}::timestamp
+              AND cl.created_at <= $${paramIndex + 1}::timestamp
+              ${filterConditions}
+          `;
+          const recatResult = await pool.query(recatQuery, [...filterParams, weekStart, weekEnd]);
+          totalTransactionsRecategorised = parseInt(recatResult.rows[0]?.count) || 0;
+        }
+      } catch (e) {
+        // categorization_learning table doesn't exist, recategorised = 0
+      }
+
       metrics[weekKey] = {
         totalUsers,
         weeklyActiveUsers: wau,
         newUsers,
+        monthlyActiveUsers: mau,
+        newUsersPerMonth,
         totalTransactionsUploaded: totalTransactions,
+        totalTransactionsRecategorised,
         totalUniqueBanksUploaded: uniqueBanks,
       };
     }
