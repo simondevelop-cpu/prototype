@@ -25,12 +25,15 @@ export async function setupTestDatabase(): Promise<TestDatabase> {
     implementation: () => 'test',
   });
 
-  // Register DATE_TRUNC function
+  // Register DATE_TRUNC function - pg-mem handles overloads automatically
+  // We register it once and it handles both timestamp and timestamptz
   db.public.registerFunction({
     name: 'date_trunc',
-    implementation: (part: string, date: Date) => {
+    implementation: (part: string, date: Date | string | any) => {
+      // Handle both Date objects and string dates
+      const d = date instanceof Date ? date : new Date(date);
       if (part === 'week') {
-        const d = new Date(date);
+        // PostgreSQL week starts on Monday, but we adjust to Sunday for display
         const day = d.getDay();
         const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
         d.setDate(diff);
@@ -38,24 +41,27 @@ export async function setupTestDatabase(): Promise<TestDatabase> {
         return d;
       }
       if (part === 'day') {
-        const d = new Date(date);
         d.setHours(0, 0, 0, 0);
         return d;
       }
-      return date;
+      return d;
     },
   });
 
   // Register EXTRACT function
   db.public.registerFunction({
     name: 'extract',
-    implementation: (field: string, from: Date) => {
+    implementation: (field: string, from: Date | string | any) => {
+      const date = from instanceof Date ? from : new Date(from);
       if (field === 'epoch') {
-        return from.getTime() / 1000;
+        return date.getTime() / 1000;
       }
       return 0;
     },
   });
+  
+  // Register MIN and MAX aggregate functions (pg-mem should have these, but ensure they work)
+  // These are usually built-in, but we can register if needed
 
   const adapter = db.adapters.createPg();
   const MockClient = adapter.Client;
