@@ -155,14 +155,21 @@ export async function GET(request: NextRequest) {
       // Column doesn't exist
     }
 
-    // Engagement query (simplified for now - will need user_events table for full metrics)
+    // Enhanced Engagement query with more metrics
     const engagementQuery = useUsersTable ? `
       SELECT 
         DATE_TRUNC('week', u.created_at) as signup_week,
+        -- Onboarding and data coverage
         COUNT(*) FILTER (WHERE u.completed_at IS NOT NULL) as onboarding_completed,
         COUNT(DISTINCT t.user_id) FILTER (WHERE t.id IS NOT NULL) as uploaded_first_statement,
-        COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 2 THEN t.user_id END) as uploaded_two_statements,
-        COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 3 THEN t.user_id END) as uploaded_three_plus_statements
+        COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 2 THEN upload_counts.user_id END) as uploaded_two_statements,
+        COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 3 THEN upload_counts.user_id END) as uploaded_three_plus_statements,
+        -- Time to achieve (in days) - excluding NULLs
+        AVG(EXTRACT(EPOCH FROM (u.completed_at - u.created_at)) / 86400) FILTER (WHERE u.completed_at IS NOT NULL) as avg_time_to_onboard_days,
+        AVG(EXTRACT(EPOCH FROM (first_upload.first_transaction_date - u.created_at)) / 86400) FILTER (WHERE first_upload.first_transaction_date IS NOT NULL) as avg_time_to_first_upload_days,
+        -- Engagement signals
+        AVG(transaction_counts.tx_count) FILTER (WHERE transaction_counts.tx_count > 0) as avg_transactions_per_user,
+        COUNT(DISTINCT CASE WHEN transaction_counts.tx_count > 0 THEN u.id END) as users_with_transactions
       FROM users u
       LEFT JOIN transactions t ON t.user_id = u.id
       LEFT JOIN (
@@ -171,6 +178,16 @@ export async function GET(request: NextRequest) {
         WHERE upload_session_id IS NOT NULL
         GROUP BY user_id
       ) upload_counts ON upload_counts.user_id = u.id
+      LEFT JOIN (
+        SELECT user_id, MIN(created_at) as first_transaction_date
+        FROM transactions
+        GROUP BY user_id
+      ) first_upload ON first_upload.user_id = u.id
+      LEFT JOIN (
+        SELECT user_id, COUNT(*) as tx_count
+        FROM transactions
+        GROUP BY user_id
+      ) transaction_counts ON transaction_counts.user_id = u.id
       WHERE u.email != $${paramIndex}
         ${filterConditions}
       GROUP BY DATE_TRUNC('week', u.created_at)
@@ -185,7 +202,11 @@ export async function GET(request: NextRequest) {
         )) as onboarding_completed,
         COUNT(DISTINCT t.user_id) FILTER (WHERE t.id IS NOT NULL) as uploaded_first_statement,
         0 as uploaded_two_statements,
-        0 as uploaded_three_plus_statements
+        0 as uploaded_three_plus_statements,
+        NULL as avg_time_to_onboard_days,
+        NULL as avg_time_to_first_upload_days,
+        NULL as avg_transactions_per_user,
+        0 as users_with_transactions
       FROM users u
       LEFT JOIN transactions t ON t.user_id = u.id
       WHERE u.email != $${paramIndex}
@@ -215,10 +236,17 @@ export async function GET(request: NextRequest) {
     engagementResult.rows.forEach((row: any) => {
       const weekKey = `w/c ${new Date(row.signup_week).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
       engagementByWeek[weekKey] = {
+        // Onboarding and data coverage
         onboardingCompleted: parseInt(row.onboarding_completed) || 0,
         uploadedFirstStatement: parseInt(row.uploaded_first_statement) || 0,
         uploadedTwoStatements: parseInt(row.uploaded_two_statements) || 0,
         uploadedThreePlusStatements: parseInt(row.uploaded_three_plus_statements) || 0,
+        // Time to achieve (in days)
+        avgTimeToOnboardDays: row.avg_time_to_onboard_days ? parseFloat(row.avg_time_to_onboard_days).toFixed(1) : null,
+        avgTimeToFirstUploadDays: row.avg_time_to_first_upload_days ? parseFloat(row.avg_time_to_first_upload_days).toFixed(1) : null,
+        // Engagement signals
+        avgTransactionsPerUser: row.avg_transactions_per_user ? parseFloat(row.avg_transactions_per_user).toFixed(1) : null,
+        usersWithTransactions: parseInt(row.users_with_transactions) || 0,
       };
     });
 

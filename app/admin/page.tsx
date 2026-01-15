@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { invalidatePatternCache } from '@/lib/categorization-engine';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 type TabName = 'inbox' | 'categories' | 'insights' | 'analytics' | 'accounts' | 'health';
 
@@ -78,6 +79,8 @@ export default function AdminDashboard() {
   const [cohortLoading, setCohortLoading] = useState(false);
   const [vanityData, setVanityData] = useState<any>(null);
   const [vanityLoading, setVanityLoading] = useState(false);
+  const [intentCategories, setIntentCategories] = useState<string[]>([]);
+  const [intentCategoriesLoading, setIntentCategoriesLoading] = useState(false);
   const [cohortFilters, setCohortFilters] = useState({
     totalAccounts: true,
     validatedEmails: false,
@@ -87,6 +90,14 @@ export default function AdminDashboard() {
     totalAccounts: true,
     validatedEmails: false,
     intentCategories: [] as string[],
+  });
+  const [engagementChartData, setEngagementChartData] = useState<any>(null);
+  const [engagementChartLoading, setEngagementChartLoading] = useState(false);
+  const [chartFilters, setChartFilters] = useState({
+    cohorts: [] as string[],
+    intentCategories: [] as string[],
+    dataCoverage: [] as string[],
+    userIds: [] as number[],
   });
 
   // Fetch customer data function (used by Refresh button and initial load)
@@ -151,6 +162,31 @@ export default function AdminDashboard() {
       console.error('Error fetching vanity metrics:', error);
     } finally {
       setVanityLoading(false);
+    }
+  };
+
+  // Fetch engagement chart data
+  const fetchEngagementChart = async () => {
+    setEngagementChartLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const params = new URLSearchParams({
+        cohorts: chartFilters.cohorts.join(','),
+        intentCategories: chartFilters.intentCategories.join(','),
+        dataCoverage: chartFilters.dataCoverage.join(','),
+        userIds: chartFilters.userIds.join(','),
+      });
+      const response = await fetch(`/api/admin/engagement-chart?${params}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setEngagementChartData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching engagement chart:', error);
+    } finally {
+      setEngagementChartLoading(false);
     }
   };
 
@@ -243,13 +279,34 @@ export default function AdminDashboard() {
     }
   }, [activeTab, analyticsSubTab, authenticated]);
 
+  // Fetch intent categories
+  const fetchIntentCategories = async () => {
+    setIntentCategoriesLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch('/api/admin/intent-categories', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setIntentCategories(data.categories || []);
+      }
+    } catch (error) {
+      console.error('Error fetching intent categories:', error);
+    } finally {
+      setIntentCategoriesLoading(false);
+    }
+  };
+
   // Fetch cohort analysis when Analytics → Dashboard tab is active
   useEffect(() => {
     if (activeTab === 'analytics' && analyticsSubTab === 'dashboard' && authenticated) {
+      fetchIntentCategories();
       fetchCohortAnalysis();
       fetchVanityMetrics();
+      fetchEngagementChart();
     }
-  }, [activeTab, analyticsSubTab, authenticated, cohortFilters, vanityFilters]);
+  }, [activeTab, analyticsSubTab, authenticated, cohortFilters, vanityFilters, chartFilters]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -850,7 +907,7 @@ export default function AdminDashboard() {
             {/* Filters */}
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Filters</h3>
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-wrap gap-4 items-end">
                 <label className="flex items-center">
                   <input
                     type="checkbox"
@@ -869,6 +926,30 @@ export default function AdminDashboard() {
                   />
                   <span className="text-sm text-gray-700">Validated Emails</span>
                 </label>
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-600 mb-1">Intent Categories:</label>
+                  <select
+                    multiple
+                    value={cohortFilters.intentCategories}
+                    onChange={(e) => {
+                      const selected = Array.from(e.target.selectedOptions, option => option.value);
+                      setCohortFilters({ ...cohortFilters, intentCategories: selected });
+                    }}
+                    className="text-sm border border-gray-300 rounded px-2 py-1 min-w-[200px] max-h-32"
+                    size={Math.min(intentCategories.length || 1, 6)}
+                  >
+                    {intentCategoriesLoading ? (
+                      <option>Loading...</option>
+                    ) : intentCategories.length > 0 ? (
+                      intentCategories.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))
+                    ) : (
+                      <option>No categories found</option>
+                    )}
+                  </select>
+                  <span className="text-xs text-gray-500 mt-1">Hold Cmd/Ctrl to select multiple</span>
+                </div>
                 <button
                   onClick={fetchCohortAnalysis}
                   disabled={cohortLoading}
@@ -976,6 +1057,12 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
+                      {/* Onboarding and Data Coverage Section */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={(cohortData.weeks?.length || 0) + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Onboarding and Data Coverage
+                        </td>
+                      </tr>
                       <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Onboarding Completed</td>
                         {cohortData.weeks?.map((week: string) => (
@@ -1008,6 +1095,74 @@ export default function AdminDashboard() {
                           </td>
                         ))}
                       </tr>
+                      {/* Time to Achieve Section */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={(cohortData.weeks?.length || 0) + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Time to Achieve (days, excluding users who haven't completed)
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to Onboard</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData.engagement?.[week]?.avgTimeToOnboardDays || '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to First Upload</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData.engagement?.[week]?.avgTimeToFirstUploadDays || '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      {/* Engagement Signals Section */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={(cohortData.weeks?.length || 0) + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Engagement Signals
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg Transactions per User (of those who uploaded)</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData.engagement?.[week]?.avgTransactionsPerUser || '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Users with Transactions</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData.engagement?.[week]?.usersWithTransactions || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-400 italic">Logged in 2+ unique days</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-400 italic">
+                            Requires user_events table
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-400 italic">Avg days logged in per month (2+ days)</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-400 italic">
+                            Requires user_events table
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-400 italic">Logged in 2+ unique months</td>
+                        {cohortData.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-400 italic">
+                            Requires user_events table
+                          </td>
+                        ))}
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -1022,7 +1177,7 @@ export default function AdminDashboard() {
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-4 border-b border-gray-200 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-900">Vanity Metrics</h3>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-end">
                   <label className="flex items-center text-sm">
                     <input
                       type="checkbox"
@@ -1041,6 +1196,30 @@ export default function AdminDashboard() {
                     />
                     Validated Emails
                   </label>
+                  <div className="flex flex-col">
+                    <label className="text-xs text-gray-600 mb-1">Intent Categories:</label>
+                    <select
+                      multiple
+                      value={vanityFilters.intentCategories}
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.selectedOptions, option => option.value);
+                        setVanityFilters({ ...vanityFilters, intentCategories: selected });
+                      }}
+                      className="text-sm border border-gray-300 rounded px-2 py-1 min-w-[200px] max-h-32"
+                      size={Math.min(intentCategories.length || 1, 6)}
+                    >
+                      {intentCategoriesLoading ? (
+                        <option>Loading...</option>
+                      ) : intentCategories.length > 0 ? (
+                        intentCategories.map((cat) => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))
+                      ) : (
+                        <option>No categories found</option>
+                      )}
+                    </select>
+                    <span className="text-xs text-gray-500 mt-1">Hold Cmd/Ctrl to select multiple</span>
+                  </div>
                   <button
                     onClick={fetchVanityMetrics}
                     disabled={vanityLoading}
