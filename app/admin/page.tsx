@@ -6,7 +6,8 @@ import { invalidatePatternCache } from '@/lib/categorization-engine';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import CheckboxDropdown from '@/components/CheckboxDropdown';
 
-type TabName = 'inbox' | 'categories' | 'insights' | 'analytics' | 'accounts' | 'health';
+type TabName = 'monitoring' | 'inbox' | 'categories' | 'insights' | 'analytics';
+type MonitoringSubTab = 'accounts' | 'health';
 
 interface Keyword {
   id: number;
@@ -41,9 +42,10 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [authenticated, setAuthenticated] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabName>('inbox');
+  const [activeTab, setActiveTab] = useState<TabName>('monitoring');
+  const [monitoringSubTab, setMonitoringSubTab] = useState<MonitoringSubTab>('accounts');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
-  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'vanity-metrics' | 'app-health'>('cohort-analysis');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'vanity-metrics'>('cohort-analysis');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
   const [stats, setStats] = useState<any>(null);
@@ -248,10 +250,10 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (activeTab === 'accounts' && authenticated) {
+    if (activeTab === 'monitoring' && monitoringSubTab === 'accounts' && authenticated) {
       fetchUsers();
     }
-  }, [activeTab, authenticated]);
+  }, [activeTab, monitoringSubTab, authenticated]);
 
   // Fetch recategorizations when Recategorization Log tab is active
   useEffect(() => {
@@ -820,7 +822,7 @@ export default function AdminDashboard() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Validated Email</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registered</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Access</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -874,11 +876,11 @@ export default function AdminDashboard() {
                         }}
                         className={`px-3 py-1 rounded text-xs font-medium ${
                           user.is_active
-                            ? 'bg-red-100 text-red-800 hover:bg-red-200'
-                            : 'bg-green-100 text-green-800 hover:bg-green-200'
+                            ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                            : 'bg-red-100 text-red-800 hover:bg-red-200'
                         } transition-colors`}
                       >
-                        {user.is_active ? 'Block' : 'Enable'}
+                        {user.is_active ? 'Access Enabled' : 'Blocked'}
                       </button>
                     </td>
                   </tr>
@@ -1537,7 +1539,6 @@ export default function AdminDashboard() {
           </div>
         )}
         
-        {analyticsSubTab === 'app-health' && renderPlaceholder('App Health')}
         
         {analyticsSubTab === 'customer-data' && (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -2079,10 +2080,10 @@ export default function AdminDashboard() {
 
   // Auto-fetch health data when health tab is active
   useEffect(() => {
-    if (activeTab === 'health' && !healthData && !healthLoading) {
+    if (activeTab === 'monitoring' && monitoringSubTab === 'health' && !healthData && !healthLoading) {
       fetchHealthData();
     }
-  }, [activeTab]);
+  }, [activeTab, monitoringSubTab]);
 
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
@@ -2286,24 +2287,14 @@ export default function AdminDashboard() {
               📊 Analytics
             </button>
             <button
-              onClick={() => setActiveTab('accounts')}
+              onClick={() => setActiveTab('monitoring')}
               className={`px-6 py-4 font-medium text-sm transition-colors relative ${
-                activeTab === 'accounts'
+                activeTab === 'monitoring'
                   ? 'text-blue-600 border-b-2 border-blue-600'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              👥 Accounts
-            </button>
-            <button
-              onClick={() => setActiveTab('health')}
-              className={`px-6 py-4 font-medium text-sm transition-colors relative ${
-                activeTab === 'health'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              🏥 App Health
+              📊 App Monitoring
             </button>
           </div>
         </div>
@@ -2311,12 +2302,40 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {activeTab === 'monitoring' && (
+          <div className="space-y-6">
+            {/* Monitoring Sub-tabs */}
+            <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
+              <button
+                onClick={() => setMonitoringSubTab('accounts')}
+                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                  monitoringSubTab === 'accounts'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                👥 Accounts
+              </button>
+              <button
+                onClick={() => setMonitoringSubTab('health')}
+                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                  monitoringSubTab === 'health'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                💚 App Health
+              </button>
+            </div>
+            {/* Monitoring Content */}
+            {monitoringSubTab === 'accounts' && renderAccountsTab()}
+            {monitoringSubTab === 'health' && renderAppHealth()}
+          </div>
+        )}
         {activeTab === 'inbox' && renderPlaceholderTab('Inbox', 'Manage bug reports, feature requests, and user feedback', '📥')}
         {activeTab === 'categories' && renderCategoriesTab()}
         {activeTab === 'insights' && renderPlaceholderTab('Insights Engine', 'Automated spending insights and personalized recommendations', '🔍')}
         {activeTab === 'analytics' && renderAnalyticsTab()}
-        {activeTab === 'accounts' && renderAccountsTab()}
-        {activeTab === 'health' && renderAppHealth()}
       </div>
       
       {/* Add Modal - only for keywords and merchants */}
