@@ -1252,7 +1252,7 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Time to onboard (minutes)</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average time to onboard (minutes)</td>
                         {displayWeeks.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes !== undefined 
@@ -1654,6 +1654,33 @@ export default function AdminDashboard() {
                         })()}
                       </tr>
                       <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">New users</td>
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.newUsers || 0}
+                          </td>
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
+                      </tr>
+                      <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Weekly active users</td>
                         {vanityData?.weeks?.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
@@ -1681,64 +1708,10 @@ export default function AdminDashboard() {
                         })()}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">New users per week</td>
-                        {vanityData?.weeks?.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {vanityData.metrics?.[week]?.newUsers || 0}
-                          </td>
-                        )) || (() => {
-                          const now = new Date();
-                          const novemberStart = new Date(now.getFullYear(), 10, 1);
-                          const firstMonday = new Date(novemberStart);
-                          const dayOfWeek = novemberStart.getDay();
-                          if (dayOfWeek === 0) {
-                            firstMonday.setDate(novemberStart.getDate() + 1);
-                          } else if (dayOfWeek !== 1) {
-                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
-                          }
-                          firstMonday.setHours(0, 0, 0, 0);
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
-                          const numWeeks = Math.max(1, weeksDiff + 1);
-                          return Array.from({ length: numWeeks }, () => (
-                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
-                          ));
-                        })()}
-                      </tr>
-                      <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Monthly active users</td>
                         {vanityData?.weeks?.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {vanityData.metrics?.[week]?.monthlyActiveUsers || 0}
-                          </td>
-                        )) || (() => {
-                          const now = new Date();
-                          const novemberStart = new Date(now.getFullYear(), 10, 1);
-                          const firstMonday = new Date(novemberStart);
-                          const dayOfWeek = novemberStart.getDay();
-                          if (dayOfWeek === 0) {
-                            firstMonday.setDate(novemberStart.getDate() + 1);
-                          } else if (dayOfWeek !== 1) {
-                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
-                          }
-                          firstMonday.setHours(0, 0, 0, 0);
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
-                          const numWeeks = Math.max(1, weeksDiff + 1);
-                          return Array.from({ length: numWeeks }, () => (
-                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
-                          ));
-                        })()}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">New users per month</td>
-                        {vanityData?.weeks?.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {vanityData.metrics?.[week]?.newUsersPerMonth || 0}
                           </td>
                         )) || (() => {
                           const now = new Date();
