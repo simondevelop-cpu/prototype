@@ -1973,12 +1973,12 @@ export default function AdminDashboard() {
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Uploaded two statements</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE COUNT(DISTINCT upload_session_id) >= 2</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE COUNT(DISTINCT upload_session_id) {'>='} 2</td>
                     <td className="px-6 py-4 text-sm text-gray-600">transactions table (upload_session_id column)</td>
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Uploaded three or more statements</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE COUNT(DISTINCT upload_session_id) >= 3</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE COUNT(DISTINCT upload_session_id) {'>='} 3</td>
                     <td className="px-6 py-4 text-sm text-gray-600">transactions table (upload_session_id column)</td>
                   </tr>
                   
