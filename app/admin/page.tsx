@@ -1877,13 +1877,15 @@ export default function AdminDashboard() {
         )}
         
         {analyticsSubTab === 'data-details' && (
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Cohort Analysis - Data Details</h2>
-              <p className="text-gray-600 mt-1">Documentation of all KPIs, formulas, and data sources used in the Cohort Analysis tab</p>
-            </div>
+          <div className="space-y-6">
+            {/* Cohort Analysis Tab - Data Details */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">Cohort Analysis - Data Details</h2>
+                <p className="text-gray-600 mt-1">Documentation of all KPIs, formulas, and data sources used in the Cohort Analysis tab</p>
+              </div>
 
-            <div className="overflow-x-auto">
+              <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -2164,7 +2166,7 @@ export default function AdminDashboard() {
             </div>
             
             {/* Events Data Tab - Data Details */}
-            <div className="mt-8 bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-xl font-bold text-gray-900">Events Data Tab - Data Details</h2>
                 <p className="text-gray-600 mt-1">Documentation of all columns displayed in the Events Data tab</p>
@@ -2216,7 +2218,7 @@ export default function AdminDashboard() {
             </div>
             
             {/* Vanity Metrics Tab - Data Details */}
-            <div className="mt-8 bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-xl font-bold text-gray-900">Vanity Metrics Tab - Data Details</h2>
                 <p className="text-gray-600 mt-1">Documentation of all metrics displayed in the Vanity Metrics tab</p>
@@ -2283,7 +2285,7 @@ export default function AdminDashboard() {
             </div>
             
             {/* Source Dataset Columns */}
-            <div className="mt-8 bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-xl font-bold text-gray-900">Source Dataset Columns</h2>
                 <p className="text-gray-600 mt-1">Complete list of all columns/data points available in the customer, events, and transactions source datasets</p>
