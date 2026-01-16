@@ -2064,7 +2064,7 @@ export default function AdminDashboard() {
             </div>
             
             {/* Customer Data Tab - Data Details */}
-            <div className="mt-8 bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-xl font-bold text-gray-900">Customer Data Tab - Data Details</h2>
                 <p className="text-gray-600 mt-1">Documentation of all columns displayed in the Customer Data tab</p>
