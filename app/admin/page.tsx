@@ -2061,17 +2061,8 @@ export default function AdminDashboard() {
               </table>
             </div>
             
-            <div className="p-6 border-t border-gray-200 bg-gray-50">
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">Data Sources Summary</h3>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li><strong>users table:</strong> Contains user account information, onboarding progress (created_at, completed_at, last_step, email_validated, motivation, etc.)</li>
-                <li><strong>transactions table:</strong> Contains transaction data with user_id and upload_session_id for tracking data coverage and first upload metrics</li>
-                <li><strong>user_events table:</strong> Contains event tracking data (currently used for login events in some metrics, but not heavily used in cohort analysis)</li>
-              </ul>
-            </div>
-            
             {/* Customer Data Tab - Data Details */}
-            <div className="mt-6 bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="mt-8 bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-xl font-bold text-gray-900">Customer Data Tab - Data Details</h2>
                 <p className="text-gray-600 mt-1">Documentation of all columns displayed in the Customer Data tab</p>
@@ -2173,7 +2164,7 @@ export default function AdminDashboard() {
             </div>
             
             {/* Events Data Tab - Data Details */}
-            <div className="mt-6 bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="mt-8 bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-xl font-bold text-gray-900">Events Data Tab - Data Details</h2>
                 <p className="text-gray-600 mt-1">Documentation of all columns displayed in the Events Data tab</p>
@@ -2225,7 +2216,7 @@ export default function AdminDashboard() {
             </div>
             
             {/* Vanity Metrics Tab - Data Details */}
-            <div className="mt-6 bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="mt-8 bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-xl font-bold text-gray-900">Vanity Metrics Tab - Data Details</h2>
                 <p className="text-gray-600 mt-1">Documentation of all metrics displayed in the Vanity Metrics tab</p>
@@ -2292,7 +2283,7 @@ export default function AdminDashboard() {
             </div>
             
             {/* Source Dataset Columns */}
-            <div className="mt-6 bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="mt-8 bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-xl font-bold text-gray-900">Source Dataset Columns</h2>
                 <p className="text-gray-600 mt-1">Complete list of all columns/data points available in the customer, events, and transactions source datasets</p>
