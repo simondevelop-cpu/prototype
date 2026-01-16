@@ -2069,6 +2069,299 @@ export default function AdminDashboard() {
                 <li><strong>user_events table:</strong> Contains event tracking data (currently used for login events in some metrics, but not heavily used in cohort analysis)</li>
               </ul>
             </div>
+            
+            {/* Customer Data Tab - Data Details */}
+            <div className="mt-6 bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">Customer Data Tab - Data Details</h2>
+                <p className="text-gray-600 mt-1">Documentation of all columns displayed in the Customer Data tab</p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Column / Data Point</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Formula / Calculation</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Source</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">User ID</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.id</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table (id column)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">First Name</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COALESCE(p.first_name, NULL) or o.first_name</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l0_pii_users table (first_name column) OR onboarding_responses table (first_name column) - PII isolated</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Province/Region</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">p.province_region or o.province_region</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l0_pii_users table OR onboarding_responses table (province_region column)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Emotional State</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.emotional_state or o.emotional_state (TEXT[] array)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table OR onboarding_responses table (emotional_state column, stored as array)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Financial Context</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.financial_context or o.financial_context (TEXT[] array)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table OR onboarding_responses table (financial_context column, stored as array)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Motivation</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.motivation or o.motivation</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table OR onboarding_responses table (motivation column)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Acquisition Source</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.acquisition_source or o.acquisition_source</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table OR onboarding_responses table (acquisition_source column)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Insight Preferences</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.insight_preferences or o.insight_preferences (TEXT[] array)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table OR onboarding_responses table (insight_preferences column, stored as array)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Email Validated</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.email_validated (defaults to false if column doesn't exist)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table (email_validated column, BOOLEAN)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Is Active</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.is_active (defaults to true if column doesn't exist)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table (is_active column, BOOLEAN)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Account Created</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.created_at or COALESCE(p.created_at, u.created_at)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table OR l0_pii_users table (created_at column)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Onboarding Completed</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.completed_at or o.completed_at</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table OR onboarding_responses table (completed_at column)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Onboarding Status</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">Calculated: completed_at ? 'Completed' : last_step ? 'Dropped after Step X' : 'Not started'</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table (calculated from completed_at and last_step columns)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Transaction Count</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT t.id) per user</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (JOIN with users table, aggregated by user_id)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Upload Session Count</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT upload_session_id) per user</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (upload_session_id column, aggregated by user_id)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">First Transaction Date</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">MIN(created_at) per user</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (created_at column, aggregated by user_id)</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Events Data Tab - Data Details */}
+            <div className="mt-6 bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">Events Data Tab - Data Details</h2>
+                <p className="text-gray-600 mt-1">Documentation of all columns displayed in the Events Data tab</p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Column / Data Point</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Formula / Calculation</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Source</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Event ID</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">e.id</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (id column)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">User ID</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">e.user_id</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (user_id column, foreign key to users table)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">First Name</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COALESCE(p.first_name, 'Unknown')</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l0_pii_users table (first_name column) - PII isolated, no email or last name shown</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Event Type</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">e.event_type</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (event_type column, e.g., 'login', 'dashboard_view', etc.)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Event Timestamp</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">e.event_timestamp (displayed as created_at in UI)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (event_timestamp column, TIMESTAMP WITH TIME ZONE)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Metadata</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">e.metadata (JSONB object)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata column, JSONB - optional additional event data)</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Vanity Metrics Tab - Data Details */}
+            <div className="mt-6 bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">Vanity Metrics Tab - Data Details</h2>
+                <p className="text-gray-600 mt-1">Documentation of all metrics displayed in the Vanity Metrics tab</p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">KPI / Metric</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Formula / Calculation</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Source</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Total users (cumulative)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at {'<='} weekEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table (created_at column, cumulative count up to end of week)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Weekly active users</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) WHERE event_type = 'login' AND event_timestamp BETWEEN weekStart AND weekEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (event_type, event_timestamp columns) JOIN users table</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">New users</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at BETWEEN weekStart AND weekEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table (created_at column, users who signed up during the week)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Monthly active users</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) WHERE event_type = 'login' AND event_timestamp BETWEEN monthStart AND monthEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (event_type, event_timestamp columns) JOIN users table, filtered by month containing the week</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">New users per month</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at BETWEEN monthStart AND monthEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table (created_at column, users who signed up during the month containing the week)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Total transactions uploaded (cumulative)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at {'<='} weekEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (created_at column, cumulative count up to end of week)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">New transactions uploaded</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at BETWEEN weekStart AND weekEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (created_at column, transactions uploaded during the week)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Total transactions recategorised</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at BETWEEN weekStart AND weekEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">categorization_learning table (created_at column, transactions recategorized during the week)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Total unique banks uploaded</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT account) WHERE created_at BETWEEN weekStart AND weekEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (account column, distinct bank/account names uploaded during the week)</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Source Dataset Columns */}
+            <div className="mt-6 bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">Source Dataset Columns</h2>
+                <p className="text-gray-600 mt-1">Complete list of all columns/data points available in the customer, events, and transactions source datasets</p>
+              </div>
+
+              <div className="p-6 space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">users table (Customer Data Source)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (user identifier)</li>
+                    <li><strong>email</strong> - TEXT UNIQUE NOT NULL (user email address)</li>
+                    <li><strong>password_hash</strong> - TEXT NOT NULL (hashed password for authentication)</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE (when user account was created)</li>
+                    <li><strong>completed_at</strong> - TIMESTAMP WITH TIME ZONE (when onboarding was completed, NULL if not completed)</li>
+                    <li><strong>last_step</strong> - INTEGER (last onboarding step reached, 0 if not started, 1-7 for steps)</li>
+                    <li><strong>motivation</strong> - TEXT (user's primary motivation/intent category from onboarding)</li>
+                    <li><strong>motivation_other</strong> - TEXT (free-text field if user selected "Other" for motivation)</li>
+                    <li><strong>emotional_state</strong> - TEXT[] (array of emotional states selected during onboarding)</li>
+                    <li><strong>financial_context</strong> - TEXT[] (array of financial contexts selected during onboarding)</li>
+                    <li><strong>acquisition_source</strong> - TEXT (how user found the product)</li>
+                    <li><strong>acquisition_other</strong> - TEXT (free-text field if user selected "Other" for acquisition source)</li>
+                    <li><strong>insight_preferences</strong> - TEXT[] (array of insight types user wants to receive)</li>
+                    <li><strong>insight_other</strong> - TEXT (free-text field for additional insight preferences)</li>
+                    <li><strong>email_validated</strong> - BOOLEAN (whether user's email has been validated)</li>
+                    <li><strong>is_active</strong> - BOOLEAN (whether user account is active/not blocked)</li>
+                    <li><strong>updated_at</strong> - TIMESTAMP WITH TIME ZONE (last update timestamp)</li>
+                    <li><strong>login_attempts</strong> - INTEGER (number of login attempts, used for security)</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">transactions table (Transactions Data Source)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (transaction identifier)</li>
+                    <li><strong>user_id</strong> - INTEGER REFERENCES users(id) (foreign key to users table)</li>
+                    <li><strong>date</strong> - DATE NOT NULL (transaction date from bank statement)</li>
+                    <li><strong>description</strong> - TEXT NOT NULL (full transaction description from statement)</li>
+                    <li><strong>merchant</strong> - TEXT (extracted merchant name, first part of description)</li>
+                    <li><strong>amount</strong> - DECIMAL(10, 2) NOT NULL (transaction amount, positive for income, negative for expenses)</li>
+                    <li><strong>cashflow</strong> - VARCHAR(50) (type: 'income', 'expense', or 'other')</li>
+                    <li><strong>category</strong> - VARCHAR(255) (categorized transaction category, e.g., 'Food', 'Bills')</li>
+                    <li><strong>account</strong> - VARCHAR(255) (bank/account name from statement, e.g., 'RBC Chequing')</li>
+                    <li><strong>label</strong> - VARCHAR(255) (sub-category label, e.g., 'Groceries', 'Rent')</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when transaction was imported/uploaded)</li>
+                    <li><strong>upload_session_id</strong> - TEXT (identifier for the upload session/batch, groups transactions from same PDF upload)</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">user_events table (Events Data Source)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (event identifier)</li>
+                    <li><strong>user_id</strong> - INTEGER REFERENCES users(id) ON DELETE CASCADE (foreign key to users table)</li>
+                    <li><strong>event_type</strong> - TEXT NOT NULL (type of event, e.g., 'login', 'dashboard_view', 'transaction_uploaded')</li>
+                    <li><strong>event_timestamp</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when the event occurred)</li>
+                    <li><strong>metadata</strong> - JSONB (optional JSON object containing additional event-specific data)</li>
+                  </ul>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Additional Tables (Referenced but not displayed in these tabs)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>l0_pii_users table:</strong> Contains PII (Personally Identifiable Information) isolated from main users table - includes first_name, last_name, email, date_of_birth, recovery_phone, province_region</li>
+                    <li><strong>onboarding_responses table:</strong> Legacy table containing onboarding data (may exist if migration not yet run) - similar structure to users table fields</li>
+                    <li><strong>categorization_learning table:</strong> Stores user corrections to transaction categorization - includes user_id, description_pattern, original_category, corrected_category, corrected_label, frequency, created_at</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
         )}
         
