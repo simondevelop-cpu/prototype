@@ -136,12 +136,6 @@ export default function AdminDashboard() {
         return;
       }
       
-      console.log('[Customer Data] Received data:', {
-        count: data.customerData?.length || 0,
-        source: data.source,
-        migrationComplete: data.migrationComplete
-      });
-      
       setCustomerData(data.customerData || []);
     } catch (error) {
       console.error('Error fetching customer data:', error);
