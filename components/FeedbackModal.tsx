@@ -71,15 +71,14 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
   const LikertScale = ({ 
     label, 
     value, 
-    onChange 
+    onChange,
+    options
   }: { 
     label: string; 
     value: number | null; 
     onChange: (value: number) => void;
+    options: string[];
   }) => {
-    const labels = ['Not at all', 'Slightly', 'Moderately', 'Very', 'Extremely'];
-    const emojis = ['😞', '😐', '🙂', '😊', '😄'];
-    
     return (
       <div className="space-y-3">
         <label className="block text-sm font-medium text-gray-700">{label}</label>
@@ -95,14 +94,8 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
                   : 'bg-white border-gray-200 hover:border-blue-300 hover:bg-blue-50'
               }`}
             >
-              <div className={`text-2xl ${value === num ? 'scale-110' : ''} transition-transform`}>
-                {emojis[num - 1]}
-              </div>
-              <div className={`text-xs font-medium ${value === num ? 'text-blue-700' : 'text-gray-600'}`}>
-                {num}
-              </div>
-              <div className={`text-xs text-center ${value === num ? 'text-blue-700 font-medium' : 'text-gray-500'}`}>
-                {labels[num - 1]}
+              <div className={`text-sm text-center font-medium ${value === num ? 'text-blue-700' : 'text-gray-700'}`}>
+                {options[num - 1]}
               </div>
             </button>
           ))}
@@ -137,15 +130,17 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
           )}
 
           <LikertScale
-            label="How useful is the app to understand your spending? *"
+            label="Is the App helpful to understand your spending? *"
             value={usefulness}
             onChange={setUsefulness}
+            options={['Very unhelpful', 'Somewhat unhelpful', 'Neutral', 'Somewhat helpful', 'Very helpful']}
           />
 
           <LikertScale
             label="Do you trust the App? *"
             value={trust}
             onChange={setTrust}
+            options={['Not at all', 'Not really', 'Neutral', 'Somewhat', 'Yes']}
           />
 
           <div>
