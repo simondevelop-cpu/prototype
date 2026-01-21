@@ -314,6 +314,31 @@ export async function GET(request: NextRequest) {
       GROUP BY user_id
     `;
     
+    // Build unique banks subquery - extract bank name from account field
+    // Account field format: "RBC Credit Card", "TD Chequing", "Scotiabank Savings", etc.
+    const uniqueBanksSubquery = `
+      SELECT 
+        user_id,
+        COUNT(DISTINCT 
+          CASE 
+            WHEN account IS NOT NULL THEN
+              CASE 
+                WHEN account ILIKE 'RBC%' THEN 'RBC'
+                WHEN account ILIKE 'TD%' OR account ILIKE 'Toronto-Dominion%' THEN 'TD'
+                WHEN account ILIKE 'Scotiabank%' OR account ILIKE 'Bank of Nova Scotia%' THEN 'Scotiabank'
+                WHEN account ILIKE 'BMO%' OR account ILIKE 'Bank of Montreal%' THEN 'BMO'
+                WHEN account ILIKE 'CIBC%' OR account ILIKE 'Canadian Imperial%' THEN 'CIBC'
+                WHEN account ILIKE 'Tangerine%' OR account ILIKE 'ING Direct%' THEN 'Tangerine'
+                ELSE NULL
+              END
+            ELSE NULL
+          END
+        ) as unique_bank_count
+      FROM transactions
+      WHERE account IS NOT NULL
+      GROUP BY user_id
+    `;
+    
     const engagementQuery = useUsersTable ? `
       SELECT 
         DATE_TRUNC('week', u.created_at) as signup_week,
@@ -322,6 +347,9 @@ export async function GET(request: NextRequest) {
         COUNT(DISTINCT t.user_id) FILTER (WHERE t.id IS NOT NULL) as uploaded_first_statement,
         COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 2 THEN upload_counts.user_id END) as uploaded_two_statements,
         COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 3 THEN upload_counts.user_id END) as uploaded_three_plus_statements,
+        -- Unique banks metrics
+        COUNT(DISTINCT CASE WHEN bank_counts.unique_bank_count >= 2 THEN u.id END) as uploaded_more_than_one_bank,
+        COUNT(DISTINCT CASE WHEN bank_counts.unique_bank_count >= 3 THEN u.id END) as uploaded_more_than_two_banks,
         -- Time to achieve (in days) - excluding NULLs
         AVG(EXTRACT(EPOCH FROM (u.completed_at - u.created_at)) / 86400) FILTER (WHERE u.completed_at IS NOT NULL) as avg_time_to_onboard_days,
         -- First upload metrics split by first day vs after first day
@@ -339,6 +367,9 @@ export async function GET(request: NextRequest) {
       LEFT JOIN (
         ${uploadCountsSubquery}
       ) upload_counts ON upload_counts.user_id = u.id
+      LEFT JOIN (
+        ${uniqueBanksSubquery}
+      ) bank_counts ON bank_counts.user_id = u.id
       LEFT JOIN (
         SELECT user_id, MIN(created_at) as first_transaction_date
         FROM transactions
@@ -364,6 +395,8 @@ export async function GET(request: NextRequest) {
         COUNT(DISTINCT t.user_id) FILTER (WHERE t.id IS NOT NULL) as uploaded_first_statement,
         0 as uploaded_two_statements,
         0 as uploaded_three_plus_statements,
+        0 as uploaded_more_than_one_bank,
+        0 as uploaded_more_than_two_banks,
         NULL as avg_time_to_onboard_days,
         NULL as avg_time_to_first_upload_days,
         NULL as avg_transactions_per_user,
@@ -488,6 +521,9 @@ export async function GET(request: NextRequest) {
         uploadedFirstStatement: parseInt(row.uploaded_first_statement) || 0,
         uploadedTwoStatements: parseInt(row.uploaded_two_statements) || 0,
         uploadedThreePlusStatements: parseInt(row.uploaded_three_plus_statements) || 0,
+        // Unique banks metrics
+        uploadedMoreThanOneBank: parseInt(row.uploaded_more_than_one_bank) || 0,
+        uploadedMoreThanTwoBanks: parseInt(row.uploaded_more_than_two_banks) || 0,
         // Time to achieve (in minutes - converted from days)
         avgTimeToOnboardMinutes: row.avg_time_to_onboard_days ? Math.round(parseFloat(row.avg_time_to_onboard_days) * 1440) : null,
         // First upload metrics split by first day vs after first day
