@@ -1,13 +1,14 @@
 <svg width="64" height="64" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
   <!-- Hummingbird logo - K shape: bird head/beak/neck forms vertical stroke, wings form K diagonals -->
-  <!-- Bird head and beak (pointing left) -->
-  <path d="M20 25 L15 20 L12 22" stroke="#2D5016" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <!-- Eye -->
-  <circle cx="18" cy="23" r="2" fill="#2D5016"/>
-  <!-- Vertical stroke (bird neck/body) forming left side of K -->
-  <path d="M20 25 L20 65" stroke="#2D5016" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Upper wing/diagonal (upper right stroke of K) - curves upwards then gently downwards -->
-  <path d="M20 45 Q37.5 25 55 25 T60 30 Q57.5 32.5 55 35" stroke="#2D5016" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <!-- Lower wing/diagonal (lower right stroke of K) - curves downwards then gently upwards -->
-  <path d="M20 45 Q37.5 65 55 65 T60 60 Q57.5 57.5 55 55" stroke="#2D5016" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Dark olive-green color (#2D5016) -->
+  <!-- Bird head and slender pointed beak extending to the left -->
+  <path d="M20 28 L12 25 L10 26" stroke="#2D5016" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Eye - small dark circular dot -->
+  <circle cx="18" cy="26" r="2.5" fill="#2D5016"/>
+  <!-- Vertical stroke (bird neck/body) forming left side of K - neck curves downwards -->
+  <path d="M20 28 Q20 35 20 45 L20 65" stroke="#2D5016" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Upper wing/diagonal (upper right stroke of K) - curves upwards then gently downwards, leaf-like -->
+  <path d="M20 45 Q35 20 50 20 Q60 22 58 28 Q56 32 52 30" stroke="#2D5016" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Lower wing/diagonal (lower right stroke of K) - curves downwards then gently upwards, mirroring upper shape -->
+  <path d="M20 45 Q35 70 50 70 Q60 68 58 62 Q56 58 52 60" stroke="#2D5016" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>
