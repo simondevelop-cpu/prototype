@@ -2075,18 +2075,18 @@ export default function AdminDashboard() {
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Bank</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">metadata->{'bank'} FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = 'statement_upload' or 'statement_linked')</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'bank' FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'})</td>
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Account Type</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">metadata->{'accountType'} FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = 'statement_upload' or 'statement_linked')</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'accountType' FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'})</td>
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Uploaded or Linked</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">metadata->{'source'} FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = 'statement_upload' or 'statement_linked', source = 'uploaded' or 'linked')</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'source' FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'}, source = {'uploaded'} or {'linked'})</td>
                   </tr>
                   
                   {/* Filters */}
