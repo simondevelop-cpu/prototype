@@ -76,31 +76,40 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
     label: string; 
     value: number | null; 
     onChange: (value: number) => void;
-  }) => (
-    <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700">{label}</label>
-      <div className="flex items-center gap-4">
-        {[1, 2, 3, 4, 5].map((num) => (
-          <button
-            key={num}
-            type="button"
-            onClick={() => onChange(num)}
-            className={`w-12 h-12 rounded-full border-2 flex items-center justify-center font-medium transition-colors ${
-              value === num
-                ? 'bg-blue-600 border-blue-600 text-white'
-                : 'bg-white border-gray-300 text-gray-700 hover:border-blue-400'
-            }`}
-          >
-            {num}
-          </button>
-        ))}
-        <div className="flex-1 text-sm text-gray-500 ml-4">
-          <span className="block">1 = Not at all</span>
-          <span className="block">5 = Extremely</span>
+  }) => {
+    const labels = ['Not at all', 'Slightly', 'Moderately', 'Very', 'Extremely'];
+    const emojis = ['😞', '😐', '🙂', '😊', '😄'];
+    
+    return (
+      <div className="space-y-3">
+        <label className="block text-sm font-medium text-gray-700">{label}</label>
+        <div className="flex items-start gap-2">
+          {[1, 2, 3, 4, 5].map((num) => (
+            <button
+              key={num}
+              type="button"
+              onClick={() => onChange(num)}
+              className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${
+                value === num
+                  ? 'bg-blue-50 border-blue-500 shadow-md'
+                  : 'bg-white border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+              }`}
+            >
+              <div className={`text-2xl ${value === num ? 'scale-110' : ''} transition-transform`}>
+                {emojis[num - 1]}
+              </div>
+              <div className={`text-xs font-medium ${value === num ? 'text-blue-700' : 'text-gray-600'}`}>
+                {num}
+              </div>
+              <div className={`text-xs text-center ${value === num ? 'text-blue-700 font-medium' : 'text-gray-500'}`}>
+                {labels[num - 1]}
+              </div>
+            </button>
+          ))}
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -149,7 +158,7 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
               onChange={(e) => setProblems(e.target.value)}
               rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Optional - Let us know about any issues..."
+              placeholder="Let us know about any issues..."
             />
           </div>
 
@@ -163,7 +172,7 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
               onChange={(e) => setLearnMore(e.target.value)}
               rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Optional - Share your thoughts..."
+              placeholder="Share your thoughts..."
             />
           </div>
 

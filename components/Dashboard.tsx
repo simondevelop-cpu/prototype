@@ -324,12 +324,6 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                 </svg>
               </button>
               <button
-                onClick={() => setShowFeedback(true)}
-                className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900 transition-colors"
-              >
-                Feedback
-              </button>
-              <button
                 onClick={onLogout}
                 className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900 transition-colors"
               >
@@ -343,7 +337,8 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
       {/* Tabs */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex gap-8">
+          <nav className="flex gap-8 items-center justify-between">
+            <div className="flex gap-8">
             <button
               onClick={() => setActiveTab('dashboard')}
               className={`py-4 border-b-2 font-medium transition-colors ${
@@ -383,6 +378,13 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
               }`}
             >
               Budget
+            </button>
+            </div>
+            <button
+              onClick={() => setShowFeedback(true)}
+              className="py-4 px-4 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              Give us feedback
             </button>
           </nav>
         </div>
