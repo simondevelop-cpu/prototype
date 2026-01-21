@@ -303,7 +303,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 flex items-center justify-center">
-                <img src="/Hummingbird_logo.jpg" alt="Hummingbird Finance" className="w-10 h-10 object-contain" />
+                <img src="/Hummingbird_logo_square.png" alt="Hummingbird Finance" className="w-10 h-10 object-contain" />
               </div>
               <h1 className="text-xl font-bold text-gray-900">Hummingbird Finance</h1>
             </div>
