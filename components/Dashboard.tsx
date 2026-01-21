@@ -382,7 +382,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
               onClick={() => setShowFeedback(true)}
               className="py-4 px-4 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
             >
-              Give us feedback
+              Help us improve the App
             </button>
           </nav>
         </div>
