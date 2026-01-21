@@ -302,12 +302,15 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              <div className="w-10 h-10 flex items-center justify-center">
+                <svg className="w-10 h-10 text-gray-900" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 100 100" strokeLinecap="round" strokeLinejoin="round">
+                  {/* Hummingbird logo - K shape forming bird: left side = head/beak/body, right side = wings */}
+                  <path d="M25 25 L25 65 L50 45 L50 25 M50 45 L50 65 M50 45 L80 30 M50 45 L80 60 M25 25 L20 20 M25 25 L15 23" />
+                  {/* Eye */}
+                  <circle cx="23" cy="23" r="2.5" fill="currentColor" />
                 </svg>
               </div>
-              <h1 className="text-xl font-bold text-gray-900">Canadian Insights</h1>
+              <h1 className="text-xl font-bold text-gray-900">Hummingbird</h1>
             </div>
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-600">
