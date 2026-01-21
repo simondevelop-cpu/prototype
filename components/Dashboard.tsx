@@ -303,19 +303,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 flex items-center justify-center">
-                <svg className="w-10 h-10 text-gray-900" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 100 100" strokeLinecap="round" strokeLinejoin="round">
-                  {/* Hummingbird logo - K shape: bird head/beak/neck forms vertical stroke, wings form K diagonals */}
-                  {/* Bird head and beak (pointing left) */}
-                  <path d="M20 25 L15 20 L12 22" />
-                  {/* Eye */}
-                  <circle cx="18" cy="23" r="2" fill="currentColor" />
-                  {/* Vertical stroke (bird neck/body) forming left side of K */}
-                  <path d="M20 25 L20 65" />
-                  {/* Upper wing/diagonal (upper right stroke of K) */}
-                  <path d="M20 45 L55 25 L60 30 L55 35" />
-                  {/* Lower wing/diagonal (lower right stroke of K) */}
-                  <path d="M20 45 L55 65 L60 60 L55 55" />
-                </svg>
+                <img src="/logo.svg" alt="Hummingbird Finance" className="w-10 h-10" />
               </div>
               <h1 className="text-xl font-bold text-gray-900">Hummingbird Finance</h1>
             </div>
