@@ -79,6 +79,10 @@ export default function AdminDashboard() {
   const [eventsData, setEventsData] = useState<any[]>([]);
   const [eventsDataLoading, setEventsDataLoading] = useState(false);
   
+  // State for User Feedback tab
+  const [userFeedback, setUserFeedback] = useState<any[]>([]);
+  const [userFeedbackLoading, setUserFeedbackLoading] = useState(false);
+  
   // State for App Health tab
   const [healthData, setHealthData] = useState<any>(null);
   const [healthLoading, setHealthLoading] = useState(false);
@@ -159,6 +163,24 @@ export default function AdminDashboard() {
       console.error('Error fetching events data:', error);
     } finally {
       setEventsDataLoading(false);
+    }
+  };
+
+  // Fetch user feedback function
+  const fetchUserFeedback = async () => {
+    setUserFeedbackLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch('/api/admin/user-feedback', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setUserFeedback(data.feedback || []);
+    } catch (error) {
+      console.error('Error fetching user feedback:', error);
+      setUserFeedback([]);
+    } finally {
+      setUserFeedbackLoading(false);
     }
   };
 
@@ -339,6 +361,13 @@ export default function AdminDashboard() {
       fetchEventsData();
     }
   }, [activeTab, analyticsSubTab, authenticated]);
+
+  // Fetch user feedback when Inbox → User Feedback tab is active
+  useEffect(() => {
+    if (activeTab === 'inbox' && inboxSubTab === 'user-feedback' && authenticated) {
+      fetchUserFeedback();
+    }
+  }, [activeTab, inboxSubTab, authenticated]);
 
   // Fetch customer data when Analytics → Customer Data tab is active
   useEffect(() => {
@@ -2038,6 +2067,28 @@ export default function AdminDashboard() {
                     <td className="px-6 py-4 text-sm text-gray-600">transactions table (COUNT(*) grouped by user_id)</td>
                   </tr>
                   
+                  {/* Bank Statement Source Tracking */}
+                  <tr className="bg-gray-100">
+                    <td colSpan={3} className="px-6 py-3 text-sm font-bold text-gray-900">
+                      BANK STATEMENT SOURCE TRACKING
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Bank</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">metadata->{'bank'} FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = 'statement_upload' or 'statement_linked')</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Account Type</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">metadata->{'accountType'} FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = 'statement_upload' or 'statement_linked')</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Uploaded or Linked</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">metadata->{'source'} FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = 'statement_upload' or 'statement_linked', source = 'uploaded' or 'linked')</td>
+                  </tr>
+                  
                   {/* Filters */}
                   <tr className="bg-gray-100">
                     <td colSpan={3} className="px-6 py-3 text-sm font-bold text-gray-900">
@@ -3320,7 +3371,79 @@ export default function AdminDashboard() {
             </div>
             {/* Inbox Content */}
             {inboxSubTab === 'bug-reports' && renderPlaceholderTab('Bug Reports', 'Coming soon...', '🐛')}
-            {inboxSubTab === 'user-feedback' && renderPlaceholderTab('User Feedback', 'Coming soon...', '💬')}
+            {inboxSubTab === 'user-feedback' && (
+              <div className="space-y-6">
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-gray-900">User Feedback</h2>
+                    <button
+                      onClick={fetchUserFeedback}
+                      disabled={userFeedbackLoading}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    >
+                      <svg className={`w-4 h-4 ${userFeedbackLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Refresh
+                    </button>
+                  </div>
+
+                  {userFeedbackLoading ? (
+                    <div className="text-center py-12">
+                      <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                      <p className="text-gray-600 mt-4">Loading feedback...</p>
+                    </div>
+                  ) : userFeedback.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">No feedback submitted yet.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Submitted At</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usefulness (1-5)</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trust (1-5)</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Problems/Complaints</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">What to Learn</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {userFeedback.map((feedback: any) => (
+                            <tr key={feedback.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {new Date(feedback.submittedAt).toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                {feedback.userId}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                {feedback.firstName}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {feedback.usefulness !== null ? feedback.usefulness : '-'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {feedback.trust !== null ? feedback.trust : '-'}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                                {feedback.problems || '-'}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                                {feedback.learnMore || '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {activeTab === 'categories' && renderCategoriesTab()}
