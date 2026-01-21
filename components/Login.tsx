@@ -105,13 +105,20 @@ export default function Login({ onLogin }: LoginProps) {
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-20 mb-4">
             <svg className="w-20 h-20 text-gray-900" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 100 100" strokeLinecap="round" strokeLinejoin="round">
-              {/* Hummingbird logo - K shape forming bird: left side = head/beak/body, right side = wings */}
-              <path d="M25 25 L25 65 L50 45 L50 25 M50 45 L50 65 M50 45 L80 30 M50 45 L80 60 M25 25 L20 20 M25 25 L15 23" />
+              {/* Hummingbird logo - K shape: bird head/beak/neck forms vertical stroke, wings form K diagonals */}
+              {/* Bird head and beak (pointing left) */}
+              <path d="M20 25 L15 20 L12 22" />
               {/* Eye */}
-              <circle cx="23" cy="23" r="2.5" fill="currentColor" />
+              <circle cx="18" cy="23" r="2" fill="currentColor" />
+              {/* Vertical stroke (bird neck/body) forming left side of K */}
+              <path d="M20 25 L20 65" />
+              {/* Upper wing/diagonal (upper right stroke of K) */}
+              <path d="M20 45 L55 25 L60 30 L55 35" />
+              {/* Lower wing/diagonal (lower right stroke of K) */}
+              <path d="M20 45 L55 65 L60 60 L55 55" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Hummingbird</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Hummingbird Finance</h1>
           <p className="text-gray-600 mt-2">Made for Canadians, by Canadians</p>
         </div>
 
