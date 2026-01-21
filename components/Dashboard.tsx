@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import CashflowChart from './CashflowChart';
 import TransactionsList from './TransactionsList';
+import FeedbackModal from './FeedbackModal';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
@@ -30,6 +31,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [hasLoadedTransactions, setHasLoadedTransactions] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [cashflowFilter, setCashflowFilter] = useState<string | null>(null);
   const [dateRangeFilter, setDateRangeFilter] = useState<{ start: string; end: string } | null>(null);
@@ -300,12 +302,10 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
+              <div className="w-10 h-10 flex items-center justify-center">
+                <img src="/Hummingbird_logo_square.png" alt="Hummingbird Finance" className="w-10 h-10 object-contain" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900">Canadian Insights</h1>
+              <h1 className="text-xl font-bold text-gray-900">Hummingbird Finance</h1>
             </div>
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-600">
@@ -335,7 +335,8 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
       {/* Tabs */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex gap-8">
+          <nav className="flex gap-8 items-center justify-between">
+            <div className="flex gap-8">
             <button
               onClick={() => setActiveTab('dashboard')}
               className={`py-4 border-b-2 font-medium transition-colors ${
@@ -375,6 +376,13 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
               }`}
             >
               Budget
+            </button>
+            </div>
+            <button
+              onClick={() => setShowFeedback(true)}
+              className="py-4 px-4 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              Give us feedback
             </button>
           </nav>
         </div>
@@ -741,6 +749,13 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
           </div>
         </div>
       )}
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        isOpen={showFeedback}
+        onClose={() => setShowFeedback(false)}
+        token={token}
+      />
     </div>
   );
 }

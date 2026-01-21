@@ -255,13 +255,22 @@ export default function StatementReviewModal({
 
     setImporting(true);
     try {
+      // Get bank and account type from first statement (or combine if multiple)
+      const bankStatementInfo = parsedStatements.length > 0 ? {
+        bank: parsedStatements[0].bank || 'Unknown',
+        accountType: parsedStatements[0].accountType || 'Unknown',
+      } : null;
+
       const response = await fetch('/api/statements/import', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ transactions: transactionsWithAccount }),
+        body: JSON.stringify({ 
+          transactions: transactionsWithAccount,
+          bankStatementInfo: bankStatementInfo,
+        }),
       });
 
       const result = await response.json();

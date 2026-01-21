@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { ensureTokenizedForAnalytics } from '@/lib/tokenization';
+import { logBankStatementEvent } from '@/lib/event-logger';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -46,11 +47,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to get user identifier' }, { status: 500 });
     }
 
-    // Get transactions from request body
-    const { transactions } = await request.json();
+    // Get transactions and bank statement info from request body
+    const { transactions, bankStatementInfo } = await request.json();
 
     if (!Array.isArray(transactions) || transactions.length === 0) {
       return NextResponse.json({ error: 'No transactions provided' }, { status: 400 });
+    }
+
+    // Log bank statement import event if bank info is provided
+    if (bankStatementInfo && bankStatementInfo.bank && bankStatementInfo.accountType) {
+      await logBankStatementEvent(userId, {
+        bank: bankStatementInfo.bank,
+        accountType: bankStatementInfo.accountType,
+        source: 'uploaded', // Imported statements are from uploads
+        transactionCount: transactions.length,
+      });
     }
 
     // Insert each transaction

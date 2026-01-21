@@ -103,12 +103,10 @@ export default function Login({ onLogin }: LoginProps) {
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-600 rounded-2xl mb-4">
-            <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-            </svg>
+          <div className="inline-flex items-center justify-center w-20 h-20 mb-4">
+            <img src="/Hummingbird_logo_square.png" alt="Hummingbird Finance" className="w-20 h-20 object-contain" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Canadian Insights</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Hummingbird Finance</h1>
           <p className="text-gray-600 mt-2">Made for Canadians, by Canadians</p>
         </div>
 

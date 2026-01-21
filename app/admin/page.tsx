@@ -46,7 +46,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabName>('monitoring');
   const [monitoringSubTab, setMonitoringSubTab] = useState<MonitoringSubTab>('accounts');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
-  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'vanity-metrics'>('cohort-analysis');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'vanity-metrics' | 'data-details'>('cohort-analysis');
   const [inboxSubTab, setInboxSubTab] = useState<InboxSubTab>('bug-reports');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
@@ -78,6 +78,10 @@ export default function AdminDashboard() {
   // State for Events Data tab
   const [eventsData, setEventsData] = useState<any[]>([]);
   const [eventsDataLoading, setEventsDataLoading] = useState(false);
+  
+  // State for User Feedback tab
+  const [userFeedback, setUserFeedback] = useState<any[]>([]);
+  const [userFeedbackLoading, setUserFeedbackLoading] = useState(false);
   
   // State for App Health tab
   const [healthData, setHealthData] = useState<any>(null);
@@ -136,12 +140,6 @@ export default function AdminDashboard() {
         return;
       }
       
-      console.log('[Customer Data] Received data:', {
-        count: data.customerData?.length || 0,
-        source: data.source,
-        migrationComplete: data.migrationComplete
-      });
-      
       setCustomerData(data.customerData || []);
     } catch (error) {
       console.error('Error fetching customer data:', error);
@@ -165,6 +163,24 @@ export default function AdminDashboard() {
       console.error('Error fetching events data:', error);
     } finally {
       setEventsDataLoading(false);
+    }
+  };
+
+  // Fetch user feedback function
+  const fetchUserFeedback = async () => {
+    setUserFeedbackLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch('/api/admin/user-feedback', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setUserFeedback(data.feedback || []);
+    } catch (error) {
+      console.error('Error fetching user feedback:', error);
+      setUserFeedback([]);
+    } finally {
+      setUserFeedbackLoading(false);
     }
   };
 
@@ -345,6 +361,13 @@ export default function AdminDashboard() {
       fetchEventsData();
     }
   }, [activeTab, analyticsSubTab, authenticated]);
+
+  // Fetch user feedback when Inbox → User Feedback tab is active
+  useEffect(() => {
+    if (activeTab === 'inbox' && inboxSubTab === 'user-feedback' && authenticated) {
+      fetchUserFeedback();
+    }
+  }, [activeTab, inboxSubTab, authenticated]);
 
   // Fetch customer data when Analytics → Customer Data tab is active
   useEffect(() => {
@@ -1033,6 +1056,16 @@ export default function AdminDashboard() {
           >
             📈 Vanity Metrics
           </button>
+          <button
+            onClick={() => setAnalyticsSubTab('data-details')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'data-details'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            📋 Data Details
+          </button>
         </div>
 
         {/* Content */}
@@ -1119,7 +1152,175 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
-                      {/* Activation Section */}
+                      {/* Engagement Signals Section - MOVED TO TOP */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Engagement Signals
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg transactions per user (of those who uploaded)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.avgTransactionsPerUser || '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Users with transactions</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.usersWithTransactions || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2 or more unique days</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.loggedInTwoPlusDays || 0)
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg days logged in per month (of those who logged in 2 or more days)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.avgDaysLoggedInPerMonth || '-')
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2 or more unique months</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.loggedInTwoPlusMonths || 0)
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average number of unique months users have logged in, of those who have logged in more than one unique month</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.avgUniqueMonthsLoggedIn || '-')
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                          </td>
+                        ))}
+                      </tr>
+                      {/* Engagement Section */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Number of users by activity completed
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Onboarding completed</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.onboardingCompleted || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded first statement</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.uploadedFirstStatement || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded two statements</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.uploadedTwoStatements || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded three+ statements</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.uploadedThreePlusStatements || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded statements for more than one unique bank</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.uploadedMoreThanOneBank || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded statements for more than two unique banks</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.uploadedMoreThanTwoBanks || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      {/* Time to Achieve Section */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Time to achieve (of users completing onboarding)
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average time to onboard (minutes)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes !== undefined 
+                              ? cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes 
+                              : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Number of users who uploaded on the first day</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.usersUploadedFirstDay || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average time to first upload, who uploaded on their first day (minutes)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadFirstDayMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToFirstUploadFirstDayMinutes !== undefined 
+                              ? cohortData?.engagement?.[week]?.avgTimeToFirstUploadFirstDayMinutes 
+                              : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Number of users who uploaded after the first day</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.usersUploadedAfterFirstDay || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average time to first upload, who uploaded after the first day (days)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadAfterFirstDayDays !== null && cohortData?.engagement?.[week]?.avgTimeToFirstUploadAfterFirstDayDays !== undefined 
+                              ? cohortData?.engagement?.[week]?.avgTimeToFirstUploadAfterFirstDayDays 
+                              : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      {/* Activation Section - MOVED TO BOTTOM */}
                       <tr className="bg-gray-50">
                         <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
                           Number of users by onboarding step completed
@@ -1204,158 +1405,6 @@ export default function AdminDashboard() {
                             {cohortData?.activation?.[week]?.avgTimeToOnboardMinutes !== null && cohortData?.activation?.[week]?.avgTimeToOnboardMinutes !== undefined 
                               ? cohortData?.activation?.[week]?.avgTimeToOnboardMinutes 
                               : '-'}
-                          </td>
-                        ))}
-                      </tr>
-                      {/* Engagement Section */}
-                      <tr className="bg-gray-50">
-                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
-                          Number of users by activity completed
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Onboarding completed</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.onboardingCompleted || 0}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded first statement</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.uploadedFirstStatement || 0}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded two statements</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.uploadedTwoStatements || 0}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded three+ statements</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.uploadedThreePlusStatements || 0}
-                          </td>
-                        ))}
-                      </tr>
-                      {/* Time to Achieve Section */}
-                      <tr className="bg-gray-50">
-                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
-                          Time to achieve (of users completing onboarding)
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average time to onboard (minutes)</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes !== undefined 
-                              ? cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes 
-                              : '-'}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Number of users who uploaded on the first day</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.usersUploadedFirstDay || 0}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average time to first upload, who uploaded on their first day (minutes)</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadFirstDayMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToFirstUploadFirstDayMinutes !== undefined 
-                              ? cohortData?.engagement?.[week]?.avgTimeToFirstUploadFirstDayMinutes 
-                              : '-'}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Number of users who uploaded after the first day</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.usersUploadedAfterFirstDay || 0}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average time to first upload, who uploaded after the first day (days)</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadAfterFirstDayDays !== null && cohortData?.engagement?.[week]?.avgTimeToFirstUploadAfterFirstDayDays !== undefined 
-                              ? cohortData?.engagement?.[week]?.avgTimeToFirstUploadAfterFirstDayDays 
-                              : '-'}
-                          </td>
-                        ))}
-                      </tr>
-                      {/* Engagement Signals Section */}
-                      <tr className="bg-gray-50">
-                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
-                          Engagement Signals
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg transactions per user (of those who uploaded)</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.avgTransactionsPerUser || '-'}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Users with transactions</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.engagement?.[week]?.usersWithTransactions || 0}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2 or more unique days</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.hasUserEventsTable 
-                              ? (cohortData?.engagement?.[week]?.loggedInTwoPlusDays || 0)
-                              : <span className="text-gray-400 italic">Requires user_events table</span>}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg days logged in per month (of those who logged in 2 or more days)</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.hasUserEventsTable 
-                              ? (cohortData?.engagement?.[week]?.avgDaysLoggedInPerMonth || '-')
-                              : <span className="text-gray-400 italic">Requires user_events table</span>}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2 or more unique months</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.hasUserEventsTable 
-                              ? (cohortData?.engagement?.[week]?.loggedInTwoPlusMonths || 0)
-                              : <span className="text-gray-400 italic">Requires user_events table</span>}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average number of unique months users have logged in, of those who have logged in more than one unique month</td>
-                        {displayWeeks.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {cohortData?.hasUserEventsTable 
-                              ? (cohortData?.engagement?.[week]?.avgUniqueMonthsLoggedIn || '-')
-                              : <span className="text-gray-400 italic">Requires user_events table</span>}
                           </td>
                         ))}
                       </tr>
@@ -1866,6 +1915,510 @@ export default function AdminDashboard() {
           </div>
         )}
         
+        {analyticsSubTab === 'data-details' && (
+          <div className="space-y-6">
+            {/* Cohort Analysis Tab - Data Details */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">Cohort Analysis - Data Details</h2>
+                <p className="text-gray-600 mt-1">Documentation of all KPIs, formulas, and data sources used in the Cohort Analysis tab</p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">KPI / Metric</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Formula / Calculation</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Source</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {/* Activation Metrics */}
+                  <tr className="bg-gray-100">
+                    <td colSpan={3} className="px-6 py-3 text-sm font-bold text-gray-900">
+                      ACTIVATION METRICS
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Started onboarding</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at IS NOT NULL</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (created_at column)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Drop-off at Step 1</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE last_step = 1 AND completed_at IS NULL</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (last_step, completed_at columns)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Drop-off at Step 2</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE last_step = 2 AND completed_at IS NULL</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (last_step, completed_at columns)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Drop-off at Step 3</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE last_step = 3 AND completed_at IS NULL</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (last_step, completed_at columns)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Drop-off at Step 4</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE last_step = 4 AND completed_at IS NULL</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (last_step, completed_at columns)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Drop-off at Step 5</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE last_step = 5 AND completed_at IS NULL</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (last_step, completed_at columns)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Drop-off at Step 6</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE last_step = 6 AND completed_at IS NULL</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (last_step, completed_at columns)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Drop-off at Step 7</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE last_step = 7 AND completed_at IS NULL</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (last_step, completed_at columns)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Completed onboarding</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE completed_at IS NOT NULL</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (completed_at column)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Started but not completed (no drop-off recorded)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">MAX(0, starting - completed - sum of all drop-offs)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (calculated from created_at, completed_at, last_step)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Average time to onboard (minutes)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">AVG(EXTRACT(EPOCH FROM (completed_at - created_at)) / 60) FILTER WHERE completed_at IS NOT NULL</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (created_at, completed_at columns)</td>
+                  </tr>
+                  
+                  {/* Engagement Metrics - Onboarding and Data Coverage */}
+                  <tr className="bg-gray-100">
+                    <td colSpan={3} className="px-6 py-3 text-sm font-bold text-gray-900">
+                      ENGAGEMENT METRICS - ONBOARDING AND DATA COVERAGE
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Onboarding completed</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE completed_at IS NOT NULL</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (completed_at column)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Uploaded first statement</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE transaction EXISTS</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (JOIN with users table)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Uploaded two statements</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE COUNT(DISTINCT upload_session_id) {'>='} 2</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (upload_session_id column)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Uploaded three or more statements</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE COUNT(DISTINCT upload_session_id) {'>='} 3</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (upload_session_id column)</td>
+                  </tr>
+                  
+                  {/* Engagement Metrics - Time to Achieve */}
+                  <tr className="bg-gray-100">
+                    <td colSpan={3} className="px-6 py-3 text-sm font-bold text-gray-900">
+                      ENGAGEMENT METRICS - TIME TO ACHIEVE
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users who uploaded on the first day</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE DATE(first_transaction_date) = DATE(created_at)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (MIN(created_at) per user) JOIN users table (created_at)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Average time to first upload, who uploaded on their first day (minutes)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">AVG(EXTRACT(EPOCH FROM (first_transaction_date - created_at)) / 60) FILTER WHERE DATE(first_transaction_date) = DATE(created_at)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (MIN(created_at) per user) JOIN users table (created_at)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users who uploaded after the first day</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE DATE(first_transaction_date) {'>'} DATE(created_at)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (MIN(created_at) per user) JOIN users table (created_at)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Average time to first upload, who uploaded after the first day (days)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">AVG(EXTRACT(EPOCH FROM (first_transaction_date - created_at)) / 86400) FILTER WHERE DATE(first_transaction_date) {'>'} DATE(created_at)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (MIN(created_at) per user) JOIN users table (created_at)</td>
+                  </tr>
+                  
+                  {/* Engagement Metrics - Engagement Signals */}
+                  <tr className="bg-gray-100">
+                    <td colSpan={3} className="px-6 py-3 text-sm font-bold text-gray-900">
+                      ENGAGEMENT METRICS - ENGAGEMENT SIGNALS
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Average transactions per user</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">AVG(COUNT(*) per user) FILTER WHERE transaction_count {'>'} 0</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (COUNT(*) grouped by user_id)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Users with transactions</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE transaction_count {'>'} 0</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (COUNT(*) grouped by user_id)</td>
+                  </tr>
+                  
+                  {/* Bank Statement Source Tracking */}
+                  <tr className="bg-gray-100">
+                    <td colSpan={3} className="px-6 py-3 text-sm font-bold text-gray-900">
+                      BANK STATEMENT SOURCE TRACKING
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Bank</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'bank' FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'})</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Account Type</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'accountType' FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'})</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Uploaded or Linked</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'source' FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'}, source = {'uploaded'} or {'linked'})</td>
+                  </tr>
+                  
+                  {/* Filters */}
+                  <tr className="bg-gray-100">
+                    <td colSpan={3} className="px-6 py-3 text-sm font-bold text-gray-900">
+                      FILTERS
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Account Type - Total Accounts</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">No filter applied (includes all accounts)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (all records)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Account Type - Validated Emails</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">FILTER WHERE email_validated = true</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (email_validated column)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Intent Categories</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">FILTER WHERE motivation = ANY(selected_categories)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (motivation column)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Cohorts (Signup Weeks)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">FILTER WHERE DATE_TRUNC('week', created_at) = selected_week</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">users table (created_at column, grouped by week)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Data Coverage</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">FILTER users based on transaction upload counts (1 upload, 2 uploads, 3+ uploads)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (upload_session_id column, COUNT DISTINCT per user)</td>
+                  </tr>
+                </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Customer Data Tab - Data Details */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">Customer Data Tab - Data Details</h2>
+                <p className="text-gray-600 mt-1">Documentation of all columns displayed in the Customer Data tab</p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Column / Data Point</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Formula / Calculation</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Source</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">User ID</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.id</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table (id column)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">First Name</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COALESCE(p.first_name, NULL) or o.first_name</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l0_pii_users table (first_name column) OR onboarding_responses table (first_name column) - PII isolated</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Province/Region</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">p.province_region or o.province_region</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l0_pii_users table OR onboarding_responses table (province_region column)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Emotional State</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.emotional_state or o.emotional_state (TEXT[] array)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table OR onboarding_responses table (emotional_state column, stored as array)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Financial Context</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.financial_context or o.financial_context (TEXT[] array)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table OR onboarding_responses table (financial_context column, stored as array)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Motivation</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.motivation or o.motivation</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table OR onboarding_responses table (motivation column)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Acquisition Source</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.acquisition_source or o.acquisition_source</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table OR onboarding_responses table (acquisition_source column)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Insight Preferences</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.insight_preferences or o.insight_preferences (TEXT[] array)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table OR onboarding_responses table (insight_preferences column, stored as array)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Email Validated</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.email_validated (defaults to false if column doesn't exist)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table (email_validated column, BOOLEAN)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Is Active</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.is_active (defaults to true if column doesn't exist)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table (is_active column, BOOLEAN)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Account Created</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.created_at or COALESCE(p.created_at, u.created_at)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table OR l0_pii_users table (created_at column)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Onboarding Completed</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">u.completed_at or o.completed_at</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table OR onboarding_responses table (completed_at column)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Onboarding Status</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">Calculated: completed_at ? 'Completed' : last_step ? 'Dropped after Step X' : 'Not started'</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table (calculated from completed_at and last_step columns)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Transaction Count</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT t.id) per user</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (JOIN with users table, aggregated by user_id)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Upload Session Count</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT upload_session_id) per user</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (upload_session_id column, aggregated by user_id)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">First Transaction Date</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">MIN(created_at) per user</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (created_at column, aggregated by user_id)</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Events Data Tab - Data Details */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">Events Data Tab - Data Details</h2>
+                <p className="text-gray-600 mt-1">Documentation of all columns displayed in the Events Data tab</p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Column / Data Point</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Formula / Calculation</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Source</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Event ID</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">e.id</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (id column)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">User ID</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">e.user_id</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (user_id column, foreign key to users table)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">First Name</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COALESCE(p.first_name, 'Unknown')</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l0_pii_users table (first_name column) - PII isolated, no email or last name shown</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Event Type</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">e.event_type</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (event_type column, e.g., 'login', 'dashboard_view', etc.)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Event Timestamp</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">e.event_timestamp (displayed as created_at in UI)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (event_timestamp column, TIMESTAMP WITH TIME ZONE)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Metadata</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">e.metadata (JSONB object)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata column, JSONB - optional additional event data)</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Vanity Metrics Tab - Data Details */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">Vanity Metrics Tab - Data Details</h2>
+                <p className="text-gray-600 mt-1">Documentation of all metrics displayed in the Vanity Metrics tab</p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">KPI / Metric</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Formula / Calculation</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Source</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Total users (cumulative)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at {'<='} weekEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table (created_at column, cumulative count up to end of week)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Weekly active users</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) WHERE event_type = 'login' AND event_timestamp BETWEEN weekStart AND weekEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (event_type, event_timestamp columns) JOIN users table</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">New users</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at BETWEEN weekStart AND weekEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table (created_at column, users who signed up during the week)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Monthly active users</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) WHERE event_type = 'login' AND event_timestamp BETWEEN monthStart AND monthEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (event_type, event_timestamp columns) JOIN users table, filtered by month containing the week</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">New users per month</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at BETWEEN monthStart AND monthEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">users table (created_at column, users who signed up during the month containing the week)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Total transactions uploaded (cumulative)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at {'<='} weekEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (created_at column, cumulative count up to end of week)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">New transactions uploaded</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at BETWEEN weekStart AND weekEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (created_at column, transactions uploaded during the week)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Total transactions recategorised</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at BETWEEN weekStart AND weekEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">categorization_learning table (created_at column, transactions recategorized during the week)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Total unique banks uploaded</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT account) WHERE created_at BETWEEN weekStart AND weekEnd</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (account column, distinct bank/account names uploaded during the week)</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Source Dataset Columns */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">Source Dataset Columns</h2>
+                <p className="text-gray-600 mt-1">Complete list of all columns/data points available in the customer, events, and transactions source datasets</p>
+              </div>
+
+              <div className="p-6 space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">users table (Customer Data Source)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (user identifier)</li>
+                    <li><strong>email</strong> - TEXT UNIQUE NOT NULL (user email address)</li>
+                    <li><strong>password_hash</strong> - TEXT NOT NULL (hashed password for authentication)</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE (when user account was created)</li>
+                    <li><strong>completed_at</strong> - TIMESTAMP WITH TIME ZONE (when onboarding was completed, NULL if not completed)</li>
+                    <li><strong>last_step</strong> - INTEGER (last onboarding step reached, 0 if not started, 1-7 for steps)</li>
+                    <li><strong>motivation</strong> - TEXT (user's primary motivation/intent category from onboarding)</li>
+                    <li><strong>motivation_other</strong> - TEXT (free-text field if user selected "Other" for motivation)</li>
+                    <li><strong>emotional_state</strong> - TEXT[] (array of emotional states selected during onboarding)</li>
+                    <li><strong>financial_context</strong> - TEXT[] (array of financial contexts selected during onboarding)</li>
+                    <li><strong>acquisition_source</strong> - TEXT (how user found the product)</li>
+                    <li><strong>acquisition_other</strong> - TEXT (free-text field if user selected "Other" for acquisition source)</li>
+                    <li><strong>insight_preferences</strong> - TEXT[] (array of insight types user wants to receive)</li>
+                    <li><strong>insight_other</strong> - TEXT (free-text field for additional insight preferences)</li>
+                    <li><strong>email_validated</strong> - BOOLEAN (whether user's email has been validated)</li>
+                    <li><strong>is_active</strong> - BOOLEAN (whether user account is active/not blocked)</li>
+                    <li><strong>updated_at</strong> - TIMESTAMP WITH TIME ZONE (last update timestamp)</li>
+                    <li><strong>login_attempts</strong> - INTEGER (number of login attempts, used for security)</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">transactions table (Transactions Data Source)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (transaction identifier)</li>
+                    <li><strong>user_id</strong> - INTEGER REFERENCES users(id) (foreign key to users table)</li>
+                    <li><strong>date</strong> - DATE NOT NULL (transaction date from bank statement)</li>
+                    <li><strong>description</strong> - TEXT NOT NULL (full transaction description from statement)</li>
+                    <li><strong>merchant</strong> - TEXT (extracted merchant name, first part of description)</li>
+                    <li><strong>amount</strong> - DECIMAL(10, 2) NOT NULL (transaction amount, positive for income, negative for expenses)</li>
+                    <li><strong>cashflow</strong> - VARCHAR(50) (type: 'income', 'expense', or 'other')</li>
+                    <li><strong>category</strong> - VARCHAR(255) (categorized transaction category, e.g., 'Food', 'Bills')</li>
+                    <li><strong>account</strong> - VARCHAR(255) (bank/account name from statement, e.g., 'RBC Chequing')</li>
+                    <li><strong>label</strong> - VARCHAR(255) (sub-category label, e.g., 'Groceries', 'Rent')</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when transaction was imported/uploaded)</li>
+                    <li><strong>upload_session_id</strong> - TEXT (identifier for the upload session/batch, groups transactions from same PDF upload)</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">user_events table (Events Data Source)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (event identifier)</li>
+                    <li><strong>user_id</strong> - INTEGER REFERENCES users(id) ON DELETE CASCADE (foreign key to users table)</li>
+                    <li><strong>event_type</strong> - TEXT NOT NULL (type of event, e.g., 'login', 'dashboard_view', 'transaction_uploaded')</li>
+                    <li><strong>event_timestamp</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when the event occurred)</li>
+                    <li><strong>metadata</strong> - JSONB (optional JSON object containing additional event-specific data)</li>
+                  </ul>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Additional Tables (Referenced but not displayed in these tabs)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>l0_pii_users table:</strong> Contains PII (Personally Identifiable Information) isolated from main users table - includes first_name, last_name, email, date_of_birth, recovery_phone, province_region</li>
+                    <li><strong>onboarding_responses table:</strong> Legacy table containing onboarding data (may exist if migration not yet run) - similar structure to users table fields</li>
+                    <li><strong>categorization_learning table:</strong> Stores user corrections to transaction categorization - includes user_id, description_pattern, original_category, corrected_category, corrected_label, frequency, created_at</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         
         {analyticsSubTab === 'customer-data' && (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -2818,7 +3371,79 @@ export default function AdminDashboard() {
             </div>
             {/* Inbox Content */}
             {inboxSubTab === 'bug-reports' && renderPlaceholderTab('Bug Reports', 'Coming soon...', '🐛')}
-            {inboxSubTab === 'user-feedback' && renderPlaceholderTab('User Feedback', 'Coming soon...', '💬')}
+            {inboxSubTab === 'user-feedback' && (
+              <div className="space-y-6">
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-gray-900">User Feedback</h2>
+                    <button
+                      onClick={fetchUserFeedback}
+                      disabled={userFeedbackLoading}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    >
+                      <svg className={`w-4 h-4 ${userFeedbackLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Refresh
+                    </button>
+                  </div>
+
+                  {userFeedbackLoading ? (
+                    <div className="text-center py-12">
+                      <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                      <p className="text-gray-600 mt-4">Loading feedback...</p>
+                    </div>
+                  ) : userFeedback.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">No feedback submitted yet.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Submitted At</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usefulness (1-5)</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trust (1-5)</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Problems/Complaints</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">What to Learn</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {userFeedback.map((feedback: any) => (
+                            <tr key={feedback.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {new Date(feedback.submittedAt).toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                {feedback.userId}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                {feedback.firstName}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {feedback.usefulness !== null ? feedback.usefulness : '-'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {feedback.trust !== null ? feedback.trust : '-'}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                                {feedback.problems || '-'}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                                {feedback.learnMore || '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {activeTab === 'categories' && renderCategoriesTab()}

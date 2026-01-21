@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { parseBankStatement } from '@/lib/pdf-parser';
+import { logBankStatementEvent } from '@/lib/event-logger';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -68,6 +69,17 @@ export async function POST(request: NextRequest) {
 
         // Parse the PDF statement
         const result = await parseBankStatement(buffer, userId, file.name);
+
+        // Log bank statement upload event
+        if (result.bank && result.accountType) {
+          await logBankStatementEvent(userId, {
+            bank: result.bank,
+            accountType: result.accountType,
+            source: 'uploaded',
+            filename: file.name,
+            transactionCount: result.transactionsImported,
+          });
+        }
 
         summary[file.name] = {
           status: 'success',
