@@ -104,7 +104,7 @@ export default function Login({ onLogin }: LoginProps) {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-20 mb-4">
-            <img src="/Hummingbird_logo_square.png" alt="Hummingbird Finance" className="w-20 h-20 object-contain" />
+            <img src="/Humminbird_logo_blue_rounded.png" alt="Hummingbird Finance" className="w-20 h-20 object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Hummingbird Finance</h1>
           <p className="text-gray-600 mt-2">Made for Canadians, by Canadians</p>
