@@ -68,7 +68,12 @@ export async function GET(request: NextRequest) {
     
     // Parse metadata and format feedback
     const feedback = result.rows.map((row: any) => {
-      let metadata = {};
+      let metadata: {
+        usefulness?: number;
+        trust?: number;
+        problems?: string;
+        learnMore?: string;
+      } = {};
       try {
         metadata = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : (row.metadata || {});
       } catch (e) {
@@ -80,10 +85,10 @@ export async function GET(request: NextRequest) {
         userId: row.user_id,
         firstName: row.first_name,
         submittedAt: row.submitted_at,
-        usefulness: metadata.usefulness || null,
-        trust: metadata.trust || null,
-        problems: metadata.problems || null,
-        learnMore: metadata.learnMore || null,
+        usefulness: metadata.usefulness ?? null,
+        trust: metadata.trust ?? null,
+        problems: metadata.problems ?? null,
+        learnMore: metadata.learnMore ?? null,
       };
     });
 
