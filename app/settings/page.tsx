@@ -63,11 +63,12 @@ export default function SettingsPage() {
       }
       
       // Log consent event
-      await fetch('/api/consent', {
+      const response = await fetch('/api/consent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin,
         },
         body: JSON.stringify({
           consentType: 'settings_update',
@@ -75,6 +76,14 @@ export default function SettingsPage() {
           value,
         }),
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to update setting:', response.status, errorData);
+        throw new Error('Failed to update setting');
+      } else {
+        console.log(`Setting ${setting} updated to ${value}`);
+      }
     } catch (error) {
       console.error('Failed to update setting:', error);
       // Revert state on error
