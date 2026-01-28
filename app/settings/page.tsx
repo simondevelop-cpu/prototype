@@ -495,23 +495,27 @@ export default function SettingsPage() {
                     at any time, however doing so would remove your access to the Service.
                   </p>
                   {showRequiredDataConfirm && (
-                    <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="mt-4">
                       <p className="text-sm font-medium text-red-900 mb-3">
                         Are you sure you want to disable Required Data? This will remove your access to the Service.
                       </p>
                       <div className="flex gap-3">
                         <button
                           onClick={() => {
+                            if (!confirm('Are you absolutely sure? This will remove your access to the Service.')) {
+                              setShowRequiredDataConfirm(false);
+                              return;
+                            }
                             setShowRequiredDataConfirm(false);
                             handleSettingChange('required_data', false);
                           }}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors text-sm"
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
                         >
                           Yes, Disable Required Data
                         </button>
                         <button
                           onClick={() => setShowRequiredDataConfirm(false)}
-                          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors text-sm"
+                          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors"
                         >
                           Cancel
                         </button>
