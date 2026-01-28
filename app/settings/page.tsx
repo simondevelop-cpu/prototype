@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+const CANADIAN_PROVINCES = [
+  'Alberta', 'British Columbia', 'Manitoba', 'New Brunswick', 'Newfoundland and Labrador',
+  'Northwest Territories', 'Nova Scotia', 'Nunavut', 'Ontario', 'Prince Edward Island',
+  'Quebec', 'Saskatchewan', 'Yukon'
+];
+
 export default function SettingsPage() {
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
@@ -13,18 +19,27 @@ export default function SettingsPage() {
   // Personal details state
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [recoveryPhone, setRecoveryPhone] = useState('');
+  const [provinceRegion, setProvinceRegion] = useState('');
   const [editingPersonal, setEditingPersonal] = useState(false);
   const [savingPersonal, setSavingPersonal] = useState(false);
   const [personalError, setPersonalError] = useState<string | null>(null);
   
-  // Account options state
-  const [essentialAnalytics, setEssentialAnalytics] = useState(true);
-  const [functional, setFunctional] = useState(true);
-  const [targetingMarketing, setTargetingMarketing] = useState(false);
-  const [cookiesEssential, setCookiesEssential] = useState(true);
+  // Data consent state
+  const [requiredData, setRequiredData] = useState(true); // Combined essential analytics + essential cookies
+  const [functionalData, setFunctionalData] = useState(true);
+  const [marketingData, setMarketingData] = useState(false);
   const [cookiesNonEssential, setCookiesNonEssential] = useState(true);
-  const [language, setLanguage] = useState('english');
   const [saving, setSaving] = useState(false);
+
+  // Language state
+  const [language, setLanguage] = useState('english');
+
+  // Delete account confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('ci.session.token');
@@ -38,10 +53,36 @@ export default function SettingsPage() {
     const parsedUser = JSON.parse(storedUser);
     setToken(storedToken);
     setUserId(parsedUser.id);
-    setDisplayName(parsedUser.name || '');
-    setEmail(parsedUser.email || '');
-    setLoading(false);
+    
+    // Fetch personal data from API
+    fetchPersonalData(storedToken);
   }, [router]);
+
+  const fetchPersonalData = async (authToken: string) => {
+    try {
+      const response = await fetch('/api/account/personal-data', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const personal = data.personalData || {};
+        setDisplayName(personal.displayName || '');
+        setEmail(personal.email || '');
+        setFirstName(personal.firstName || '');
+        setLastName(personal.lastName || '');
+        setDateOfBirth(personal.dateOfBirth || '');
+        setRecoveryPhone(personal.recoveryPhone || '');
+        setProvinceRegion(personal.provinceRegion || '');
+      }
+    } catch (error) {
+      console.error('Failed to fetch personal data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePersonalDetailsSave = async () => {
     if (!token || !userId) return;
@@ -50,7 +91,7 @@ export default function SettingsPage() {
     setPersonalError(null);
     
     try {
-      const response = await fetch('/api/account/update', {
+      const response = await fetch('/api/account/personal-data', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -60,6 +101,11 @@ export default function SettingsPage() {
         body: JSON.stringify({
           displayName: displayName.trim() || undefined,
           email: email.trim() || undefined,
+          firstName: firstName.trim() || undefined,
+          lastName: lastName.trim() || undefined,
+          dateOfBirth: dateOfBirth || undefined,
+          recoveryPhone: recoveryPhone.trim() || undefined,
+          provinceRegion: provinceRegion || undefined,
         }),
       });
       
@@ -72,7 +118,13 @@ export default function SettingsPage() {
       const data = await response.json();
       
       // Update localStorage with new user data
-      localStorage.setItem('ci.session.user', JSON.stringify(data.user));
+      const storedUser = localStorage.getItem('ci.session.user');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        parsedUser.name = data.personalData.displayName;
+        parsedUser.email = data.personalData.email;
+        localStorage.setItem('ci.session.user', JSON.stringify(parsedUser));
+      }
       
       setEditingPersonal(false);
     } catch (error) {
@@ -91,17 +143,14 @@ export default function SettingsPage() {
     try {
       // Update local state
       switch (setting) {
-        case 'essential_analytics':
-          setEssentialAnalytics(value as boolean);
+        case 'required_data':
+          setRequiredData(value as boolean);
           break;
-        case 'functional':
-          setFunctional(value as boolean);
+        case 'functional_data':
+          setFunctionalData(value as boolean);
           break;
-        case 'targeting_marketing':
-          setTargetingMarketing(value as boolean);
-          break;
-        case 'cookies_essential':
-          setCookiesEssential(value as boolean);
+        case 'marketing_data':
+          setMarketingData(value as boolean);
           break;
         case 'cookies_non_essential':
           setCookiesNonEssential(value as boolean);
@@ -139,17 +188,14 @@ export default function SettingsPage() {
       console.error('Failed to update setting:', error);
       // Revert state on error
       switch (setting) {
-        case 'essential_analytics':
-          setEssentialAnalytics(!(value as boolean));
+        case 'required_data':
+          setRequiredData(!(value as boolean));
           break;
-        case 'functional':
-          setFunctional(!(value as boolean));
+        case 'functional_data':
+          setFunctionalData(!(value as boolean));
           break;
-        case 'targeting_marketing':
-          setTargetingMarketing(!(value as boolean));
-          break;
-        case 'cookies_essential':
-          setCookiesEssential(!(value as boolean));
+        case 'marketing_data':
+          setMarketingData(!(value as boolean));
           break;
         case 'cookies_non_essential':
           setCookiesNonEssential(!(value as boolean));
@@ -161,7 +207,13 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAccount = async () => {
-    if (!confirm('Are you sure you want to delete your account? This action is irreversible.')) {
+    if (!showDeleteConfirm) {
+      setShowDeleteConfirm(true);
+      return;
+    }
+    
+    if (!confirm('Are you absolutely sure? This action is irreversible and will permanently delete your account and all associated data.')) {
+      setShowDeleteConfirm(false);
       return;
     }
     
@@ -181,10 +233,12 @@ export default function SettingsPage() {
         router.push('/');
       } else {
         alert('Failed to delete account. Please try again.');
+        setShowDeleteConfirm(false);
       }
     } catch (error) {
       console.error('Failed to delete account:', error);
       alert('Failed to delete account. Please try again.');
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -213,7 +267,7 @@ export default function SettingsPage() {
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Personal Details</h2>
           <p className="text-sm text-gray-600 mb-6">
-            Update your name and email address. These details are used to personalize your experience.
+            Update your personal information. These details are used to personalize your experience and for account recovery.
           </p>
           
           {personalError && (
@@ -223,9 +277,49 @@ export default function SettingsPage() {
           )}
 
           <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  First Name
+                </label>
+                {editingPersonal ? (
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="John"
+                  />
+                ) : (
+                  <div className="px-4 py-2 bg-gray-50 rounded-lg text-gray-900">
+                    {firstName || 'Not set'}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Last Name
+                </label>
+                {editingPersonal ? (
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Doe"
+                  />
+                ) : (
+                  <div className="px-4 py-2 bg-gray-50 rounded-lg text-gray-900">
+                    {lastName || 'Not set'}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Name
+                Display Name
               </label>
               {editingPersonal ? (
                 <input
@@ -261,6 +355,66 @@ export default function SettingsPage() {
               )}
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Date of Birth
+              </label>
+              {editingPersonal ? (
+                <input
+                  type="date"
+                  value={dateOfBirth}
+                  onChange={(e) => setDateOfBirth(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              ) : (
+                <div className="px-4 py-2 bg-gray-50 rounded-lg text-gray-900">
+                  {dateOfBirth || 'Not set'}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Province/Region
+              </label>
+              {editingPersonal ? (
+                <select
+                  value={provinceRegion}
+                  onChange={(e) => setProvinceRegion(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                >
+                  <option value="">Select your province</option>
+                  {CANADIAN_PROVINCES.map(province => (
+                    <option key={province} value={province}>{province}</option>
+                  ))}
+                  <option value="International / Outside of Canada">International / Outside of Canada</option>
+                </select>
+              ) : (
+                <div className="px-4 py-2 bg-gray-50 rounded-lg text-gray-900">
+                  {provinceRegion || 'Not set'}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Recovery Phone Number (Optional)
+              </label>
+              {editingPersonal ? (
+                <input
+                  type="tel"
+                  value={recoveryPhone}
+                  onChange={(e) => setRecoveryPhone(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="+1 (555) 123-4567"
+                />
+              ) : (
+                <div className="px-4 py-2 bg-gray-50 rounded-lg text-gray-900">
+                  {recoveryPhone || 'Not set'}
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-3">
               {editingPersonal ? (
                 <>
@@ -275,13 +429,8 @@ export default function SettingsPage() {
                     onClick={() => {
                       setEditingPersonal(false);
                       setPersonalError(null);
-                      // Reset to original values
-                      const storedUser = localStorage.getItem('ci.session.user');
-                      if (storedUser) {
-                        const parsedUser = JSON.parse(storedUser);
-                        setDisplayName(parsedUser.name || '');
-                        setEmail(parsedUser.email || '');
-                      }
+                      // Reset to original values by fetching again
+                      if (token) fetchPersonalData(token);
                     }}
                     disabled={savingPersonal}
                     className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
@@ -301,11 +450,11 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Panel 2: Account Options */}
+        {/* Panel 2: Data Consent */}
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Account Options</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Data Consent</h2>
           <p className="text-sm text-gray-600 mb-6">
-            Manage your data collection preferences, cookies, and language settings. You can review our{' '}
+            Manage your data collection preferences and cookies. You can review our{' '}
             <Link href="/privacy-policy" target="_blank" className="text-blue-600 hover:underline">
               Privacy Policy
             </Link>
@@ -317,30 +466,31 @@ export default function SettingsPage() {
           </p>
 
           <div className="space-y-6">
-            {/* Essential, Performance and Analytics */}
+            {/* Required Data (Essential Analytics + Essential Cookies combined) */}
             <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">Essential, Performance and Analytics</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Required Data</h3>
                     <span className={`px-2 py-1 text-xs font-medium rounded ${
-                      essentialAnalytics 
+                      requiredData 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-gray-100 text-gray-800'
                     }`}>
-                      {essentialAnalytics ? 'Enabled' : 'Disabled'}
+                      {requiredData ? 'Enabled' : 'Disabled'}
                     </span>
                   </div>
                   <p className="text-sm text-gray-600">
-                    We require essential data collection including performance and analytics, in order to operate the Service. 
-                    You may remove consent at any time, however doing so would remove your access to the Service.
+                    We require essential data collection including performance and analytics, as well as essential cookies for 
+                    authentication, security, and session management, in order to operate the Service. You may remove consent 
+                    at any time, however doing so would remove your access to the Service.
                   </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
                   <input
                     type="checkbox"
-                    checked={essentialAnalytics}
-                    onChange={(e) => handleSettingChange('essential_analytics', e.target.checked)}
+                    checked={requiredData}
+                    onChange={(e) => handleSettingChange('required_data', e.target.checked)}
                     disabled={saving}
                     className="sr-only peer"
                   />
@@ -349,18 +499,18 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Functional */}
+            {/* Functional Data */}
             <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">Functional</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Functional Data</h3>
                     <span className={`px-2 py-1 text-xs font-medium rounded ${
-                      functional 
+                      functionalData 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-gray-100 text-gray-800'
                     }`}>
-                      {functional ? 'Enabled' : 'Disabled'}
+                      {functionalData ? 'Enabled' : 'Disabled'}
                     </span>
                   </div>
                   <p className="text-sm text-gray-600">
@@ -372,8 +522,8 @@ export default function SettingsPage() {
                 <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
                   <input
                     type="checkbox"
-                    checked={functional}
-                    onChange={(e) => handleSettingChange('functional', e.target.checked)}
+                    checked={functionalData}
+                    onChange={(e) => handleSettingChange('functional_data', e.target.checked)}
                     disabled={saving}
                     className="sr-only peer"
                   />
@@ -382,18 +532,18 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Targeting and Marketing */}
+            {/* Marketing Data */}
             <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">Targeting and Marketing</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Marketing Data</h3>
                     <span className={`px-2 py-1 text-xs font-medium rounded ${
-                      targetingMarketing 
+                      marketingData 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-gray-100 text-gray-800'
                     }`}>
-                      {targetingMarketing ? 'Enabled' : 'Disabled'}
+                      {marketingData ? 'Enabled' : 'Disabled'}
                     </span>
                   </div>
                   <p className="text-sm text-gray-600">
@@ -404,40 +554,8 @@ export default function SettingsPage() {
                 <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
                   <input
                     type="checkbox"
-                    checked={targetingMarketing}
-                    onChange={(e) => handleSettingChange('targeting_marketing', e.target.checked)}
-                    disabled={saving}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-            </div>
-
-            {/* Cookies - Essential */}
-            <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">Cookies - Essential</h3>
-                    <span className={`px-2 py-1 text-xs font-medium rounded ${
-                      cookiesEssential 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {cookiesEssential ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    Essential cookies are required to provide core functionality such as authentication, security, and session 
-                    management. You may remove consent at any time, however doing so would remove your access to the Service.
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={cookiesEssential}
-                    onChange={(e) => handleSettingChange('cookies_essential', e.target.checked)}
+                    checked={marketingData}
+                    onChange={(e) => handleSettingChange('marketing_data', e.target.checked)}
                     disabled={saving}
                     className="sr-only peer"
                   />
@@ -477,32 +595,28 @@ export default function SettingsPage() {
                 </label>
               </div>
             </div>
-
-            {/* Language */}
-            <div className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Language</h3>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Choose your preferred language for the application interface.
-                  </p>
-                  <select
-                    value={language}
-                    onChange={(e) => handleSettingChange('language', e.target.value)}
-                    disabled={true}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-100 cursor-not-allowed"
-                  >
-                    <option value="english">English</option>
-                    <option value="french">Français (Coming Soon)</option>
-                  </select>
-                  <p className="text-xs text-gray-500 mt-2">French language support coming soon</p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* Panel 3: Account Deletion - Separate Danger Zone */}
+        {/* Panel 3: Language */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Language</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Choose your preferred language for the application interface.
+          </p>
+          <select
+            value={language}
+            onChange={(e) => handleSettingChange('language', e.target.value)}
+            disabled={true}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-100 cursor-not-allowed max-w-xs"
+          >
+            <option value="english">English</option>
+            <option value="french">Français (Coming Soon)</option>
+          </select>
+          <p className="text-xs text-gray-500 mt-2">French language support coming soon</p>
+        </div>
+
+        {/* Panel 4: Account Deletion - Separate Danger Zone */}
         <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6">
           <div className="flex items-start gap-4">
             <div className="flex-shrink-0">
@@ -516,12 +630,34 @@ export default function SettingsPage() {
                 You can delete your account at any time. This will permanently remove your personal data from our systems, 
                 subject only to limited legal or regulatory retention requirements. Account deletion is irreversible.
               </p>
-              <button
-                onClick={handleDeleteAccount}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
-              >
-                Delete My Account
-              </button>
+              {!showDeleteConfirm ? (
+                <button
+                  onClick={handleDeleteAccount}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                >
+                  Delete My Account
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-red-900">
+                    Are you sure you want to delete your account? This action cannot be undone.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleDeleteAccount}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                    >
+                      Yes, Delete My Account
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
