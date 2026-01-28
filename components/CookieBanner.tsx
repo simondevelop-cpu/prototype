@@ -22,49 +22,75 @@ export default function CookieBanner({ token, userId }: CookieBannerProps) {
   }, []);
 
   const handleAcceptAll = async () => {
-    localStorage.setItem('cookie_consent', 'accept_all');
-    setChoice('accept_all');
-    setIsVisible(false);
-    
-    // Log consent event
+    // Log consent event FIRST (before hiding banner)
     try {
-      await fetch('/api/consent', {
+      const response = await fetch('/api/consent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin, // Add Origin header for CSRF check
         },
         body: JSON.stringify({
           consentType: 'cookie_banner',
           choice: 'accept_all',
         }),
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to log cookie consent:', response.status, errorData);
+        // Don't hide banner if logging failed
+        return;
+      } else {
+        console.log('Cookie consent logged successfully');
+      }
     } catch (error) {
       console.error('Failed to log cookie consent:', error);
+      // Don't hide banner if logging failed
+      return;
     }
+    
+    // Only update UI if logging succeeded
+    localStorage.setItem('cookie_consent', 'accept_all');
+    setChoice('accept_all');
+    setIsVisible(false);
   };
 
   const handleEssentialOnly = async () => {
-    localStorage.setItem('cookie_consent', 'essential_only');
-    setChoice('essential_only');
-    setIsVisible(false);
-    
-    // Log consent event
+    // Log consent event FIRST (before hiding banner)
     try {
-      await fetch('/api/consent', {
+      const response = await fetch('/api/consent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin, // Add Origin header for CSRF check
         },
         body: JSON.stringify({
           consentType: 'cookie_banner',
           choice: 'essential_only',
         }),
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to log cookie consent:', response.status, errorData);
+        // Don't hide banner if logging failed
+        return;
+      } else {
+        console.log('Cookie consent logged successfully');
+      }
     } catch (error) {
       console.error('Failed to log cookie consent:', error);
+      // Don't hide banner if logging failed
+      return;
     }
+    
+    // Only update UI if logging succeeded
+    localStorage.setItem('cookie_consent', 'essential_only');
+    setChoice('essential_only');
+    setIsVisible(false);
   };
 
   if (!isVisible || choice) {
