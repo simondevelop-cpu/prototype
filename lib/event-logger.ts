@@ -73,3 +73,44 @@ export async function logFeedbackEvent(
   }
 }
 
+/**
+ * Log a consent event
+ */
+export async function logConsentEvent(
+  userId: string | number,
+  consentType: 'account_creation' | 'cookie_banner' | 'first_upload' | 'account_linking' | 'settings_update',
+  metadata: {
+    version?: string; // Terms/Privacy Policy version
+    scope?: string; // What consent covers
+    choice?: string; // User's choice (e.g., 'accept_all', 'essential_only')
+    setting?: string; // For settings updates, which setting was changed
+    value?: boolean; // For settings updates, the new value
+    [key: string]: any;
+  }
+): Promise<void> {
+  const pool = getPool();
+  if (!pool) {
+    console.warn('[Event Logger] Database not available, skipping event log');
+    return;
+  }
+
+  try {
+    const eventMetadata = {
+      ...metadata,
+      consentType,
+      timestamp: new Date().toISOString(),
+    };
+
+    await pool.query(
+      `INSERT INTO user_events (user_id, event_type, event_timestamp, metadata)
+       VALUES ($1, $2, NOW(), $3::jsonb)`,
+      [userId, 'consent', JSON.stringify(eventMetadata)]
+    );
+    
+    console.log(`[Event Logger] Logged consent event (${consentType}) for user ${userId}`);
+  } catch (error: any) {
+    // Don't throw - event logging should not break the main flow
+    console.error('[Event Logger] Failed to log consent event:', error);
+  }
+}
+

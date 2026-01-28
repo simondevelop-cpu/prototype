@@ -16,6 +16,7 @@ export default function Login({ onLogin }: LoginProps) {
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [consentAccepted, setConsentAccepted] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,9 +24,15 @@ export default function Login({ onLogin }: LoginProps) {
     setLoading(true);
 
     try {
+      if (isRegister && !consentAccepted) {
+        setError('You must accept the Terms and Conditions and Privacy Policy to create an account.');
+        setLoading(false);
+        return;
+      }
+
       const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
       const body = isRegister
-        ? { email, password, name }
+        ? { email, password, name, consentAccepted: true }
         : { email, password };
 
       const response = await fetch(endpoint, {
@@ -209,9 +216,33 @@ export default function Login({ onLogin }: LoginProps) {
               )}
             </div>
 
+            {isRegister && (
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  id="consent"
+                  checked={consentAccepted}
+                  onChange={(e) => setConsentAccepted(e.target.checked)}
+                  className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  required
+                />
+                <label htmlFor="consent" className="text-sm text-gray-700">
+                  I confirm that I am 18 years of age or older. I consent to the collection and use of my data as described in the{' '}
+                  <a href="/privacy-policy" target="_blank" className="text-blue-600 hover:underline">
+                    Privacy Policy
+                  </a>
+                  {' '}and agree to the{' '}
+                  <a href="/terms-and-conditions" target="_blank" className="text-blue-600 hover:underline">
+                    Terms and Conditions
+                  </a>
+                  . I understand that my data will be protected with encryption and access controls, and I will be notified of any security incidents. I can withdraw my consent at any time by deleting my account in Account Settings, subject to legal or contractual restrictions.
+                </label>
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (isRegister && !consentAccepted)}
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Loading...' : (isRegister ? 'Create Account' : 'Sign In')}

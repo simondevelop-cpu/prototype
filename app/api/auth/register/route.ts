@@ -4,6 +4,7 @@ import { hashPassword, createToken } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { verifyRequestOrigin } from '@/lib/csrf';
 import { validatePasswordStrength } from '@/lib/password-validation';
+import { logConsentEvent } from '@/lib/event-logger';
 
 // Force dynamic rendering (POST endpoint requires runtime request body)
 export const dynamic = 'force-dynamic';
@@ -23,7 +24,15 @@ export async function POST(request: NextRequest) {
     }
     
     const body = await request.json();
-    const { email, password, name } = body;
+    const { email, password, name, consentAccepted } = body;
+    
+    // Require consent for registration
+    if (!consentAccepted) {
+      return NextResponse.json(
+        { error: 'You must accept the Terms and Conditions and Privacy Policy to create an account.' },
+        { status: 400 }
+      );
+    }
     
     // Rate limiting check (use email or IP)
     const identifier = email || request.headers.get('x-forwarded-for') || 'unknown';
@@ -99,6 +108,18 @@ export async function POST(request: NextRequest) {
 
       const user = result.rows[0];
       const token = createToken(user.id);
+
+      // Log consent event
+      try {
+        await logConsentEvent(user.id, 'account_creation', {
+          version: '1.0', // TODO: Update with actual version from database
+          scope: 'terms_and_privacy',
+          timestamp: new Date().toISOString(),
+        });
+      } catch (consentError) {
+        console.error('[Register] Failed to log consent event:', consentError);
+        // Don't fail registration if consent logging fails
+      }
 
       return NextResponse.json({
         token,
