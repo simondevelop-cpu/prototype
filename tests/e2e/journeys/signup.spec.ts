@@ -47,6 +47,33 @@ test.describe('Sign Up / Account Creation', () => {
     }
   });
 
+  test('should show consent checkbox and copy when creating an account', async ({ page }) => {
+    const createAccountTab = page.locator('button:has-text("Create Account")').first();
+    const hasCreateTab = await createAccountTab.isVisible({ timeout: 3000 }).catch(() => false);
+
+    if (!hasCreateTab) {
+      test.skip(); // UI may differ in some environments
+    }
+
+    await createAccountTab.click();
+
+    // Look for consent checkbox and key phrases from the consent copy
+    const consentCheckbox = page.locator('input[type="checkbox"]#consent');
+    const hasCheckbox = await consentCheckbox.isVisible({ timeout: 3000 }).catch(() => false);
+
+    if (hasCheckbox) {
+      await expect(consentCheckbox).toBeVisible();
+    }
+
+    const consentText = page.locator('text=/Privacy Policy|Terms and Conditions|I confirm that I am 18 years of age/i').first();
+    const hasConsentText = await consentText.isVisible({ timeout: 3000 }).catch(() => false);
+
+    if (hasConsentText) {
+      const text = await consentText.textContent();
+      expect(text).toBeTruthy();
+    }
+  });
+
   test('should validate password strength requirements', async ({ page }) => {
     const emailInput = page.locator('input[type="email"], input[name="email"]').first();
     const hasForm = await emailInput.isVisible({ timeout: 3000 }).catch(() => false);

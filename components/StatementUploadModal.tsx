@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import StatementReviewModal from './StatementReviewModal';
+import FirstUploadConsentModal from './FirstUploadConsentModal';
 
 interface StatementUploadModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
   const [uploadProgress, setUploadProgress] = useState<Record<string, { status: string; message?: string; transactions?: number }>>({});
   const [parsedStatements, setParsedStatements] = useState<ParsedStatement[]>([]);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showFirstUploadConsent, setShowFirstUploadConsent] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -65,16 +67,17 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleUpload = async () => {
+  // Core upload logic (used after consent gating)
+  const performUpload = async () => {
     if (files.length === 0) return;
-    
+
     setUploading(true);
     const formData = new FormData();
-    
+
     files.forEach(file => {
       formData.append('statements', file);
     });
-    
+
     try {
       const response = await fetch('/api/statements/parse', {
         method: 'POST',
@@ -85,11 +88,11 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
       });
 
       const result = await response.json();
-      
+
       if (response.ok) {
         // Filter successful parses
         const successfulParses = result.results.filter((r: any) => r.status === 'success');
-        
+
         if (successfulParses.length === 0) {
           alert('No statements could be parsed. Please check the error messages.');
           setUploadProgress(result.results.reduce((acc: any, r: any) => {
@@ -98,7 +101,7 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
           }, {}));
           return;
         }
-        
+
         // Transition to review modal
         setParsedStatements(successfulParses);
         setShowReviewModal(true);
@@ -111,6 +114,21 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleUpload = async () => {
+    if (files.length === 0) return;
+
+    const hasConsent = typeof window !== 'undefined'
+      ? localStorage.getItem('first_upload_consent') === 'true'
+      : true;
+
+    if (!hasConsent) {
+      setShowFirstUploadConsent(true);
+      return;
+    }
+
+    await performUpload();
   };
 
   const handleClose = () => {
@@ -143,6 +161,17 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
 
   return (
     <>
+      {/* First Upload Consent Modal */}
+      <FirstUploadConsentModal
+        isOpen={showFirstUploadConsent}
+        onClose={() => setShowFirstUploadConsent(false)}
+        token={token}
+        onAgree={async () => {
+          setShowFirstUploadConsent(false);
+          await performUpload();
+        }}
+      />
+
       {/* Review Modal */}
       {showReviewModal && (
         <StatementReviewModal

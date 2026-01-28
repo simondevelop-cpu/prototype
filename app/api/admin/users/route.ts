@@ -137,8 +137,65 @@ export async function GET(request: NextRequest) {
         status: (transactionCount > 0 || completedOnboarding > 0) ? 'Active Account' : 'Failed to log in',
         is_active: row.is_active !== undefined ? row.is_active : true, // Include is_active if available
         email_validated: row.email_validated !== undefined ? row.email_validated : false, // Include email_validated if available
+        // Consent-related fields are populated in a follow-up step below (schema-adaptive)
+        account_creation_consent_at: null,
+        cookie_consent_choice: null,
+        first_upload_consent_at: null,
       };
     });
+
+    // Enrich users with consent information from user_events (schema-adaptive)
+    try {
+      // Check if user_events table exists
+      const tableCheck = await pool.query(`
+        SELECT 1 
+        FROM information_schema.tables 
+        WHERE table_name = 'user_events'
+        LIMIT 1
+      `);
+
+      if (tableCheck.rows.length > 0 && users.length > 0) {
+        const userIds = users.map(u => u.id);
+
+        // Fetch latest consent events per user and consentType
+        const consentResult = await pool.query(`
+          SELECT DISTINCT ON (user_id, metadata->>'consentType')
+            user_id,
+            metadata->>'consentType' AS consent_type,
+            metadata->>'choice' AS choice,
+            event_timestamp
+          FROM user_events
+          WHERE event_type = 'consent'
+            AND user_id = ANY($1::int[])
+          ORDER BY user_id, metadata->>'consentType', event_timestamp DESC
+        `, [userIds]);
+
+        const consentByUser: Record<number, any> = {};
+        for (const row of consentResult.rows) {
+          const uid = row.user_id as number;
+          if (!consentByUser[uid]) consentByUser[uid] = {};
+          consentByUser[uid][row.consent_type] = {
+            choice: row.choice,
+            event_timestamp: row.event_timestamp,
+          };
+        }
+
+        // Attach consent info to users
+        users.forEach(user => {
+          const info = consentByUser[user.id] || {};
+          const accountCreation = info['account_creation'];
+          const cookieBanner = info['cookie_banner'];
+          const firstUpload = info['first_upload'];
+
+          user.account_creation_consent_at = accountCreation?.event_timestamp || null;
+          user.cookie_consent_choice = cookieBanner?.choice || null;
+          user.first_upload_consent_at = firstUpload?.event_timestamp || null;
+        });
+      }
+    } catch (e) {
+      console.log('[Users API] Could not enrich users with consent events:', e);
+      // Continue without consent enrichment
+    }
 
     return NextResponse.json({
       users,

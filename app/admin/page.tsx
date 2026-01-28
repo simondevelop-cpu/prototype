@@ -920,6 +920,9 @@ export default function AdminDashboard() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Validated Email</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registered</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Creation Consent</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cookie Consent</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Upload Consent</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Access</th>
                 </tr>
               </thead>
@@ -942,6 +945,23 @@ export default function AdminDashboard() {
                     <td className="px-6 py-4 text-sm text-gray-600">{user.email_validated ? 'True' : 'False'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {new Date(user.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {user.account_creation_consent_at
+                        ? new Date(user.account_creation_consent_at).toLocaleString()
+                        : <span className="text-gray-400 italic">No record</span>}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {user.cookie_consent_choice
+                        ? user.cookie_consent_choice === 'accept_all'
+                          ? 'Accept all cookies'
+                          : 'Essential cookies only'
+                        : <span className="text-gray-400 italic">No record</span>}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {user.first_upload_consent_at
+                        ? new Date(user.first_upload_consent_at).toLocaleString()
+                        : <span className="text-gray-400 italic">No record</span>}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <button

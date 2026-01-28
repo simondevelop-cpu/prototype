@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import CashflowChart from './CashflowChart';
 import TransactionsList from './TransactionsList';
 import FeedbackModal from './FeedbackModal';
+import CookieBanner from './CookieBanner';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
@@ -756,6 +757,9 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         onClose={() => setShowFeedback(false)}
         token={token}
       />
+
+      {/* Cookie Banner - shown for signed-in users until choice recorded */}
+      <CookieBanner token={token} userId={user?.id} />
     </div>
   );
 }
