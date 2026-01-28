@@ -40,6 +40,8 @@ export default function SettingsPage() {
 
   // Delete account confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // Required data uncheck confirmation
+  const [showRequiredDataConfirm, setShowRequiredDataConfirm] = useState(false);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('ci.session.token');
@@ -138,6 +140,12 @@ export default function SettingsPage() {
   const handleSettingChange = async (setting: string, value: boolean | string) => {
     if (!token || !userId) return;
     
+    // Special handling for required_data - if unchecking, show confirmation
+    if (setting === 'required_data' && !(value as boolean) && requiredData) {
+      setShowRequiredDataConfirm(true);
+      return; // Don't proceed until confirmed
+    }
+    
     setSaving(true);
     
     try {
@@ -145,6 +153,7 @@ export default function SettingsPage() {
       switch (setting) {
         case 'required_data':
           setRequiredData(value as boolean);
+          setShowRequiredDataConfirm(false); // Clear confirmation state
           break;
         case 'functional_data':
           setFunctionalData(value as boolean);
@@ -485,13 +494,37 @@ export default function SettingsPage() {
                     authentication, security, and session management, in order to operate the Service. You may remove consent 
                     at any time, however doing so would remove your access to the Service.
                   </p>
+                  {showRequiredDataConfirm && (
+                    <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm font-medium text-red-900 mb-3">
+                        Are you sure you want to disable Required Data? This will remove your access to the Service.
+                      </p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            setShowRequiredDataConfirm(false);
+                            handleSettingChange('required_data', false);
+                          }}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors text-sm"
+                        >
+                          Yes, Disable Required Data
+                        </button>
+                        <button
+                          onClick={() => setShowRequiredDataConfirm(false)}
+                          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
                   <input
                     type="checkbox"
                     checked={requiredData}
                     onChange={(e) => handleSettingChange('required_data', e.target.checked)}
-                    disabled={saving}
+                    disabled={saving || showRequiredDataConfirm}
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -499,12 +532,12 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Functional Data */}
+            {/* Non-essential Data */}
             <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">Functional Data</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Non-essential Data</h3>
                     <span className={`px-2 py-1 text-xs font-medium rounded ${
                       functionalData 
                         ? 'bg-green-100 text-green-800' 
@@ -564,12 +597,12 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Cookies - Non-essential */}
+            {/* Non-essential Cookies */}
             <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">Cookies - Non-essential</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Non-essential Cookies</h3>
                     <span className={`px-2 py-1 text-xs font-medium rounded ${
                       cookiesNonEssential 
                         ? 'bg-green-100 text-green-800' 
