@@ -19,17 +19,26 @@ export default function FirstUploadConsentModal({ isOpen, onClose, onAgree, toke
     
     try {
       // Log consent event
-      await fetch('/api/consent', {
+      const response = await fetch('/api/consent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin,
         },
         body: JSON.stringify({
           consentType: 'first_upload',
           choice: 'agreed',
         }),
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to log first upload consent:', response.status, errorData);
+        // Still proceed even if logging fails
+      } else {
+        console.log('First upload consent logged successfully');
+      }
       
       // Mark as consented in localStorage
       localStorage.setItem('first_upload_consent', 'true');
@@ -46,7 +55,7 @@ export default function FirstUploadConsentModal({ isOpen, onClose, onAgree, toke
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">Before You Upload</h2>
         

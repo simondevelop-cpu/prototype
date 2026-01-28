@@ -159,18 +159,26 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
 
   if (!isOpen) return null;
 
-  return (
-    <>
-      {/* First Upload Consent Modal */}
+  // If consent modal is showing, only show that (not the upload modal)
+  if (showFirstUploadConsent) {
+    return (
       <FirstUploadConsentModal
         isOpen={showFirstUploadConsent}
-        onClose={() => setShowFirstUploadConsent(false)}
+        onClose={() => {
+          setShowFirstUploadConsent(false);
+          // Don't close the upload modal, just hide consent
+        }}
         token={token}
         onAgree={async () => {
           setShowFirstUploadConsent(false);
           await performUpload();
         }}
       />
+    );
+  }
+
+  return (
+    <>
 
       {/* Review Modal */}
       {showReviewModal && (
