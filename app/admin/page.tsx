@@ -3585,7 +3585,6 @@ export default function AdminDashboard() {
             {monitoringSubTab === 'accounts' && renderAccountsTab()}
             {monitoringSubTab === 'health' && renderAppHealth()}
             {monitoringSubTab === 'privacy-policy' && renderPrivacyPolicyCheck()}
-            {monitoringSubTab === 'privacy-policy' && renderPrivacyPolicyCheck()}
           </div>
         )}
         {activeTab === 'inbox' && (
