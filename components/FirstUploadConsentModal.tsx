@@ -61,15 +61,10 @@ export default function FirstUploadConsentModal({ isOpen, onClose, onAgree, toke
         
         <div className="space-y-4 text-gray-700 mb-6">
           <p>
-            By uploading a PDF statement, you confirm that you have the right to authorize us to process this information 
-            for categorization and insights.
+            By uploading a PDF statement, you confirm you have the right to do so and authorize us to process it to generate categories and insights. We only store your financial transaction data. We never store your account numbers or similar information.
           </p>
           <p>
-            You can review, correct, or delete your data at any time in Account Settings. The categorization we provide 
-            is for informational purposes only. Please verify all figures and do not rely solely on our outputs for financial decisions.
-          </p>
-          <p className="font-medium">
-            We do not guarantee the accuracy of our categorization, and all outputs are for informational purposes only.
+            You may review, correct, or delete your data at any time on the transactions tab. Categorization is for information only. Please verify important figures before making decisions. We do not, and cannot, guarantee 100% accuracy, but we'll do our best. Outputs are provided for informational purposes only.
           </p>
         </div>
 

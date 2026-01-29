@@ -102,8 +102,7 @@ export default function CookieBanner({ token, userId }: CookieBannerProps) {
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex-1">
           <p className="text-sm text-gray-700">
-            We use cookies to improve your experience. Non-essential cookies help us understand how you use the app. 
-            You can accept all cookies, use essential cookies only, or manage your preferences in Account Settings.
+            We use non-essential cookies only with your consent to improve the experience. You can accept all cookies, use essential cookies only, or manage your preferences at any time.
           </p>
         </div>
         <div className="flex gap-3">

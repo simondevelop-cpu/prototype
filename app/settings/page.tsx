@@ -459,6 +459,26 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Our Security Commitment */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Our Security Commitment</h2>
+          <p className="text-sm text-gray-700 mb-4">
+            Without your trust, our business cannot succeed. That's why we treat your data as if it was our own. We will always prioritize security and confidentiality, and we will never try to monetise your data behind your back.
+          </p>
+          <p className="text-sm text-gray-700 mb-4">
+            We are therefore proud to make the following high-integrity commitments to your data security and privacy:
+          </p>
+          <ul className="space-y-2 text-sm text-gray-700 list-disc list-inside">
+            <li>We are compliant with Canadian privacy law (PIPEDA & Québec Law 25)</li>
+            <li>Your data is never sold or used for advertising; we do not share with third parties except essential service providers</li>
+            <li>We give you full control: export, edit or delete your data at any time</li>
+            <li>Your consent is required before we do anything with your data</li>
+            <li>We have strong anti-breach protections, including encryption, access controls, and continuous monitoring</li>
+            <li>Clear breach notification if something goes wrong</li>
+            <li>Upfront and transparent monetization</li>
+          </ul>
+        </div>
+
         {/* Panel 2: Data Consent */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Data Consent</h2>
@@ -490,9 +510,7 @@ export default function SettingsPage() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-600">
-                    We require essential data collection including performance and analytics, as well as essential cookies for 
-                    authentication, security, and session management, in order to operate the Service. You may remove consent 
-                    at any time, however doing so would remove your access to the Service.
+                    We require personal information, financial information and usage data in order to operate the essential functions of the Service. You may remove consent at any time, however doing so would remove your access to Hummingbird.
                   </p>
                   {showRequiredDataConfirm && (
                     <div className="mt-4">
@@ -551,9 +569,7 @@ export default function SettingsPage() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-600">
-                    Functional data helps improve how the Service works for you (for example, remembering your categorisation 
-                    preferences or improving reliability). You may turn this off at any time. Doing so may limit certain features 
-                    or reduce the overall quality of your experience.
+                    Service improvement functions help improve how the Service works for you (for example, remembering your categorisation preferences or improving reliability). You may turn this off at any time. Doing so may limit certain features or reduce the overall quality of your experience.
                   </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
@@ -584,8 +600,7 @@ export default function SettingsPage() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-600">
-                    We do not require targeting or marketing data to operate the Service. You can opt out at any time without 
-                    affecting your account or core functionality.
+                    Targeting and marketing functions allow you to benefit from tailored advertisements and offers. We do not require targeting or marketing data to operate the Service. You can opt out at any time without affecting your account or core functionality.
                   </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
