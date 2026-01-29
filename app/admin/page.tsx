@@ -7,7 +7,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import CheckboxDropdown from '@/components/CheckboxDropdown';
 
 type TabName = 'monitoring' | 'inbox' | 'categories' | 'insights' | 'analytics';
-type MonitoringSubTab = 'accounts' | 'health';
+type MonitoringSubTab = 'accounts' | 'health' | 'privacy-policy';
 type InboxSubTab = 'bug-reports' | 'user-feedback';
 
 interface Keyword {
@@ -86,6 +86,10 @@ export default function AdminDashboard() {
   // State for App Health tab
   const [healthData, setHealthData] = useState<any>(null);
   const [healthLoading, setHealthLoading] = useState(false);
+  
+  // State for Privacy Policy Check tab
+  const [privacyCheckData, setPrivacyCheckData] = useState<any>(null);
+  const [privacyCheckLoading, setPrivacyCheckLoading] = useState(false);
   
   // State for Analytics Dashboard (Cohort Analysis & Vanity Metrics)
   const [cohortData, setCohortData] = useState<any>(null);
@@ -2715,15 +2719,216 @@ export default function AdminDashboard() {
   const fetchHealthData = async () => {
     setHealthLoading(true);
     try {
-      const response = await fetch('/api/admin/health');
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/health', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       const data = await response.json();
-      setHealthData(data);
-    } catch (error) {
+      if (response.ok) {
+        setHealthData(data);
+      } else {
+        alert(`Failed to fetch health data: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
       console.error('Error fetching health data:', error);
-      setHealthData({ error: 'Failed to fetch health data' });
+      alert(`Error fetching health data: ${error.message || 'Unknown error'}`);
     } finally {
       setHealthLoading(false);
     }
+  };
+
+  const fetchPrivacyCheckData = async () => {
+    setPrivacyCheckLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/privacy-policy-check', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setPrivacyCheckData(data);
+      } else {
+        alert(`Failed to fetch privacy policy check: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error fetching privacy policy check:', error);
+      alert(`Error fetching privacy policy check: ${error.message || 'Unknown error'}`);
+    } finally {
+      setPrivacyCheckLoading(false);
+    }
+  };
+
+  // Render Privacy Policy Check Tab
+  const renderPrivacyPolicyCheck = () => {
+    const getStatusIcon = (status: string) => {
+      switch (status) {
+        case 'pass':
+          return '✅';
+        case 'fail':
+          return '❌';
+        case 'warning':
+          return '⚠️';
+        default:
+          return '❓';
+      }
+    };
+
+    const getStatusColor = (status: string) => {
+      switch (status) {
+        case 'pass':
+          return 'bg-green-50 border-green-200 text-green-800';
+        case 'fail':
+          return 'bg-red-50 border-red-200 text-red-800';
+        case 'warning':
+          return 'bg-yellow-50 border-yellow-200 text-yellow-800';
+        default:
+          return 'bg-gray-50 border-gray-200 text-gray-800';
+      }
+    };
+
+    if (!privacyCheckData && !privacyCheckLoading) {
+      return (
+        <div className="text-center py-12">
+          <p className="text-gray-600 mb-4">Click "Run Privacy Policy Check" to verify compliance</p>
+          <button
+            onClick={fetchPrivacyCheckData}
+            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            Run Privacy Policy Check
+          </button>
+        </div>
+      );
+    }
+
+    if (privacyCheckLoading) {
+      return (
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+          <p className="mt-4 text-gray-600">Running privacy policy checks...</p>
+        </div>
+      );
+    }
+
+    const { status, summary, checks, lastChecked } = privacyCheckData || {};
+
+    // Group checks by category
+    const checksByCategory: { [key: string]: any[] } = {};
+    checks?.forEach((check: any) => {
+      if (!checksByCategory[check.category]) {
+        checksByCategory[check.category] = [];
+      }
+      checksByCategory[check.category].push(check);
+    });
+
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">🔒 Privacy Policy Check</h2>
+              <p className="text-gray-600">
+                Automated compliance verification for Privacy Policy commitments.
+              </p>
+            </div>
+            <button
+              onClick={fetchPrivacyCheckData}
+              disabled={privacyCheckLoading}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {privacyCheckLoading ? 'Checking...' : '🔄 Refresh'}
+            </button>
+          </div>
+        </div>
+
+        {/* Overall Status */}
+        {summary && (
+          <div className={`rounded-lg border-2 p-6 ${
+            status === 'pass' 
+              ? 'bg-green-50 border-green-300' 
+              : status === 'fail'
+              ? 'bg-red-50 border-red-300'
+              : 'bg-yellow-50 border-yellow-300'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold mb-2">
+                  Overall Status: {getStatusIcon(status)} {status.toUpperCase()}
+                </h3>
+                <div className="grid grid-cols-4 gap-4 mt-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">{summary.passed}</div>
+                    <div className="text-sm text-gray-600">Passed</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-red-600">{summary.failed}</div>
+                    <div className="text-sm text-gray-600">Failed</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-yellow-600">{summary.warnings}</div>
+                    <div className="text-sm text-gray-600">Warnings</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-600">{summary.total}</div>
+                    <div className="text-sm text-gray-600">Total</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {lastChecked && (
+              <p className="text-sm text-gray-500 mt-4">
+                Last checked: {new Date(lastChecked).toLocaleString()}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Checks by Category */}
+        <div className="space-y-6">
+          {Object.entries(checksByCategory).map(([category, categoryChecks]) => (
+            <div key={category} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">{category}</h3>
+              <div className="space-y-3">
+                {categoryChecks.map((check: any, index: number) => (
+                  <div
+                    key={check.id}
+                    className={`border rounded-lg p-4 ${getStatusColor(check.status)}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">{getStatusIcon(check.status)}</span>
+                          <h4 className="font-semibold">{check.name}</h4>
+                          <span className="text-xs font-mono bg-white bg-opacity-50 px-2 py-1 rounded">
+                            {check.id}
+                          </span>
+                        </div>
+                        <p className="text-sm mb-1">{check.message}</p>
+                        {check.details && (
+                          <p className="text-xs opacity-75 mt-2 italic">{check.details}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   // Render App Health Tab
@@ -3360,10 +3565,27 @@ export default function AdminDashboard() {
               >
                 💚 App Health
               </button>
+              <button
+                onClick={() => {
+                  setMonitoringSubTab('privacy-policy');
+                  if (!privacyCheckData && !privacyCheckLoading) {
+                    fetchPrivacyCheckData();
+                  }
+                }}
+                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                  monitoringSubTab === 'privacy-policy'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🔒 Privacy Policy Check
+              </button>
             </div>
             {/* Monitoring Content */}
             {monitoringSubTab === 'accounts' && renderAccountsTab()}
             {monitoringSubTab === 'health' && renderAppHealth()}
+            {monitoringSubTab === 'privacy-policy' && renderPrivacyPolicyCheck()}
+            {monitoringSubTab === 'privacy-policy' && renderPrivacyPolicyCheck()}
           </div>
         )}
         {activeTab === 'inbox' && (
