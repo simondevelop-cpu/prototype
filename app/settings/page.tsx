@@ -631,8 +631,7 @@ export default function SettingsPage() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-600">
-                    Non-essential data is used only for optional features, analytics, or improvements. You may withdraw consent 
-                    at any time without losing access to the core Service.
+                    Non-essential cookies are used only for optional features, analytics, or improvements. You may withdraw consent at any time without losing access to the core Service.
                   </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
