@@ -495,12 +495,12 @@ export default function SettingsPage() {
           </p>
 
           <div className="space-y-6">
-            {/* Required Data (Essential Analytics + Essential Cookies combined) */}
+            {/* Essential (Essential Analytics + Essential Cookies combined) */}
             <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">Required Data</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Essential</h3>
                     <span className={`px-2 py-1 text-xs font-medium rounded ${
                       requiredData 
                         ? 'bg-green-100 text-green-800' 
@@ -515,7 +515,7 @@ export default function SettingsPage() {
                   {showRequiredDataConfirm && (
                     <div className="mt-4">
                       <p className="text-sm font-medium text-red-900 mb-3">
-                        Are you sure you want to disable Required Data? This will remove your access to the Service.
+                        Are you sure you want to disable Essential? This will remove your access to the Service.
                       </p>
                       <div className="flex gap-3">
                         <button
@@ -529,7 +529,7 @@ export default function SettingsPage() {
                           }}
                           className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
                         >
-                          Yes, Disable Required Data
+                          Yes, Disable Essential
                         </button>
                         <button
                           onClick={() => setShowRequiredDataConfirm(false)}
@@ -554,12 +554,12 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Non-essential Data */}
+            {/* Service improvement */}
             <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">Non-essential Data</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Service improvement</h3>
                     <span className={`px-2 py-1 text-xs font-medium rounded ${
                       functionalData 
                         ? 'bg-green-100 text-green-800' 
@@ -585,12 +585,12 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Marketing Data */}
+            {/* Targeting and marketing */}
             <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">Marketing Data</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Targeting and marketing</h3>
                     <span className={`px-2 py-1 text-xs font-medium rounded ${
                       marketingData 
                         ? 'bg-green-100 text-green-800' 
@@ -616,12 +616,12 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Non-essential Cookies */}
+            {/* Non-essential cookies */}
             <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">Non-essential Cookies</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Non-essential cookies</h3>
                     <span className={`px-2 py-1 text-xs font-medium rounded ${
                       cookiesNonEssential 
                         ? 'bg-green-100 text-green-800' 
