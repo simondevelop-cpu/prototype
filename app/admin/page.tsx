@@ -2443,6 +2443,115 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+            
+            {/* Additional Tables (Not referenced in these tabs) */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">Additional Tables (Not referenced in these tabs)</h2>
+                <p className="text-gray-600 mt-1">Complete list of all additional tables and data points we collect beyond the main source datasets</p>
+              </div>
+
+              <div className="p-6 space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">l0_pii_users table (PII - Personally Identifiable Information)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (PII record identifier)</li>
+                    <li><strong>internal_user_id</strong> - INTEGER UNIQUE NOT NULL REFERENCES users(id) (links to users table, not exposed to analytics)</li>
+                    <li><strong>email</strong> - TEXT NOT NULL UNIQUE (user email address - PII)</li>
+                    <li><strong>first_name</strong> - TEXT (user's first name - PII)</li>
+                    <li><strong>last_name</strong> - TEXT (user's last name - PII)</li>
+                    <li><strong>date_of_birth</strong> - DATE (user's date of birth - PII)</li>
+                    <li><strong>recovery_phone</strong> - TEXT (user's recovery phone number - PII)</li>
+                    <li><strong>province_region</strong> - TEXT (user's province/region - PII)</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE (when PII record was created)</li>
+                    <li><strong>updated_at</strong> - TIMESTAMP WITH TIME ZONE (when PII record was last updated)</li>
+                    <li><strong>deleted_at</strong> - TIMESTAMP WITH TIME ZONE (soft delete timestamp for PIPEDA compliance - 30 day retention)</li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-2 italic">Purpose: Isolates PII from main users table for privacy compliance. Data is retained for 30 days after deletion request per PIPEDA requirements.</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">categorization_learning table (Machine Learning Data)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (learning record identifier)</li>
+                    <li><strong>user_id</strong> - INTEGER REFERENCES users(id) (foreign key to users table)</li>
+                    <li><strong>description_pattern</strong> - TEXT (transaction description pattern/merchant name)</li>
+                    <li><strong>original_category</strong> - VARCHAR(255) (original auto-categorized category)</li>
+                    <li><strong>corrected_category</strong> - VARCHAR(255) (user-corrected category)</li>
+                    <li><strong>corrected_label</strong> - VARCHAR(255) (user-corrected sub-category label)</li>
+                    <li><strong>frequency</strong> - INTEGER (how many times this correction has been applied)</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE (when correction was first made)</li>
+                    <li><strong>updated_at</strong> - TIMESTAMP WITH TIME ZONE (when correction was last used)</li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-2 italic">Purpose: Stores user corrections to transaction categorization to improve future auto-categorization accuracy.</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">onboarding_responses table (Legacy - may exist pre-migration)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (onboarding response identifier)</li>
+                    <li><strong>user_id</strong> - INTEGER REFERENCES users(id) (foreign key to users table)</li>
+                    <li><strong>motivation</strong> - TEXT (user's primary motivation/intent category)</li>
+                    <li><strong>motivation_other</strong> - TEXT (free-text field if user selected "Other" for motivation)</li>
+                    <li><strong>emotional_state</strong> - TEXT[] (array of emotional states selected)</li>
+                    <li><strong>financial_context</strong> - TEXT[] (array of financial contexts selected)</li>
+                    <li><strong>acquisition_source</strong> - TEXT (how user found the product)</li>
+                    <li><strong>acquisition_other</strong> - TEXT (free-text field if user selected "Other" for acquisition)</li>
+                    <li><strong>insight_preferences</strong> - TEXT[] (array of insight types user wants to receive)</li>
+                    <li><strong>insight_other</strong> - TEXT (free-text field for additional insight preferences)</li>
+                    <li><strong>last_step</strong> - INTEGER (last onboarding step reached, 0 if not started, 1-7 for steps)</li>
+                    <li><strong>completed_at</strong> - TIMESTAMP WITH TIME ZONE (when onboarding was completed, NULL if not completed)</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE (when onboarding response was created)</li>
+                    <li><strong>updated_at</strong> - TIMESTAMP WITH TIME ZONE (last update timestamp)</li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-2 italic">Purpose: Legacy table containing onboarding questionnaire data. After migration, this data is merged into the users table. This table may still exist for backward compatibility.</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">user_events table metadata fields (Additional data collected in events)</h3>
+                  <p className="text-sm text-gray-600 mb-2">The user_events table's metadata JSONB field contains additional structured data depending on event_type:</p>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>consent events (event_type = 'consent'):</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-disc list-inside">
+                        <li><strong>consentType</strong> - TEXT ('account_creation', 'cookie_banner', 'first_upload', 'account_linking', 'settings_update')</li>
+                        <li><strong>choice</strong> - TEXT (user's consent choice, e.g., 'accept_all', 'essential_only', 'agreed')</li>
+                        <li><strong>setting</strong> - TEXT (for settings_update events, the setting name that was changed)</li>
+                        <li><strong>value</strong> - BOOLEAN (for settings_update events, the new setting value)</li>
+                        <li><strong>version</strong> - TEXT (optional, version of consent policy)</li>
+                        <li><strong>scope</strong> - TEXT (optional, scope of consent)</li>
+                        <li><strong>timestamp</strong> - TEXT (ISO timestamp of when consent was given)</li>
+                      </ul>
+                    </li>
+                    <li><strong>feedback events (event_type = 'feedback'):</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-disc list-inside">
+                        <li><strong>usefulness</strong> - TEXT (Likert scale: 'Very unhelpful', 'Somewhat unhelpful', 'Neutral', 'Somewhat helpful', 'Very helpful')</li>
+                        <li><strong>trust</strong> - TEXT (Likert scale: 'Not at all', 'Not really', 'Neutral', 'Somewhat', 'Yes')</li>
+                        <li><strong>problems</strong> - TEXT (free text, max 250 words, user complaints/bugs)</li>
+                        <li><strong>learnMore</strong> - TEXT (free text, max 250 words, what user wants to learn)</li>
+                      </ul>
+                    </li>
+                    <li><strong>statement_upload events (event_type = 'statement_upload'):</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-disc list-inside">
+                        <li><strong>bank</strong> - TEXT (detected bank name, e.g., 'RBC', 'TD', 'Scotiabank')</li>
+                        <li><strong>accountType</strong> - TEXT (detected account type, e.g., 'Credit Card', 'Checking', 'Savings')</li>
+                        <li><strong>filename</strong> - TEXT (original PDF filename)</li>
+                      </ul>
+                    </li>
+                    <li><strong>statement_import events (event_type = 'statement_import'):</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-disc list-inside">
+                        <li><strong>bank</strong> - TEXT (bank name from imported statement)</li>
+                        <li><strong>accountType</strong> - TEXT (account type from imported statement)</li>
+                        <li><strong>transactionCount</strong> - INTEGER (number of transactions imported)</li>
+                        <li><strong>upload_session_id</strong> - TEXT (identifier for the upload session)</li>
+                      </ul>
+                    </li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-2 italic">Purpose: Flexible JSONB metadata field allows storing event-specific data without schema changes. Different event types store different metadata structures.</p>
+                </div>
+              </div>
+            </div>
+              </div>
+            </div>
           </div>
         )}
         
