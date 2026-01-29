@@ -64,6 +64,14 @@ describe('Authentication API', () => {
         completed_at TIMESTAMP WITH TIME ZONE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS user_events (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        event_type TEXT NOT NULL,
+        event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        metadata JSONB
+      );
     `);
 
     // Mock getPool to return our test pool
@@ -97,6 +105,7 @@ describe('Authentication API', () => {
             email: 'newuser@test.com',
             password: 'StrongP@ss1',
             name: 'Test User',
+            consentAccepted: true,
           }),
         });
 
@@ -120,6 +129,7 @@ describe('Authentication API', () => {
             email: 'hashtest@test.com',
             password: 'StrongP@ss1',
             name: 'Test User',
+            consentAccepted: true,
           }),
         });
 
@@ -147,6 +157,7 @@ describe('Authentication API', () => {
             email: 'weak@test.com',
             password: 'weak',
             name: 'Test User',
+            consentAccepted: true,
           }),
         });
 
@@ -169,6 +180,7 @@ describe('Authentication API', () => {
             email: 'duplicate@test.com',
             password: 'StrongP@ss1',
             name: 'Test User',
+            consentAccepted: true,
           }),
         });
         const response1 = await registerHandler(request1);
@@ -192,6 +204,7 @@ describe('Authentication API', () => {
             email: 'duplicate@test.com',
             password: 'StrongP@ss2',
             name: 'Test User 2',
+            consentAccepted: true,
           }),
         });
 
@@ -200,6 +213,28 @@ describe('Authentication API', () => {
 
         expect(response.status).toBe(400);
         expect(data.error).toContain('already registered');
+      });
+
+      it('should require consentAccepted for registration', async () => {
+        const request = new NextRequest('http://localhost/api/auth/register', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'origin': 'http://localhost',
+          },
+          body: JSON.stringify({
+            email: 'noconsent@test.com',
+            password: 'StrongP@ss1',
+            name: 'No Consent User',
+            // consentAccepted omitted on purpose
+          }),
+        });
+
+        const response = await registerHandler(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(String(data.error)).toContain('accept the Terms and Conditions and Privacy Policy');
       });
     });
   });

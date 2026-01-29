@@ -7,7 +7,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import CheckboxDropdown from '@/components/CheckboxDropdown';
 
 type TabName = 'monitoring' | 'inbox' | 'categories' | 'insights' | 'analytics';
-type MonitoringSubTab = 'accounts' | 'health';
+type MonitoringSubTab = 'accounts' | 'health' | 'privacy-policy';
 type InboxSubTab = 'bug-reports' | 'user-feedback';
 
 interface Keyword {
@@ -86,6 +86,10 @@ export default function AdminDashboard() {
   // State for App Health tab
   const [healthData, setHealthData] = useState<any>(null);
   const [healthLoading, setHealthLoading] = useState(false);
+  
+  // State for Privacy Policy Check tab
+  const [privacyCheckData, setPrivacyCheckData] = useState<any>(null);
+  const [privacyCheckLoading, setPrivacyCheckLoading] = useState(false);
   
   // State for Analytics Dashboard (Cohort Analysis & Vanity Metrics)
   const [cohortData, setCohortData] = useState<any>(null);
@@ -920,6 +924,9 @@ export default function AdminDashboard() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Validated Email</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registered</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Creation Consent</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cookie Consent</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Upload Consent</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Access</th>
                 </tr>
               </thead>
@@ -942,6 +949,25 @@ export default function AdminDashboard() {
                     <td className="px-6 py-4 text-sm text-gray-600">{user.email_validated ? 'True' : 'False'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {new Date(user.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {user.account_creation_consent_at
+                        ? new Date(user.account_creation_consent_at).toLocaleString()
+                        : <span className="text-gray-400 italic">No record</span>}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {user.cookie_consent_choice
+                        ? user.cookie_consent_choice === 'accept_all'
+                          ? 'Accept all cookies'
+                          : 'Essential cookies only'
+                        : <span className="text-gray-400 italic">No record</span>}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {user.first_upload_consent_at
+                        ? typeof user.first_upload_consent_at === 'string' && user.first_upload_consent_at.includes('pre-logging')
+                          ? <span className="text-gray-500 italic">{user.first_upload_consent_at}</span>
+                          : new Date(user.first_upload_consent_at).toLocaleString()
+                        : <span className="text-gray-400 italic">No record</span>}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <button
@@ -2417,6 +2443,113 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+            
+            {/* Additional Tables (Not referenced in these tabs) */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">Additional Tables (Not referenced in these tabs)</h2>
+                <p className="text-gray-600 mt-1">Complete list of all additional tables and data points we collect beyond the main source datasets</p>
+              </div>
+
+              <div className="p-6 space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">l0_pii_users table (PII - Personally Identifiable Information)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (PII record identifier)</li>
+                    <li><strong>internal_user_id</strong> - INTEGER UNIQUE NOT NULL REFERENCES users(id) (links to users table, not exposed to analytics)</li>
+                    <li><strong>email</strong> - TEXT NOT NULL UNIQUE (user email address - PII)</li>
+                    <li><strong>first_name</strong> - TEXT (user's first name - PII)</li>
+                    <li><strong>last_name</strong> - TEXT (user's last name - PII)</li>
+                    <li><strong>date_of_birth</strong> - DATE (user's date of birth - PII)</li>
+                    <li><strong>recovery_phone</strong> - TEXT (user's recovery phone number - PII)</li>
+                    <li><strong>province_region</strong> - TEXT (user's province/region - PII)</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE (when PII record was created)</li>
+                    <li><strong>updated_at</strong> - TIMESTAMP WITH TIME ZONE (when PII record was last updated)</li>
+                    <li><strong>deleted_at</strong> - TIMESTAMP WITH TIME ZONE (soft delete timestamp for PIPEDA compliance - 30 day retention)</li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-2 italic">Purpose: Isolates PII from main users table for privacy compliance. Data is retained for 30 days after deletion request per PIPEDA requirements.</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">categorization_learning table (Machine Learning Data)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (learning record identifier)</li>
+                    <li><strong>user_id</strong> - INTEGER REFERENCES users(id) (foreign key to users table)</li>
+                    <li><strong>description_pattern</strong> - TEXT (transaction description pattern/merchant name)</li>
+                    <li><strong>original_category</strong> - VARCHAR(255) (original auto-categorized category)</li>
+                    <li><strong>corrected_category</strong> - VARCHAR(255) (user-corrected category)</li>
+                    <li><strong>corrected_label</strong> - VARCHAR(255) (user-corrected sub-category label)</li>
+                    <li><strong>frequency</strong> - INTEGER (how many times this correction has been applied)</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE (when correction was first made)</li>
+                    <li><strong>updated_at</strong> - TIMESTAMP WITH TIME ZONE (when correction was last used)</li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-2 italic">Purpose: Stores user corrections to transaction categorization to improve future auto-categorization accuracy.</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">onboarding_responses table (Legacy - may exist pre-migration)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (onboarding response identifier)</li>
+                    <li><strong>user_id</strong> - INTEGER REFERENCES users(id) (foreign key to users table)</li>
+                    <li><strong>motivation</strong> - TEXT (user's primary motivation/intent category)</li>
+                    <li><strong>motivation_other</strong> - TEXT (free-text field if user selected "Other" for motivation)</li>
+                    <li><strong>emotional_state</strong> - TEXT[] (array of emotional states selected)</li>
+                    <li><strong>financial_context</strong> - TEXT[] (array of financial contexts selected)</li>
+                    <li><strong>acquisition_source</strong> - TEXT (how user found the product)</li>
+                    <li><strong>acquisition_other</strong> - TEXT (free-text field if user selected "Other" for acquisition)</li>
+                    <li><strong>insight_preferences</strong> - TEXT[] (array of insight types user wants to receive)</li>
+                    <li><strong>insight_other</strong> - TEXT (free-text field for additional insight preferences)</li>
+                    <li><strong>last_step</strong> - INTEGER (last onboarding step reached, 0 if not started, 1-7 for steps)</li>
+                    <li><strong>completed_at</strong> - TIMESTAMP WITH TIME ZONE (when onboarding was completed, NULL if not completed)</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE (when onboarding response was created)</li>
+                    <li><strong>updated_at</strong> - TIMESTAMP WITH TIME ZONE (last update timestamp)</li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-2 italic">Purpose: Legacy table containing onboarding questionnaire data. After migration, this data is merged into the users table. This table may still exist for backward compatibility.</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">user_events table metadata fields (Additional data collected in events)</h3>
+                  <p className="text-sm text-gray-600 mb-2">The user_events table's metadata JSONB field contains additional structured data depending on event_type:</p>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>consent events (event_type = 'consent'):</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-disc list-inside">
+                        <li><strong>consentType</strong> - TEXT ('account_creation', 'cookie_banner', 'first_upload', 'account_linking', 'settings_update')</li>
+                        <li><strong>choice</strong> - TEXT (user's consent choice, e.g., 'accept_all', 'essential_only', 'agreed')</li>
+                        <li><strong>setting</strong> - TEXT (for settings_update events, the setting name that was changed)</li>
+                        <li><strong>value</strong> - BOOLEAN (for settings_update events, the new setting value)</li>
+                        <li><strong>version</strong> - TEXT (optional, version of consent policy)</li>
+                        <li><strong>scope</strong> - TEXT (optional, scope of consent)</li>
+                        <li><strong>timestamp</strong> - TEXT (ISO timestamp of when consent was given)</li>
+                      </ul>
+                    </li>
+                    <li><strong>feedback events (event_type = 'feedback'):</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-disc list-inside">
+                        <li><strong>usefulness</strong> - TEXT (Likert scale: 'Very unhelpful', 'Somewhat unhelpful', 'Neutral', 'Somewhat helpful', 'Very helpful')</li>
+                        <li><strong>trust</strong> - TEXT (Likert scale: 'Not at all', 'Not really', 'Neutral', 'Somewhat', 'Yes')</li>
+                        <li><strong>problems</strong> - TEXT (free text, max 250 words, user complaints/bugs)</li>
+                        <li><strong>learnMore</strong> - TEXT (free text, max 250 words, what user wants to learn)</li>
+                      </ul>
+                    </li>
+                    <li><strong>statement_upload events (event_type = 'statement_upload'):</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-disc list-inside">
+                        <li><strong>bank</strong> - TEXT (detected bank name, e.g., 'RBC', 'TD', 'Scotiabank')</li>
+                        <li><strong>accountType</strong> - TEXT (detected account type, e.g., 'Credit Card', 'Checking', 'Savings')</li>
+                        <li><strong>filename</strong> - TEXT (original PDF filename)</li>
+                      </ul>
+                    </li>
+                    <li><strong>statement_import events (event_type = 'statement_import'):</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-disc list-inside">
+                        <li><strong>bank</strong> - TEXT (bank name from imported statement)</li>
+                        <li><strong>accountType</strong> - TEXT (account type from imported statement)</li>
+                        <li><strong>transactionCount</strong> - INTEGER (number of transactions imported)</li>
+                        <li><strong>upload_session_id</strong> - TEXT (identifier for the upload session)</li>
+                      </ul>
+                    </li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-2 italic">Purpose: Flexible JSONB metadata field allows storing event-specific data without schema changes. Different event types store different metadata structures.</p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
         
@@ -2693,15 +2826,216 @@ export default function AdminDashboard() {
   const fetchHealthData = async () => {
     setHealthLoading(true);
     try {
-      const response = await fetch('/api/admin/health');
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/health', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       const data = await response.json();
-      setHealthData(data);
-    } catch (error) {
+      if (response.ok) {
+        setHealthData(data);
+      } else {
+        alert(`Failed to fetch health data: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
       console.error('Error fetching health data:', error);
-      setHealthData({ error: 'Failed to fetch health data' });
+      alert(`Error fetching health data: ${error.message || 'Unknown error'}`);
     } finally {
       setHealthLoading(false);
     }
+  };
+
+  const fetchPrivacyCheckData = async () => {
+    setPrivacyCheckLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/privacy-policy-check', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setPrivacyCheckData(data);
+      } else {
+        alert(`Failed to fetch privacy policy check: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error fetching privacy policy check:', error);
+      alert(`Error fetching privacy policy check: ${error.message || 'Unknown error'}`);
+    } finally {
+      setPrivacyCheckLoading(false);
+    }
+  };
+
+  // Render Privacy Policy Check Tab
+  const renderPrivacyPolicyCheck = () => {
+    const getStatusIcon = (status: string) => {
+      switch (status) {
+        case 'pass':
+          return '✅';
+        case 'fail':
+          return '❌';
+        case 'warning':
+          return '⚠️';
+        default:
+          return '❓';
+      }
+    };
+
+    const getStatusColor = (status: string) => {
+      switch (status) {
+        case 'pass':
+          return 'bg-green-50 border-green-200 text-green-800';
+        case 'fail':
+          return 'bg-red-50 border-red-200 text-red-800';
+        case 'warning':
+          return 'bg-yellow-50 border-yellow-200 text-yellow-800';
+        default:
+          return 'bg-gray-50 border-gray-200 text-gray-800';
+      }
+    };
+
+    if (!privacyCheckData && !privacyCheckLoading) {
+      return (
+        <div className="text-center py-12">
+          <p className="text-gray-600 mb-4">Click "Run Privacy Policy Check" to verify compliance</p>
+          <button
+            onClick={fetchPrivacyCheckData}
+            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            Run Privacy Policy Check
+          </button>
+        </div>
+      );
+    }
+
+    if (privacyCheckLoading) {
+      return (
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+          <p className="mt-4 text-gray-600">Running privacy policy checks...</p>
+        </div>
+      );
+    }
+
+    const { status, summary, checks, lastChecked } = privacyCheckData || {};
+
+    // Group checks by category
+    const checksByCategory: { [key: string]: any[] } = {};
+    checks?.forEach((check: any) => {
+      if (!checksByCategory[check.category]) {
+        checksByCategory[check.category] = [];
+      }
+      checksByCategory[check.category].push(check);
+    });
+
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">🔒 Privacy Policy Check</h2>
+              <p className="text-gray-600">
+                Automated compliance verification for Privacy Policy commitments.
+              </p>
+            </div>
+            <button
+              onClick={fetchPrivacyCheckData}
+              disabled={privacyCheckLoading}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {privacyCheckLoading ? 'Checking...' : '🔄 Refresh'}
+            </button>
+          </div>
+        </div>
+
+        {/* Overall Status */}
+        {summary && (
+          <div className={`rounded-lg border-2 p-6 ${
+            status === 'pass' 
+              ? 'bg-green-50 border-green-300' 
+              : status === 'fail'
+              ? 'bg-red-50 border-red-300'
+              : 'bg-yellow-50 border-yellow-300'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold mb-2">
+                  Overall Status: {getStatusIcon(status)} {status.toUpperCase()}
+                </h3>
+                <div className="grid grid-cols-4 gap-4 mt-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">{summary.passed}</div>
+                    <div className="text-sm text-gray-600">Passed</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-red-600">{summary.failed}</div>
+                    <div className="text-sm text-gray-600">Failed</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-yellow-600">{summary.warnings}</div>
+                    <div className="text-sm text-gray-600">Warnings</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-600">{summary.total}</div>
+                    <div className="text-sm text-gray-600">Total</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {lastChecked && (
+              <p className="text-sm text-gray-500 mt-4">
+                Last checked: {new Date(lastChecked).toLocaleString()}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Checks by Category */}
+        <div className="space-y-6">
+          {Object.entries(checksByCategory).map(([category, categoryChecks]) => (
+            <div key={category} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">{category}</h3>
+              <div className="space-y-3">
+                {categoryChecks.map((check: any, index: number) => (
+                  <div
+                    key={check.id}
+                    className={`border rounded-lg p-4 ${getStatusColor(check.status)}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">{getStatusIcon(check.status)}</span>
+                          <h4 className="font-semibold">{check.name}</h4>
+                          <span className="text-xs font-mono bg-white bg-opacity-50 px-2 py-1 rounded">
+                            {check.id}
+                          </span>
+                        </div>
+                        <p className="text-sm mb-1">{check.message}</p>
+                        {check.details && (
+                          <p className="text-xs opacity-75 mt-2 italic">{check.details}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   // Render App Health Tab
@@ -3338,10 +3672,26 @@ export default function AdminDashboard() {
               >
                 💚 App Health
               </button>
+              <button
+                onClick={() => {
+                  setMonitoringSubTab('privacy-policy');
+                  if (!privacyCheckData && !privacyCheckLoading) {
+                    fetchPrivacyCheckData();
+                  }
+                }}
+                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                  monitoringSubTab === 'privacy-policy'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🔒 Privacy Policy Check
+              </button>
             </div>
             {/* Monitoring Content */}
             {monitoringSubTab === 'accounts' && renderAccountsTab()}
             {monitoringSubTab === 'health' && renderAppHealth()}
+            {monitoringSubTab === 'privacy-policy' && renderPrivacyPolicyCheck()}
           </div>
         )}
         {activeTab === 'inbox' && (
