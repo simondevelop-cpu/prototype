@@ -189,7 +189,14 @@ export async function GET(request: NextRequest) {
 
           user.account_creation_consent_at = accountCreation?.event_timestamp || null;
           user.cookie_consent_choice = cookieBanner?.choice || null;
-          user.first_upload_consent_at = firstUpload?.event_timestamp || null;
+          
+          // If user has transactions but no first_upload consent event, they likely gave consent before logging was added
+          // Show a note that consent was given (implied by having transactions) but timestamp is unavailable
+          if (!firstUpload && user.transaction_count > 0) {
+            user.first_upload_consent_at = 'Consent given (pre-logging)';
+          } else {
+            user.first_upload_consent_at = firstUpload?.event_timestamp || null;
+          }
         });
       }
     } catch (e) {
