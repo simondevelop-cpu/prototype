@@ -960,7 +960,9 @@ export default function AdminDashboard() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {user.first_upload_consent_at
-                        ? new Date(user.first_upload_consent_at).toLocaleString()
+                        ? typeof user.first_upload_consent_at === 'string' && user.first_upload_consent_at.includes('pre-logging')
+                          ? <span className="text-gray-500 italic">{user.first_upload_consent_at}</span>
+                          : new Date(user.first_upload_consent_at).toLocaleString()
                         : <span className="text-gray-400 italic">No record</span>}
                     </td>
                     <td className="px-6 py-4 text-sm">
