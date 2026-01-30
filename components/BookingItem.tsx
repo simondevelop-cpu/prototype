@@ -9,12 +9,6 @@ interface BookingItemProps {
   onUpdate: () => void;
 }
 
-interface BookingItemProps {
-  booking: any;
-  token: string;
-  onUpdate: () => void;
-}
-
 export default function BookingItem({ booking, token, onUpdate }: BookingItemProps) {
   const [editingNotes, setEditingNotes] = useState(false);
   const [editedNotes, setEditedNotes] = useState(booking.notes || '');
