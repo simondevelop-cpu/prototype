@@ -491,13 +491,13 @@ export default function TransactionsList({ transactions, loading, token, onRefre
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            Upload Statements
+            Upload statements
           </button>
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
           >
-            Add Transaction
+            Add transaction
           </button>
         </div>
       </div>
@@ -522,17 +522,20 @@ export default function TransactionsList({ transactions, loading, token, onRefre
             </div>
             
             <div className="flex items-center gap-3">
-              {selectedTransactionIds.size > 0 && (
-                <button
-                  onClick={() => setIsBulkModalOpen(true)}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Bulk Update ({selectedTransactionIds.size})
-                </button>
-              )}
+              <button
+                onClick={() => setIsBulkModalOpen(true)}
+                disabled={selectedTransactionIds.size === 0}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                  selectedTransactionIds.size > 0
+                    ? 'bg-purple-600 text-white hover:bg-purple-700'
+                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Bulk edit or update {selectedTransactionIds.size > 0 && `(${selectedTransactionIds.size})`}
+              </button>
               
               <button
                 onClick={() => setIsUploadModalOpen(true)}
@@ -541,7 +544,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                Upload Statements
+                Upload statements
               </button>
               
               <button
@@ -551,7 +554,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                Add Transaction
+                Add transaction
               </button>
             </div>
           </div>
@@ -666,9 +669,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left relative" ref={cashflowDropdownRef}>
                   <button
                     onClick={() => setShowCashflowDropdown(!showCashflowDropdown)}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap flex items-center gap-1"
                   >
-                    CASHFLOW {selectedCashflows.length > 0 && `(${selectedCashflows.length})`} ▾
+                    CASHFLOW {selectedCashflows.length > 0 && `(${selectedCashflows.length})`} <span className="text-base font-bold">▾</span>
                   </button>
                   {showCashflowDropdown && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
@@ -714,9 +717,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left relative" ref={accountDropdownRef}>
                   <button
                     onClick={() => setShowAccountDropdown(!showAccountDropdown)}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap flex items-center gap-1"
                   >
-                    ACCOUNT {selectedAccounts.length > 0 && `(${selectedAccounts.length})`} ▾
+                    ACCOUNT {selectedAccounts.length > 0 && `(${selectedAccounts.length})`} <span className="text-base font-bold">▾</span>
                   </button>
                   {showAccountDropdown && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
@@ -754,9 +757,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left relative" ref={categoryDropdownRef}>
                   <button
                     onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap flex items-center gap-1"
                   >
-                    CATEGORY {selectedCategories.length > 0 && `(${selectedCategories.length})`} ▾
+                    CATEGORY {selectedCategories.length > 0 && `(${selectedCategories.length})`} <span className="text-base font-bold">▾</span>
                   </button>
                   {showCategoryDropdown && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
@@ -802,9 +805,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left relative" ref={labelDropdownRef}>
                   <button
                     onClick={() => setShowLabelDropdown(!showLabelDropdown)}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap flex items-center gap-1"
                   >
-                    LABEL {selectedLabels.length > 0 && `(${selectedLabels.length})`} ▾
+                    LABEL {selectedLabels.length > 0 && `(${selectedLabels.length})`} <span className="text-base font-bold">▾</span>
                   </button>
                   {showLabelDropdown && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
