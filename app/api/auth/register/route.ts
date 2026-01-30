@@ -101,10 +101,31 @@ export async function POST(request: NextRequest) {
     if (userResult.rows.length === 0) {
       // User doesn't exist, proceed with registration
       const passwordHash = await hashPassword(password);
-      const result = await pool.query(
-        'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id, email, display_name',
-        [email.toLowerCase(), passwordHash, name || email]
-      );
+      
+      // Check if email_validated column exists, and set it to true by default
+      // Schema-adaptive: handle both cases
+      let hasEmailValidated = false;
+      try {
+        const columnCheck = await pool.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'users' 
+          AND column_name = 'email_validated'
+        `);
+        hasEmailValidated = columnCheck.rows.length > 0;
+      } catch (e) {
+        console.log('[Register] Could not check email_validated column, skipping');
+      }
+      
+      const result = hasEmailValidated
+        ? await pool.query(
+            'INSERT INTO users (email, password_hash, display_name, email_validated) VALUES ($1, $2, $3, $4) RETURNING id, email, display_name',
+            [email.toLowerCase(), passwordHash, name || email, true]
+          )
+        : await pool.query(
+            'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id, email, display_name',
+            [email.toLowerCase(), passwordHash, name || email]
+          );
 
       const user = result.rows[0];
       const token = createToken(user.id);
