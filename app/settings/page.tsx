@@ -38,10 +38,12 @@ export default function SettingsPage() {
   // Language state
   const [language, setLanguage] = useState('english');
 
-  // Delete account confirmation
+  // Delete account confirmation (double confirmation)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  // Required data uncheck confirmation
+  const [showDeleteConfirm2, setShowDeleteConfirm2] = useState(false);
+  // Required data uncheck confirmation (double confirmation)
   const [showRequiredDataConfirm, setShowRequiredDataConfirm] = useState(false);
+  const [showRequiredDataConfirm2, setShowRequiredDataConfirm2] = useState(false);
   // Other toggle confirmations
   const [showFunctionalDataConfirm, setShowFunctionalDataConfirm] = useState(false);
   const [showMarketingDataConfirm, setShowMarketingDataConfirm] = useState(false);
@@ -246,8 +248,8 @@ export default function SettingsPage() {
       return;
     }
     
-    if (!confirm('Are you absolutely sure? This action is irreversible and will permanently delete your account and all associated data.')) {
-      setShowDeleteConfirm(false);
+    if (!showDeleteConfirm2) {
+      setShowDeleteConfirm2(true);
       return;
     }
     
@@ -268,11 +270,13 @@ export default function SettingsPage() {
       } else {
         alert('Failed to delete account. Please try again.');
         setShowDeleteConfirm(false);
+        setShowDeleteConfirm2(false);
       }
     } catch (error) {
       console.error('Failed to delete account:', error);
       alert('Failed to delete account. Please try again.');
       setShowDeleteConfirm(false);
+      setShowDeleteConfirm2(false);
     }
   };
 
@@ -537,7 +541,7 @@ export default function SettingsPage() {
                   <p className="text-sm text-gray-600">
                     We require personal information, financial information and usage data in order to operate the essential functions of the Service. You may remove consent at any time, however doing so would remove your access to Hummingbird.
                   </p>
-                  {showRequiredDataConfirm && (
+                  {showRequiredDataConfirm && !showRequiredDataConfirm2 && (
                     <div className="mt-4">
                       <p className="text-sm font-medium text-red-900 mb-3">
                         Are you sure you want to disable Essential? This will remove your access to the Service.
@@ -545,12 +549,7 @@ export default function SettingsPage() {
                       <div className="flex gap-3">
                         <button
                           onClick={() => {
-                            if (!confirm('Are you absolutely sure? This will remove your access to the Service.')) {
-                              setShowRequiredDataConfirm(false);
-                              return;
-                            }
-                            setShowRequiredDataConfirm(false);
-                            handleSettingChange('required_data', false, true); // Skip confirmation since we're already confirmed
+                            setShowRequiredDataConfirm2(true);
                           }}
                           className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
                         >
@@ -558,6 +557,34 @@ export default function SettingsPage() {
                         </button>
                         <button
                           onClick={() => setShowRequiredDataConfirm(false)}
+                          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {showRequiredDataConfirm && showRequiredDataConfirm2 && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-red-900 mb-3">
+                        Are you absolutely sure? This will remove your access to the Service.
+                      </p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            setShowRequiredDataConfirm(false);
+                            setShowRequiredDataConfirm2(false);
+                            handleSettingChange('required_data', false, true); // Skip confirmation since we're already confirmed
+                          }}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                        >
+                          Yes, delete my account
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowRequiredDataConfirm(false);
+                            setShowRequiredDataConfirm2(false);
+                          }}
                           className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors"
                         >
                           Cancel

@@ -51,6 +51,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [showLabelDropdown, setShowLabelDropdown] = useState(false);
   const [showAddCategoryInput, setShowAddCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [deleteConfirmTxId, setDeleteConfirmTxId] = useState<number | null>(null);
   
   const cashflowDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
   const accountDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
@@ -365,8 +366,15 @@ export default function TransactionsList({ transactions, loading, token, onRefre
     }
   }, [editingCell]);
 
-  const handleDeleteTransaction = async (txId: number) => {
-    if (!confirm('Are you sure you want to delete this transaction?')) return;
+  const handleDeleteTransactionClick = (txId: number) => {
+    setDeleteConfirmTxId(txId);
+  };
+
+  const handleDeleteTransactionConfirm = async () => {
+    if (!deleteConfirmTxId) return;
+
+    const txId = deleteConfirmTxId;
+    setDeleteConfirmTxId(null);
 
     try {
       const response = await fetch(`/api/transactions/delete?id=${txId}`, {
@@ -386,6 +394,10 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       console.error('Delete transaction error:', error);
       alert(error.message);
     }
+  };
+
+  const handleDeleteTransactionCancel = () => {
+    setDeleteConfirmTxId(null);
   };
 
   const handleBulkUpdate = async (updates: any) => {
@@ -1153,15 +1165,35 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </button>
-                      <button
-                        onClick={() => handleDeleteTransaction(tx.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+                      {deleteConfirmTxId === tx.id ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-red-700 font-medium">Delete?</span>
+                          <button
+                            onClick={handleDeleteTransactionConfirm}
+                            className="text-red-600 hover:text-red-900 font-medium text-xs"
+                            title="Confirm delete"
+                          >
+                            Yes
+                          </button>
+                          <button
+                            onClick={handleDeleteTransactionCancel}
+                            className="text-gray-600 hover:text-gray-900 font-medium text-xs"
+                            title="Cancel"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleDeleteTransactionClick(tx.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
