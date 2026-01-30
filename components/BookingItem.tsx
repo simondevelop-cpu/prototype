@@ -46,11 +46,11 @@ export default function BookingItem({ booking, token, onUpdate }: BookingItemPro
     }
   };
 
-  const handleCancel = async () => {
-    if (!confirm('Are you sure you want to cancel this meeting request?')) {
-      return;
-    }
+  const handleCancelClick = () => {
+    setShowCancelConfirm(true);
+  };
 
+  const handleCancelConfirm = async () => {
     setCancelling(true);
     try {
       const response = await fetch('/api/bookings/update', {
