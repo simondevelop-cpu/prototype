@@ -39,6 +39,11 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
   
+  // Inline editing state
+  const [editingCell, setEditingCell] = useState<{ txId: string; field: string } | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
+  const editInputRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
+  
   // Dropdown visibility states
   const [showCashflowDropdown, setShowCashflowDropdown] = useState(false);
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
@@ -65,6 +70,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       if (labelDropdownRef.current && !labelDropdownRef.current.contains(event.target as Node)) {
         setShowLabelDropdown(false);
       }
+      // Close inline edit if clicking outside (handled by onBlur on inputs)
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -195,13 +201,13 @@ export default function TransactionsList({ transactions, loading, token, onRefre
     }
   };
 
-  const handleUpdateTransaction = async (transactionData: any) => {
+  const handleUpdateTransaction = async (transactionData: any, originalTx?: any) => {
     try {
       // Check if category or label changed (for learning)
-      const originalTx = editingTransaction;
-      const categoryChanged = originalTx && (
-        originalTx.category !== transactionData.category ||
-        originalTx.label !== transactionData.label
+      const txToCheck = originalTx || editingTransaction;
+      const categoryChanged = txToCheck && (
+        txToCheck.category !== transactionData.category ||
+        txToCheck.label !== transactionData.label
       );
 
       const response = await fetch('/api/transactions/update', {
@@ -219,7 +225,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       }
 
       // If category changed, save to learning database
-      if (categoryChanged && originalTx.description) {
+      if (categoryChanged && txToCheck.description) {
         try {
           const learnResponse = await fetch('/api/categorization/learn', {
             method: 'POST',
@@ -228,9 +234,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
               'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify({
-              description: originalTx.description,
-              originalCategory: originalTx.category,
-              originalLabel: originalTx.label,
+              description: txToCheck.description,
+              originalCategory: txToCheck.category,
+              originalLabel: txToCheck.label,
               correctedCategory: transactionData.category,
               correctedLabel: transactionData.label,
             }),
@@ -253,6 +259,88 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       throw error;
     }
   };
+  
+  // Inline edit handlers
+  const startInlineEdit = (tx: any, field: string) => {
+    const txId = getTxId(tx);
+    setEditingCell({ txId, field });
+    
+    // Format value based on field type
+    if (field === 'date') {
+      // Convert date to YYYY-MM-DD format for input
+      const date = dayjs.utc(tx.date);
+      setEditValue(date.format('YYYY-MM-DD'));
+    } else if (field === 'amount') {
+      // Store amount as string without sign for editing
+      setEditValue(Math.abs(tx.amount || 0).toString());
+    } else {
+      setEditValue(tx[field] || '');
+    }
+  };
+  
+  const saveInlineEdit = async (tx: any, field: string) => {
+    if (!editingCell) return;
+    
+    const originalValue = tx[field];
+    let newValue: any = editValue.trim();
+    
+    // Convert value based on field type
+    if (field === 'date') {
+      // Date is already in YYYY-MM-DD format, keep as is
+      if (!newValue) {
+        setEditingCell(null);
+        return;
+      }
+    } else if (field === 'amount') {
+      // Convert amount string to number, preserve sign from original
+      const numValue = parseFloat(newValue);
+      if (isNaN(numValue) || numValue < 0) {
+        setEditingCell(null);
+        return;
+      }
+      // Preserve the original sign (positive or negative)
+      newValue = tx.amount >= 0 ? numValue : -numValue;
+    } else {
+      // For other fields, use trimmed string
+      newValue = newValue || null;
+    }
+    
+    // Don't save if value hasn't changed
+    if (field === 'amount') {
+      if (Math.abs(originalValue) === Math.abs(newValue) && (originalValue >= 0) === (newValue >= 0)) {
+        setEditingCell(null);
+        return;
+      }
+    } else if (originalValue === newValue) {
+      setEditingCell(null);
+      return;
+    }
+    
+    try {
+      const updatedTx = { ...tx, [field]: newValue };
+      await handleUpdateTransaction(updatedTx, tx);
+      setEditingCell(null);
+    } catch (error) {
+      console.error('Failed to save inline edit:', error);
+      // Revert on error
+      setEditingCell(null);
+    }
+  };
+  
+  const cancelInlineEdit = (tx: any, field: string) => {
+    setEditingCell(null);
+    setEditValue('');
+  };
+  
+  // Focus input when editing starts
+  useEffect(() => {
+    if (editingCell && editInputRef.current) {
+      editInputRef.current.focus();
+      if (editInputRef.current instanceof HTMLInputElement) {
+        editInputRef.current.select();
+      }
+    }
+  }, [editingCell]);
 
   const handleDeleteTransaction = async (txId: number) => {
     if (!confirm('Are you sure you want to delete this transaction?')) return;
@@ -533,7 +621,18 @@ export default function TransactionsList({ transactions, loading, token, onRefre
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full table-fixed">
+            <colgroup>
+              <col className="w-12" /> {/* Checkbox */}
+              <col className="w-32" /> {/* Date */}
+              <col className="w-64" /> {/* Description */}
+              <col className="w-32" /> {/* Cashflow */}
+              <col className="w-40" /> {/* Account */}
+              <col className="w-40" /> {/* Category */}
+              <col className="w-40" /> {/* Label */}
+              <col className="w-32" /> {/* Amount */}
+              <col className="w-32" /> {/* Actions */}
+            </colgroup>
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left">
@@ -755,30 +854,194 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {dayjs.utc(tx.date).format('MMM D, YYYY')}
+                      {editingCell?.txId === txId && editingCell?.field === 'date' ? (
+                        <input
+                          ref={editInputRef as React.RefObject<HTMLInputElement>}
+                          type="date"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => saveInlineEdit(tx, 'date')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveInlineEdit(tx, 'date');
+                            if (e.key === 'Escape') cancelInlineEdit(tx, 'date');
+                          }}
+                          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <span 
+                          onClick={() => startInlineEdit(tx, 'date')}
+                          className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded"
+                          title="Click to edit"
+                        >
+                          {dayjs.utc(tx.date).format('MMM D, YYYY')}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      <div className="font-medium">{tx.description}</div>
-                      {tx.merchant && tx.merchant !== tx.description && (
-                        <div className="text-gray-500 text-xs mt-1">{tx.merchant}</div>
+                      {editingCell?.txId === txId && editingCell?.field === 'description' ? (
+                        <input
+                          ref={editInputRef as React.RefObject<HTMLInputElement>}
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => saveInlineEdit(tx, 'description')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveInlineEdit(tx, 'description');
+                            if (e.key === 'Escape') cancelInlineEdit(tx, 'description');
+                          }}
+                          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <div 
+                          onClick={() => startInlineEdit(tx, 'description')}
+                          className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded"
+                          title="Click to edit"
+                        >
+                          <div className="font-medium truncate" title={tx.description}>{tx.description}</div>
+                          {tx.merchant && tx.merchant !== tx.description && (
+                            <div className="text-gray-500 text-xs mt-1 truncate" title={tx.merchant}>{tx.merchant}</div>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getCashflowBadge(tx.cashflow)}
+                      {editingCell?.txId === txId && editingCell?.field === 'cashflow' ? (
+                        <select
+                          ref={editInputRef as React.RefObject<HTMLSelectElement>}
+                          value={editValue}
+                          onChange={(e) => {
+                            setEditValue(e.target.value);
+                            saveInlineEdit(tx, 'cashflow');
+                          }}
+                          onBlur={() => saveInlineEdit(tx, 'cashflow')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') cancelInlineEdit(tx, 'cashflow');
+                          }}
+                          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="income">income</option>
+                          <option value="expense">expense</option>
+                          <option value="other">other</option>
+                        </select>
+                      ) : (
+                        <span 
+                          onClick={() => startInlineEdit(tx, 'cashflow')}
+                          className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded inline-block"
+                          title="Click to edit"
+                        >
+                          {getCashflowBadge(tx.cashflow)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {tx.account || '-'}
+                      {editingCell?.txId === txId && editingCell?.field === 'account' ? (
+                        <select
+                          ref={editInputRef as React.RefObject<HTMLSelectElement>}
+                          value={editValue}
+                          onChange={(e) => {
+                            setEditValue(e.target.value);
+                            saveInlineEdit(tx, 'account');
+                          }}
+                          onBlur={() => saveInlineEdit(tx, 'account')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') cancelInlineEdit(tx, 'account');
+                          }}
+                          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">-</option>
+                          {accounts.map(acc => (
+                            <option key={acc} value={acc}>{acc}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span 
+                          onClick={() => startInlineEdit(tx, 'account')}
+                          className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded truncate block"
+                          title={tx.account || 'Click to edit'}
+                        >
+                          {tx.account || '-'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {tx.category || '-'}
+                      {editingCell?.txId === txId && editingCell?.field === 'category' ? (
+                        <select
+                          ref={editInputRef as React.RefObject<HTMLSelectElement>}
+                          value={editValue}
+                          onChange={(e) => {
+                            setEditValue(e.target.value);
+                            saveInlineEdit(tx, 'category');
+                          }}
+                          onBlur={() => saveInlineEdit(tx, 'category')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') cancelInlineEdit(tx, 'category');
+                          }}
+                          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">-</option>
+                          {categories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span 
+                          onClick={() => startInlineEdit(tx, 'category')}
+                          className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded truncate block"
+                          title={tx.category || 'Click to edit'}
+                        >
+                          {tx.category || '-'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {tx.label || '-'}
+                      {editingCell?.txId === txId && editingCell?.field === 'label' ? (
+                        <input
+                          ref={editInputRef as React.RefObject<HTMLInputElement>}
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => saveInlineEdit(tx, 'label')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveInlineEdit(tx, 'label');
+                            if (e.key === 'Escape') cancelInlineEdit(tx, 'label');
+                          }}
+                          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <span 
+                          onClick={() => startInlineEdit(tx, 'label')}
+                          className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded truncate block"
+                          title={tx.label || 'Click to edit'}
+                        >
+                          {tx.label || '-'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold">
-                      <span className={tx.amount >= 0 ? 'text-green-600' : 'text-red-600'}>
-                        {tx.amount >= 0 ? '+' : ''}${Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
+                      {editingCell?.txId === txId && editingCell?.field === 'amount' ? (
+                        <input
+                          ref={editInputRef as React.RefObject<HTMLInputElement>}
+                          type="number"
+                          step="0.01"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => saveInlineEdit(tx, 'amount')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveInlineEdit(tx, 'amount');
+                            if (e.key === 'Escape') cancelInlineEdit(tx, 'amount');
+                          }}
+                          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-right"
+                          placeholder="0.00"
+                        />
+                      ) : (
+                        <span 
+                          onClick={() => startInlineEdit(tx, 'amount')}
+                          className={`cursor-pointer hover:bg-blue-50 px-2 py-1 rounded inline-block ${tx.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                          title="Click to edit"
+                        >
+                          {tx.amount >= 0 ? '+' : ''}${Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
