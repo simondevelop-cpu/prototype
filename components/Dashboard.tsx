@@ -750,9 +750,6 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         )}
 
         {activeTab === 'budget' && (
-                    <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                      1. Of the following features, which would you (i) expect and consider a table stake (ii) would use or (iii) would love? (Select all that apply)
-                    </h3>
                     <div className="overflow-x-auto">
                       <table className="w-full border-collapse">
                         <thead>
