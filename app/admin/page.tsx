@@ -1267,56 +1267,47 @@ export default function AdminDashboard() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {booking.status === 'requested' ? (
-                          <select
-                            value={booking.status}
-                            onChange={async (e) => {
-                              const newStatus = e.target.value;
-                              try {
-                                const token = localStorage.getItem('admin_token');
-                                const response = await fetch('/api/admin/bookings/update-status', {
-                                  method: 'PUT',
-                                  headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${token}`,
-                                  },
-                                  body: JSON.stringify({
-                                    bookingId: booking.id,
-                                    status: newStatus,
-                                  }),
-                                });
-                                if (response.ok) {
-                                  fetchBookings();
-                                } else {
-                                  alert('Failed to update status');
-                                }
-                              } catch (error) {
-                                console.error('Error updating status:', error);
-                                alert('Failed to update status');
+                        <select
+                          value={booking.status}
+                          onChange={async (e) => {
+                            const newStatus = e.target.value;
+                            try {
+                              const token = localStorage.getItem('admin_token');
+                              const response = await fetch('/api/admin/bookings/update-status', {
+                                method: 'PUT',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${token}`,
+                                },
+                                body: JSON.stringify({
+                                  bookingId: booking.id,
+                                  status: newStatus,
+                                }),
+                              });
+                              if (response.ok) {
+                                fetchBookings();
+                              } else {
+                                const errorData = await response.json().catch(() => ({}));
+                                alert(errorData.error || 'Failed to update status');
                               }
-                            }}
-                            className={`px-2 py-1 rounded-full text-xs font-medium border ${
-                              booking.status === 'confirmed' ? 'bg-green-100 text-green-800 border-green-300' :
-                              booking.status === 'cancelled' ? 'bg-red-100 text-red-800 border-red-300' :
-                              booking.status === 'completed' ? 'bg-blue-100 text-blue-800 border-blue-300' :
-                              'bg-yellow-100 text-yellow-800 border-yellow-300'
-                            }`}
-                          >
-                            <option value="requested">Requested</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="cancelled">Cancelled</option>
-                            <option value="completed">Completed</option>
-                          </select>
-                        ) : (
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                            booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                            booking.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                            'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {booking.status}
-                          </span>
-                        )}
+                            } catch (error) {
+                              console.error('Error updating status:', error);
+                              alert('Failed to update status');
+                            }
+                          }}
+                          className={`px-2 py-1 rounded text-xs font-medium border ${
+                            booking.status === 'confirmed' ? 'bg-green-100 text-green-800 border-green-300' :
+                            booking.status === 'cancelled' ? 'bg-red-100 text-red-800 border-red-300' :
+                            booking.status === 'completed' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                            booking.status === 'requested' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                            'bg-gray-100 text-gray-800 border-gray-300'
+                          }`}
+                        >
+                          <option value="requested">Requested</option>
+                          <option value="confirmed">Confirmed</option>
+                          <option value="cancelled">Cancelled</option>
+                          <option value="completed">Completed</option>
+                        </select>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(booking.createdAt).toLocaleDateString()}
