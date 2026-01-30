@@ -33,6 +33,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Extract user ID from token (token uses 'sub' field)
+    const userId = decoded.userId || decoded.id || decoded.sub;
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Invalid token: no user ID' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { consentType, choice, setting, value, ...otherMetadata } = body;
 
@@ -46,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Log consent event
-    await logConsentEvent(decoded.userId, consentType as any, {
+    await logConsentEvent(userId, consentType as any, {
       choice,
       setting,
       value,
