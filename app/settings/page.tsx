@@ -812,10 +812,10 @@ export default function SettingsPage() {
                 >
                   Delete My Account
                 </button>
-              ) : (
+              ) : !showDeleteConfirm2 ? (
                 <div className="space-y-3">
                   <p className="text-sm font-medium text-red-900">
-                    Are you sure you want to delete your account? This action cannot be undone.
+                    Are you sure you want to delete your account? This action is irreversible and will permanently delete your account and all associated data.
                   </p>
                   <div className="flex gap-3">
                     <button
@@ -826,6 +826,29 @@ export default function SettingsPage() {
                     </button>
                     <button
                       onClick={() => setShowDeleteConfirm(false)}
+                      className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-red-900">
+                    Are you absolutely sure? This action is irreversible and will permanently delete your account and all associated data.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleDeleteAccount}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                    >
+                      Yes, Delete My Account
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowDeleteConfirm(false);
+                        setShowDeleteConfirm2(false);
+                      }}
                       className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors"
                     >
                       Cancel
