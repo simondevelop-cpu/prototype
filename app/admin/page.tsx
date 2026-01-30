@@ -174,6 +174,23 @@ export default function AdminDashboard() {
     }
   };
 
+  // Fetch editing events data function
+  const fetchEditingEventsData = async () => {
+    setEditingEventsDataLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch('/api/admin/editing-events', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setEditingEventsData(data.editingEvents || []);
+    } catch (error) {
+      console.error('Error fetching editing events data:', error);
+    } finally {
+      setEditingEventsDataLoading(false);
+    }
+  };
+
   // Fetch user feedback function
   const fetchUserFeedback = async () => {
     setUserFeedbackLoading(true);
