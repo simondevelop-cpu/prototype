@@ -1063,6 +1063,8 @@ export default function AdminDashboard() {
         });
 
         if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Failed to save slot availability:', response.status, errorData);
           // Revert on error
           setAvailableSlots(prev => {
             const revertedSet = new Set(prev);
@@ -1073,7 +1075,8 @@ export default function AdminDashboard() {
             }
             return revertedSet;
           });
-          console.error('Failed to save slot availability');
+        } else {
+          console.log('Slot availability saved successfully');
         }
       } catch (error) {
         console.error('Error saving slot availability:', error);
