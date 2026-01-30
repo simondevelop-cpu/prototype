@@ -512,7 +512,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
           {/* Header with Title and Action Buttons */}
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">All Transactions</h2>
+              <h2 className="text-2xl font-bold text-gray-900">All transactions</h2>
               {selectedTransactionIds.size > 0 && (
                 <p className="text-sm text-gray-600 mt-1">
                   {selectedTransactionIds.size} transaction{selectedTransactionIds.size !== 1 ? 's' : ''} selected 
@@ -563,7 +563,6 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="lg:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Search Everything</label>
             <input
               type="text"
               value={searchTerm}
@@ -613,7 +612,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
             }}
             className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
           >
-            Clear All Filters
+            Clear all filters
           </button>
         </div>
       </div>

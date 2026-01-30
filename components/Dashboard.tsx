@@ -463,7 +463,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
             {/* Chart */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">Cash Flow</h2>
+                <h2 className="text-xl font-bold text-gray-900">Cashflow</h2>
                 {!loading && summary.length > 0 && (
                   <span className="text-xs text-gray-500">{getDateRangeDisplay()}</span>
                 )}
@@ -485,7 +485,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Total Income</p>
+                    <p className="text-sm text-gray-600">Total income</p>
                     <p className="text-2xl font-bold text-green-600 mt-1">
                       ${Math.round(summary.reduce((sum, m) => sum + (m.income || 0), 0)).toLocaleString()}
                     </p>
@@ -505,7 +505,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Total Expenses</p>
+                    <p className="text-sm text-gray-600">Total expenses</p>
                     <p className="text-2xl font-bold text-red-600 mt-1">
                       ${Math.round(summary.reduce((sum, m) => sum + (m.expense || 0), 0)).toLocaleString()}
                     </p>
@@ -526,7 +526,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600 flex items-center gap-1">
-                      Total Other
+                      Total other
                       <span className="inline-block w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" title="Transfers between accounts, credit card payments, and other internal movements">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -557,7 +557,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mt-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-bold text-gray-900">
-                    {selectedCashflow.charAt(0).toUpperCase() + selectedCashflow.slice(1)} Breakdown
+                    {selectedCashflow.charAt(0).toUpperCase() + selectedCashflow.slice(1)} breakdown
                   </h2>
                   <span className="text-sm text-gray-600">
                     {selectedMonth 
