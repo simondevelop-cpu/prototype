@@ -1006,17 +1006,66 @@ export default function AdminDashboard() {
     const timeSlots = generateTimeSlots();
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-    const toggleSlot = (date: Date, time: string) => {
+    const toggleSlot = async (date: Date, time: string) => {
       const slotKey = `${date.toISOString().split('T')[0]}_${time}`;
+      const isCurrentlyAvailable = availableSlots.has(slotKey);
+      const newAvailability = !isCurrentlyAvailable;
+
+      // Optimistically update UI
       setAvailableSlots(prev => {
         const newSet = new Set(prev);
-        if (newSet.has(slotKey)) {
-          newSet.delete(slotKey);
-        } else {
+        if (newAvailability) {
           newSet.add(slotKey);
+        } else {
+          newSet.delete(slotKey);
         }
         return newSet;
       });
+
+      // Save to database
+      try {
+        const token = localStorage.getItem('admin_token');
+        if (!token) return;
+
+        const response = await fetch('/api/admin/available-slots', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            slotDate: date.toISOString().split('T')[0],
+            slotTime: time,
+            isAvailable: newAvailability,
+          }),
+        });
+
+        if (!response.ok) {
+          // Revert on error
+          setAvailableSlots(prev => {
+            const revertedSet = new Set(prev);
+            if (isCurrentlyAvailable) {
+              revertedSet.add(slotKey);
+            } else {
+              revertedSet.delete(slotKey);
+            }
+            return revertedSet;
+          });
+          console.error('Failed to save slot availability');
+        }
+      } catch (error) {
+        console.error('Error saving slot availability:', error);
+        // Revert on error
+        setAvailableSlots(prev => {
+          const revertedSet = new Set(prev);
+          if (isCurrentlyAvailable) {
+            revertedSet.add(slotKey);
+          } else {
+            revertedSet.delete(slotKey);
+          }
+          return revertedSet;
+        });
+      }
     };
 
     const isSlotAvailable = (date: Date, time: string) => {
@@ -1035,7 +1084,7 @@ export default function AdminDashboard() {
           <p className="text-gray-600 mt-1">Manage available hourly slots for user bookings (Office hours: 9am - 6pm, 3 meetings per hour)</p>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-w-5xl mx-auto">
           <div className="overflow-x-auto">
             <div className="inline-block min-w-full">
               {weeks.map((week, weekIndex) => (
@@ -1043,12 +1092,12 @@ export default function AdminDashboard() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">
                     Week {weekIndex + 1}: {formatDate(week[0])} - {formatDate(week[6])}
                   </h3>
-                  <div className="grid grid-cols-8 gap-1">
+                  <div className="grid grid-cols-8 gap-0.5" style={{ gridTemplateColumns: '60px repeat(7, minmax(40px, 1fr))' }}>
                     {/* Time column header */}
                     <div className="font-medium text-xs text-gray-700 p-1"></div>
                     {/* Day headers */}
                     {week.map((date, dayIndex) => (
-                      <div key={dayIndex} className="text-center">
+                      <div key={dayIndex} className="text-center p-1">
                         <div className="font-medium text-xs text-gray-700">{dayNames[dayIndex]}</div>
                         <div className="text-xs text-gray-500">{formatDate(date)}</div>
                       </div>
@@ -1066,7 +1115,7 @@ export default function AdminDashboard() {
                               key={`${date.toISOString()}_${time}`}
                               onClick={() => !isPast && toggleSlot(date, time)}
                               disabled={isPast}
-                              className={`p-1 text-xs rounded border transition-colors min-h-[32px] ${
+                              className={`p-0.5 text-xs rounded border transition-colors min-h-[28px] min-w-[40px] ${
                                 isPast
                                   ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-50'
                                   : available
