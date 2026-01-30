@@ -205,24 +205,34 @@ export default function BookingModal({ isOpen, onClose, date, time, token }: Boo
             <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
               Is there anything in particular you want help? Let us know if we should bring someone from a specific team.
             </label>
-            <textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                // Enforce 200 word limit
-                const words = newValue.trim().split(/\s+/).filter(Boolean);
-                if (words.length <= 200) {
-                  setNotes(newValue);
-                }
-              }}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-none"
-              placeholder="Optional: Share any specific topics, questions, or team members..."
-            />
-            {notes.trim().split(/\s+/).filter(Boolean).length >= 200 && (
-              <p className="text-sm text-red-600 mt-1">Maximum 200 words reached</p>
-            )}
+            {(() => {
+              const wordCount = notes.trim().split(/\s+/).filter(Boolean).length;
+              const maxWords = 200;
+              return (
+                <>
+                  <textarea
+                    id="notes"
+                    value={notes}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      // Enforce 200 word limit - prevent typing beyond limit
+                      const words = newValue.trim().split(/\s+/).filter(Boolean);
+                      if (words.length <= maxWords) {
+                        setNotes(newValue);
+                      }
+                    }}
+                    rows={4}
+                    className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-none ${
+                      wordCount >= maxWords ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    placeholder="Optional: Share any specific topics, questions, or team members..."
+                  />
+                  {wordCount >= maxWords && (
+                    <p className="text-sm text-red-600 mt-1">200 word maximum</p>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">

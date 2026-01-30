@@ -318,10 +318,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
         <h2 className="text-2xl font-bold text-gray-900 mb-4">
           What functionality should we prioritise improving?
         </h2>
-        <p className="text-gray-600 mb-4">Rank the top 6</p>
-        <p className="text-sm text-gray-500 mb-6">
-          <strong>Note:</strong> "Maintain user trust with obsession on data security" is automatically ranked #1.
-        </p>
+        <p className="text-gray-600 mb-6">Rank the top 6</p>
 
         {/* Ranked Items */}
         {rankedItems.length > 0 && (
@@ -479,20 +476,37 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
     </div>
   );
 
-  const renderStep4 = () => (
-    <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-4">
-        Would you like to leave any comments, suggestions or be willing to have a follow up conversation? Let us know.
-      </h2>
-      <textarea
-        value={q5Data}
-        onChange={(e) => setQ5Data(e.target.value)}
-        rows={6}
-        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-        placeholder="Your comments, suggestions, or let us know if you're open to a follow-up conversation..."
-      />
-    </div>
-  );
+  const renderStep4 = () => {
+    const wordCount = q5Data.trim().split(/\s+/).filter(Boolean).length;
+    const maxWords = 200;
+    
+    return (
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          Would you like to leave any comments, suggestions or be willing to have a follow up conversation? Let us know.
+        </h2>
+        <textarea
+          value={q5Data}
+          onChange={(e) => {
+            const newValue = e.target.value;
+            const words = newValue.trim().split(/\s+/).filter(Boolean);
+            // Prevent typing beyond word limit
+            if (words.length <= maxWords) {
+              setQ5Data(newValue);
+            }
+          }}
+          rows={6}
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
+            wordCount >= maxWords ? 'border-red-300' : 'border-gray-300'
+          }`}
+          placeholder="Your comments, suggestions, or let us know if you're open to a follow-up conversation..."
+        />
+        {wordCount >= maxWords && (
+          <p className="text-sm text-red-600 mt-1">200 word maximum</p>
+        )}
+      </div>
+    );
+  };
 
   if (!isOpen) return null;
 

@@ -611,14 +611,34 @@ export default function OnboardingPage() {
 
       {formData.insightPreferences.includes("I have a great idea that you didn't mention") && (
         <div>
-          <textarea
-            value={formData.insightOther}
-            onChange={(e) => setFormData({ ...formData, insightOther: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            rows={3}
-            placeholder="Tell us your idea"
-            required
-          />
+          {(() => {
+            const wordCount = formData.insightOther.trim().split(/\s+/).filter(Boolean).length;
+            const maxWords = 200;
+            return (
+              <>
+                <textarea
+                  value={formData.insightOther}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    // Enforce 200 word limit - prevent typing beyond limit
+                    const words = newValue.trim().split(/\s+/).filter(Boolean);
+                    if (words.length <= maxWords) {
+                      setFormData({ ...formData, insightOther: newValue });
+                    }
+                  }}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    wordCount >= maxWords ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                  rows={3}
+                  placeholder="Tell us your idea"
+                  required
+                />
+                {wordCount >= maxWords && (
+                  <p className="text-sm text-red-600 mt-1">200 word maximum</p>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 

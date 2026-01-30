@@ -177,11 +177,18 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
               value={problems}
               onChange={(e) => handleTextChange(setProblems, problems, e.target.value)}
               rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-none overflow-y-auto"
+              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-none overflow-y-auto ${
+                countWords(problems) >= 250 ? 'border-red-300' : 'border-gray-300'
+              }`}
               placeholder="Let us know about any issues..."
             />
-            <div className="text-xs text-gray-500 mt-1 text-right">
-              {countWords(problems)} / 250 words
+            <div className="flex justify-between items-center mt-1">
+              {countWords(problems) >= 250 && (
+                <p className="text-xs text-red-600">250 word maximum</p>
+              )}
+              <div className={`text-xs ml-auto ${countWords(problems) >= 250 ? 'text-red-600' : 'text-gray-500'}`}>
+                {countWords(problems)} / 250 words
+              </div>
             </div>
           </div>
 
@@ -194,11 +201,18 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
               value={learnMore}
               onChange={(e) => handleTextChange(setLearnMore, learnMore, e.target.value)}
               rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-none overflow-y-auto"
+              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-none overflow-y-auto ${
+                countWords(learnMore) >= 250 ? 'border-red-300' : 'border-gray-300'
+              }`}
               placeholder="Share your thoughts..."
             />
-            <div className="text-xs text-gray-500 mt-1 text-right">
-              {countWords(learnMore)} / 250 words
+            <div className="flex justify-between items-center mt-1">
+              {countWords(learnMore) >= 250 && (
+                <p className="text-xs text-red-600">250 word maximum</p>
+              )}
+              <div className={`text-xs ml-auto ${countWords(learnMore) >= 250 ? 'text-red-600' : 'text-gray-500'}`}>
+                {countWords(learnMore)} / 250 words
+              </div>
             </div>
           </div>
 

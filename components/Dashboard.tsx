@@ -737,7 +737,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   Instead of telling you our feature roadmap over the next few months, we'd love to hear from you!
                 </h2>
                 <p className="text-gray-700 text-lg mb-8 leading-relaxed">
-                  The survey will take 2 minutes and will directly inform what we build next. Thanks in advance for helping us build a tool that everyone else might love!
+                  The survey will take 2 minutes and will directly inform what we build next. Thanks in advance for helping us out!
                 </p>
                 <button
                   onClick={() => setShowSurveyModal(true)}

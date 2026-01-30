@@ -121,22 +121,33 @@ export default function BookingItem({ booking, token, onUpdate }: BookingItemPro
             </div>
           ) : (
             <div className="mt-2">
-              <textarea
-                value={editedNotes}
-                onChange={(e) => {
-                  const newValue = e.target.value;
-                  const words = newValue.trim().split(/\s+/).filter(Boolean);
-                  if (words.length <= 200) {
-                    setEditedNotes(newValue);
-                  }
-                }}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-none"
-                placeholder="Add notes..."
-              />
-              {editedNotes.trim().split(/\s+/).filter(Boolean).length >= 200 && (
-                <p className="text-xs text-red-600 mt-1">Maximum 200 words reached</p>
-              )}
+              {(() => {
+                const wordCount = editedNotes.trim().split(/\s+/).filter(Boolean).length;
+                const maxWords = 200;
+                return (
+                  <>
+                    <textarea
+                      value={editedNotes}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        // Enforce 200 word limit - prevent typing beyond limit
+                        const words = newValue.trim().split(/\s+/).filter(Boolean);
+                        if (words.length <= maxWords) {
+                          setEditedNotes(newValue);
+                        }
+                      }}
+                      rows={3}
+                      className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-none ${
+                        wordCount >= maxWords ? 'border-red-300' : 'border-gray-300'
+                      }`}
+                      placeholder="Add notes..."
+                    />
+                    {wordCount >= maxWords && (
+                      <p className="text-xs text-red-600 mt-1">200 word maximum</p>
+                    )}
+                  </>
+                );
+              })()}
               <div className="flex gap-2 mt-2">
                 <button
                   onClick={handleUpdateNotes}
