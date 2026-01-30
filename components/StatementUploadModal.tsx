@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import StatementReviewModal from './StatementReviewModal';
 import FirstUploadConsentModal from './FirstUploadConsentModal';
 
@@ -31,7 +31,38 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
   const [parsedStatements, setParsedStatements] = useState<ParsedStatement[]>([]);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showFirstUploadConsent, setShowFirstUploadConsent] = useState(false);
+  const [hasFirstUploadConsent, setHasFirstUploadConsent] = useState<boolean | null>(null); // null = checking, true/false = result
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Check for existing first upload consent when modal opens
+  useEffect(() => {
+    if (isOpen && hasFirstUploadConsent === null) {
+      const checkConsent = async () => {
+        try {
+          const response = await fetch('/api/consent/check?type=first_upload', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setHasFirstUploadConsent(data.hasConsent);
+          } else {
+            // On error, assume no consent to be safe
+            console.error('Failed to check first upload consent:', response.status);
+            setHasFirstUploadConsent(false);
+          }
+        } catch (error) {
+          console.error('Error checking first upload consent:', error);
+          // On error, assume no consent to be safe
+          setHasFirstUploadConsent(false);
+        }
+      };
+
+      checkConsent();
+    }
+  }, [isOpen, token, hasFirstUploadConsent]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -119,11 +150,14 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
   const handleUpload = async () => {
     if (files.length === 0) return;
 
-    const hasConsent = typeof window !== 'undefined'
-      ? localStorage.getItem('first_upload_consent') === 'true'
-      : true;
+    // Check database for consent (if not already checked)
+    if (hasFirstUploadConsent === null) {
+      // Still checking, wait a moment
+      setTimeout(() => handleUpload(), 100);
+      return;
+    }
 
-    if (!hasConsent) {
+    if (!hasFirstUploadConsent) {
       setShowFirstUploadConsent(true);
       return;
     }
@@ -171,6 +205,7 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
         token={token}
         onAgree={async () => {
           setShowFirstUploadConsent(false);
+          setHasFirstUploadConsent(true); // Mark as consented
           await performUpload();
         }}
       />

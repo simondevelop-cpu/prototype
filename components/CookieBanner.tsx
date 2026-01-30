@@ -10,16 +10,44 @@ interface CookieBannerProps {
 export default function CookieBanner({ token, userId }: CookieBannerProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [choice, setChoice] = useState<string | null>(null);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    // Check if user has already made a cookie choice
-    const cookieChoice = localStorage.getItem('cookie_consent');
-    if (!cookieChoice) {
-      setIsVisible(true);
-    } else {
-      setChoice(cookieChoice);
-    }
-  }, []);
+    // Check database for existing consent timestamp
+    const checkConsent = async () => {
+      try {
+        const response = await fetch('/api/consent/check?type=cookie_banner', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.hasConsent) {
+            // User has already given consent, don't show banner
+            setChoice(data.choice || 'accept_all');
+            setIsVisible(false);
+          } else {
+            // No consent recorded, show banner
+            setIsVisible(true);
+          }
+        } else {
+          // On error, show banner to be safe
+          console.error('Failed to check cookie consent:', response.status);
+          setIsVisible(true);
+        }
+      } catch (error) {
+        console.error('Error checking cookie consent:', error);
+        // On error, show banner to be safe
+        setIsVisible(true);
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    checkConsent();
+  }, [token]);
 
   const handleAcceptAll = async () => {
     // Log consent event FIRST (before hiding banner)
@@ -93,7 +121,8 @@ export default function CookieBanner({ token, userId }: CookieBannerProps) {
     setIsVisible(false);
   };
 
-  if (!isVisible || choice) {
+  // Don't show banner while checking or if consent already given
+  if (checking || !isVisible || choice) {
     return null;
   }
 
