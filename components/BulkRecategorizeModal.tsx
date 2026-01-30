@@ -74,15 +74,6 @@ export default function BulkRecategorizeModal({
   const handleDeleteConfirm = async () => {
     if (!onDelete) return;
     
-    const confirmed = confirm(
-      `Are you absolutely sure you want to delete ${selectedCount} ${selectedCount === 1 ? 'transaction' : 'transactions'}? This action cannot be undone.`
-    );
-    
-    if (!confirmed) {
-      setShowDeleteConfirm(false);
-      return;
-    }
-    
     setError('');
     setIsDeleting(true);
     setShowDeleteConfirm(false);
