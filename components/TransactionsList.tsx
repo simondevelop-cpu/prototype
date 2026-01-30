@@ -49,6 +49,8 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showLabelDropdown, setShowLabelDropdown] = useState(false);
+  const [showAddCategoryInput, setShowAddCategoryInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
   
   const cashflowDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
   const accountDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
@@ -119,10 +121,17 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   });
 
   // Get unique values for each filter
-  // Include all predefined categories plus any custom ones from transactions
-  const allPredefinedCategories = Object.keys(CATEGORIES);
+  // Default categories for new users (only show these if user has no custom categories)
+  const defaultCategories = ['Housing', 'Bills', 'Subscriptions', 'Food', 'Travel', 'Health', 'Transport', 'Education', 'Personal', 'Shopping', 'Work', 'Uncategorised'];
   const transactionCategories = Array.from(new Set((transactions || []).map(tx => tx.category).filter(Boolean)));
-  const categories = Array.from(new Set([...allPredefinedCategories, ...transactionCategories, 'Uncategorised'])).sort();
+  
+  // Check if user has any custom categories (categories not in default list)
+  const hasCustomCategories = transactionCategories.some(cat => !defaultCategories.includes(cat));
+  
+  // For new users (no custom categories), only show defaults. Otherwise, show all.
+  const categories = hasCustomCategories 
+    ? Array.from(new Set([...defaultCategories, ...transactionCategories])).sort()
+    : defaultCategories;
   
   const accounts = Array.from(new Set((transactions || []).map(tx => tx.account).filter(Boolean))).sort();
   const cashflows = Array.from(new Set((transactions || []).map(tx => tx.cashflow).filter(Boolean))).sort();
@@ -534,7 +543,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                Bulk edit or update {selectedTransactionIds.size > 0 && `(${selectedTransactionIds.size})`}
+                Bulk edit or delete {selectedTransactionIds.size > 0 && `(${selectedTransactionIds.size})`}
               </button>
               
               <button
@@ -797,6 +806,65 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                             <span className="text-sm">{cat}</span>
                           </label>
                         ))}
+                        {/* Add new category option */}
+                        {!showAddCategoryInput ? (
+                          <button
+                            onClick={() => setShowAddCategoryInput(true)}
+                            className="w-full px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded border-t border-gray-200 mt-2 font-medium"
+                          >
+                            + Add new category
+                          </button>
+                        ) : (
+                          <div className="px-3 py-2 border-t border-gray-200 mt-2">
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={newCategoryName}
+                                onChange={(e) => setNewCategoryName(e.target.value)}
+                                placeholder="Category name"
+                                className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && newCategoryName.trim()) {
+                                    const trimmedName = newCategoryName.trim();
+                                    if (!categories.includes(trimmedName)) {
+                                      setSelectedCategories([...selectedCategories, trimmedName]);
+                                    }
+                                    setNewCategoryName('');
+                                    setShowAddCategoryInput(false);
+                                  } else if (e.key === 'Escape') {
+                                    setNewCategoryName('');
+                                    setShowAddCategoryInput(false);
+                                  }
+                                }}
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => {
+                                  if (newCategoryName.trim()) {
+                                    const trimmedName = newCategoryName.trim();
+                                    if (!categories.includes(trimmedName)) {
+                                      setSelectedCategories([...selectedCategories, trimmedName]);
+                                    }
+                                  }
+                                  setNewCategoryName('');
+                                  setShowAddCategoryInput(false);
+                                }}
+                                className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                              >
+                                Add
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setNewCategoryName('');
+                                  setShowAddCategoryInput(false);
+                                }}
+                                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -983,25 +1051,38 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {editingCell?.txId === txId && editingCell?.field === 'category' ? (
-                        <select
-                          ref={editInputRef as React.RefObject<HTMLSelectElement>}
-                          value={editValue}
-                          onChange={(e) => {
-                            const newVal = e.target.value;
-                            setEditValue(newVal);
-                            saveInlineEdit(tx, 'category', newVal);
-                          }}
-                          onBlur={() => saveInlineEdit(tx, 'category')}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Escape') cancelInlineEdit(tx, 'category');
-                          }}
-                          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">-</option>
-                          {categories.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
+                        <div className="relative">
+                          <select
+                            ref={editInputRef as React.RefObject<HTMLSelectElement>}
+                            value={editValue}
+                            onChange={(e) => {
+                              const newVal = e.target.value;
+                              if (newVal === '__ADD_NEW__') {
+                                const newCat = prompt('Enter new category name:');
+                                if (newCat && newCat.trim() && !categories.includes(newCat.trim())) {
+                                  setEditValue(newCat.trim());
+                                  saveInlineEdit(tx, 'category', newCat.trim());
+                                } else {
+                                  setEditValue('');
+                                }
+                              } else {
+                                setEditValue(newVal);
+                                saveInlineEdit(tx, 'category', newVal);
+                              }
+                            }}
+                            onBlur={() => saveInlineEdit(tx, 'category')}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') cancelInlineEdit(tx, 'category');
+                            }}
+                            className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">-</option>
+                            {categories.map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                            <option value="__ADD_NEW__" className="text-blue-600 font-medium">+ Add new category</option>
+                          </select>
+                        </div>
                       ) : (
                         <span 
                           onClick={() => startInlineEdit(tx, 'category')}

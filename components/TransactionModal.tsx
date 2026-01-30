@@ -208,13 +208,24 @@ export default function TransactionModal({
               </label>
               <select
                 value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                onChange={(e) => {
+                  const newVal = e.target.value;
+                  if (newVal === '__ADD_NEW__') {
+                    const newCat = prompt('Enter new category name:');
+                    if (newCat && newCat.trim()) {
+                      setFormData({ ...formData, category: newCat.trim() });
+                    }
+                  } else {
+                    setFormData({ ...formData, category: newVal });
+                  }
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
               >
                 <option value="">Select a category...</option>
                 {categories.map((cat) => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
+                <option value="__ADD_NEW__" className="text-blue-600 font-medium">+ Add new category</option>
               </select>
             </div>
 
