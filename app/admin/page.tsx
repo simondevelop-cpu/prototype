@@ -1184,29 +1184,6 @@ export default function AdminDashboard() {
     );
   };
 
-  const fetchBookings = async () => {
-    setBookingsLoading(true);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) return;
-
-      const response = await fetch('/api/admin/bookings', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setBookings(data.bookings || []);
-      }
-    } catch (error) {
-      console.error('Error fetching bookings:', error);
-    } finally {
-      setBookingsLoading(false);
-    }
-  };
-
   // Render Accounts Tab
   const renderAccountsTab = () => {
     return (
