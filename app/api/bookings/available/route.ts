@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     // Return only admin-marked slots that aren't booked
     const availableSlots: string[] = [];
-    adminMarkedSlots.forEach(slotKey => {
+    adminMarkedSlots.forEach((slotKey: string) => {
       if (!bookedSlots.has(slotKey)) {
         availableSlots.push(slotKey);
       }
