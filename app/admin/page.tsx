@@ -1106,8 +1106,8 @@ export default function AdminDashboard() {
           <p className="text-gray-600 mt-1">Manage available hourly slots for user bookings (Office hours: 9am - 6pm, 3 meetings per hour)</p>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-w-4xl mx-auto px-12 py-6">
-          <div className="overflow-x-auto">
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="overflow-x-auto p-6">
             <table className="w-full border-collapse">
               <colgroup>
                 <col style={{ width: '60px' }} />

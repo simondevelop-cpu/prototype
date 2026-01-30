@@ -23,6 +23,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
+    // Ensure table exists
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS available_slots (
+          id SERIAL PRIMARY KEY,
+          slot_date DATE NOT NULL,
+          slot_time TIME NOT NULL,
+          is_available BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(slot_date, slot_time)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_available_slots_date_time ON available_slots(slot_date, slot_time)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_available_slots_available ON available_slots(is_available)`);
+    } catch (createError: any) {
+      console.error('[API] Error ensuring available_slots table exists:', createError);
+      // Continue anyway - might already exist
+    }
+
     // Get admin-marked available slots
     const availableSlotsResult = await pool.query(
       `SELECT slot_date, slot_time 
@@ -38,12 +58,45 @@ export async function GET(request: NextRequest) {
       })
     );
 
+    // Ensure chat_bookings table exists
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS chat_bookings (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          booking_date DATE NOT NULL,
+          booking_time TIME NOT NULL,
+          preferred_method TEXT NOT NULL CHECK (preferred_method IN ('teams', 'google-meet', 'phone')),
+          share_screen BOOLEAN,
+          record_conversation BOOLEAN,
+          notes TEXT,
+          status TEXT DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed')),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(booking_date, booking_time)
+        )
+      `);
+    } catch (createError: any) {
+      console.error('[API] Error ensuring chat_bookings table exists:', createError);
+      // Continue anyway - might already exist
+    }
+
     // Get all bookings
-    const bookingsResult = await pool.query(
-      `SELECT booking_date, booking_time 
-       FROM chat_bookings 
-       WHERE status IN ('pending', 'confirmed')`
-    );
+    let bookingsResult;
+    try {
+      bookingsResult = await pool.query(
+        `SELECT booking_date, booking_time 
+         FROM chat_bookings 
+         WHERE status IN ('pending', 'confirmed')`
+      );
+    } catch (error: any) {
+      // If table doesn't exist, no bookings yet
+      if (error.message?.includes('does not exist') || error.code === '42P01') {
+        bookingsResult = { rows: [] };
+      } else {
+        throw error;
+      }
+    }
     const bookedSlots = new Set(
       bookingsResult.rows.map((row: any) => {
         const timeStr = typeof row.booking_time === 'string' 

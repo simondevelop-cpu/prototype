@@ -29,26 +29,61 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
+    // Ensure chat_bookings table exists
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS chat_bookings (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          booking_date DATE NOT NULL,
+          booking_time TIME NOT NULL,
+          preferred_method TEXT NOT NULL CHECK (preferred_method IN ('teams', 'google-meet', 'phone')),
+          share_screen BOOLEAN,
+          record_conversation BOOLEAN,
+          notes TEXT,
+          status TEXT DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed')),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(booking_date, booking_time)
+        )
+      `);
+    } catch (createError: any) {
+      console.error('[API] Error ensuring chat_bookings table exists:', createError);
+      // Continue anyway - might already exist
+    }
+
     // Get all bookings with user information
-    const result = await pool.query(
-      `SELECT 
-        cb.id,
-        cb.user_id,
-        u.email as user_email,
-        u.display_name,
-        cb.booking_date,
-        cb.booking_time,
-        cb.preferred_method,
-        cb.share_screen,
-        cb.record_conversation,
-        cb.notes,
-        cb.status,
-        cb.created_at
-       FROM chat_bookings cb
-       JOIN users u ON cb.user_id = u.id
-       ORDER BY cb.booking_date DESC, cb.booking_time DESC
-       LIMIT 500`
-    );
+    let result;
+    try {
+      result = await pool.query(
+        `SELECT 
+          cb.id,
+          cb.user_id,
+          u.email as user_email,
+          u.display_name,
+          cb.booking_date,
+          cb.booking_time,
+          cb.preferred_method,
+          cb.share_screen,
+          cb.record_conversation,
+          cb.notes,
+          cb.status,
+          cb.created_at
+         FROM chat_bookings cb
+         JOIN users u ON cb.user_id = u.id
+         ORDER BY cb.booking_date DESC, cb.booking_time DESC
+         LIMIT 500`
+      );
+    } catch (error: any) {
+      // If table doesn't exist, return empty array
+      if (error.message?.includes('does not exist') || error.code === '42P01') {
+        return NextResponse.json({
+          success: true,
+          bookings: [],
+        });
+      }
+      throw error;
+    }
 
     return NextResponse.json({
       success: true,
