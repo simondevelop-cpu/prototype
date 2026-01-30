@@ -99,16 +99,8 @@ export default function TransactionsList({ transactions, loading, token, onRefre
     }
   }, [initialCashflowFilter]);
 
-  if (loading) {
-    return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-        <div className="text-center text-gray-500">Loading transactions...</div>
-      </div>
-    );
-  }
-
-  // Filter transactions
-  const filteredTransactions = transactions.filter(tx => {
+  // Filter transactions (calculate even when loading to maintain hook order)
+  const filteredTransactions = (transactions || []).filter(tx => {
     const matchesSearch = searchTerm === '' || 
       tx.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.merchant?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -129,12 +121,12 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   // Get unique values for each filter
   // Include all predefined categories plus any custom ones from transactions
   const allPredefinedCategories = Object.keys(CATEGORIES);
-  const transactionCategories = Array.from(new Set(transactions.map(tx => tx.category).filter(Boolean)));
+  const transactionCategories = Array.from(new Set((transactions || []).map(tx => tx.category).filter(Boolean)));
   const categories = Array.from(new Set([...allPredefinedCategories, ...transactionCategories, 'Uncategorised'])).sort();
   
-  const accounts = Array.from(new Set(transactions.map(tx => tx.account).filter(Boolean))).sort();
-  const cashflows = Array.from(new Set(transactions.map(tx => tx.cashflow).filter(Boolean))).sort();
-  const labels = Array.from(new Set(transactions.map(tx => tx.label).filter(Boolean))).sort();
+  const accounts = Array.from(new Set((transactions || []).map(tx => tx.account).filter(Boolean))).sort();
+  const cashflows = Array.from(new Set((transactions || []).map(tx => tx.cashflow).filter(Boolean))).sort();
+  const labels = Array.from(new Set((transactions || []).map(tx => tx.label).filter(Boolean))).sort();
   
   // Multi-select toggle handlers
   const toggleFilter = (value: string, selected: string[], setSelected: (vals: string[]) => void) => {
@@ -172,13 +164,13 @@ export default function TransactionsList({ transactions, loading, token, onRefre
     setSelectedTransactionIds(newSelected);
   };
 
-  const selectedTotal = transactions
+  const selectedTotal = (transactions || [])
     .filter(tx => selectedTransactionIds.has(getTxId(tx)))
     .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
   // Get IDs of selected transactions
   const getSelectedIds = () => {
-    return transactions
+    return (transactions || [])
       .filter(tx => selectedTransactionIds.has(getTxId(tx)))
       .map(tx => tx.id)
       .filter(Boolean);
@@ -350,10 +342,16 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   // Focus input when editing starts
   useEffect(() => {
     if (editingCell && editInputRef.current) {
-      editInputRef.current.focus();
-      if (editInputRef.current instanceof HTMLInputElement) {
-        editInputRef.current.select();
-      }
+      // Use setTimeout to ensure DOM is ready
+      const timer = setTimeout(() => {
+        if (editInputRef.current) {
+          editInputRef.current.focus();
+          if (editInputRef.current instanceof HTMLInputElement) {
+            editInputRef.current.select();
+          }
+        }
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [editingCell]);
 
@@ -474,7 +472,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   };
 
   // Empty state content
-  const emptyStateContent = !transactions.length ? (
+  const emptyStateContent = !transactions || transactions.length === 0 ? (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
       <div className="text-center">
         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
