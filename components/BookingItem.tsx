@@ -14,6 +14,7 @@ export default function BookingItem({ booking, token, onUpdate }: BookingItemPro
   const [editedNotes, setEditedNotes] = useState(booking.notes || '');
   const [updating, setUpdating] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const handleUpdateNotes = async () => {
     setUpdating(true);
@@ -170,7 +171,7 @@ export default function BookingItem({ booking, token, onUpdate }: BookingItemPro
             <div className="flex flex-col gap-1">
               {!showCancelConfirm ? (
                 <button
-                  onClick={handleCancel}
+                  onClick={handleCancelClick}
                   disabled={cancelling}
                   className="text-xs px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
                 >
@@ -181,37 +182,7 @@ export default function BookingItem({ booking, token, onUpdate }: BookingItemPro
                   <p className="text-xs text-gray-600 mb-1">Cancel this meeting?</p>
                   <div className="flex gap-1">
                     <button
-                      onClick={async () => {
-                        setCancelling(true);
-                        try {
-                          const response = await fetch('/api/bookings/update', {
-                            method: 'PUT',
-                            headers: {
-                              'Content-Type': 'application/json',
-                              'Authorization': `Bearer ${token}`,
-                              'Origin': window.location.origin,
-                            },
-                            body: JSON.stringify({
-                              bookingId: booking.id,
-                              action: 'cancel',
-                            }),
-                          });
-
-                          if (response.ok) {
-                            onUpdate(); // Refresh bookings
-                          } else {
-                            const errorData = await response.json().catch(() => ({}));
-                            alert(errorData.error || 'Failed to cancel booking');
-                            setShowCancelConfirm(false);
-                          }
-                        } catch (error) {
-                          console.error('Error cancelling booking:', error);
-                          alert('Failed to cancel booking');
-                          setShowCancelConfirm(false);
-                        } finally {
-                          setCancelling(false);
-                        }
-                      }}
+                      onClick={handleCancelConfirm}
                       disabled={cancelling}
                       className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                     >
