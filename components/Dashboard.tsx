@@ -6,6 +6,7 @@ import TransactionsList from './TransactionsList';
 import FeedbackModal from './FeedbackModal';
 import CookieBanner from './CookieBanner';
 import BookingModal from './BookingModal';
+import SurveyModal from './SurveyModal';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
@@ -34,6 +35,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [hasLoadedTransactions, setHasLoadedTransactions] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showSurveyModal, setShowSurveyModal] = useState(false);
   const [selectedBookingSlot, setSelectedBookingSlot] = useState<{ date: string; time: string } | null>(null);
   const [availableSlots, setAvailableSlots] = useState<Array<{ date: string; time: string }>>([]);
   const [myBookings, setMyBookings] = useState<any[]>([]);
@@ -728,16 +730,26 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
 
         {activeTab === 'insights' && (
           <div className="flex items-center justify-center min-h-[60vh] py-12">
-            <div className="max-w-4xl w-full">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+            <div className="max-w-2xl w-full text-center">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                  Instead of telling you our feature roadmap over the next few months, we'd love to hear from you!
+                </h2>
                 <p className="text-gray-700 text-lg mb-8 leading-relaxed">
-                  Instead of telling you our feature roadmap over the next few months, we'd love to hear from you! The survey will take 2 minutes and will directly inform what we build next. Thanks in advance for helping us build a tool that everyone else might love!
+                  The survey will take 2 minutes and will directly inform what we build next. Thanks in advance for helping us build a tool that everyone else might love!
                 </p>
+                <button
+                  onClick={() => setShowSurveyModal(true)}
+                  className="px-8 py-4 bg-blue-600 text-white rounded-lg font-medium text-lg hover:bg-blue-700 transition-colors shadow-md"
+                >
+                  Begin 2 minute survey
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
-                {/* Survey Questions */}
-                <div className="space-y-8">
-                  {/* Question 1 */}
-                  <div>
+        {activeTab === 'budget' && (
                     <h3 className="text-xl font-semibold text-gray-900 mb-4">
                       1. Of the following features, which would you (i) expect and consider a table stake (ii) would use or (iii) would love? (Select all that apply)
                     </h3>
