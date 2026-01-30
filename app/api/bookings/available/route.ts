@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
           share_screen BOOLEAN,
           record_conversation BOOLEAN,
           notes TEXT,
-          status TEXT DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed')),
+          status TEXT DEFAULT 'requested' CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed')),
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(booking_date, booking_time)
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
       bookingsResult = await pool.query(
         `SELECT booking_date, booking_time 
          FROM chat_bookings 
-         WHERE status IN ('pending', 'confirmed')`
+         WHERE status IN ('pending', 'requested', 'confirmed')`
       );
     } catch (error: any) {
       // If table doesn't exist, no bookings yet
@@ -110,19 +110,42 @@ export async function GET(request: NextRequest) {
     }
     const bookedSlots = new Set(
       bookingsResult.rows.map((row: any) => {
+        // Ensure date is in YYYY-MM-DD format
+        let dateStr = row.booking_date;
+        if (dateStr instanceof Date) {
+          const year = dateStr.getFullYear();
+          const month = String(dateStr.getMonth() + 1).padStart(2, '0');
+          const day = String(dateStr.getDate()).padStart(2, '0');
+          dateStr = `${year}-${month}-${day}`;
+        } else if (typeof dateStr === 'string' && dateStr.includes('T')) {
+          dateStr = dateStr.split('T')[0];
+        }
+        
         const timeStr = typeof row.booking_time === 'string' 
           ? row.booking_time.slice(0, 5)
           : String(row.booking_time).slice(0, 5);
-        return `${row.booking_date}_${timeStr}`;
+        return `${dateStr}_${timeStr}`;
       })
     );
 
-    // Return only admin-marked slots that aren't booked
+    // Generate 20-minute slots for each available hour
+    // Each hour marked available by admin generates 3 slots: :00, :20, :40
     const availableSlots: string[] = [];
     adminMarkedSlots.forEach((slotKey: string) => {
-      if (!bookedSlots.has(slotKey)) {
-        availableSlots.push(slotKey);
-      }
+      const [date, hourTime] = slotKey.split('_');
+      // Extract hour from HH:MM format
+      const hour = parseInt(hourTime.split(':')[0]);
+      
+      // Generate 3 slots per hour: :00, :20, :40
+      ['00', '20', '40'].forEach(minutes => {
+        const slotTime = `${hour.toString().padStart(2, '0')}:${minutes}`;
+        const fullSlotKey = `${date}_${slotTime}`;
+        
+        // Only add if not already booked
+        if (!bookedSlots.has(fullSlotKey)) {
+          availableSlots.push(fullSlotKey);
+        }
+      });
     });
 
     return NextResponse.json({ 

@@ -68,10 +68,10 @@ export async function POST(request: NextRequest) {
       ? `${bookingTime}:00` 
       : bookingTime;
 
-    // Check if slot is already booked
+    // Check if slot is already booked (including requested status)
     const existingBooking = await pool.query(
       `SELECT id FROM chat_bookings 
-       WHERE booking_date = $1 AND booking_time = $2 AND status IN ('pending', 'confirmed')`,
+       WHERE booking_date = $1 AND booking_time = $2 AND status IN ('pending', 'requested', 'confirmed')`,
       [bookingDate, normalizedTime]
     );
 
@@ -82,11 +82,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create booking
+    // Validate notes word count (200 word limit)
+    if (notes) {
+      const wordCount = notes.trim().split(/\s+/).filter(Boolean).length;
+      if (wordCount > 200) {
+        return NextResponse.json(
+          { error: 'Notes cannot exceed 200 words' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Create booking with status 'requested' (admin will confirm)
     const result = await pool.query(
       `INSERT INTO chat_bookings 
        (user_id, booking_date, booking_time, preferred_method, share_screen, record_conversation, notes, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'confirmed')
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'requested')
        RETURNING id, booking_date, booking_time, preferred_method, share_screen, record_conversation, notes, status, created_at`,
       [
         userId,

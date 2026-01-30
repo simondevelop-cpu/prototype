@@ -6,6 +6,7 @@ import TransactionsList from './TransactionsList';
 import FeedbackModal from './FeedbackModal';
 import CookieBanner from './CookieBanner';
 import BookingModal from './BookingModal';
+import BookingItem from './BookingItem';
 import SurveyModal from './SurveyModal';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -764,37 +765,12 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                 <h3 className="text-xl font-bold text-gray-900 mb-4">My scheduled chats</h3>
                 <div className="space-y-3">
                   {myBookings.map((booking: any) => (
-                    <div key={booking.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {dayjs(booking.date).format('dddd, MMMM D, YYYY')} at {booking.time}
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            Method: {booking.preferredMethod === 'teams' ? 'Microsoft Teams' : booking.preferredMethod === 'google-meet' ? 'Google Meet' : 'Phone call'}
-                          </p>
-                          {booking.preferredMethod !== 'phone' && (
-                            <>
-                              <p className="text-sm text-gray-600">
-                                Share screen: {booking.shareScreen ? 'Yes' : 'No'} | Record: {booking.recordConversation ? 'Yes' : 'No'}
-                              </p>
-                            </>
-                          )}
-                          {booking.notes && (
-                            <p className="text-sm text-gray-600 mt-1">
-                              Notes: {booking.notes}
-                            </p>
-                          )}
-                        </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                          booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {booking.status}
-                        </span>
-                      </div>
-                    </div>
+                    <BookingItem
+                      key={booking.id}
+                      booking={booking}
+                      token={token}
+                      onUpdate={fetchMyBookings}
+                    />
                   ))}
                 </div>
               </div>

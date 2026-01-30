@@ -203,21 +203,26 @@ export default function BookingModal({ isOpen, onClose, date, time, token }: Boo
 
           <div>
             <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
-              Is there anything in particular you want help with or let us know ahead of time?
+              Is there anything in particular you want help? Let us know if we should bring someone from a specific team.
             </label>
             <textarea
               id="notes"
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                // Enforce 200 word limit
+                const words = newValue.trim().split(/\s+/).filter(Boolean);
+                if (words.length <= 200) {
+                  setNotes(newValue);
+                }
+              }}
               rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-none"
-              placeholder="Optional: Share any specific topics or questions..."
+              placeholder="Optional: Share any specific topics, questions, or team members..."
             />
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
-            <p className="font-medium mb-1">Confirmation email</p>
-            <p>We will send you a confirmation email with the meeting details and link (if applicable) once your booking is confirmed.</p>
+            {notes.trim().split(/\s+/).filter(Boolean).length >= 200 && (
+              <p className="text-sm text-red-600 mt-1">Maximum 200 words reached</p>
+            )}
           </div>
 
           <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
@@ -234,7 +239,7 @@ export default function BookingModal({ isOpen, onClose, date, time, token }: Boo
               disabled={submitting}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting ? 'Confirming...' : 'Confirm meeting'}
+              {submitting ? 'Requesting...' : 'Request a meeting'}
             </button>
           </div>
         </form>
