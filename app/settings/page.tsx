@@ -303,7 +303,7 @@ export default function SettingsPage() {
 
         {/* Panel 1: Personal Details */}
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Personal Details</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Personal details</h2>
           <p className="text-sm text-gray-600 mb-6">
             Update your personal information. These details are used to personalize your experience and for account recovery.
           </p>
@@ -490,7 +490,7 @@ export default function SettingsPage() {
 
         {/* Our Security Commitment */}
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Our Security Commitment</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Our security commitment</h2>
           <p className="text-sm text-gray-700 mb-4">
             Without your trust, our business cannot succeed. That's why we treat your data as if it was our own. We will always prioritize security and confidentiality, and we will never try to monetise your data behind your back.
           </p>
@@ -510,7 +510,7 @@ export default function SettingsPage() {
 
         {/* Panel 2: Data Consent */}
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Data Consent</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Your consent</h2>
           <p className="text-sm text-gray-600 mb-6">
             Manage your data collection preferences and cookies. You can review our{' '}
             <Link href="/privacy-policy" target="_blank" className="text-blue-600 hover:underline">
@@ -800,7 +800,7 @@ export default function SettingsPage() {
               </svg>
             </div>
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-red-900 mb-2">Delete Account</h2>
+              <h2 className="text-xl font-bold text-red-900 mb-2">Delete account</h2>
               <p className="text-sm text-red-800 mb-4">
                 You can delete your account at any time. This will permanently remove your personal data from our systems, 
                 subject only to limited legal or regulatory retention requirements. Account deletion is irreversible.
@@ -810,7 +810,7 @@ export default function SettingsPage() {
                   onClick={handleDeleteAccount}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
                 >
-                  Delete My Account
+                  Delete my account
                 </button>
               ) : !showDeleteConfirm2 ? (
                 <div className="space-y-3">
@@ -822,7 +822,7 @@ export default function SettingsPage() {
                       onClick={handleDeleteAccount}
                       className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
                     >
-                      Yes, Delete My Account
+                      Yes, delete my account
                     </button>
                     <button
                       onClick={() => setShowDeleteConfirm(false)}
@@ -842,7 +842,7 @@ export default function SettingsPage() {
                       onClick={handleDeleteAccount}
                       className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
                     >
-                      Yes, Delete My Account
+                      Yes, delete my account
                     </button>
                     <button
                       onClick={() => {
