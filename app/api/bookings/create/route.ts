@@ -37,6 +37,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
+    // Ensure chat_bookings table exists with correct constraint
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS chat_bookings (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          booking_date DATE NOT NULL,
+          booking_time TIME NOT NULL,
+          preferred_method TEXT NOT NULL CHECK (preferred_method IN ('teams', 'google-meet', 'phone')),
+          share_screen BOOLEAN,
+          record_conversation BOOLEAN,
+          notes TEXT,
+          status TEXT DEFAULT 'requested' CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed')),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(booking_date, booking_time)
+        )
+      `);
+      
+      // Try to update the constraint if table already exists with old constraint
+      try {
+        await pool.query(`
+          ALTER TABLE chat_bookings DROP CONSTRAINT IF EXISTS chat_bookings_status_check;
+          ALTER TABLE chat_bookings ADD CONSTRAINT chat_bookings_status_check 
+            CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed'));
+        `);
+      } catch (alterError: any) {
+        // Constraint might already be correct, ignore error
+        console.log('[API] Constraint update (if needed):', alterError.message);
+      }
+    } catch (createError: any) {
+      console.error('[API] Error ensuring chat_bookings table exists:', createError);
+      // Continue anyway - might already exist
+    }
+
     const body = await request.json();
     const { bookingDate, bookingTime, preferredMethod, shareScreen, recordConversation, notes } = body;
 
