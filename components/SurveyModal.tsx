@@ -42,7 +42,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
   const [q5Data, setQ5Data] = useState('');
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
 
-  const totalSteps = 3; // Q1, Q2, Q3+Q4+Q5
+  const totalSteps = 4; // Q1, Q2, Q3+Q4, Q5
 
   useEffect(() => {
     if (!isOpen) {
@@ -217,13 +217,12 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
       <h2 className="text-2xl font-bold text-gray-900 mb-6">
         Of the following features, which would you (i) expect and consider a table stake (ii) would use or (iii) would love?
       </h2>
-      <p className="text-gray-600 mb-6">Select all that apply</p>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b-2 border-gray-300">
               <th className="text-left p-3 font-semibold text-gray-900">Feature</th>
-              <th className="text-center p-3 font-semibold text-gray-900 min-w-[120px]">Expect / Table stake</th>
+              <th className="text-center p-3 font-semibold text-gray-900 min-w-[120px]">Expect</th>
               <th className="text-center p-3 font-semibold text-gray-900 min-w-[100px]">Use</th>
               <th className="text-center p-3 font-semibold text-gray-900 min-w-[100px]">Love</th>
             </tr>
@@ -411,7 +410,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
       {/* Question 3 */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          If we dilligenced and partnered with one or two trusted professionals who could optionally use this tool (with your permission) to help you, would you be interested in any of them?
+          If we dilligenced and partnered with trusted professionals who could optionally use this tool (with your permission) to help you, would you be interested in any of them?
         </h2>
         <p className="text-gray-600 mb-4">Select all that apply</p>
         <div className="space-y-3">
@@ -477,20 +476,21 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
           </div>
         </div>
       )}
+    </div>
+  );
 
-      {/* Question 5 */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          Would you like to leave any comments, suggestions or be willing to have a follow up conversation? Let us know.
-        </h2>
-        <textarea
-          value={q5Data}
-          onChange={(e) => setQ5Data(e.target.value)}
-          rows={4}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-          placeholder="Your comments, suggestions, or let us know if you're open to a follow-up conversation..."
-        />
-      </div>
+  const renderStep4 = () => (
+    <div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-4">
+        Would you like to leave any comments, suggestions or be willing to have a follow up conversation? Let us know.
+      </h2>
+      <textarea
+        value={q5Data}
+        onChange={(e) => setQ5Data(e.target.value)}
+        rows={6}
+        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+        placeholder="Your comments, suggestions, or let us know if you're open to a follow-up conversation..."
+      />
     </div>
   );
 
@@ -521,6 +521,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
               {currentStep === 0 && renderStep1()}
               {currentStep === 1 && renderStep2()}
               {currentStep === 2 && renderStep3()}
+              {currentStep === 3 && renderStep4()}
             </div>
 
             {/* Navigation Buttons */}

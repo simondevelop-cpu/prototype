@@ -8,7 +8,7 @@ import CheckboxDropdown from '@/components/CheckboxDropdown';
 
 type TabName = 'monitoring' | 'inbox' | 'categories' | 'insights' | 'analytics';
 type MonitoringSubTab = 'accounts' | 'health' | 'privacy-policy';
-type InboxSubTab = 'chat-scheduler' | 'user-feedback';
+type InboxSubTab = 'chat-scheduler' | 'feedback' | 'whats-coming-survey';
 
 interface Keyword {
   id: number;
@@ -423,14 +423,34 @@ export default function AdminDashboard() {
     }
   }, [activeTab, analyticsSubTab, authenticated]);
 
-  // Fetch user feedback when Inbox → User Feedback tab is active
+  const fetchSurveyResponses = async () => {
+    setSurveyResponsesLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch('/api/admin/survey-responses', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setSurveyResponses(data.responses || []);
+    } catch (error) {
+      console.error('Error fetching survey responses:', error);
+      setSurveyResponses([]);
+    } finally {
+      setSurveyResponsesLoading(false);
+    }
+  };
+
+  // Fetch data when Inbox sub-tabs are active
   useEffect(() => {
-    if (activeTab === 'inbox' && inboxSubTab === 'user-feedback' && authenticated) {
+    if (activeTab === 'inbox' && inboxSubTab === 'feedback' && authenticated) {
       fetchUserFeedback();
     }
     if (activeTab === 'inbox' && inboxSubTab === 'chat-scheduler' && authenticated) {
       fetchBookings();
       fetchAvailableSlots();
+    }
+    if (activeTab === 'inbox' && inboxSubTab === 'whats-coming-survey' && authenticated) {
+      fetchSurveyResponses();
     }
   }, [activeTab, inboxSubTab, authenticated]);
 
@@ -4250,23 +4270,33 @@ export default function AdminDashboard() {
                 📅 Chat scheduler
               </button>
               <button
-                onClick={() => setInboxSubTab('user-feedback')}
+                onClick={() => setInboxSubTab('feedback')}
                 className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                  inboxSubTab === 'user-feedback'
+                  inboxSubTab === 'feedback'
                     ? 'bg-white text-blue-600 shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                💬 User Feedback
+                💬 Feedback
+              </button>
+              <button
+                onClick={() => setInboxSubTab('whats-coming-survey')}
+                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                  inboxSubTab === 'whats-coming-survey'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                📊 What's coming survey
               </button>
             </div>
             {/* Inbox Content */}
             {inboxSubTab === 'chat-scheduler' && renderChatScheduler()}
-            {inboxSubTab === 'user-feedback' && (
+            {inboxSubTab === 'feedback' && (
               <div className="space-y-6">
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                   <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-gray-900">User Feedback</h2>
+                    <h2 className="text-lg font-semibold text-gray-900">Feedback</h2>
                     <button
                       onClick={fetchUserFeedback}
                       disabled={userFeedbackLoading}
