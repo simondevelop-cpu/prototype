@@ -87,6 +87,10 @@ export default function AdminDashboard() {
   const [userFeedback, setUserFeedback] = useState<any[]>([]);
   const [userFeedbackLoading, setUserFeedbackLoading] = useState(false);
   
+  // State for What's Coming Survey tab
+  const [surveyResponses, setSurveyResponses] = useState<any[]>([]);
+  const [surveyResponsesLoading, setSurveyResponsesLoading] = useState(false);
+  
   // State for App Health tab
   const [healthData, setHealthData] = useState<any>(null);
   const [healthLoading, setHealthLoading] = useState(false);
