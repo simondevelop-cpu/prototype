@@ -678,21 +678,132 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         )}
 
         {activeTab === 'insights' && (
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center max-w-2xl">
-              <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">What's coming</h2>
-              <div className="text-left space-y-4 text-gray-700">
-                <p className="mb-4">
-                  We're building a feature prioritization tool to help shape our 6-month roadmap. This will be a quick survey with 3 multiple choice questions designed to understand what matters most to you.
+          <div className="flex items-center justify-center min-h-[60vh] py-12">
+            <div className="max-w-3xl w-full">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+                <p className="text-gray-700 text-lg mb-8 leading-relaxed">
+                  Instead of telling you our feature roadmap over the next few months, we'd love to hear from you! The survey will take 2 minutes and will directly inform what we build next. Thanks in advance for helping us build a tool that everyone else might love!
                 </p>
-                <p className="text-sm text-gray-600">
-                  Your responses will directly influence which features we build next, ensuring we focus on what will be most valuable to you and other users.
-                </p>
+
+                {/* Survey Questions */}
+                <div className="space-y-8">
+                  {/* Question 1 */}
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                      1. What financial challenges are you trying to solve? (Select all that apply)
+                    </h3>
+                    <div className="space-y-3">
+                      {[
+                        'Understanding where my money goes each month',
+                        'Sticking to a budget or spending plan',
+                        'Saving for specific goals (vacation, emergency fund, etc.)',
+                        'Reducing unnecessary expenses',
+                        'Planning for major purchases',
+                        'Tracking multiple accounts in one place',
+                        'Getting better insights into my spending patterns',
+                        'Preparing for tax season',
+                        'Managing debt repayment',
+                        'Building long-term wealth',
+                      ].map((option, idx) => (
+                        <label key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            name="challenges"
+                            value={option}
+                            className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-gray-700 flex-1">{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Question 2 */}
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                      2. Which features would save you the most time or make your life easier? (Select all that apply)
+                    </h3>
+                    <div className="space-y-3">
+                      {[
+                        'Automated bill reminders and due date tracking',
+                        'Smart spending alerts when I\'m over budget',
+                        'Automatic categorization of all transactions',
+                        'Monthly spending reports and summaries',
+                        'Goal tracking with progress visualization',
+                        'Receipt scanning and expense matching',
+                        'Multi-currency support for travel expenses',
+                        'Integration with more banks and credit cards',
+                        'Predictive insights (e.g., "You usually spend $X on groceries this week")',
+                        'Export data to Excel or CSV for my own analysis',
+                        'Mobile app for on-the-go expense tracking',
+                        'Family/household budget sharing',
+                      ].map((option, idx) => (
+                        <label key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            name="features"
+                            value={option}
+                            className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-gray-700 flex-1">{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Question 3 */}
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                      3. What would make you use this app more frequently? (Select all that apply)
+                    </h3>
+                    <div className="space-y-3">
+                      {[
+                        'More accurate automatic categorization',
+                        'Faster transaction import and processing',
+                        'Better visualizations and charts',
+                        'Personalized financial tips and recommendations',
+                        'Ability to set and track custom spending limits',
+                        'Notifications about unusual spending patterns',
+                        'Comparison with previous months or years',
+                        'Integration with investment tracking',
+                        'Tax preparation features',
+                        'Better mobile experience',
+                        'More detailed category breakdowns',
+                        'Ability to add notes or tags to transactions',
+                      ].map((option, idx) => (
+                        <label key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            name="engagement"
+                            value={option}
+                            className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-gray-700 flex-1">{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="pt-4">
+                    <button
+                      onClick={() => {
+                        // Collect all selected answers
+                        const form = document.querySelector('form') || document;
+                        const challenges = Array.from(form.querySelectorAll<HTMLInputElement>('input[name="challenges"]:checked')).map(cb => cb.value);
+                        const features = Array.from(form.querySelectorAll<HTMLInputElement>('input[name="features"]:checked')).map(cb => cb.value);
+                        const engagement = Array.from(form.querySelectorAll<HTMLInputElement>('input[name="engagement"]:checked')).map(cb => cb.value);
+                        
+                        // TODO: Submit to API endpoint
+                        console.log('Survey responses:', { challenges, features, engagement });
+                        alert('Thank you for your feedback! Your responses will help shape our roadmap.');
+                      }}
+                      className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                    >
+                      Submit Survey
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
