@@ -9,6 +9,12 @@ interface BookingItemProps {
   onUpdate: () => void;
 }
 
+interface BookingItemProps {
+  booking: any;
+  token: string;
+  onUpdate: () => void;
+}
+
 export default function BookingItem({ booking, token, onUpdate }: BookingItemProps) {
   const [editingNotes, setEditingNotes] = useState(false);
   const [editedNotes, setEditedNotes] = useState(booking.notes || '');
@@ -167,13 +173,66 @@ export default function BookingItem({ booking, token, onUpdate }: BookingItemPro
             {booking.status === 'requested' ? 'Requested' : booking.status}
           </span>
           {booking.status !== 'cancelled' && (
-            <button
-              onClick={handleCancel}
-              disabled={cancelling}
-              className="text-xs px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
-            >
-              {cancelling ? 'Cancelling...' : 'Cancel'}
-            </button>
+            <div className="flex flex-col gap-1">
+              {!showCancelConfirm ? (
+                <button
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className="text-xs px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs text-gray-600 mb-1">Cancel this meeting?</p>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={async () => {
+                        setCancelling(true);
+                        try {
+                          const response = await fetch('/api/bookings/update', {
+                            method: 'PUT',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${token}`,
+                              'Origin': window.location.origin,
+                            },
+                            body: JSON.stringify({
+                              bookingId: booking.id,
+                              action: 'cancel',
+                            }),
+                          });
+
+                          if (response.ok) {
+                            onUpdate(); // Refresh bookings
+                          } else {
+                            const errorData = await response.json().catch(() => ({}));
+                            alert(errorData.error || 'Failed to cancel booking');
+                            setShowCancelConfirm(false);
+                          }
+                        } catch (error) {
+                          console.error('Error cancelling booking:', error);
+                          alert('Failed to cancel booking');
+                          setShowCancelConfirm(false);
+                        } finally {
+                          setCancelling(false);
+                        }
+                      }}
+                      disabled={cancelling}
+                      className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {cancelling ? 'Cancelling...' : 'Yes, cancel'}
+                    </button>
+                    <button
+                      onClick={() => setShowCancelConfirm(false)}
+                      className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                    >
+                      No
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
