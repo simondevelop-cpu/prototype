@@ -1106,38 +1106,49 @@ export default function AdminDashboard() {
           <p className="text-gray-600 mt-1">Manage available hourly slots for user bookings (Office hours: 9am - 6pm, 3 meetings per hour)</p>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-w-4xl mx-auto px-8">
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-w-4xl mx-auto px-12 py-6">
           <div className="overflow-x-auto">
-            <div className="inline-block min-w-full">
+            <table className="w-full border-collapse">
+              <colgroup>
+                <col style={{ width: '60px' }} />
+                <col style={{ width: '35px' }} />
+                <col style={{ width: '35px' }} />
+                <col style={{ width: '35px' }} />
+                <col style={{ width: '35px' }} />
+                <col style={{ width: '35px' }} />
+                <col style={{ width: '35px' }} />
+                <col style={{ width: '35px' }} />
+              </colgroup>
               {weeks.map((week, weekIndex) => (
-                <div key={weekIndex} className="mb-8">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Week {weekIndex + 1}: {formatDate(week[0])} - {formatDate(week[6])}
-                  </h3>
-                  <div className="grid grid-cols-8 gap-0.5" style={{ gridTemplateColumns: '50px repeat(7, 35px)' }}>
-                    {/* Time column header */}
-                    <div className="font-medium text-xs text-gray-700 p-0.5"></div>
-                    {/* Day headers */}
+                <tbody key={weekIndex} className={weekIndex > 0 ? 'mt-8' : ''}>
+                  <tr>
+                    <td colSpan={8} className="pb-4 pt-6">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Week {weekIndex + 1}: {formatDate(week[0])} - {formatDate(week[6])}
+                      </h3>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="font-medium text-xs text-gray-700 p-1"></td>
                     {week.map((date, dayIndex) => (
-                      <div key={dayIndex} className="text-center p-0.5">
+                      <td key={dayIndex} className="text-center p-1">
                         <div className="font-medium text-xs text-gray-700">{dayNames[dayIndex]}</div>
                         <div className="text-xs text-gray-500">{formatDate(date)}</div>
-                      </div>
+                      </td>
                     ))}
-                    
-                    {/* Time slots */}
-                    {timeSlots.map((time) => (
-                      <div key={time} className="contents">
-                        <div className="text-xs text-gray-600 p-0.5 font-medium">{time}</div>
-                        {week.map((date, dayIndex) => {
-                          const available = isSlotAvailable(date, time);
-                          const isPast = date < new Date() || (date.toDateString() === new Date().toDateString() && time < new Date().toTimeString().slice(0, 5));
-                          return (
+                  </tr>
+                  {timeSlots.map((time) => (
+                    <tr key={time}>
+                      <td className="text-xs text-gray-600 p-1 font-medium align-middle">{time}</td>
+                      {week.map((date, dayIndex) => {
+                        const available = isSlotAvailable(date, time);
+                        const isPast = date < new Date() || (date.toDateString() === new Date().toDateString() && time < new Date().toTimeString().slice(0, 5));
+                        return (
+                          <td key={dayIndex} className="p-0.5">
                             <button
-                              key={`${date.toISOString()}_${time}`}
                               onClick={() => !isPast && toggleSlot(date, time)}
                               disabled={isPast}
-                              className={`p-0.5 text-xs rounded border transition-colors min-h-[24px] min-w-[35px] max-w-[35px] ${
+                              className={`w-full h-8 text-xs rounded border transition-colors ${
                                 isPast
                                   ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-50'
                                   : available
@@ -1148,14 +1159,14 @@ export default function AdminDashboard() {
                             >
                               {available ? '✓' : ''}
                             </button>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
               ))}
-            </div>
+            </table>
           </div>
         </div>
 

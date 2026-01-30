@@ -703,7 +703,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
             <div className="text-center">
               <h2 className="text-3xl font-bold text-gray-900 mb-2">Schedule a chat</h2>
               <p className="text-gray-600">
-                Book a 20-minute chat with our team to discuss any issues, get help with the app, or just chat about your experience.
+                Do you need any support with the App, some money therapy or just want to chat? Book a 20 minute chat with the team.
               </p>
             </div>
 
