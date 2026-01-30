@@ -595,7 +595,7 @@ export default function SettingsPage() {
                     Service improvement functions help improve how the Service works for you (for example, remembering your categorisation preferences or improving reliability). You may turn this off at any time. Doing so may limit certain features or reduce the overall quality of your experience.
                   </p>
                   {showFunctionalDataConfirm && (
-                    <div className="mt-4">
+                    <div className="mt-4 relative z-10">
                       <p className="text-sm font-medium text-gray-900 mb-3">
                         Are you sure you want to disable Service improvement? This may limit certain features or reduce the overall quality of your experience.
                       </p>
@@ -605,13 +605,13 @@ export default function SettingsPage() {
                             setShowFunctionalDataConfirm(false);
                             handleSettingChange('functional_data', false);
                           }}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors relative z-10"
                         >
-                          Disable Service improvement
+                          Disable service improvement
                         </button>
                         <button
                           onClick={() => setShowFunctionalDataConfirm(false)}
-                          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors relative z-10"
                         >
                           Cancel
                         </button>
@@ -619,7 +619,7 @@ export default function SettingsPage() {
                     </div>
                   )}
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
+                <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0 z-0">
                   <input
                     type="checkbox"
                     checked={functionalData}
@@ -650,7 +650,7 @@ export default function SettingsPage() {
                     Targeting and marketing functions allow you to benefit from tailored advertisements and offers. We do not require targeting or marketing data to operate the Service. You can opt out at any time without affecting your account or core functionality.
                   </p>
                   {showMarketingDataConfirm && (
-                    <div className="mt-4">
+                    <div className="mt-4 relative z-10">
                       <p className="text-sm font-medium text-gray-900 mb-3">
                         Are you sure you want to disable Targeting and marketing? You will no longer receive tailored advertisements and offers.
                       </p>
@@ -660,13 +660,13 @@ export default function SettingsPage() {
                             setShowMarketingDataConfirm(false);
                             handleSettingChange('marketing_data', false);
                           }}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors relative z-10"
                         >
-                          Disable Targeting and marketing
+                          Disable targeting and marketing
                         </button>
                         <button
                           onClick={() => setShowMarketingDataConfirm(false)}
-                          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors relative z-10"
                         >
                           Cancel
                         </button>
@@ -674,7 +674,7 @@ export default function SettingsPage() {
                     </div>
                   )}
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
+                <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0 z-0">
                   <input
                     type="checkbox"
                     checked={marketingData}
@@ -705,7 +705,7 @@ export default function SettingsPage() {
                     Non-essential cookies are used only for optional features, analytics, or improvements. You may withdraw consent at any time without losing access to the core Service.
                   </p>
                   {showCookiesNonEssentialConfirm && (
-                    <div className="mt-4">
+                    <div className="mt-4 relative z-10">
                       <p className="text-sm font-medium text-gray-900 mb-3">
                         Are you sure you want to disable Non-essential cookies? This may limit optional features, analytics, or improvements.
                       </p>
@@ -715,13 +715,13 @@ export default function SettingsPage() {
                             setShowCookiesNonEssentialConfirm(false);
                             handleSettingChange('cookies_non_essential', false);
                           }}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors relative z-10"
                         >
-                          Disable Non-essential cookies
+                          Disable non-essential cookies
                         </button>
                         <button
                           onClick={() => setShowCookiesNonEssentialConfirm(false)}
-                          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors relative z-10"
                         >
                           Cancel
                         </button>
@@ -729,7 +729,7 @@ export default function SettingsPage() {
                     </div>
                   )}
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
+                <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0 z-0">
                   <input
                     type="checkbox"
                     checked={cookiesNonEssential}
