@@ -5,6 +5,7 @@ import CashflowChart from './CashflowChart';
 import TransactionsList from './TransactionsList';
 import FeedbackModal from './FeedbackModal';
 import CookieBanner from './CookieBanner';
+import BookingModal from './BookingModal';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
@@ -32,6 +33,11 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [hasLoadedTransactions, setHasLoadedTransactions] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [selectedBookingSlot, setSelectedBookingSlot] = useState<{ date: string; time: string } | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<Array<{ date: string; time: string }>>([]);
+  const [myBookings, setMyBookings] = useState<any[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [cashflowFilter, setCashflowFilter] = useState<string | null>(null);
   const [dateRangeFilter, setDateRangeFilter] = useState<{ start: string; end: string } | null>(null);
@@ -693,22 +699,94 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         )}
 
         {activeTab === 'budget' && (
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center max-w-2xl">
-              <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+          <div className="space-y-6">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Schedule a chat</h2>
+              <p className="text-gray-600">
+                Book a 20-minute chat with our team to discuss any issues, get help with the app, or just chat about your experience.
+              </p>
+            </div>
+
+            {/* My Bookings */}
+            {myBookings.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">My scheduled chats</h3>
+                <div className="space-y-3">
+                  {myBookings.map((booking: any) => (
+                    <div key={booking.id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {dayjs(booking.date).format('dddd, MMMM D, YYYY')} at {booking.time}
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Method: {booking.preferredMethod === 'teams' ? 'Microsoft Teams' : booking.preferredMethod === 'google-meet' ? 'Google Meet' : 'Phone call'}
+                          </p>
+                          {booking.preferredMethod !== 'phone' && (
+                            <>
+                              <p className="text-sm text-gray-600">
+                                Share screen: {booking.shareScreen ? 'Yes' : 'No'} | Record: {booking.recordConversation ? 'Yes' : 'No'}
+                              </p>
+                            </>
+                          )}
+                          {booking.notes && (
+                            <p className="text-sm text-gray-600 mt-1">
+                              Notes: {booking.notes}
+                            </p>
+                          )}
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                          booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {booking.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">Schedule a chat</h2>
-              <div className="text-left space-y-4 text-gray-700">
-                <p>
-                  We'd love to hear from you! Schedule a 20-minute chat with our team to discuss any issues you might be having, get help with the app, or just chat about your experience.
-                </p>
-                <p className="text-sm text-gray-600">
-                  Booking functionality coming soon. For now, please reach out to us directly if you'd like to schedule a call.
-                </p>
-              </div>
+            )}
+
+            {/* Available Slots */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Available time slots</h3>
+              {bookingsLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                  <p className="text-gray-600 mt-4">Loading available slots...</p>
+                </div>
+              ) : availableSlots.length === 0 ? (
+                <p className="text-gray-600 text-center py-8">No available slots at this time. Please check back later.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {availableSlots.slice(0, 30).map((slot, idx) => {
+                    const slotDate = dayjs(slot.date);
+                    const isPast = slotDate.isBefore(dayjs(), 'day') || (slotDate.isSame(dayjs(), 'day') && slot.time < dayjs().format('HH:mm'));
+                    const isBooked = myBookings.some((b: any) => b.date === slot.date && b.time === slot.time);
+                    
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => !isPast && !isBooked && setSelectedBookingSlot(slot) && setShowBookingModal(true)}
+                        disabled={isPast || isBooked}
+                        className={`p-4 border rounded-lg text-left transition-colors ${
+                          isPast || isBooked
+                            ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-50'
+                            : 'bg-white border-gray-300 hover:border-blue-500 hover:bg-blue-50'
+                        }`}
+                      >
+                        <p className="font-medium text-gray-900">
+                          {slotDate.format('ddd, MMM D')}
+                        </p>
+                        <p className="text-sm text-gray-600">{slot.time}</p>
+                        {isBooked && <p className="text-xs text-blue-600 mt-1">Already booked</p>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}

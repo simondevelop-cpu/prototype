@@ -37,20 +37,36 @@ export default function BookingModal({ isOpen, onClose, date, time, token }: Boo
     setError(null);
 
     try {
-      // TODO: Connect to backend API when ready
-      // For now, just show success message
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      const response = await fetch('/api/bookings/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin,
+        },
+        body: JSON.stringify({
+          bookingDate: date,
+          bookingTime: time + ':00', // Add seconds for database
+          preferredMethod,
+          shareScreen: preferredMethod === 'phone' ? null : shareScreen,
+          recordConversation: preferredMethod === 'phone' ? null : recordConversation,
+          notes: notes.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to book appointment');
+      }
+
       // Reset form
       setPreferredMethod('');
       setShareScreen(null);
       setRecordConversation(null);
       setNotes('');
       
-      // Close modal after showing success
-      setTimeout(() => {
-        onClose();
-      }, 2000);
+      // Close modal
+      onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to book appointment. Please try again.');
     } finally {
