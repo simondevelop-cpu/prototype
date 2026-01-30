@@ -76,13 +76,28 @@ export default function TransactionsList({ transactions, loading, token, onRefre
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Apply initial filters when they change
-  if (initialCategoryFilter && !selectedCategories.includes(initialCategoryFilter)) {
-    setSelectedCategories([initialCategoryFilter]);
-  }
-  if (initialCashflowFilter && !selectedCashflows.includes(initialCashflowFilter)) {
-    setSelectedCashflows([initialCashflowFilter]);
-  }
+  // Apply initial filters when they change (must be in useEffect, not during render)
+  useEffect(() => {
+    if (initialCategoryFilter) {
+      setSelectedCategories(prev => {
+        if (!prev.includes(initialCategoryFilter)) {
+          return [initialCategoryFilter];
+        }
+        return prev;
+      });
+    }
+  }, [initialCategoryFilter]);
+  
+  useEffect(() => {
+    if (initialCashflowFilter) {
+      setSelectedCashflows(prev => {
+        if (!prev.includes(initialCashflowFilter)) {
+          return [initialCashflowFilter];
+        }
+        return prev;
+      });
+    }
+  }, [initialCashflowFilter]);
 
   if (loading) {
     return (
