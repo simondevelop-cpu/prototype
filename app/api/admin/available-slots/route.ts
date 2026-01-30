@@ -29,13 +29,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Get all available slots
-    const result = await pool.query(
-      `SELECT slot_date, slot_time 
-       FROM available_slots 
-       WHERE is_available = TRUE
-       ORDER BY slot_date, slot_time`
-    );
+    // Get all available slots (handle case where table doesn't exist yet)
+    let result;
+    try {
+      result = await pool.query(
+        `SELECT slot_date, slot_time 
+         FROM available_slots 
+         WHERE is_available = TRUE
+         ORDER BY slot_date, slot_time`
+      );
+    } catch (error: any) {
+      // If table doesn't exist, return empty array
+      if (error.message?.includes('does not exist') || error.code === '42P01') {
+        console.log('[API] available_slots table does not exist yet, returning empty array');
+        return NextResponse.json({
+          success: true,
+          availableSlots: [],
+        });
+      }
+      throw error;
+    }
 
     const slots = result.rows.map((row: any) => {
       const timeStr = typeof row.slot_time === 'string' 
@@ -96,14 +109,25 @@ export async function POST(request: NextRequest) {
       ? `${slotTime}:00` 
       : slotTime;
 
-    // Upsert the slot availability
-    await pool.query(
-      `INSERT INTO available_slots (slot_date, slot_time, is_available, updated_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (slot_date, slot_time)
-       DO UPDATE SET is_available = $3, updated_at = NOW()`,
-      [slotDate, normalizedTime, isAvailable !== false]
-    );
+    // Upsert the slot availability (handle case where table doesn't exist yet)
+    try {
+      await pool.query(
+        `INSERT INTO available_slots (slot_date, slot_time, is_available, updated_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (slot_date, slot_time)
+         DO UPDATE SET is_available = $3, updated_at = NOW()`,
+        [slotDate, normalizedTime, isAvailable !== false]
+      );
+    } catch (error: any) {
+      // If table doesn't exist, suggest running init-db
+      if (error.message?.includes('does not exist') || error.code === '42P01') {
+        return NextResponse.json(
+          { error: 'Database table not initialized. Please run /api/admin/init-db first.' },
+          { status: 500 }
+        );
+      }
+      throw error;
+    }
 
     return NextResponse.json({
       success: true,

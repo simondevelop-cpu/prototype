@@ -153,6 +153,58 @@ async function initializeTables() {
     `);
     console.log('[DB Init] ✅ onboarding_responses table created');
     
+    // Create available_slots table for admin-managed booking availability
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS available_slots (
+        id SERIAL PRIMARY KEY,
+        slot_date DATE NOT NULL,
+        slot_time TIME NOT NULL,
+        is_available BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(slot_date, slot_time)
+      )
+    `);
+    console.log('[DB Init] ✅ available_slots table created');
+    
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_available_slots_date_time ON available_slots(slot_date, slot_time)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_available_slots_available ON available_slots(is_available)
+    `);
+    console.log('[DB Init] ✅ available_slots indexes created');
+    
+    // Create chat_bookings table for user bookings
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_bookings (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        booking_date DATE NOT NULL,
+        booking_time TIME NOT NULL,
+        preferred_method TEXT NOT NULL CHECK (preferred_method IN ('teams', 'google-meet', 'phone')),
+        share_screen BOOLEAN,
+        record_conversation BOOLEAN,
+        notes TEXT,
+        status TEXT DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed')),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(booking_date, booking_time)
+      )
+    `);
+    console.log('[DB Init] ✅ chat_bookings table created');
+    
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_chat_bookings_user_id ON chat_bookings(user_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_chat_bookings_date_time ON chat_bookings(booking_date, booking_time)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_chat_bookings_status ON chat_bookings(status)
+    `);
+    console.log('[DB Init] ✅ chat_bookings indexes created');
+    
     // Check if data exists
     const keywordCount = await client.query('SELECT COUNT(*) as count FROM admin_keywords');
     const merchantCount = await client.query('SELECT COUNT(*) as count FROM admin_merchants');
