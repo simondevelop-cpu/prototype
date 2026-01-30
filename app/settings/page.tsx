@@ -141,25 +141,27 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSettingChange = async (setting: string, value: boolean | string) => {
+  const handleSettingChange = async (setting: string, value: boolean | string, skipConfirmation: boolean = false) => {
     if (!token || !userId) return;
     
-    // Special handling for toggles - if unchecking, show confirmation
-    if (setting === 'required_data' && !(value as boolean) && requiredData) {
-      setShowRequiredDataConfirm(true);
-      return; // Don't proceed until confirmed
-    }
-    if (setting === 'functional_data' && !(value as boolean) && functionalData) {
-      setShowFunctionalDataConfirm(true);
-      return;
-    }
-    if (setting === 'marketing_data' && !(value as boolean) && marketingData) {
-      setShowMarketingDataConfirm(true);
-      return;
-    }
-    if (setting === 'cookies_non_essential' && !(value as boolean) && cookiesNonEssential) {
-      setShowCookiesNonEssentialConfirm(true);
-      return;
+    // Special handling for toggles - if unchecking, show confirmation (unless skipping)
+    if (!skipConfirmation) {
+      if (setting === 'required_data' && !(value as boolean) && requiredData) {
+        setShowRequiredDataConfirm(true);
+        return; // Don't proceed until confirmed
+      }
+      if (setting === 'functional_data' && !(value as boolean) && functionalData) {
+        setShowFunctionalDataConfirm(true);
+        return;
+      }
+      if (setting === 'marketing_data' && !(value as boolean) && marketingData) {
+        setShowMarketingDataConfirm(true);
+        return;
+      }
+      if (setting === 'cookies_non_essential' && !(value as boolean) && cookiesNonEssential) {
+        setShowCookiesNonEssentialConfirm(true);
+        return;
+      }
     }
     
     setSaving(true);
@@ -548,7 +550,7 @@ export default function SettingsPage() {
                               return;
                             }
                             setShowRequiredDataConfirm(false);
-                            handleSettingChange('required_data', false);
+                            handleSettingChange('required_data', false, true); // Skip confirmation since we're already confirmed
                           }}
                           className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
                         >
@@ -603,7 +605,7 @@ export default function SettingsPage() {
                         <button
                           onClick={() => {
                             setShowFunctionalDataConfirm(false);
-                            handleSettingChange('functional_data', false);
+                            handleSettingChange('functional_data', false, true); // Skip confirmation since we're already confirmed
                           }}
                           className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors relative z-10"
                         >
@@ -658,7 +660,7 @@ export default function SettingsPage() {
                         <button
                           onClick={() => {
                             setShowMarketingDataConfirm(false);
-                            handleSettingChange('marketing_data', false);
+                            handleSettingChange('marketing_data', false, true); // Skip confirmation since we're already confirmed
                           }}
                           className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors relative z-10"
                         >
@@ -713,7 +715,7 @@ export default function SettingsPage() {
                         <button
                           onClick={() => {
                             setShowCookiesNonEssentialConfirm(false);
-                            handleSettingChange('cookies_non_essential', false);
+                            handleSettingChange('cookies_non_essential', false, true); // Skip confirmation since we're already confirmed
                           }}
                           className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors relative z-10"
                         >
