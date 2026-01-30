@@ -80,6 +80,14 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     setAllTransactions([]);
   }, [token]);
 
+  // Fetch available slots and bookings when Schedule a chat tab is active
+  useEffect(() => {
+    if (activeTab === 'budget') {
+      fetchAvailableSlots();
+      fetchMyBookings();
+    }
+  }, [activeTab, token]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -165,6 +173,47 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
       setCategories(catData.categories || []);
     } catch (err) {
       console.error('Error fetching categories:', err);
+    }
+  };
+
+  const fetchAvailableSlots = async () => {
+    setBookingsLoading(true);
+    try {
+      const response = await fetch('/api/bookings/available', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Fetched available slots:', data.availableSlots?.length || 0);
+        setAvailableSlots(data.availableSlots || []);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to fetch available slots:', response.status, errorData);
+        setAvailableSlots([]);
+      }
+    } catch (err) {
+      console.error('Error fetching available slots:', err);
+      setAvailableSlots([]);
+    } finally {
+      setBookingsLoading(false);
+    }
+  };
+
+  const fetchMyBookings = async () => {
+    try {
+      const response = await fetch('/api/bookings/my-bookings', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setMyBookings(data.bookings || []);
+      } else {
+        console.error('Failed to fetch my bookings:', response.status);
+        setMyBookings([]);
+      }
+    } catch (err) {
+      console.error('Error fetching my bookings:', err);
+      setMyBookings([]);
     }
   };
 
@@ -1108,6 +1157,23 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         onClose={() => setShowFeedback(false)}
         token={token}
       />
+
+      {/* Booking Modal */}
+      {selectedBookingSlot && (
+        <BookingModal
+          isOpen={showBookingModal}
+          onClose={() => {
+            setShowBookingModal(false);
+            setSelectedBookingSlot(null);
+            // Refresh slots and bookings after closing
+            fetchAvailableSlots();
+            fetchMyBookings();
+          }}
+          date={selectedBookingSlot.date}
+          time={selectedBookingSlot.time}
+          token={token}
+        />
+      )}
 
       {/* Cookie Banner - shown for signed-in users until choice recorded */}
       <CookieBanner token={token} userId={user?.id} />
