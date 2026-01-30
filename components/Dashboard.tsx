@@ -769,7 +769,12 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                     return (
                       <button
                         key={idx}
-                        onClick={() => !isPast && !isBooked && setSelectedBookingSlot(slot) && setShowBookingModal(true)}
+                        onClick={() => {
+                          if (!isPast && !isBooked) {
+                            setSelectedBookingSlot(slot);
+                            setShowBookingModal(true);
+                          }
+                        }}
                         disabled={isPast || isBooked}
                         className={`p-4 border rounded-lg text-left transition-colors ${
                           isPast || isBooked
