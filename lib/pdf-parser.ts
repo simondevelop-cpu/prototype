@@ -1310,7 +1310,7 @@ function createTransaction(
     cashflow,
     category,
     account: accountType,
-    label: category === 'Uncategorised' ? 'Needs Review' : 'Imported',
+    label: '',
   };
 }
 

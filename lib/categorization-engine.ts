@@ -193,7 +193,7 @@ export function categorizeTransaction(
         console.log(`  Confidence: ${95 + confidenceBoost}%`);
         return {
           category: pattern.corrected_category,
-          label: pattern.corrected_label,
+          label: '',
           confidence: 95 + confidenceBoost,
           matchReason,
         };
@@ -220,7 +220,7 @@ export function categorizeTransaction(
         console.log(`  Confidence: 90%`);
         return {
           category: merchant.category,
-          label: merchant.label,
+          label: '',
           confidence: 90,
           matchReason,
         };
@@ -258,7 +258,7 @@ export function categorizeTransaction(
     console.warn('[Step 3] ⚠️  No keyword patterns loaded from database. Returning Uncategorised.');
     return {
       category: 'Uncategorised',
-      label: 'Uncategorised',
+      label: '',
       confidence: 0,
       matchReason: 'No patterns loaded from database',
     };
@@ -288,7 +288,7 @@ export function categorizeTransaction(
           console.log(`  Confidence: 85%`);
           return {
             category: pattern.category,
-            label: pattern.label,
+            label: '',
             confidence: 85,
             matchReason,
           };
@@ -302,7 +302,7 @@ export function categorizeTransaction(
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
   return { 
     category: 'Uncategorised', 
-    label: 'Uncategorised', 
+    label: '', 
     confidence: 0,
     matchReason: 'No matching pattern found',
   };

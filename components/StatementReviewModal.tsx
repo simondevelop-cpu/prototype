@@ -147,12 +147,12 @@ export default function StatementReviewModal({
     const newEdited = new Map(editedTransactions);
     expenseTransactions.forEach((tx, index) => {
       const key = getTxKey(tx);
-      newEdited.set(key, {
-        ...tx,
-        category: categorized[index].category,
-        label: categorized[index].label,
-        confidence: categorized[index].confidence,
-      });
+        newEdited.set(key, {
+          ...tx,
+          category: categorized[index].category,
+          label: '',
+          confidence: categorized[index].confidence,
+        });
     });
     
     setEditedTransactions(newEdited);
@@ -236,7 +236,7 @@ export default function StatementReviewModal({
           newEdited.set(key, {
             ...existing,
             category: categorized[index].category,
-            label: categorized[index].label,
+            label: '',
           });
         });
         
