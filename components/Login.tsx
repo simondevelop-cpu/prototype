@@ -114,7 +114,6 @@ export default function Login({ onLogin }: LoginProps) {
             <img src="/Humminbird_logo_blue_rounded.png" alt="Hummingbird Finance" className="w-20 h-20 object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Hummingbird Finance</h1>
-          <p className="text-gray-600 mt-2">Made for Canadians, by Canadians</p>
         </div>
 
         {/* Auth Form */}
@@ -235,7 +234,7 @@ export default function Login({ onLogin }: LoginProps) {
                   <a href="/terms-and-conditions" target="_blank" className="text-blue-600 hover:underline">
                     Terms and Conditions
                   </a>
-                  . I understand that my data will be protected with encryption and access controls, and I will be notified of any security incidents. I can withdraw my consent at any time by deleting my account in Account Settings, subject to legal or contractual restrictions.
+                  . I understand that my data will be protected with encryption and access controls, and I will be notified of any security incidents. I can withdraw my consent at any time by deleting my account in Account Settings.
                 </label>
               </div>
             )}

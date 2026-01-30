@@ -362,9 +362,6 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      <p className="text-xs text-gray-500 text-center pb-4">
-        (Don't worry Ella, will actually check authentication once I confirm reg)
-      </p>
 
       <div className="flex justify-between items-center">
         <button
@@ -439,7 +436,7 @@ export default function OnboardingPage() {
           "I've been dipping into my savings this year",
           "I have a comfortable savings cushion",
           "I share finances with a partner or have dependents",
-          "I manage multiple accounts (e.g. work vs. personal, family members)",
+          "I have accounts with multiple institutions",
           "Prefer not to answer"
         ].map(option => (
           <label key={option} className="flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
@@ -466,7 +463,7 @@ export default function OnboardingPage() {
         <h2 className="text-xl font-semibold text-gray-900">
           What brings you here today?
         </h2>
-        <p className="text-sm text-gray-600 mt-1">(Select the one that best describes you)</p>
+        <p className="text-sm text-gray-500 italic mt-1">(Select the one that best describes you)</p>
       </div>
 
       <div className="space-y-0">
@@ -475,20 +472,42 @@ export default function OnboardingPage() {
           "Get organized (see where my money goes, combine accounts)",
           "Improve my finances (spend smarter, save more, get back on track)",
           "Plan ahead (for a goal, trip, event or the next year)",
-          "Discover smarter, AI-powered insights",
+          "Optimize my finances",
           "Something else"
-        ].map(option => (
-          <label key={option} className="flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
-            <input
-              type="radio"
-              name="motivation"
-              checked={formData.motivation === option}
-              onChange={() => setFormData({ ...formData, motivation: option, motivationOther: '' })}
-              className="mr-3 h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500"
-            />
-            <span className="text-gray-700">{option}</span>
-          </label>
-        ))}
+        ].map(option => {
+          // Split option text to style brackets differently
+          const parts = option.match(/^(.+?)\s*\((.+?)\)\s*$/);
+          if (parts) {
+            const mainText = parts[1].trim();
+            const bracketText = parts[2].trim();
+            return (
+              <label key={option} className="flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
+                <input
+                  type="radio"
+                  name="motivation"
+                  checked={formData.motivation === option}
+                  onChange={() => setFormData({ ...formData, motivation: option, motivationOther: '' })}
+                  className="mr-3 h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-gray-700">
+                  {mainText} <span className="text-gray-500 italic">({bracketText})</span>
+                </span>
+              </label>
+            );
+          }
+          return (
+            <label key={option} className="flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors rounded-lg">
+              <input
+                type="radio"
+                name="motivation"
+                checked={formData.motivation === option}
+                onChange={() => setFormData({ ...formData, motivation: option, motivationOther: '' })}
+                className="mr-3 h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-gray-700">{option}</span>
+            </label>
+          );
+        })}
       </div>
 
       {formData.motivation === "Something else" && (
@@ -563,7 +582,7 @@ export default function OnboardingPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-gray-900">
-          Would any of these AI-powered insights interest you?
+          We're working on building smart insights; would any of these interest you?
         </h2>
         <p className="text-sm text-gray-600 mt-1">(Select all that apply)</p>
       </div>
