@@ -51,10 +51,21 @@ export async function GET(request: NextRequest) {
     );
     const adminMarkedSlots = new Set(
       availableSlotsResult.rows.map((row: any) => {
+        // Ensure date is in YYYY-MM-DD format
+        let dateStr = row.slot_date;
+        if (dateStr instanceof Date) {
+          const year = dateStr.getFullYear();
+          const month = String(dateStr.getMonth() + 1).padStart(2, '0');
+          const day = String(dateStr.getDate()).padStart(2, '0');
+          dateStr = `${year}-${month}-${day}`;
+        } else if (typeof dateStr === 'string' && dateStr.includes('T')) {
+          dateStr = dateStr.split('T')[0];
+        }
+        
         const timeStr = typeof row.slot_time === 'string' 
           ? row.slot_time.slice(0, 5)
           : String(row.slot_time).slice(0, 5);
-        return `${row.slot_date}_${timeStr}`;
+        return `${dateStr}_${timeStr}`;
       })
     );
 
