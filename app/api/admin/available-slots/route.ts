@@ -58,12 +58,28 @@ export async function GET(request: NextRequest) {
     );
 
     const slots = result.rows.map((row: any) => {
+      // Ensure date is in YYYY-MM-DD format (handle Date objects)
+      let dateStr = row.slot_date;
+      if (dateStr instanceof Date) {
+        const year = dateStr.getFullYear();
+        const month = String(dateStr.getMonth() + 1).padStart(2, '0');
+        const day = String(dateStr.getDate()).padStart(2, '0');
+        dateStr = `${year}-${month}-${day}`;
+      } else if (typeof dateStr === 'string' && dateStr.includes('T')) {
+        // If it's an ISO string, extract just the date part
+        dateStr = dateStr.split('T')[0];
+      }
+      
       const timeStr = typeof row.slot_time === 'string' 
         ? row.slot_time.slice(0, 5)
         : String(row.slot_time).slice(0, 5);
-      return `${row.slot_date}_${timeStr}`;
+      
+      const slotKey = `${dateStr}_${timeStr}`;
+      console.log('[API] Returning slot:', slotKey);
+      return slotKey;
     });
 
+    console.log('[API] Total available slots:', slots.length);
     return NextResponse.json({
       success: true,
       availableSlots: Array.from(slots),
@@ -136,18 +152,34 @@ export async function POST(request: NextRequest) {
       ? `${slotTime}:00` 
       : slotTime;
 
+    // Ensure date is in YYYY-MM-DD format
+    let normalizedDate = slotDate;
+    if (normalizedDate.includes('T')) {
+      normalizedDate = normalizedDate.split('T')[0];
+    }
+
+    console.log('[API] Saving slot:', { normalizedDate, normalizedTime, isAvailable });
+
     // Upsert the slot availability
-    await pool.query(
+    const result = await pool.query(
       `INSERT INTO available_slots (slot_date, slot_time, is_available, updated_at)
        VALUES ($1, $2, $3, NOW())
        ON CONFLICT (slot_date, slot_time)
-       DO UPDATE SET is_available = $3, updated_at = NOW()`,
-      [slotDate, normalizedTime, isAvailable !== false]
+       DO UPDATE SET is_available = $3, updated_at = NOW()
+       RETURNING slot_date, slot_time, is_available`,
+      [normalizedDate, normalizedTime, isAvailable !== false]
     );
+
+    console.log('[API] Slot saved:', result.rows[0]);
 
     return NextResponse.json({
       success: true,
       message: 'Slot availability updated',
+      slot: {
+        date: result.rows[0].slot_date,
+        time: result.rows[0].slot_time,
+        isAvailable: result.rows[0].is_available,
+      },
     });
   } catch (error: any) {
     console.error('[API] Update available slot error:', error);

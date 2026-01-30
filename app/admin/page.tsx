@@ -438,7 +438,10 @@ export default function AdminDashboard() {
   const fetchAvailableSlots = async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      if (!token) return;
+      if (!token) {
+        console.log('No admin token found');
+        return;
+      }
 
       const response = await fetch('/api/admin/available-slots', {
         headers: {
@@ -448,7 +451,11 @@ export default function AdminDashboard() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('Fetched available slots:', data.availableSlots?.length || 0, 'slots');
         setAvailableSlots(new Set(data.availableSlots || []));
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to fetch available slots:', response.status, errorData);
       }
     } catch (error) {
       console.error('Error fetching available slots:', error);
@@ -1029,9 +1036,16 @@ export default function AdminDashboard() {
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     const toggleSlot = async (date: Date, time: string) => {
-      const slotKey = `${date.toISOString().split('T')[0]}_${time}`;
+      // Use local date to avoid timezone issues
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const slotDate = `${year}-${month}-${day}`;
+      const slotKey = `${slotDate}_${time}`;
       const isCurrentlyAvailable = availableSlots.has(slotKey);
       const newAvailability = !isCurrentlyAvailable;
+
+      console.log('Toggling slot:', { slotDate, slotTime: time, slotKey, isCurrentlyAvailable, newAvailability });
 
       // Optimistically update UI
       setAvailableSlots(prev => {
@@ -1056,7 +1070,7 @@ export default function AdminDashboard() {
             'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({
-            slotDate: date.toISOString().split('T')[0],
+            slotDate: slotDate,
             slotTime: time,
             isAvailable: newAvailability,
           }),
@@ -1076,7 +1090,9 @@ export default function AdminDashboard() {
             return revertedSet;
           });
         } else {
-          console.log('Slot availability saved successfully');
+          console.log('Slot availability saved successfully, refreshing...');
+          // Refresh slots from database to ensure consistency
+          await fetchAvailableSlots();
         }
       } catch (error) {
         console.error('Error saving slot availability:', error);
@@ -1094,7 +1110,12 @@ export default function AdminDashboard() {
     };
 
     const isSlotAvailable = (date: Date, time: string) => {
-      const slotKey = `${date.toISOString().split('T')[0]}_${time}`;
+      // Use local date to match toggleSlot format
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const slotDate = `${year}-${month}-${day}`;
+      const slotKey = `${slotDate}_${time}`;
       return availableSlots.has(slotKey);
     };
 
