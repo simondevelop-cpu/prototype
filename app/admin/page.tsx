@@ -79,9 +79,6 @@ export default function AdminDashboard() {
   const [eventsData, setEventsData] = useState<any[]>([]);
   const [eventsDataLoading, setEventsDataLoading] = useState(false);
   
-  // State for Chat Scheduler
-  const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
-  
   // State for Editing Events Data tab
   const [editingEventsData, setEditingEventsData] = useState<any[]>([]);
   const [editingEventsDataLoading, setEditingEventsDataLoading] = useState(false);
