@@ -365,7 +365,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
-              Insights
+              What's coming
             </button>
             <button
               onClick={() => setActiveTab('budget')}
@@ -375,14 +375,14 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
-              Budget
+              Schedule a chat
             </button>
             </div>
             <button
               onClick={() => setShowFeedback(true)}
               className="py-4 px-4 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
             >
-              Help us improve the App
+              Feedback
             </button>
           </nav>
         </div>
@@ -673,38 +673,42 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
 
         {activeTab === 'insights' && (
           <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center max-w-md">
+            <div className="text-center max-w-2xl">
               <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
                 <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-3">Insights Coming Soon</h2>
-              <p className="text-gray-600 mb-2">
-                We're building powerful AI-driven insights to help you understand your spending patterns, identify savings opportunities, and make smarter financial decisions.
-              </p>
-              <p className="text-sm text-gray-500">
-                Stay tuned for automated categorization, spending predictions, and personalized recommendations!
-              </p>
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">What's coming</h2>
+              <div className="text-left space-y-4 text-gray-700">
+                <p className="mb-4">
+                  We're building a feature prioritization tool to help shape our 6-month roadmap. This will be a quick survey with 3 multiple choice questions designed to understand what matters most to you.
+                </p>
+                <p className="text-sm text-gray-600">
+                  Your responses will directly influence which features we build next, ensuring we focus on what will be most valuable to you and other users.
+                </p>
+              </div>
             </div>
           </div>
         )}
 
         {activeTab === 'budget' && (
           <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center max-w-md">
+            <div className="text-center max-w-2xl">
               <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
                 <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-3">Budget Coming Soon</h2>
-              <p className="text-gray-600 mb-2">
-                Set spending limits, track progress, and get alerts when you're approaching your budget goals.
-              </p>
-              <p className="text-sm text-gray-500">
-                Stay tuned for category-based budgets, monthly tracking, and overspending alerts!
-              </p>
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">Schedule a chat</h2>
+              <div className="text-left space-y-4 text-gray-700">
+                <p>
+                  We'd love to hear from you! Schedule a 20-minute chat with our team to discuss any issues you might be having, get help with the app, or just chat about your experience.
+                </p>
+                <p className="text-sm text-gray-600">
+                  Booking functionality coming soon. For now, please reach out to us directly if you'd like to schedule a call.
+                </p>
+              </div>
             </div>
           </div>
         )}

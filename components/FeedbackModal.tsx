@@ -127,7 +127,7 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">Help us improve the App</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Thanks in advance for helping us improve the App!</h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"

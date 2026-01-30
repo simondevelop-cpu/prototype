@@ -8,7 +8,7 @@ import CheckboxDropdown from '@/components/CheckboxDropdown';
 
 type TabName = 'monitoring' | 'inbox' | 'categories' | 'insights' | 'analytics';
 type MonitoringSubTab = 'accounts' | 'health' | 'privacy-policy';
-type InboxSubTab = 'bug-reports' | 'user-feedback';
+type InboxSubTab = 'chat-scheduler' | 'user-feedback';
 
 interface Keyword {
   id: number;
@@ -47,7 +47,7 @@ export default function AdminDashboard() {
   const [monitoringSubTab, setMonitoringSubTab] = useState<MonitoringSubTab>('accounts');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
   const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'editing-events-data' | 'vanity-metrics' | 'data-details'>('cohort-analysis');
-  const [inboxSubTab, setInboxSubTab] = useState<InboxSubTab>('bug-reports');
+  const [inboxSubTab, setInboxSubTab] = useState<InboxSubTab>('chat-scheduler');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
   const [stats, setStats] = useState<any>(null);
@@ -79,6 +79,9 @@ export default function AdminDashboard() {
   const [eventsData, setEventsData] = useState<any[]>([]);
   const [eventsDataLoading, setEventsDataLoading] = useState(false);
   
+  // State for Chat Scheduler
+  const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
+  
   // State for Editing Events Data tab
   const [editingEventsData, setEditingEventsData] = useState<any[]>([]);
   const [editingEventsDataLoading, setEditingEventsDataLoading] = useState(false);
@@ -94,6 +97,9 @@ export default function AdminDashboard() {
   // State for Privacy Policy Check tab
   const [privacyCheckData, setPrivacyCheckData] = useState<any>(null);
   const [privacyCheckLoading, setPrivacyCheckLoading] = useState(false);
+  
+  // State for Chat Scheduler
+  const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
   
   // State for Analytics Dashboard (Cohort Analysis & Vanity Metrics)
   const [cohortData, setCohortData] = useState<any>(null);
@@ -932,6 +938,134 @@ export default function AdminDashboard() {
       </div>
     </div>
   );
+
+  // Render Chat Scheduler
+  const renderChatScheduler = () => {
+    // Generate 4 weeks of dates starting from today
+    const generateWeeks = () => {
+      const weeks = [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      for (let week = 0; week < 4; week++) {
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() + (week * 7));
+        // Start from Monday
+        const dayOfWeek = weekStart.getDay();
+        const diff = weekStart.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        weekStart.setDate(diff);
+        
+        const weekDays = [];
+        for (let day = 0; day < 7; day++) {
+          const date = new Date(weekStart);
+          date.setDate(weekStart.getDate() + day);
+          weekDays.push(new Date(date));
+        }
+        weeks.push(weekDays);
+      }
+      return weeks;
+    };
+
+    // Generate 20-minute time slots from 9am to 6pm
+    const generateTimeSlots = () => {
+      const slots = [];
+      for (let hour = 9; hour < 18; hour++) {
+        for (let minute = 0; minute < 60; minute += 20) {
+          const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+          slots.push(timeStr);
+        }
+      }
+      return slots;
+    };
+
+    const weeks = generateWeeks();
+    const timeSlots = generateTimeSlots();
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    const toggleSlot = (date: Date, time: string) => {
+      const slotKey = `${date.toISOString().split('T')[0]}_${time}`;
+      setAvailableSlots(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(slotKey)) {
+          newSet.delete(slotKey);
+        } else {
+          newSet.add(slotKey);
+        }
+        return newSet;
+      });
+    };
+
+    const isSlotAvailable = (date: Date, time: string) => {
+      const slotKey = `${date.toISOString().split('T')[0]}_${time}`;
+      return availableSlots.has(slotKey);
+    };
+
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Chat scheduler</h2>
+          <p className="text-gray-600 mt-1">Manage available 20-minute slots for user bookings (Office hours: 9am - 6pm)</p>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <div className="inline-block min-w-full">
+              {weeks.map((week, weekIndex) => (
+                <div key={weekIndex} className="mb-8">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                    Week {weekIndex + 1}: {formatDate(week[0])} - {formatDate(week[6])}
+                  </h3>
+                  <div className="grid grid-cols-8 gap-2">
+                    {/* Time column header */}
+                    <div className="font-medium text-sm text-gray-700 p-2"></div>
+                    {/* Day headers */}
+                    {week.map((date, dayIndex) => (
+                      <div key={dayIndex} className="text-center">
+                        <div className="font-medium text-sm text-gray-700">{dayNames[dayIndex]}</div>
+                        <div className="text-xs text-gray-500">{formatDate(date)}</div>
+                      </div>
+                    ))}
+                    
+                    {/* Time slots */}
+                    {timeSlots.map((time) => (
+                      <div key={time} className="contents">
+                        <div className="text-xs text-gray-600 p-2 font-medium">{time}</div>
+                        {week.map((date, dayIndex) => {
+                          const available = isSlotAvailable(date, time);
+                          const isPast = date < new Date() || (date.toDateString() === new Date().toDateString() && time < new Date().toTimeString().slice(0, 5));
+                          return (
+                            <button
+                              key={`${date.toISOString()}_${time}`}
+                              onClick={() => !isPast && toggleSlot(date, time)}
+                              disabled={isPast}
+                              className={`p-2 text-xs rounded border transition-colors ${
+                                isPast
+                                  ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-50'
+                                  : available
+                                  ? 'bg-green-100 border-green-500 hover:bg-green-200'
+                                  : 'bg-white border-gray-300 hover:bg-gray-50'
+                              }`}
+                              title={isPast ? 'Past date/time' : available ? 'Click to mark unavailable' : 'Click to mark available'}
+                            >
+                              {available ? '✓' : ''}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Render Accounts Tab
   const renderAccountsTab = () => {
@@ -3850,14 +3984,14 @@ export default function AdminDashboard() {
             {/* Inbox Sub-tabs */}
             <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
               <button
-                onClick={() => setInboxSubTab('bug-reports')}
+                onClick={() => setInboxSubTab('chat-scheduler')}
                 className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                  inboxSubTab === 'bug-reports'
+                  inboxSubTab === 'chat-scheduler'
                     ? 'bg-white text-blue-600 shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                🐛 Bug Reports
+                📅 Chat scheduler
               </button>
               <button
                 onClick={() => setInboxSubTab('user-feedback')}
@@ -3871,7 +4005,7 @@ export default function AdminDashboard() {
               </button>
             </div>
             {/* Inbox Content */}
-            {inboxSubTab === 'bug-reports' && renderPlaceholderTab('Bug Reports', 'Coming soon...', '🐛')}
+            {inboxSubTab === 'chat-scheduler' && renderChatScheduler()}
             {inboxSubTab === 'user-feedback' && (
               <div className="space-y-6">
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
