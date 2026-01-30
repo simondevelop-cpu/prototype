@@ -926,33 +926,36 @@ export default function StatementReviewModal({
             </button>
 
             <div className="flex gap-3">
-              {currentStep === 'summary' && (
+              {currentStep === 'summary' && !categorizationApplied && (
                 <button
                   onClick={handleCheckCategorization}
                   disabled={importing}
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
-                  Check Auto-Categorisation
+                  Auto-categorise now
                 </button>
               )}
               
-              <button
-                onClick={handleImport}
-                disabled={importing || getTransactionsToImport().length === 0}
-                className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50"
-              >
-                {importing ? (
-                  <>
-                    <svg className="animate-spin w-5 h-5 inline mr-2" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Importing...
-                  </>
-                ) : (
-                  `Import ${getTransactionsToImport().length} Transactions`
-                )}
-              </button>
+              {/* Only show import button on summary step if categorization has been applied */}
+              {currentStep === 'summary' && categorizationApplied && (
+                <button
+                  onClick={handleImport}
+                  disabled={importing || getTransactionsToImport().length === 0}
+                  className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  {importing ? (
+                    <>
+                      <svg className="animate-spin w-5 h-5 inline mr-2" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Importing...
+                    </>
+                  ) : (
+                    `Import ${getTransactionsToImport().length} Transactions`
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1045,6 +1048,9 @@ export default function StatementReviewModal({
             setShowCategorizationModal(false);
             setHideReviewModal(false); // Show review modal again
           }}
+          onImport={handleImport}
+          totalTransactionsToImport={getTransactionsToImport().length}
+          importing={importing}
         />
       )}
     </>
