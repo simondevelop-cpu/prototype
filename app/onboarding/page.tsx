@@ -43,7 +43,7 @@ export default function OnboardingPage() {
 
   const [errors, setErrors] = useState<{[key: string]: string}>({});
 
-  const totalSteps = 8; // 0=verification, 1-7=questions
+  const totalSteps = 7; // 0=verification, 1-6=questions (step 6 is profile, the final step)
 
   // Get user email and name from localStorage
   useEffect(() => {
@@ -291,7 +291,7 @@ export default function OnboardingPage() {
       // Add completion metadata
       const submissionData = {
         ...formData,
-        lastStep: 7, // Completed all steps
+        lastStep: 6, // Completed all steps (step 6 is the final profile step)
         completedAt: new Date().toISOString()
       };
       
@@ -490,7 +490,7 @@ export default function OnboardingPage() {
                   className="mr-3 h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="text-gray-700">
-                  {mainText} <span className="text-gray-500 italic">({bracketText})</span>
+                  {mainText} <span className="text-gray-400 italic">({bracketText})</span>
                 </span>
               </label>
             );
