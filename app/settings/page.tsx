@@ -42,6 +42,10 @@ export default function SettingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   // Required data uncheck confirmation
   const [showRequiredDataConfirm, setShowRequiredDataConfirm] = useState(false);
+  // Other toggle confirmations
+  const [showFunctionalDataConfirm, setShowFunctionalDataConfirm] = useState(false);
+  const [showMarketingDataConfirm, setShowMarketingDataConfirm] = useState(false);
+  const [showCookiesNonEssentialConfirm, setShowCookiesNonEssentialConfirm] = useState(false);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('ci.session.token');
@@ -140,10 +144,22 @@ export default function SettingsPage() {
   const handleSettingChange = async (setting: string, value: boolean | string) => {
     if (!token || !userId) return;
     
-    // Special handling for required_data - if unchecking, show confirmation
+    // Special handling for toggles - if unchecking, show confirmation
     if (setting === 'required_data' && !(value as boolean) && requiredData) {
       setShowRequiredDataConfirm(true);
       return; // Don't proceed until confirmed
+    }
+    if (setting === 'functional_data' && !(value as boolean) && functionalData) {
+      setShowFunctionalDataConfirm(true);
+      return;
+    }
+    if (setting === 'marketing_data' && !(value as boolean) && marketingData) {
+      setShowMarketingDataConfirm(true);
+      return;
+    }
+    if (setting === 'cookies_non_essential' && !(value as boolean) && cookiesNonEssential) {
+      setShowCookiesNonEssentialConfirm(true);
+      return;
     }
     
     setSaving(true);
@@ -157,12 +173,15 @@ export default function SettingsPage() {
           break;
         case 'functional_data':
           setFunctionalData(value as boolean);
+          setShowFunctionalDataConfirm(false);
           break;
         case 'marketing_data':
           setMarketingData(value as boolean);
+          setShowMarketingDataConfirm(false);
           break;
         case 'cookies_non_essential':
           setCookiesNonEssential(value as boolean);
+          setShowCookiesNonEssentialConfirm(false);
           break;
         case 'language':
           setLanguage(value as string);
@@ -199,15 +218,19 @@ export default function SettingsPage() {
       switch (setting) {
         case 'required_data':
           setRequiredData(!(value as boolean));
+          setShowRequiredDataConfirm(false);
           break;
         case 'functional_data':
           setFunctionalData(!(value as boolean));
+          setShowFunctionalDataConfirm(false);
           break;
         case 'marketing_data':
           setMarketingData(!(value as boolean));
+          setShowMarketingDataConfirm(false);
           break;
         case 'cookies_non_essential':
           setCookiesNonEssential(!(value as boolean));
+          setShowCookiesNonEssentialConfirm(false);
           break;
       }
     } finally {
@@ -529,7 +552,7 @@ export default function SettingsPage() {
                           }}
                           className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
                         >
-                          Yes, Disable Essential
+                          Yes, delete my account
                         </button>
                         <button
                           onClick={() => setShowRequiredDataConfirm(false)}
@@ -546,7 +569,7 @@ export default function SettingsPage() {
                     type="checkbox"
                     checked={requiredData}
                     onChange={(e) => handleSettingChange('required_data', e.target.checked)}
-                    disabled={saving || showRequiredDataConfirm}
+                    disabled={saving || showRequiredDataConfirm || showFunctionalDataConfirm || showMarketingDataConfirm || showCookiesNonEssentialConfirm}
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -571,13 +594,37 @@ export default function SettingsPage() {
                   <p className="text-sm text-gray-600">
                     Service improvement functions help improve how the Service works for you (for example, remembering your categorisation preferences or improving reliability). You may turn this off at any time. Doing so may limit certain features or reduce the overall quality of your experience.
                   </p>
+                  {showFunctionalDataConfirm && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-gray-900 mb-3">
+                        Are you sure you want to disable Service improvement? This may limit certain features or reduce the overall quality of your experience.
+                      </p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            setShowFunctionalDataConfirm(false);
+                            handleSettingChange('functional_data', false);
+                          }}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                        >
+                          Disable Service improvement
+                        </button>
+                        <button
+                          onClick={() => setShowFunctionalDataConfirm(false)}
+                          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
                   <input
                     type="checkbox"
                     checked={functionalData}
                     onChange={(e) => handleSettingChange('functional_data', e.target.checked)}
-                    disabled={saving}
+                    disabled={saving || showRequiredDataConfirm || showFunctionalDataConfirm || showMarketingDataConfirm || showCookiesNonEssentialConfirm}
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -602,13 +649,37 @@ export default function SettingsPage() {
                   <p className="text-sm text-gray-600">
                     Targeting and marketing functions allow you to benefit from tailored advertisements and offers. We do not require targeting or marketing data to operate the Service. You can opt out at any time without affecting your account or core functionality.
                   </p>
+                  {showMarketingDataConfirm && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-gray-900 mb-3">
+                        Are you sure you want to disable Targeting and marketing? You will no longer receive tailored advertisements and offers.
+                      </p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            setShowMarketingDataConfirm(false);
+                            handleSettingChange('marketing_data', false);
+                          }}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                        >
+                          Disable Targeting and marketing
+                        </button>
+                        <button
+                          onClick={() => setShowMarketingDataConfirm(false)}
+                          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
                   <input
                     type="checkbox"
                     checked={marketingData}
                     onChange={(e) => handleSettingChange('marketing_data', e.target.checked)}
-                    disabled={saving}
+                    disabled={saving || showRequiredDataConfirm || showFunctionalDataConfirm || showMarketingDataConfirm || showCookiesNonEssentialConfirm}
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -633,13 +704,37 @@ export default function SettingsPage() {
                   <p className="text-sm text-gray-600">
                     Non-essential cookies are used only for optional features, analytics, or improvements. You may withdraw consent at any time without losing access to the core Service.
                   </p>
+                  {showCookiesNonEssentialConfirm && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-gray-900 mb-3">
+                        Are you sure you want to disable Non-essential cookies? This may limit optional features, analytics, or improvements.
+                      </p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            setShowCookiesNonEssentialConfirm(false);
+                            handleSettingChange('cookies_non_essential', false);
+                          }}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                        >
+                          Disable Non-essential cookies
+                        </button>
+                        <button
+                          onClick={() => setShowCookiesNonEssentialConfirm(false)}
+                          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
                   <input
                     type="checkbox"
                     checked={cookiesNonEssential}
                     onChange={(e) => handleSettingChange('cookies_non_essential', e.target.checked)}
-                    disabled={saving}
+                    disabled={saving || showRequiredDataConfirm || showFunctionalDataConfirm || showMarketingDataConfirm || showCookiesNonEssentialConfirm}
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>

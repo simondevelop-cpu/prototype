@@ -2,8 +2,12 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Canadian Insights",
-  description: "Made for Canadians, by Canadians",
+  title: "Hummingbird Finance",
+  description: "Personal finance management for Canadians",
+  icons: {
+    icon: '/Humminbird_logo_blue_rounded.png',
+    apple: '/Humminbird_logo_blue_rounded.png',
+  },
 };
 
 export default function RootLayout({
