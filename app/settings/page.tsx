@@ -81,7 +81,12 @@ export default function SettingsPage() {
         setEmail(personal.email || '');
         setFirstName(personal.firstName || '');
         setLastName(personal.lastName || '');
-        setDateOfBirth(personal.dateOfBirth || '');
+        // Format date of birth: extract YYYY-MM-DD from ISO string if present
+        let dob = personal.dateOfBirth || '';
+        if (dob && dob.includes('T')) {
+          dob = dob.split('T')[0]; // Extract just the date part
+        }
+        setDateOfBirth(dob);
         setRecoveryPhone(personal.recoveryPhone || '');
         setProvinceRegion(personal.provinceRegion || '');
       }
@@ -406,7 +411,15 @@ export default function SettingsPage() {
                 />
               ) : (
                 <div className="px-4 py-2 bg-gray-50 rounded-lg text-gray-900">
-                  {dateOfBirth || 'Not set'}
+                  {dateOfBirth ? (() => {
+                    // Format date for display: convert YYYY-MM-DD to readable format
+                    try {
+                      const date = new Date(dateOfBirth + 'T00:00:00');
+                      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                    } catch {
+                      return dateOfBirth;
+                    }
+                  })() : 'Not set'}
                 </div>
               )}
             </div>
