@@ -430,8 +430,30 @@ export default function AdminDashboard() {
     }
     if (activeTab === 'inbox' && inboxSubTab === 'chat-scheduler' && authenticated) {
       fetchBookings();
+      fetchAvailableSlots();
     }
   }, [activeTab, inboxSubTab, authenticated]);
+
+  // Fetch available slots from database
+  const fetchAvailableSlots = async () => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) return;
+
+      const response = await fetch('/api/admin/available-slots', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableSlots(new Set(data.availableSlots || []));
+      }
+    } catch (error) {
+      console.error('Error fetching available slots:', error);
+    }
+  };
 
   // Fetch customer data when Analytics → Customer Data tab is active
   useEffect(() => {
