@@ -657,14 +657,14 @@ export default function AdminDashboard() {
         <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
       </div>
     ) : (
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Label</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Previous Category</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Category</th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Frequency</th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Last Used</th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Reviewed</th>
@@ -676,9 +676,15 @@ export default function AdminDashboard() {
                 <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.description_pattern}</td>
                 <td className="px-6 py-4 text-sm text-gray-600">{item.user_email}</td>
                 <td className="px-6 py-4 text-sm">
+                  {item.original_category ? (
+                    <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-medium">{item.original_category}</span>
+                  ) : (
+                    <span className="text-gray-400 italic">-</span>
+                  )}
+                </td>
+                <td className="px-6 py-4 text-sm">
                   <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">{item.corrected_category}</span>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-600">{item.corrected_label}</td>
                 <td className="px-6 py-4 text-center text-sm text-gray-600">{item.frequency}</td>
                 <td className="px-6 py-4 text-sm text-gray-500">
                   {item.last_used ? new Date(item.last_used).toLocaleDateString() : '-'}
