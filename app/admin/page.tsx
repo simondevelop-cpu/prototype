@@ -4365,6 +4365,106 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
+            {inboxSubTab === 'whats-coming-survey' && (
+              <div className="space-y-6">
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-gray-900">What's coming survey responses</h2>
+                    <button
+                      onClick={fetchSurveyResponses}
+                      disabled={surveyResponsesLoading}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    >
+                      <svg className={`w-4 h-4 ${surveyResponsesLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Refresh
+                    </button>
+                  </div>
+
+                  {surveyResponsesLoading ? (
+                    <div className="text-center py-12">
+                      <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                      <p className="text-gray-600 mt-4">Loading survey responses...</p>
+                    </div>
+                  ) : surveyResponses.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">No survey responses yet.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Submitted At</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q1: Features</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q2: Priorities</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q3: Professionals</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q4: Access Level</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q5: Comments</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {surveyResponses.map((response: any) => (
+                            <tr key={response.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {new Date(response.createdAt).toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                <div>
+                                  <div className="font-medium">{response.displayName || response.userEmail}</div>
+                                  <div className="text-xs text-gray-500">{response.userEmail}</div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                                {response.q1 && Array.isArray(response.q1) && response.q1.length > 0 ? (
+                                  <div className="space-y-1">
+                                    {response.q1.map((item: any, idx: number) => (
+                                      <div key={idx} className="text-xs">
+                                        {item.feature}: {item.expect ? 'Expect' : item.use ? 'Use' : item.love ? 'Love' : ''}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : '-'}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                                {response.q2 && Array.isArray(response.q2) && response.q2.length > 0 ? (
+                                  <div className="space-y-1">
+                                    {response.q2.map((item: any, idx: number) => (
+                                      <div key={idx} className="text-xs">
+                                        #{item.rank}: {item.text}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : '-'}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                                {response.q3 && Array.isArray(response.q3) && response.q3.length > 0 ? (
+                                  <div className="space-y-1">
+                                    {response.q3.map((item: string, idx: number) => (
+                                      <div key={idx} className="text-xs">{item}</div>
+                                    ))}
+                                  </div>
+                                ) : '-'}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600">
+                                {response.q4 || '-'}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600 max-w-md">
+                                <div className="break-words whitespace-normal">
+                                  {response.q5 || '-'}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {activeTab === 'categories' && renderCategoriesTab()}
