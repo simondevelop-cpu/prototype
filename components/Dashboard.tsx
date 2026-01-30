@@ -750,11 +750,9 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         )}
 
         {activeTab === 'budget' && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead>
-                          <tr className="border-b-2 border-gray-300">
-                            <th className="text-left p-3 font-semibold text-gray-900">Feature</th>
+          <div className="space-y-6">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Schedule a chat</h2>
                             <th className="text-center p-3 font-semibold text-gray-900 min-w-[120px]">Expect / Table stake</th>
                             <th className="text-center p-3 font-semibold text-gray-900 min-w-[100px]">Use</th>
                             <th className="text-center p-3 font-semibold text-gray-900 min-w-[100px]">Love</th>
