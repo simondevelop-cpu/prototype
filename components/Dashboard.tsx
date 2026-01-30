@@ -679,7 +679,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
 
         {activeTab === 'insights' && (
           <div className="flex items-center justify-center min-h-[60vh] py-12">
-            <div className="max-w-3xl w-full">
+            <div className="max-w-4xl w-full">
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
                 <p className="text-gray-700 text-lg mb-8 leading-relaxed">
                   Instead of telling you our feature roadmap over the next few months, we'd love to hear from you! The survey will take 2 minutes and will directly inform what we build next. Thanks in advance for helping us build a tool that everyone else might love!
@@ -690,63 +690,157 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   {/* Question 1 */}
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                      1. What financial challenges are you trying to solve? (Select all that apply)
+                      1. Of the following features, which would you (i) expect and consider a table stake (ii) would use or (iii) would love? (Select all that apply)
                     </h3>
-                    <div className="space-y-3">
-                      {[
-                        'Understanding where my money goes each month',
-                        'Sticking to a budget or spending plan',
-                        'Saving for specific goals (vacation, emergency fund, etc.)',
-                        'Reducing unnecessary expenses',
-                        'Planning for major purchases',
-                        'Tracking multiple accounts in one place',
-                        'Getting better insights into my spending patterns',
-                        'Preparing for tax season',
-                        'Managing debt repayment',
-                        'Building long-term wealth',
-                      ].map((option, idx) => (
-                        <label key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            name="challenges"
-                            value={option}
-                            className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                          <span className="text-gray-700 flex-1">{option}</span>
-                        </label>
-                      ))}
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="border-b-2 border-gray-300">
+                            <th className="text-left p-3 font-semibold text-gray-900">Feature</th>
+                            <th className="text-center p-3 font-semibold text-gray-900 min-w-[120px]">Expect / Table stake</th>
+                            <th className="text-center p-3 font-semibold text-gray-900 min-w-[100px]">Use</th>
+                            <th className="text-center p-3 font-semibold text-gray-900 min-w-[100px]">Love</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[
+                            'Monthly spending reports and summaries',
+                            'Goal tracking with progress visualization',
+                            'Receipt scanning and expense matching',
+                            'Multi-currency support for travel expenses',
+                            'Integration with more banks and credit cards',
+                            'Predictive insights (e.g., "You usually spend $X on groceries this week")',
+                            'Export data to Excel or CSV for my own analysis',
+                            'Mobile app for on-the-go expense tracking',
+                            'Family/household budget sharing',
+                          ].map((feature, idx) => (
+                            <tr key={idx} className="border-b border-gray-200 hover:bg-gray-50">
+                              <td className="p-3 text-gray-700">{feature}</td>
+                              <td className="p-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  name={`q1_${idx}`}
+                                  value="expect"
+                                  onChange={(e) => {
+                                    // Deselect other options in this row
+                                    const row = e.target.closest('tr');
+                                    if (row) {
+                                      const useCheckbox = row.querySelector('input[value="use"]') as HTMLInputElement;
+                                      const loveCheckbox = row.querySelector('input[value="love"]') as HTMLInputElement;
+                                      if (e.target.checked) {
+                                        if (useCheckbox) useCheckbox.checked = false;
+                                        if (loveCheckbox) loveCheckbox.checked = false;
+                                      }
+                                    }
+                                  }}
+                                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                              </td>
+                              <td className="p-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  name={`q1_${idx}`}
+                                  value="use"
+                                  onChange={(e) => {
+                                    // Deselect other options in this row
+                                    const row = e.target.closest('tr');
+                                    if (row) {
+                                      const expectCheckbox = row.querySelector('input[value="expect"]') as HTMLInputElement;
+                                      const loveCheckbox = row.querySelector('input[value="love"]') as HTMLInputElement;
+                                      if (e.target.checked) {
+                                        if (expectCheckbox) expectCheckbox.checked = false;
+                                        if (loveCheckbox) loveCheckbox.checked = false;
+                                      }
+                                    }
+                                  }}
+                                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                              </td>
+                              <td className="p-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  name={`q1_${idx}`}
+                                  value="love"
+                                  onChange={(e) => {
+                                    // Deselect other options in this row
+                                    const row = e.target.closest('tr');
+                                    if (row) {
+                                      const expectCheckbox = row.querySelector('input[value="expect"]') as HTMLInputElement;
+                                      const useCheckbox = row.querySelector('input[value="use"]') as HTMLInputElement;
+                                      if (e.target.checked) {
+                                        if (expectCheckbox) expectCheckbox.checked = false;
+                                        if (useCheckbox) useCheckbox.checked = false;
+                                      }
+                                    }
+                                  }}
+                                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
 
                   {/* Question 2 */}
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                      2. Which features would save you the most time or make your life easier? (Select all that apply)
+                      2. What functionality should we prioritise improving? (Rank the top 6)
                     </h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      <strong>Note:</strong> "Maintain user trust with obsession on data security" is automatically ranked #1.
+                    </p>
                     <div className="space-y-3">
                       {[
-                        'Automated bill reminders and due date tracking',
-                        'Smart spending alerts when I\'m over budget',
-                        'Automatic categorization of all transactions',
-                        'Monthly spending reports and summaries',
-                        'Goal tracking with progress visualization',
-                        'Receipt scanning and expense matching',
-                        'Multi-currency support for travel expenses',
-                        'Integration with more banks and credit cards',
-                        'Predictive insights (e.g., "You usually spend $X on groceries this week")',
-                        'Export data to Excel or CSV for my own analysis',
-                        'Mobile app for on-the-go expense tracking',
-                        'Family/household budget sharing',
+                        { text: 'Maintain user trust with obsession on data security', locked: true, rank: 1 },
+                        { text: 'More accurate automatic categorization', locked: false },
+                        { text: 'Faster transaction import and processing', locked: false },
+                        { text: 'Better visualizations and charts', locked: false },
+                        { text: 'Personalized financial tips and recommendations', locked: false },
+                        { text: 'Ability to set and track custom spending limits', locked: false },
+                        { text: 'Notifications about unusual spending patterns', locked: false },
+                        { text: 'Comparison with peers - is my spend normal type charts', locked: false },
+                        { text: 'Integration with investment tracking', locked: false },
+                        { text: 'Tax preparation features', locked: false },
+                        { text: 'Better mobile experience', locked: false },
+                        { text: 'More detailed category breakdowns', locked: false },
+                        { text: 'Ability to add notes or tags to transactions', locked: false },
+                        { text: 'Communicating the value proposition better', locked: false },
+                        { text: 'Explaining how the tool works', locked: false },
+                        { text: 'Integration with my banking provider', locked: false },
+                        { text: 'Unleash the power of AI', locked: false, footnote: 'Sorry if you want this as we will never let AI touch user data' },
                       ].map((option, idx) => (
-                        <label key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            name="features"
-                            value={option}
-                            className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                          <span className="text-gray-700 flex-1">{option}</span>
-                        </label>
+                        <div key={idx} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200">
+                          {option.locked ? (
+                            <>
+                              <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                                1
+                              </div>
+                              <span className="text-gray-700 flex-1 font-medium">{option.text}</span>
+                              <span className="text-xs text-gray-500">(Locked as #1)</span>
+                            </>
+                          ) : (
+                            <>
+                              <select
+                                name={`q2_rank_${idx}`}
+                                className="flex-shrink-0 w-16 h-8 border border-gray-300 rounded text-sm px-2 focus:ring-blue-500 focus:border-blue-500"
+                                defaultValue=""
+                              >
+                                <option value="">-</option>
+                                {[2, 3, 4, 5, 6].map(rank => (
+                                  <option key={rank} value={rank}>{rank}</option>
+                                ))}
+                              </select>
+                              <span className="text-gray-700 flex-1">
+                                {option.text}
+                                {option.footnote && (
+                                  <span className="text-xs text-gray-500 italic ml-2">({option.footnote})</span>
+                                )}
+                              </span>
+                            </>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -754,48 +848,147 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   {/* Question 3 */}
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                      3. What would make you use this app more frequently? (Select all that apply)
+                      3. If we dilligenced and partnered with one or two trusted professionals who could optionally use this tool (with your permission) to help you, would you be interested in any of them? (Select all that apply)
                     </h3>
                     <div className="space-y-3">
                       {[
-                        'More accurate automatic categorization',
-                        'Faster transaction import and processing',
-                        'Better visualizations and charts',
-                        'Personalized financial tips and recommendations',
-                        'Ability to set and track custom spending limits',
-                        'Notifications about unusual spending patterns',
-                        'Comparison with previous months or years',
-                        'Integration with investment tracking',
-                        'Tax preparation features',
-                        'Better mobile experience',
-                        'More detailed category breakdowns',
-                        'Ability to add notes or tags to transactions',
+                        { emoji: '🧾', text: 'Accountant / CPA (taxes, filings, cleanup, year-end)' },
+                        { emoji: '🏦', text: 'Fee-only financial planner (budgeting, saving, big decisions)' },
+                        { emoji: '💳', text: 'Credit card / rewards specialist (optimize cards based on spend)' },
+                        { emoji: '🏠', text: 'Mortgage or home-buying advisor' },
+                        { emoji: '📈', text: 'Investment advisor (non-sales / fee-only)' },
+                        { emoji: '🧠', text: 'Financial coach (habits, accountability, planning)' },
+                        { emoji: '🧑‍💼', text: 'Small-business / side-hustle advisor' },
+                        { emoji: '❌', text: 'I wouldn\'t want to involve a human advisor', excludeFromQ4: true },
+                        { emoji: '🤔', text: 'Not sure, depends on context' },
+                        { emoji: '🤔', text: 'Not sure, don\'t think I would ever want one', excludeFromQ4: true },
                       ].map((option, idx) => (
                         <label key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
                           <input
                             type="checkbox"
-                            name="engagement"
-                            value={option}
+                            name="q3_professionals"
+                            value={option.text}
+                            data-exclude-from-q4={option.excludeFromQ4 || false}
+                            onChange={(e) => {
+                              // Show/hide Q4 based on selections
+                              const allQ3Checkboxes = document.querySelectorAll<HTMLInputElement>('input[name="q3_professionals"]');
+                              const q4Container = document.getElementById('q4_container');
+                              if (q4Container) {
+                                const hasValidSelection = Array.from(allQ3Checkboxes).some(cb => {
+                                  if (!cb.checked) return false;
+                                  return cb.dataset.excludeFromQ4 !== 'true';
+                                });
+                                if (hasValidSelection) {
+                                  q4Container.classList.remove('hidden');
+                                } else {
+                                  q4Container.classList.add('hidden');
+                                  // Clear Q4 selection if hidden
+                                  const q4Radios = document.querySelectorAll<HTMLInputElement>('input[name="q4_access"]');
+                                  q4Radios.forEach(radio => radio.checked = false);
+                                }
+                              }
+                            }}
                             className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                           />
-                          <span className="text-gray-700 flex-1">{option}</span>
+                          <span className="text-gray-700 flex-1">
+                            <span className="mr-2">{option.emoji}</span>
+                            {option.text}
+                          </span>
                         </label>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Question 4 - Conditional */}
+                  <div id="q4_container" className="hidden">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                      4. If you did involve a professional, what level of access would you be comfortable with? (Select one)
+                    </h3>
+                    <div className="space-y-3">
+                      {[
+                        { emoji: '👀', text: 'View-only access (they can see, not edit)' },
+                        { emoji: '✏️', text: 'Suggest changes (categories, insights, notes)' },
+                        { emoji: '🤝', text: 'Work together live (shared session / screen)' },
+                        { emoji: '📤', text: 'Export-only (I send them reports)' },
+                        { emoji: '🔒', text: 'No direct access — advice only' },
+                        { emoji: '❌', text: 'I wouldn\'t want to share my data' },
+                      ].map((option, idx) => (
+                        <label key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="q4_access"
+                            value={option.text}
+                            className="mt-1 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                          />
+                          <span className="text-gray-700 flex-1">
+                            <span className="mr-2">{option.emoji}</span>
+                            {option.text}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Question 5 */}
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                      5. Would you like to leave any comments, suggestions or be willing to have a follow up conversation? Let us know.
+                    </h3>
+                    <textarea
+                      name="q5_comments"
+                      rows={4}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      placeholder="Your comments, suggestions, or let us know if you're open to a follow-up conversation..."
+                    />
                   </div>
 
                   {/* Submit Button */}
                   <div className="pt-4">
                     <button
                       onClick={() => {
-                        // Collect all selected answers
-                        const form = document.querySelector('form') || document;
-                        const challenges = Array.from(form.querySelectorAll<HTMLInputElement>('input[name="challenges"]:checked')).map(cb => cb.value);
-                        const features = Array.from(form.querySelectorAll<HTMLInputElement>('input[name="features"]:checked')).map(cb => cb.value);
-                        const engagement = Array.from(form.querySelectorAll<HTMLInputElement>('input[name="engagement"]:checked')).map(cb => cb.value);
-                        
+                        // Collect all answers
+                        const q1Data: any[] = [];
+                        document.querySelectorAll('tr').forEach((row, idx) => {
+                          if (idx === 0) return; // Skip header
+                          const feature = row.querySelector('td:first-child')?.textContent || '';
+                          const expect = (row.querySelector('input[value="expect"]') as HTMLInputElement)?.checked || false;
+                          const use = (row.querySelector('input[value="use"]') as HTMLInputElement)?.checked || false;
+                          const love = (row.querySelector('input[value="love"]') as HTMLInputElement)?.checked || false;
+                          if (expect || use || love) {
+                            q1Data.push({ feature, expect, use, love });
+                          }
+                        });
+
+                        const q2Data: any[] = [];
+                        q2Data.push({ text: 'Maintain user trust with obsession on data security', rank: 1 });
+                        document.querySelectorAll('select[name^="q2_rank"]').forEach((select) => {
+                          const rank = parseInt((select as HTMLSelectElement).value);
+                          if (rank) {
+                            // Get the text from the span that contains the option text (excluding footnote)
+                            const container = select.closest('div');
+                            const textSpan = container?.querySelector('span.text-gray-700');
+                            let text = '';
+                            if (textSpan) {
+                              // Clone to avoid modifying the original
+                              const clone = textSpan.cloneNode(true) as HTMLElement;
+                              // Remove the footnote span if it exists
+                              const footnote = clone.querySelector('span.text-xs');
+                              if (footnote) footnote.remove();
+                              text = clone.textContent?.trim() || '';
+                            }
+                            if (text) {
+                              q2Data.push({ text, rank });
+                            }
+                          }
+                        });
+                        q2Data.sort((a, b) => a.rank - b.rank);
+
+                        const q3Data = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="q3_professionals"]:checked')).map(cb => cb.value);
+                        const q4Data = (document.querySelector('input[name="q4_access"]:checked') as HTMLInputElement)?.value || null;
+                        const q5Data = (document.querySelector('textarea[name="q5_comments"]') as HTMLTextAreaElement)?.value || '';
+
                         // TODO: Submit to API endpoint
-                        console.log('Survey responses:', { challenges, features, engagement });
+                        console.log('Survey responses:', { q1: q1Data, q2: q2Data, q3: q3Data, q4: q4Data, q5: q5Data });
                         alert('Thank you for your feedback! Your responses will help shape our roadmap.');
                       }}
                       className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
