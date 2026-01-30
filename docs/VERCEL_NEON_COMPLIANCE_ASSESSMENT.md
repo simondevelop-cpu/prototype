@@ -75,3 +75,4 @@ We can state that:
 3. What data residency options exist for Canadian data?
 4. What features/configurations must we use/avoid to maintain compliance?
 
+

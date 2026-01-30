@@ -114,3 +114,39 @@ export async function logConsentEvent(
   }
 }
 
+/**
+ * Log a transaction editing event
+ */
+export async function logTransactionEditEvent(
+  userId: string | number,
+  transactionId: number,
+  changes: {
+    field: string;
+    oldValue: any;
+    newValue: any;
+  }[]
+): Promise<void> {
+  const pool = getPool();
+  if (!pool) {
+    console.warn('[Event Logger] Database not available, skipping event log');
+    return;
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO user_events (user_id, event_type, event_timestamp, metadata)
+       VALUES ($1, $2, NOW(), $3::jsonb)`,
+      [userId, 'transaction_edit', JSON.stringify({
+        transactionId,
+        changes,
+        timestamp: new Date().toISOString(),
+      })]
+    );
+    
+    console.log(`[Event Logger] Logged transaction edit event for user ${userId}, transaction ${transactionId}`);
+  } catch (error: any) {
+    // Don't throw - event logging should not break the main flow
+    console.error('[Event Logger] Failed to log transaction edit event:', error);
+  }
+}
+

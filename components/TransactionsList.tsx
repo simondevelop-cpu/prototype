@@ -285,11 +285,12 @@ export default function TransactionsList({ transactions, loading, token, onRefre
     }
   };
   
-  const saveInlineEdit = async (tx: any, field: string) => {
+  const saveInlineEdit = async (tx: any, field: string, directValue?: string) => {
     if (!editingCell) return;
     
     const originalValue = tx[field];
-    let newValue: any = editValue.trim();
+    // Use directValue if provided (for dropdowns), otherwise use editValue from state
+    let newValue: any = directValue !== undefined ? directValue : editValue.trim();
     
     // Convert value based on field type
     if (field === 'date') {
@@ -923,8 +924,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                           ref={editInputRef as React.RefObject<HTMLSelectElement>}
                           value={editValue}
                           onChange={(e) => {
-                            setEditValue(e.target.value);
-                            saveInlineEdit(tx, 'cashflow');
+                            const newVal = e.target.value;
+                            setEditValue(newVal);
+                            saveInlineEdit(tx, 'cashflow', newVal);
                           }}
                           onBlur={() => saveInlineEdit(tx, 'cashflow')}
                           onKeyDown={(e) => {
@@ -952,8 +954,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                           ref={editInputRef as React.RefObject<HTMLSelectElement>}
                           value={editValue}
                           onChange={(e) => {
-                            setEditValue(e.target.value);
-                            saveInlineEdit(tx, 'account');
+                            const newVal = e.target.value;
+                            setEditValue(newVal);
+                            saveInlineEdit(tx, 'account', newVal);
                           }}
                           onBlur={() => saveInlineEdit(tx, 'account')}
                           onKeyDown={(e) => {
@@ -982,8 +985,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                           ref={editInputRef as React.RefObject<HTMLSelectElement>}
                           value={editValue}
                           onChange={(e) => {
-                            setEditValue(e.target.value);
-                            saveInlineEdit(tx, 'category');
+                            const newVal = e.target.value;
+                            setEditValue(newVal);
+                            saveInlineEdit(tx, 'category', newVal);
                           }}
                           onBlur={() => saveInlineEdit(tx, 'category')}
                           onKeyDown={(e) => {

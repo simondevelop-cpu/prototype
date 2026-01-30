@@ -46,7 +46,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabName>('monitoring');
   const [monitoringSubTab, setMonitoringSubTab] = useState<MonitoringSubTab>('accounts');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
-  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'vanity-metrics' | 'data-details'>('cohort-analysis');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'editing-events-data' | 'vanity-metrics' | 'data-details'>('cohort-analysis');
   const [inboxSubTab, setInboxSubTab] = useState<InboxSubTab>('bug-reports');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
@@ -78,6 +78,10 @@ export default function AdminDashboard() {
   // State for Events Data tab
   const [eventsData, setEventsData] = useState<any[]>([]);
   const [eventsDataLoading, setEventsDataLoading] = useState(false);
+  
+  // State for Editing Events Data tab
+  const [editingEventsData, setEditingEventsData] = useState<any[]>([]);
+  const [editingEventsDataLoading, setEditingEventsDataLoading] = useState(false);
   
   // State for User Feedback tab
   const [userFeedback, setUserFeedback] = useState<any[]>([]);
@@ -363,6 +367,13 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (activeTab === 'analytics' && analyticsSubTab === 'events-data' && authenticated) {
       fetchEventsData();
+    }
+  }, [activeTab, analyticsSubTab, authenticated]);
+
+  // Fetch editing events data when Editing Events Data tab is active
+  useEffect(() => {
+    if (activeTab === 'analytics' && analyticsSubTab === 'editing-events-data' && authenticated) {
+      fetchEditingEventsData();
     }
   }, [activeTab, analyticsSubTab, authenticated]);
 
@@ -1088,6 +1099,16 @@ export default function AdminDashboard() {
             }`}
           >
             📋 Events Data
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('editing-events-data')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'editing-events-data'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            ✏️ Editing Events Data
           </button>
           <button
             onClick={() => setAnalyticsSubTab('vanity-metrics')}
@@ -2824,6 +2845,102 @@ export default function AdminDashboard() {
                             <p className="text-lg font-medium mb-2">No events data available</p>
                             <p className="text-sm text-gray-400">
                               Events will appear here once the user_events table is created and events are logged.
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {analyticsSubTab === 'editing-events-data' && (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Editing Events Data</h2>
+                <p className="text-gray-600 mt-1">Transaction editing events - all changes made to transactions</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={fetchEditingEventsData}
+                  disabled={editingEventsDataLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  <svg className={`w-4 h-4 ${editingEventsDataLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh Data
+                </button>
+              </div>
+            </div>
+
+            {editingEventsDataLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-600 mt-4">Loading editing events data...</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Changes</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {editingEventsData.length > 0 ? (
+                      editingEventsData.map((event) => {
+                        const metadata = typeof event.metadata === 'string' ? JSON.parse(event.metadata) : event.metadata;
+                        const changes = metadata?.changes || [];
+                        return (
+                          <tr key={event.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm text-gray-600 font-mono">{event.id}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600 font-mono">{event.user_id}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{event.email || '-'}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600 font-mono">{metadata?.transactionId || '-'}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {changes.length > 0 ? (
+                                <div className="space-y-1">
+                                  {changes.map((change: any, idx: number) => (
+                                    <div key={idx} className="text-xs">
+                                      <span className="font-medium">{change.field}:</span>{' '}
+                                      <span className="text-red-600 line-through">{String(change.oldValue || '-')}</span>
+                                      {' → '}
+                                      <span className="text-green-600">{String(change.newValue || '-')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 italic">No changes</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {event.created_at 
+                                ? new Date(event.created_at).toLocaleString()
+                                : <span className="text-gray-400 italic">null</span>}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                          <div className="flex flex-col items-center">
+                            <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            <p className="text-lg font-medium mb-2">No editing events available</p>
+                            <p className="text-sm text-gray-400">
+                              Editing events will appear here once users start editing transactions.
                             </p>
                           </div>
                         </td>
