@@ -873,6 +873,13 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         />
       )}
 
+      {/* Survey Modal */}
+      <SurveyModal
+        isOpen={showSurveyModal}
+        onClose={() => setShowSurveyModal(false)}
+        token={token}
+      />
+
       {/* Cookie Banner - shown for signed-in users until choice recorded */}
       <CookieBanner token={token} userId={user?.id} />
     </div>

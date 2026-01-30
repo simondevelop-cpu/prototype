@@ -9,8 +9,17 @@ export function getPool(): Pool | null {
   
   if (!pool) {
     const useSSL = process.env.DATABASE_SSL !== 'false';
+    let connectionString = process.env.DATABASE_URL || '';
+    
+    // Fix SSL mode warning by explicitly setting sslmode=verify-full in connection string
+    if (useSSL && connectionString && !connectionString.includes('sslmode=')) {
+      // Add sslmode parameter to connection string
+      const separator = connectionString.includes('?') ? '&' : '?';
+      connectionString = `${connectionString}${separator}sslmode=verify-full`;
+    }
+    
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString,
       ssl: useSSL ? { rejectUnauthorized: false } : false,
     });
     console.log('[DB] Pool created');

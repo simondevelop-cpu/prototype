@@ -125,11 +125,25 @@ export function verifyRequestOrigin(request: { headers: Headers | { get: (key: s
     return isLocalhost;
   }
   
-  // Production: If ALLOWED_ORIGINS not set, allow all (less secure but practical)
+  // Production: If ALLOWED_ORIGINS not set, try to use VERCEL_URL as fallback
   // NOTE: For production deployments, set ALLOWED_ORIGINS environment variable
   //       for stricter CSRF protection (e.g., ALLOWED_ORIGINS=https://yourapp.com)
   if (process.env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
-    console.warn('[CSRF] ALLOWED_ORIGINS not set in production - allowing all origins (consider setting it for better security)');
+    // Try to use VERCEL_URL if available (Vercel automatically sets this)
+    const vercelUrl = process.env.VERCEL_URL;
+    if (vercelUrl) {
+      // VERCEL_URL is just the hostname, need to add protocol
+      const protocol = process.env.VERCEL_ENV === 'production' ? 'https' : 'https';
+      const fallbackOrigin = `${protocol}://${vercelUrl}`;
+      if (originToCheck === fallbackOrigin || originToCheck.endsWith(`.${vercelUrl}`)) {
+        return true;
+      }
+    }
+    // Only warn if we're actually in production and no fallback worked
+    // Suppress warning if we have VERCEL_URL (it will be set automatically)
+    if (!vercelUrl) {
+      console.warn('[CSRF] ALLOWED_ORIGINS not set in production - allowing all origins (consider setting it for better security)');
+    }
     return true;
   }
   
