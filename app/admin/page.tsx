@@ -913,7 +913,7 @@ export default function AdminDashboard() {
             <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="bg-white rounded-lg shadow overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -956,10 +956,21 @@ export default function AdminDashboard() {
                         : <span className="text-gray-400 italic">No record</span>}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {user.cookie_consent_choice
-                        ? user.cookie_consent_choice === 'accept_all'
-                          ? 'Accept all cookies'
-                          : 'Essential cookies only'
+                      {user.cookie_consent_at
+                        ? (
+                            <div>
+                              <div className="font-medium">
+                                {user.cookie_consent_choice === 'accept_all'
+                                  ? 'Accept all cookies'
+                                  : user.cookie_consent_choice === 'essential_only'
+                                  ? 'Essential cookies only'
+                                  : user.cookie_consent_choice || 'Unknown'}
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {new Date(user.cookie_consent_at).toLocaleString()}
+                              </div>
+                            </div>
+                          )
                         : <span className="text-gray-400 italic">No record</span>}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">

@@ -140,6 +140,7 @@ export async function GET(request: NextRequest) {
         // Consent-related fields are populated in a follow-up step below (schema-adaptive)
         account_creation_consent_at: null,
         cookie_consent_choice: null,
+        cookie_consent_at: null,
         first_upload_consent_at: null,
       };
     });
@@ -163,7 +164,8 @@ export async function GET(request: NextRequest) {
             user_id,
             metadata->>'consentType' AS consent_type,
             metadata->>'choice' AS choice,
-            event_timestamp
+            event_timestamp,
+            metadata
           FROM user_events
           WHERE event_type = 'consent'
             AND user_id = ANY($1::int[])
@@ -189,6 +191,7 @@ export async function GET(request: NextRequest) {
 
           user.account_creation_consent_at = accountCreation?.event_timestamp || null;
           user.cookie_consent_choice = cookieBanner?.choice || null;
+          user.cookie_consent_at = cookieBanner?.event_timestamp || null;
           
           // If user has transactions but no first_upload consent event, they likely gave consent before logging was added
           // Show a note that consent was given (implied by having transactions) but timestamp is unavailable
