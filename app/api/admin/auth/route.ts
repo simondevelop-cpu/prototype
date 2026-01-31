@@ -3,7 +3,14 @@ import jwt from 'jsonwebtoken';
 import { ADMIN_EMAIL, JWT_SECRET } from '@/lib/admin-constants';
 import { logAdminEvent } from '@/lib/event-logger';
 
+// Get admin password from environment variable, with fallback for development
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'categorisationandinsightsengine';
+
+// Security check: Warn if using default password in production
+if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD) {
+  console.warn('⚠️  SECURITY WARNING: ADMIN_PASSWORD environment variable is not set in production!');
+  console.warn('⚠️  Using default password. Please set ADMIN_PASSWORD environment variable for security.');
+}
 
 export async function POST(request: NextRequest) {
   try {

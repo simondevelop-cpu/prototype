@@ -68,6 +68,14 @@ describe('Transactions API', () => {
         label TEXT DEFAULT '',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+      
+      CREATE TABLE IF NOT EXISTS user_events (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        event_type TEXT NOT NULL,
+        event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        metadata JSONB
+      );
     `);
 
     vi.spyOn(dbModule, 'getPool').mockReturnValue(mockPool);
@@ -81,6 +89,8 @@ describe('Transactions API', () => {
   });
 
   beforeEach(async () => {
+    // Delete in order to respect foreign key constraints (child tables first)
+    await testClient.query('DELETE FROM user_events');
     await testClient.query('DELETE FROM l1_transaction_facts');
     await testClient.query('DELETE FROM l0_user_tokenization');
     await testClient.query('DELETE FROM users');

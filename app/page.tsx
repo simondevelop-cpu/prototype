@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Dashboard from '@/components/Dashboard';
 import Login from '@/components/Login';
+import { apiFetch } from '@/lib/api-client';
 
 export default function Home() {
   const router = useRouter();
@@ -22,15 +23,18 @@ export default function Home() {
         
         // Check if user needs to complete onboarding
         try {
-          const statusResponse = await fetch('/api/onboarding/status', {
-            headers: {
-              'Authorization': `Bearer ${storedToken}`
-            }
+          const statusResponse = await apiFetch('/api/onboarding/status', {
+            method: 'GET',
+          }, () => {
+            // On unauthorized, clear session and show login
+            localStorage.removeItem('ci.session.token');
+            localStorage.removeItem('ci.session.user');
+            setToken(null);
+            setUser(null);
           });
           
-          if (statusResponse.ok) {
-            const statusData = await statusResponse.json();
-            if (statusData.needsOnboarding) {
+          if (statusResponse.data) {
+            if (statusResponse.data.needsOnboarding) {
               console.log('[Home] User needs onboarding, redirecting...');
               router.push('/onboarding');
               return;

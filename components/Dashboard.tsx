@@ -8,6 +8,8 @@ import CookieBanner from './CookieBanner';
 import BookingModal from './BookingModal';
 import BookingItem from './BookingItem';
 import SurveyModal from './SurveyModal';
+import TokenExpirationWarning from './TokenExpirationWarning';
+import { apiFetch } from '@/lib/api-client';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
@@ -20,6 +22,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ user, token, onLogout }: DashboardProps) {
+  const [currentToken, setCurrentToken] = useState(token);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [timeframe, setTimeframe] = useState('3m');
   const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
@@ -45,9 +48,14 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [cashflowFilter, setCashflowFilter] = useState<string | null>(null);
   const [dateRangeFilter, setDateRangeFilter] = useState<{ start: string; end: string } | null>(null);
 
+  // Update currentToken when token prop changes
+  useEffect(() => {
+    setCurrentToken(token);
+  }, [token]);
+
   useEffect(() => {
     fetchData();
-  }, [timeframe, token]);
+  }, [timeframe, currentToken]);
 
   useEffect(() => {
     if (selectedCashflow) {
@@ -75,13 +83,13 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     if (activeTab === 'transactions' && !hasLoadedTransactions) {
       fetchAllTransactions();
     }
-  }, [activeTab, token]);
+  }, [activeTab, currentToken]);
 
   // Reset loaded state when token changes (user logs in/out)
   useEffect(() => {
     setHasLoadedTransactions(false);
     setAllTransactions([]);
-  }, [token]);
+  }, [currentToken]);
 
   // Fetch available slots and bookings when Schedule a chat tab is active
   useEffect(() => {
@@ -89,7 +97,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
       fetchAvailableSlots();
       fetchMyBookings();
     }
-  }, [activeTab, token]);
+  }, [activeTab, currentToken]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -103,19 +111,23 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         txUrl = `/api/transactions?start=${customDateRange.start}&end=${customDateRange.end}`;
       }
 
-      // Fetch summary
-      const summaryRes = await fetch(summaryUrl, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const summaryData = await summaryRes.json();
-      setSummary(summaryData.summary || []);
+      // Fetch summary using apiFetch
+      const summaryResponse = await apiFetch(summaryUrl, {
+        method: 'GET',
+      }, onLogout);
+      
+      if (summaryResponse.data) {
+        setSummary(summaryResponse.data.summary || []);
+      }
 
       // Fetch transactions (filtered by timeframe for dashboard)
-      const txRes = await fetch(txUrl, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const txData = await txRes.json();
-      setTransactions(txData.transactions || []);
+      const txResponse = await apiFetch(txUrl, {
+        method: 'GET',
+      }, onLogout);
+      
+      if (txResponse.data) {
+        setTransactions(txResponse.data.transactions || []);
+      }
 
       // Fetch categories for selected month/cashflow
       await fetchCategories();
@@ -130,11 +142,13 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     setTransactionsLoading(true);
     try {
       // Fetch ALL transactions (no date filter) for transactions tab
-      const txRes = await fetch('/api/transactions', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const txData = await txRes.json();
-      setAllTransactions(txData.transactions || []);
+      const txResponse = await apiFetch('/api/transactions', {
+        method: 'GET',
+      }, onLogout);
+      
+      if (txResponse.data) {
+        setAllTransactions(txResponse.data.transactions || []);
+      }
       setHasLoadedTransactions(true); // Mark as loaded
     } catch (err) {
       console.error('Error fetching all transactions:', err);
@@ -169,11 +183,13 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         catUrl += `?${params.toString()}`;
       }
       
-      const catRes = await fetch(catUrl, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const catData = await catRes.json();
-      setCategories(catData.categories || []);
+      const catResponse = await apiFetch(catUrl, {
+        method: 'GET',
+      }, onLogout);
+      
+      if (catResponse.data) {
+        setCategories(catResponse.data.categories || []);
+      }
     } catch (err) {
       console.error('Error fetching categories:', err);
     }
@@ -182,16 +198,15 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const fetchAvailableSlots = async () => {
     setBookingsLoading(true);
     try {
-      const response = await fetch('/api/bookings/available', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Fetched available slots:', data.availableSlots?.length || 0);
-        setAvailableSlots(data.availableSlots || []);
+      const response = await apiFetch('/api/bookings/available', {
+        method: 'GET',
+      }, onLogout);
+      
+      if (response.data) {
+        console.log('Fetched available slots:', response.data.availableSlots?.length || 0);
+        setAvailableSlots(response.data.availableSlots || []);
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Failed to fetch available slots:', response.status, errorData);
+        console.error('Failed to fetch available slots:', response.status, response.error);
         setAvailableSlots([]);
       }
     } catch (err) {
@@ -204,14 +219,14 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
 
   const fetchMyBookings = async () => {
     try {
-      const response = await fetch('/api/bookings/my-bookings', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setMyBookings(data.bookings || []);
+      const response = await apiFetch('/api/bookings/my-bookings', {
+        method: 'GET',
+      }, onLogout);
+      
+      if (response.data) {
+        setMyBookings(response.data.bookings || []);
       } else {
-        console.error('Failed to fetch my bookings:', response.status);
+        console.error('Failed to fetch my bookings:', response.status, response.error);
         setMyBookings([]);
       }
     } catch (err) {
@@ -718,7 +733,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
           <TransactionsList 
             transactions={allTransactions} 
             loading={transactionsLoading}
-            token={token}
+            token={currentToken}
             onRefresh={fetchAllTransactions}
             initialCategoryFilter={categoryFilter}
             onClearCategoryFilter={() => setCategoryFilter(null)}
@@ -768,7 +783,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                     <BookingItem
                       key={booking.id}
                       booking={booking}
-                      token={token}
+                      token={currentToken}
                       onUpdate={fetchMyBookings}
                     />
                   ))}
@@ -829,7 +844,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
       <FeedbackModal
         isOpen={showFeedback}
         onClose={() => setShowFeedback(false)}
-        token={token}
+        token={currentToken}
       />
 
       {/* Booking Modal */}
@@ -845,7 +860,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
           }}
           date={selectedBookingSlot.date}
           time={selectedBookingSlot.time}
-          token={token}
+          token={currentToken}
         />
       )}
 
@@ -853,11 +868,21 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
       <SurveyModal
         isOpen={showSurveyModal}
         onClose={() => setShowSurveyModal(false)}
-        token={token}
+        token={currentToken}
+      />
+
+      {/* Token Expiration Warning */}
+      <TokenExpirationWarning 
+        token={currentToken} 
+        onRefresh={(newToken) => {
+          setCurrentToken(newToken);
+          // Update localStorage
+          localStorage.setItem('ci.session.token', newToken);
+        }}
       />
 
       {/* Cookie Banner - shown for signed-in users until choice recorded */}
-      <CookieBanner token={token} userId={user?.id} />
+      <CookieBanner token={currentToken} userId={user?.id} />
     </div>
   );
 }
