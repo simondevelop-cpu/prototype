@@ -85,7 +85,7 @@ describe('Summary API Authorization', () => {
 
   beforeEach(async () => {
     // Delete in order to respect foreign key constraints (child tables first)
-    await testClient.query('DELETE FROM user_events');
+    // Note: user_events table is not created in this test schema, so skip it
     await testClient.query('DELETE FROM l1_transaction_facts');
     await testClient.query('DELETE FROM l0_user_tokenization');
     await testClient.query('DELETE FROM users');
