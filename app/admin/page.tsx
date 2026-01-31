@@ -6,8 +6,8 @@ import { invalidatePatternCache } from '@/lib/categorization-engine';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import CheckboxDropdown from '@/components/CheckboxDropdown';
 
-type TabName = 'monitoring' | 'inbox' | 'categories' | 'insights' | 'analytics';
-type MonitoringSubTab = 'accounts' | 'health' | 'privacy-policy';
+type TabName = 'monitoring' | 'inbox' | 'categories' | 'analytics';
+type MonitoringSubTab = 'accounts' | 'health' | 'privacy-policy' | 'admin-logins';
 type InboxSubTab = 'chat-scheduler' | 'feedback' | 'whats-coming-survey';
 
 interface Keyword {
@@ -98,6 +98,10 @@ export default function AdminDashboard() {
   // State for Privacy Policy Check tab
   const [privacyCheckData, setPrivacyCheckData] = useState<any>(null);
   const [privacyCheckLoading, setPrivacyCheckLoading] = useState(false);
+  
+  // State for Admin Logins tab
+  const [adminLogins, setAdminLogins] = useState<any[]>([]);
+  const [adminLoginsLoading, setAdminLoginsLoading] = useState(false);
   
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
@@ -367,12 +371,49 @@ export default function AdminDashboard() {
     }
   }, [viewType, activeTab, authenticated]);
 
+  // Fetch admin logins
+  const fetchAdminLogins = async () => {
+    setAdminLoginsLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch('/api/admin/logins', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setAdminLogins(data.logins || []);
+    } catch (error) {
+      console.error('Error fetching admin logins:', error);
+      setAdminLogins([]);
+    } finally {
+      setAdminLoginsLoading(false);
+    }
+  };
+
   // Fetch users when Accounts tab is active
   // Fetch users function (used by Accounts tab and block button)
   const fetchUsers = async () => {
     setAccountsLoading(true);
     try {
       const token = localStorage.getItem('admin_token');
+      
+      // Log when admin opens Accounts tab
+      try {
+        await fetch('/api/admin/log-action', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'tab_access',
+            tab: 'accounts',
+          }),
+        });
+      } catch (logError) {
+        // Don't fail if logging fails
+        console.error('Failed to log tab access:', logError);
+      }
+      
       const response = await fetch('/api/admin/users', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -4300,16 +4341,6 @@ export default function AdminDashboard() {
               🏷️ Category engine
             </button>
             <button
-              onClick={() => setActiveTab('insights')}
-              className={`px-6 py-4 font-medium text-sm transition-colors relative ${
-                activeTab === 'insights'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              🔍 Insights engine
-            </button>
-            <button
               onClick={() => setActiveTab('analytics')}
               className={`px-6 py-4 font-medium text-sm transition-colors relative ${
                 activeTab === 'analytics'
@@ -4374,11 +4405,89 @@ export default function AdminDashboard() {
               >
                 🔒 Privacy policy check
               </button>
+              <button
+                onClick={() => setMonitoringSubTab('admin-logins')}
+                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                  monitoringSubTab === 'admin-logins'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🔐 Admin logins
+              </button>
             </div>
             {/* Monitoring Content */}
             {monitoringSubTab === 'accounts' && renderAccountsTab()}
             {monitoringSubTab === 'health' && renderAppHealth()}
             {monitoringSubTab === 'privacy-policy' && renderPrivacyPolicyCheck()}
+            {monitoringSubTab === 'admin-logins' && (
+              <div className="space-y-6">
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-gray-900">Admin logins</h2>
+                    <button
+                      onClick={fetchAdminLogins}
+                      disabled={adminLoginsLoading}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    >
+                      <svg className={`w-4 h-4 ${adminLoginsLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Refresh
+                    </button>
+                  </div>
+
+                  {adminLoginsLoading ? (
+                    <div className="text-center py-12">
+                      <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                      <p className="text-gray-600 mt-4">Loading admin logins...</p>
+                    </div>
+                  ) : adminLogins.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">No admin login events recorded yet.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin Email</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tab</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {adminLogins.map((login: any, idx: number) => {
+                            const metadata = typeof login.metadata === 'string' ? JSON.parse(login.metadata) : login.metadata;
+                            return (
+                              <tr key={idx} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  {new Date(login.event_timestamp || login.created_at).toLocaleString()}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                  {metadata?.adminEmail || 'Unknown'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                  {login.event_type === 'admin_login' ? 'Login' : login.event_type === 'admin_tab_access' ? 'Tab Access' : login.event_type}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                  {metadata?.tab || '-'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                  {metadata?.ip || '-'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {activeTab === 'inbox' && (
@@ -4594,7 +4703,6 @@ export default function AdminDashboard() {
           </div>
         )}
         {activeTab === 'categories' && renderCategoriesTab()}
-        {activeTab === 'insights' && renderPlaceholderTab('Insights Engine', 'Automated spending insights and personalized recommendations', '🔍')}
         {activeTab === 'analytics' && renderAnalyticsTab()}
       </div>
       

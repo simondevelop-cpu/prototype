@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { ADMIN_EMAIL, JWT_SECRET } from '@/lib/admin-constants';
+import { logAdminEvent } from '@/lib/event-logger';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'categorisationandinsightsengine';
 
@@ -26,6 +27,12 @@ export async function POST(request: NextRequest) {
       JWT_SECRET,
       { expiresIn: '1d' } // Token expires in 1 day
     );
+
+    // Log admin login event
+    await logAdminEvent(email, 'admin_login', {
+      action: 'login',
+      ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+    });
 
     return NextResponse.json({
       success: true,

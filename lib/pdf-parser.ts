@@ -1338,11 +1338,21 @@ async function insertTransactionsWithDuplicateCheck(
 
   for (const tx of transactions) {
     try {
+      // Normalize description for comparison (remove extra spaces, lowercase)
+      const normalizedDescription = tx.description?.trim().toLowerCase().replace(/\s+/g, ' ') || '';
+      
       // Check if transaction already exists in L1 fact table
+      // Use date, absolute amount, normalized description, and cashflow for duplicate detection
+      // This ensures edited transactions (where merchant/description might have changed) are still detected as duplicates
+      // We normalize the description in the database query too to handle any existing variations
       const existingCheck = await pool.query(
         `SELECT id FROM l1_transaction_facts 
-         WHERE tokenized_user_id = $1 AND transaction_date = $2 AND amount = $3 AND merchant = $4 AND cashflow = $5`,
-        [tokenizedUserId, tx.date, tx.amount, tx.merchant, tx.cashflow]
+         WHERE tokenized_user_id = $1 
+           AND transaction_date = $2 
+           AND ABS(amount) = $3 
+           AND LOWER(REGEXP_REPLACE(TRIM(description), '\\s+', ' ', 'g')) = $4 
+           AND cashflow = $5`,
+        [tokenizedUserId, tx.date, Math.abs(tx.amount), normalizedDescription, tx.cashflow]
       );
 
       if (existingCheck.rows.length > 0) {

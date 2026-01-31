@@ -150,3 +150,75 @@ export async function logTransactionEditEvent(
   }
 }
 
+/**
+ * Log a bulk transaction editing event
+ */
+export async function logBulkEditEvent(
+  userId: string | number,
+  transactionIds: number[],
+  fieldsUpdated: string[],
+  transactionCount: number
+): Promise<void> {
+  const pool = getPool();
+  if (!pool) {
+    console.warn('[Event Logger] Database not available, skipping event log');
+    return;
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO user_events (user_id, event_type, event_timestamp, metadata)
+       VALUES ($1, $2, NOW(), $3::jsonb)`,
+      [userId, 'bulk_edit', JSON.stringify({
+        transactionIds,
+        fieldsUpdated,
+        transactionCount,
+        timestamp: new Date().toISOString(),
+      })]
+    );
+    
+    console.log(`[Event Logger] Logged bulk edit event for user ${userId}, ${transactionCount} transactions`);
+  } catch (error: any) {
+    // Don't throw - event logging should not break the main flow
+    console.error('[Event Logger] Failed to log bulk edit event:', error);
+  }
+}
+
+/**
+ * Log an admin event (login, tab access, etc.)
+ */
+export async function logAdminEvent(
+  adminEmail: string,
+  eventType: 'admin_login' | 'admin_tab_access',
+  metadata: {
+    action?: string;
+    tab?: string;
+    [key: string]: any;
+  }
+): Promise<void> {
+  const pool = getPool();
+  if (!pool) {
+    console.warn('[Event Logger] Database not available, skipping event log');
+    return;
+  }
+
+  try {
+    // Get admin user ID (use a special admin user ID or create a system user)
+    // For now, we'll use email as identifier and store in metadata
+    await pool.query(
+      `INSERT INTO user_events (user_id, event_type, event_timestamp, metadata)
+       VALUES (0, $1, NOW(), $2::jsonb)`,
+      [eventType, JSON.stringify({
+        adminEmail,
+        ...metadata,
+        timestamp: new Date().toISOString(),
+      })]
+    );
+    
+    console.log(`[Event Logger] Logged admin event: ${eventType} for ${adminEmail}`);
+  } catch (error: any) {
+    // Don't throw - event logging should not break the main flow
+    console.error('[Event Logger] Failed to log admin event:', error);
+  }
+}
+

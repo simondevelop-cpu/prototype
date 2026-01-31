@@ -52,7 +52,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [showAddCategoryInput, setShowAddCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [deleteConfirmTxId, setDeleteConfirmTxId] = useState<number | null>(null);
-  const [editCounts, setEditCounts] = useState({ description: 0, category: 0, label: 0, date: 0, amount: 0, statementsUploaded: 0 });
+  const [editCounts, setEditCounts] = useState({ description: 0, category: 0, label: 0, date: 0, amount: 0, statementsUploaded: 0, bulkEdit: 0 });
   const [editCountsLoading, setEditCountsLoading] = useState(false);
   
   const cashflowDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
@@ -457,6 +457,8 @@ export default function TransactionsList({ transactions, loading, token, onRefre
 
       setSelectedTransactionIds(new Set()); // Clear selection
       onRefresh(); // Refresh the list
+      // Refresh edit counts after successful bulk update
+      fetchEditCounts();
     } catch (error: any) {
       console.error('Bulk update error:', error);
       throw error;
@@ -563,7 +565,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
         <>
           {/* Your Activity Section */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Your activity</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Your monthly activity... measuring just how much we got wrong (and can get better)!</h3>
             <p className="text-sm text-gray-600 mb-4">
               Let's play a game - you try and get these numbers as high as you can, and we'll try and bring the blue ones down over time!
             </p>
@@ -572,7 +574,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <div className="animate-spin w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-blue-600">{editCounts.description}</div>
                   <div className="text-sm text-gray-600 mt-1">Description</div>
@@ -596,6 +598,10 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <div className="text-center">
                   <div className="text-3xl font-bold text-green-600">{editCounts.statementsUploaded}</div>
                   <div className="text-sm text-gray-600 mt-1">Statements uploaded</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600">{editCounts.bulkEdit}</div>
+                  <div className="text-sm text-gray-600 mt-1">Bulk edit</div>
                 </div>
               </div>
             )}
@@ -653,16 +659,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
 
       {/* Filters */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="lg:col-span-2">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Description, amount, category, label..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
             <input
@@ -682,7 +679,16 @@ export default function TransactionsList({ transactions, loading, token, onRefre
             />
           </div>
         </div>
-        <div className="mt-4 flex justify-end">
+        <div className="flex items-end gap-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Description, amount, category, label..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
           <button
             onClick={() => {
               setSearchTerm('');

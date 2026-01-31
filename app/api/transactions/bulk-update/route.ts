@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { ensureTokenizedForAnalytics } from '@/lib/tokenization';
+import { logBulkEditEvent } from '@/lib/event-logger';
 
 // Force dynamic rendering (POST endpoint requires runtime request body)
 export const dynamic = 'force-dynamic';
@@ -88,6 +89,12 @@ export async function POST(request: NextRequest) {
        RETURNING id`,
       values
     );
+
+    // Log bulk edit event (count as single event, not per transaction)
+    if (result.rowCount && result.rowCount > 0) {
+      const fieldsUpdated = Object.keys(updates).filter(key => updates[key] !== undefined);
+      await logBulkEditEvent(userId, transactionIds, fieldsUpdated, result.rowCount);
+    }
 
     return NextResponse.json({ 
       success: true, 

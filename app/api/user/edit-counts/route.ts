@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
         date: 0,
         amount: 0,
         statementsUploaded: 0,
+        bulkEdit: 0,
       }, { status: 200 });
     }
 
@@ -67,6 +68,14 @@ export async function GET(request: NextRequest) {
       FROM user_events
       WHERE user_id = $1
         AND event_type = 'transaction_edit'
+    `, [userId]);
+
+    // Fetch bulk edit events for this user
+    const bulkEditResult = await pool.query(`
+      SELECT COUNT(*) as count
+      FROM user_events
+      WHERE user_id = $1
+        AND event_type = 'bulk_edit'
     `, [userId]);
 
     // Fetch statement upload events for this user
@@ -85,13 +94,15 @@ export async function GET(request: NextRequest) {
       date: 0,
       amount: 0,
       statementsUploaded: parseInt(statementResult.rows[0]?.count || '0', 10),
+      bulkEdit: parseInt(bulkEditResult.rows[0]?.count || '0', 10),
     };
 
     editResult.rows.forEach((row: any) => {
       const metadata = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
       if (metadata && metadata.changes && Array.isArray(metadata.changes)) {
         metadata.changes.forEach((change: any) => {
-          const field = change.field?.toLowerCase();
+          // Use exact field name match (case-sensitive) to ensure proper mapping
+          const field = change.field;
           // Only count specific fields - exclude account, cashflow, merchant
           if (field === 'description') {
             counts.description++;
