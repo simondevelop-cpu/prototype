@@ -214,8 +214,8 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
 
   const renderStep1 = () => (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">
-        Of the following features, which would you (i) expect and consider a table stake (ii) would use or (iii) would love?
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">
+        Of the following features, which would you (i) expect (ii) would use or (iii) would love?
       </h2>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
@@ -409,7 +409,6 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
         <h2 className="text-2xl font-bold text-gray-900 mb-4">
           If we dilligenced and partnered with trusted professionals who could optionally use this tool (with your permission) to help you, would you be interested in any of them?
         </h2>
-        <p className="text-gray-600 mb-4">Select all that apply</p>
         <div className="space-y-3">
           {[
             { emoji: '🧾', text: 'Accountant / CPA (taxes, filings, cleanup, year-end)' },

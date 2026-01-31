@@ -52,6 +52,8 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [showAddCategoryInput, setShowAddCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [deleteConfirmTxId, setDeleteConfirmTxId] = useState<number | null>(null);
+  const [editCounts, setEditCounts] = useState({ description: 0, category: 0, label: 0, date: 0, amount: 0 });
+  const [editCountsLoading, setEditCountsLoading] = useState(false);
   
   const cashflowDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
   const accountDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
@@ -101,6 +103,31 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       });
     }
   }, [initialCashflowFilter]);
+
+  // Fetch edit counts
+  const fetchEditCounts = async () => {
+    setEditCountsLoading(true);
+    try {
+      const response = await fetch('/api/user/edit-counts', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setEditCounts(data);
+      }
+    } catch (error) {
+      console.error('Error fetching edit counts:', error);
+    } finally {
+      setEditCountsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEditCounts();
+  }, [token]);
 
   // Filter transactions (calculate even when loading to maintain hook order)
   const filteredTransactions = (transactions || []).filter(tx => {
@@ -271,6 +298,8 @@ export default function TransactionsList({ transactions, loading, token, onRefre
 
       setEditingTransaction(null);
       onRefresh(); // Refresh the list
+      // Refresh edit counts after successful update
+      fetchEditCounts();
     } catch (error: any) {
       console.error('Update transaction error:', error);
       throw error;
@@ -338,6 +367,8 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       const updatedTx = { ...tx, [field]: newValue };
       await handleUpdateTransaction(updatedTx, tx);
       setEditingCell(null);
+      // Refresh edit counts after successful edit
+      fetchEditCounts();
     } catch (error) {
       console.error('Failed to save inline edit:', error);
       // Revert on error
@@ -530,6 +561,42 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       {/* Show empty state or normal content */}
       {emptyStateContent || (
         <>
+          {/* Your Activity Section */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Your activity</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Let's play a game - see how high you can get these numbers, and we'll try and bring them down!
+            </p>
+            {editCountsLoading ? (
+              <div className="text-center py-4">
+                <div className="animate-spin w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600">{editCounts.description}</div>
+                  <div className="text-sm text-gray-600 mt-1">Description</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600">{editCounts.category}</div>
+                  <div className="text-sm text-gray-600 mt-1">Category</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600">{editCounts.label}</div>
+                  <div className="text-sm text-gray-600 mt-1">Label</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600">{editCounts.date}</div>
+                  <div className="text-sm text-gray-600 mt-1">Date</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600">{editCounts.amount}</div>
+                  <div className="text-sm text-gray-600 mt-1">Amount</div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Header with Title and Action Buttons */}
           <div className="flex items-center justify-between">
             <div>
@@ -691,7 +758,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                     onClick={() => setShowCashflowDropdown(!showCashflowDropdown)}
                     className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap flex items-center gap-1"
                   >
-                    CASHFLOW {selectedCashflows.length > 0 && `(${selectedCashflows.length})`} <span className="text-base font-bold">▾</span>
+                    CASHFLOW {selectedCashflows.length > 0 && `(${selectedCashflows.length})`} <span className="text-5xl font-bold">▾</span>
                   </button>
                   {showCashflowDropdown && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
@@ -739,7 +806,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                     onClick={() => setShowAccountDropdown(!showAccountDropdown)}
                     className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap flex items-center gap-1"
                   >
-                    ACCOUNT {selectedAccounts.length > 0 && `(${selectedAccounts.length})`} <span className="text-base font-bold">▾</span>
+                    ACCOUNT {selectedAccounts.length > 0 && `(${selectedAccounts.length})`} <span className="text-5xl font-bold">▾</span>
                   </button>
                   {showAccountDropdown && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
@@ -779,7 +846,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                     onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
                     className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap flex items-center gap-1"
                   >
-                    CATEGORY {selectedCategories.length > 0 && `(${selectedCategories.length})`} <span className="text-base font-bold">▾</span>
+                    CATEGORY {selectedCategories.length > 0 && `(${selectedCategories.length})`} <span className="text-5xl font-bold">▾</span>
                   </button>
                   {showCategoryDropdown && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
@@ -886,7 +953,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                     onClick={() => setShowLabelDropdown(!showLabelDropdown)}
                     className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap flex items-center gap-1"
                   >
-                    LABEL {selectedLabels.length > 0 && `(${selectedLabels.length})`} <span className="text-base font-bold">▾</span>
+                    LABEL {selectedLabels.length > 0 && `(${selectedLabels.length})`} <span className="text-5xl font-bold">▾</span>
                   </button>
                   {showLabelDropdown && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">

@@ -58,17 +58,37 @@ export async function POST(request: NextRequest) {
       
       // Try to update the constraint if table already exists with old constraint
       try {
-        await pool.query(`
-          ALTER TABLE chat_bookings DROP CONSTRAINT IF EXISTS chat_bookings_status_check;
-          ALTER TABLE chat_bookings ADD CONSTRAINT chat_bookings_status_check 
-            CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed'));
+        // First, check if constraint exists and what values it allows
+        const constraintCheck = await pool.query(`
+          SELECT conname, pg_get_constraintdef(oid) as definition
+          FROM pg_constraint
+          WHERE conrelid = 'chat_bookings'::regclass
+          AND conname = 'chat_bookings_status_check'
         `);
-      } catch (alterError: any) {
-        // Constraint might already be correct, ignore error
-        // Only log if it's not a "constraint already exists" type error
-        if (!alterError.message?.includes('already exists') && !alterError.code?.includes('42710')) {
-          console.log('[API] Constraint update note:', alterError.message);
+        
+        if (constraintCheck.rows.length > 0) {
+          const definition = constraintCheck.rows[0].definition;
+          // Check if 'requested' is in the constraint
+          if (!definition.includes("'requested'")) {
+            // Drop old constraint and add new one
+            await pool.query(`
+              ALTER TABLE chat_bookings DROP CONSTRAINT chat_bookings_status_check;
+            `);
+            await pool.query(`
+              ALTER TABLE chat_bookings ADD CONSTRAINT chat_bookings_status_check 
+                CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed'));
+            `);
+          }
+        } else {
+          // Constraint doesn't exist, add it
+          await pool.query(`
+            ALTER TABLE chat_bookings ADD CONSTRAINT chat_bookings_status_check 
+              CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed'));
+          `);
         }
+      } catch (alterError: any) {
+        // Log error but continue - constraint might already be correct or table might not exist yet
+        console.warn('[API] Constraint update note:', alterError.message);
       }
     } catch (createError: any) {
       console.error('[API] Error ensuring chat_bookings table exists:', createError);
