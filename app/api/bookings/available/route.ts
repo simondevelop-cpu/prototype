@@ -133,8 +133,23 @@ export async function GET(request: NextRequest) {
     const availableSlots: string[] = [];
     adminMarkedSlots.forEach((slotKey: string) => {
       const [date, hourTime] = slotKey.split('_');
+      if (!date || !hourTime) {
+        console.warn('[API] Invalid slot key format:', slotKey);
+        return;
+      }
+      
       // Extract hour from HH:MM format
-      const hour = parseInt(hourTime.split(':')[0]);
+      const hourMatch = hourTime.match(/^(\d{2}):/);
+      if (!hourMatch) {
+        console.warn('[API] Invalid time format in slot key:', slotKey);
+        return;
+      }
+      
+      const hour = parseInt(hourMatch[1], 10);
+      if (isNaN(hour) || hour < 0 || hour > 23) {
+        console.warn('[API] Invalid hour in slot key:', slotKey);
+        return;
+      }
       
       // Generate 3 slots per hour: :00, :20, :40
       ['00', '20', '40'].forEach(minutes => {

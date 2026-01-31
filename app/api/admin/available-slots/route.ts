@@ -75,11 +75,8 @@ export async function GET(request: NextRequest) {
         : String(row.slot_time).slice(0, 5);
       
       const slotKey = `${dateStr}_${timeStr}`;
-      console.log('[API] Returning slot:', slotKey);
       return slotKey;
     });
-
-    console.log('[API] Total available slots:', slots.length);
     return NextResponse.json({
       success: true,
       availableSlots: Array.from(slots),
@@ -147,18 +144,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Normalize time to HH:MM:SS format
+    // Validate and normalize time to HH:MM:SS format
+    const timeRegex = /^\d{2}:\d{2}(:\d{2})?$/;
+    if (!timeRegex.test(slotTime)) {
+      return NextResponse.json(
+        { error: 'Invalid time format. Expected HH:MM or HH:MM:SS' },
+        { status: 400 }
+      );
+    }
     const normalizedTime = slotTime.includes(':') && slotTime.split(':').length === 2 
       ? `${slotTime}:00` 
       : slotTime;
 
-    // Ensure date is in YYYY-MM-DD format
+    // Validate and normalize date to YYYY-MM-DD format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}/;
     let normalizedDate = slotDate;
     if (normalizedDate.includes('T')) {
       normalizedDate = normalizedDate.split('T')[0];
     }
-
-    console.log('[API] Saving slot:', { normalizedDate, normalizedTime, isAvailable });
+    if (!dateRegex.test(normalizedDate)) {
+      return NextResponse.json(
+        { error: 'Invalid date format. Expected YYYY-MM-DD' },
+        { status: 400 }
+      );
+    }
 
     // Upsert the slot availability
     const result = await pool.query(
@@ -169,8 +178,6 @@ export async function POST(request: NextRequest) {
        RETURNING slot_date, slot_time, is_available`,
       [normalizedDate, normalizedTime, isAvailable !== false]
     );
-
-    console.log('[API] Slot saved:', result.rows[0]);
 
     return NextResponse.json({
       success: true,

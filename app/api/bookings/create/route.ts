@@ -65,7 +65,10 @@ export async function POST(request: NextRequest) {
         `);
       } catch (alterError: any) {
         // Constraint might already be correct, ignore error
-        console.log('[API] Constraint update (if needed):', alterError.message);
+        // Only log if it's not a "constraint already exists" type error
+        if (!alterError.message?.includes('already exists') && !alterError.code?.includes('42710')) {
+          console.log('[API] Constraint update note:', alterError.message);
+        }
       }
     } catch (createError: any) {
       console.error('[API] Error ensuring chat_bookings table exists:', createError);
@@ -78,6 +81,71 @@ export async function POST(request: NextRequest) {
     if (!bookingDate || !bookingTime || !preferredMethod) {
       return NextResponse.json(
         { error: 'Missing required fields: bookingDate, bookingTime, preferredMethod' },
+        { status: 400 }
+      );
+    }
+
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(bookingDate)) {
+      return NextResponse.json(
+        { error: 'Invalid date format. Expected YYYY-MM-DD' },
+        { status: 400 }
+      );
+    }
+
+    // Validate time format (HH:MM or HH:MM:SS)
+    const timeRegex = /^\d{2}:\d{2}(:\d{2})?$/;
+    if (!timeRegex.test(bookingTime)) {
+      return NextResponse.json(
+        { error: 'Invalid time format. Expected HH:MM or HH:MM:SS' },
+        { status: 400 }
+      );
+    }
+
+    // Normalize booking time to HH:MM:SS format
+    let normalizedTime: string;
+    if (bookingTime.includes(':') && bookingTime.split(':').length === 2) {
+      normalizedTime = `${bookingTime}:00`;
+    } else if (bookingTime.includes(':') && bookingTime.split(':').length === 3) {
+      normalizedTime = bookingTime; // Already in HH:MM:SS format
+    } else {
+      return NextResponse.json(
+        { error: 'Invalid time format. Expected HH:MM or HH:MM:SS' },
+        { status: 400 }
+      );
+    }
+
+    // Validate time is valid (0-23 hours, 0-59 minutes)
+    const timeParts = normalizedTime.split(':');
+    if (timeParts.length < 2) {
+      return NextResponse.json(
+        { error: 'Invalid time format' },
+        { status: 400 }
+      );
+    }
+    const hours = parseInt(timeParts[0], 10);
+    const minutes = parseInt(timeParts[1], 10);
+    if (isNaN(hours) || hours < 0 || hours > 23 || isNaN(minutes) || minutes < 0 || minutes > 59) {
+      return NextResponse.json(
+        { error: 'Invalid time. Hours must be 0-23, minutes must be 0-59' },
+        { status: 400 }
+      );
+    }
+
+    // Validate date is not in the past
+    const bookingDateObj = new Date(bookingDate + 'T00:00:00'); // Use local midnight to avoid timezone issues
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (isNaN(bookingDateObj.getTime())) {
+      return NextResponse.json(
+        { error: 'Invalid date' },
+        { status: 400 }
+      );
+    }
+    if (bookingDateObj < today) {
+      return NextResponse.json(
+        { error: 'Cannot book slots in the past' },
         { status: 400 }
       );
     }
@@ -98,10 +166,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Normalize booking time to HH:MM:SS format
-    const normalizedTime = bookingTime.includes(':') && bookingTime.split(':').length === 2 
-      ? `${bookingTime}:00` 
-      : bookingTime;
 
     // Check if slot is already booked (including requested status)
     const existingBooking = await pool.query(
@@ -117,8 +181,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate notes word count (200 word limit)
-    if (notes) {
+    // Validate notes type and word count (200 word limit)
+    if (notes !== null && notes !== undefined) {
+      if (typeof notes !== 'string') {
+        return NextResponse.json(
+          { error: 'Notes must be a string' },
+          { status: 400 }
+        );
+      }
       const wordCount = notes.trim().split(/\s+/).filter(Boolean).length;
       if (wordCount > 200) {
         return NextResponse.json(

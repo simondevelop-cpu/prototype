@@ -86,6 +86,14 @@ export async function PUT(request: NextRequest) {
 
     // Handle notes update
     if (notes !== undefined) {
+      // Validate notes is a string
+      if (notes !== null && typeof notes !== 'string') {
+        return NextResponse.json(
+          { error: 'Notes must be a string or null' },
+          { status: 400 }
+        );
+      }
+      
       // Validate word count (200 word limit)
       if (notes) {
         const wordCount = notes.trim().split(/\s+/).filter(Boolean).length;

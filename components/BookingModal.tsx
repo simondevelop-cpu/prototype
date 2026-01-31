@@ -46,7 +46,7 @@ export default function BookingModal({ isOpen, onClose, date, time, token }: Boo
         },
         body: JSON.stringify({
           bookingDate: date,
-          bookingTime: time + ':00', // Add seconds for database
+          bookingTime: time.includes(':') ? time : `${time}:00`, // Ensure HH:MM format
           preferredMethod,
           shareScreen: preferredMethod === 'phone' ? null : shareScreen,
           recordConversation: preferredMethod === 'phone' ? null : recordConversation,
