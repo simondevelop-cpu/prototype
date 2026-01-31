@@ -622,7 +622,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            🔄 Recategorization Log
+            🔄 Recategorization log
           </button>
         </div>
 
@@ -1352,7 +1352,7 @@ export default function AdminDashboard() {
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Unique Users</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Unique users</h2>
           <p className="text-gray-600 mt-1">View all user registrations and account status</p>
         </div>
 
@@ -1509,7 +1509,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            📊 Cohort Analysis
+            📊 Cohort analysis
           </button>
           <button
             onClick={() => setAnalyticsSubTab('customer-data')}
@@ -1519,7 +1519,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            👥 Customer Data
+            👥 Customer data
           </button>
           <button
             onClick={() => setAnalyticsSubTab('events-data')}
@@ -1529,7 +1529,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            📋 Events Data
+            📋 Events data
           </button>
           <button
             onClick={() => setAnalyticsSubTab('editing-events-data')}
@@ -1539,7 +1539,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            ✏️ Editing Events Data
+            ✏️ Editing events data
           </button>
           <button
             onClick={() => setAnalyticsSubTab('vanity-metrics')}
@@ -1549,7 +1549,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            📈 Vanity Metrics
+            📈 Vanity metrics
           </button>
           <button
             onClick={() => setAnalyticsSubTab('data-details')}
@@ -1559,7 +1559,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            📋 Data Details
+            📋 Data details
           </button>
         </div>
 
@@ -3414,7 +3414,7 @@ export default function AdminDashboard() {
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="p-6 border-b border-gray-200 flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Editing Events Data</h2>
+                <h2 className="text-xl font-bold text-gray-900">Editing events data</h2>
                 <p className="text-gray-600 mt-1">Transaction editing events - all changes made to transactions</p>
               </div>
               <div className="flex gap-2">
@@ -3600,7 +3600,7 @@ export default function AdminDashboard() {
             onClick={fetchPrivacyCheckData}
             className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
           >
-            Run Privacy Policy Check
+            Run Privacy policy check
           </button>
         </div>
       );
@@ -3632,7 +3632,7 @@ export default function AdminDashboard() {
         <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">🔒 Privacy Policy Check</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">🔒 Privacy policy check</h2>
               <p className="text-gray-600">
                 Automated compliance verification for Privacy Policy commitments.
               </p>
@@ -3760,7 +3760,7 @@ export default function AdminDashboard() {
         <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">🏥 App Health</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">🏥 App health</h2>
               <p className="text-gray-600">
                 Comprehensive health checks for application and database infrastructure.
               </p>
@@ -4256,7 +4256,7 @@ export default function AdminDashboard() {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Admin dashboard</h1>
               <p className="text-gray-600 mt-1">Manage categorization, analytics, and user accounts</p>
             </div>
             <div className="flex items-center gap-4">
@@ -4297,7 +4297,7 @@ export default function AdminDashboard() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              🏷️ Category Engine
+              🏷️ Category engine
             </button>
             <button
               onClick={() => setActiveTab('insights')}
@@ -4307,7 +4307,7 @@ export default function AdminDashboard() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              🔍 Insights Engine
+              🔍 Insights engine
             </button>
             <button
               onClick={() => setActiveTab('analytics')}
@@ -4327,7 +4327,7 @@ export default function AdminDashboard() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              📊 App Monitoring
+              📊 App monitoring
             </button>
           </div>
         </div>
@@ -4357,7 +4357,7 @@ export default function AdminDashboard() {
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                💚 App Health
+                💚 App health
               </button>
               <button
                 onClick={() => {
@@ -4372,7 +4372,7 @@ export default function AdminDashboard() {
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                🔒 Privacy Policy Check
+                🔒 Privacy policy check
               </button>
             </div>
             {/* Monitoring Content */}

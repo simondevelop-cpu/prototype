@@ -52,7 +52,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [showAddCategoryInput, setShowAddCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [deleteConfirmTxId, setDeleteConfirmTxId] = useState<number | null>(null);
-  const [editCounts, setEditCounts] = useState({ description: 0, category: 0, label: 0, date: 0, amount: 0 });
+  const [editCounts, setEditCounts] = useState({ description: 0, category: 0, label: 0, date: 0, amount: 0, statementsUploaded: 0 });
   const [editCountsLoading, setEditCountsLoading] = useState(false);
   
   const cashflowDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
@@ -565,14 +565,14 @@ export default function TransactionsList({ transactions, loading, token, onRefre
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
             <h3 className="text-xl font-bold text-gray-900 mb-2">Your activity</h3>
             <p className="text-sm text-gray-600 mb-4">
-              Let's play a game - see how high you can get these numbers, and we'll try and bring them down!
+              Let's play a game - you try and get these numbers as high as you can, and we'll try and bring the blue ones down over time!
             </p>
             {editCountsLoading ? (
               <div className="text-center py-4">
                 <div className="animate-spin w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-blue-600">{editCounts.description}</div>
                   <div className="text-sm text-gray-600 mt-1">Description</div>
@@ -592,6 +592,10 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <div className="text-center">
                   <div className="text-3xl font-bold text-blue-600">{editCounts.amount}</div>
                   <div className="text-sm text-gray-600 mt-1">Amount</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-green-600">{editCounts.statementsUploaded}</div>
+                  <div className="text-sm text-gray-600 mt-1">Statements uploaded</div>
                 </div>
               </div>
             )}

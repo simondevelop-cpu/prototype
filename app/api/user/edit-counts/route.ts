@@ -57,42 +57,54 @@ export async function GET(request: NextRequest) {
         label: 0,
         date: 0,
         amount: 0,
+        statementsUploaded: 0,
       }, { status: 200 });
     }
 
     // Fetch transaction editing events for this user
-    const result = await pool.query(`
+    const editResult = await pool.query(`
       SELECT metadata
       FROM user_events
       WHERE user_id = $1
         AND event_type = 'transaction_edit'
     `, [userId]);
 
-    // Count edits by field
+    // Fetch statement upload events for this user
+    const statementResult = await pool.query(`
+      SELECT COUNT(*) as count
+      FROM user_events
+      WHERE user_id = $1
+        AND event_type = 'statement_upload'
+    `, [userId]);
+
+    // Count edits by field (only count specific fields, exclude account and cashflow)
     const counts = {
       description: 0,
       category: 0,
       label: 0,
       date: 0,
       amount: 0,
+      statementsUploaded: parseInt(statementResult.rows[0]?.count || '0', 10),
     };
 
-    result.rows.forEach((row: any) => {
+    editResult.rows.forEach((row: any) => {
       const metadata = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
       if (metadata && metadata.changes && Array.isArray(metadata.changes)) {
         metadata.changes.forEach((change: any) => {
           const field = change.field?.toLowerCase();
-          if (field === 'description' && counts.description !== undefined) {
+          // Only count specific fields - exclude account, cashflow, merchant
+          if (field === 'description') {
             counts.description++;
-          } else if (field === 'category' && counts.category !== undefined) {
+          } else if (field === 'category') {
             counts.category++;
-          } else if (field === 'label' && counts.label !== undefined) {
+          } else if (field === 'label') {
             counts.label++;
-          } else if (field === 'date' && counts.date !== undefined) {
+          } else if (field === 'date') {
             counts.date++;
-          } else if (field === 'amount' && counts.amount !== undefined) {
+          } else if (field === 'amount') {
             counts.amount++;
           }
+          // Explicitly ignore: account, cashflow, merchant
         });
       }
     });
