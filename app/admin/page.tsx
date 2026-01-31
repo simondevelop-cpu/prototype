@@ -3014,8 +3014,98 @@ export default function AdminDashboard() {
                         <li><strong>upload_session_id</strong> - TEXT (identifier for the upload session)</li>
                       </ul>
                     </li>
+                    <li><strong>transaction_edit events (event_type = 'transaction_edit'):</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-disc list-inside">
+                        <li><strong>transactionId</strong> - INTEGER (ID of the transaction that was edited)</li>
+                        <li><strong>changes</strong> - JSONB ARRAY (array of change objects, each containing):
+                          <ul className="ml-4 mt-1 space-y-1 list-disc list-inside">
+                            <li><strong>field</strong> - TEXT (field that was changed, e.g., 'category', 'label', 'amount', 'description', 'date', 'cashflow', 'account')</li>
+                            <li><strong>oldValue</strong> - TEXT/INTEGER/DECIMAL (previous value of the field)</li>
+                            <li><strong>newValue</strong> - TEXT/INTEGER/DECIMAL (new value of the field)</li>
+                          </ul>
+                        </li>
+                        <li><strong>timestamp</strong> - TEXT (ISO timestamp of when the edit occurred)</li>
+                      </ul>
+                    </li>
                   </ul>
                   <p className="text-xs text-gray-500 mt-2 italic">Purpose: Flexible JSONB metadata field allows storing event-specific data without schema changes. Different event types store different metadata structures.</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">chat_bookings table (Chat Booking System)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (booking identifier)</li>
+                    <li><strong>user_id</strong> - INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE (foreign key to users table)</li>
+                    <li><strong>booking_date</strong> - DATE NOT NULL (date of the booked appointment)</li>
+                    <li><strong>booking_time</strong> - TIME NOT NULL (time of the booked appointment, HH:MM:SS format)</li>
+                    <li><strong>preferred_method</strong> - TEXT NOT NULL CHECK (preferred_method IN ('teams', 'google-meet', 'phone')) (communication method)</li>
+                    <li><strong>share_screen</strong> - BOOLEAN (whether user wants to share screen, for Teams/Google Meet only)</li>
+                    <li><strong>record_conversation</strong> - BOOLEAN (whether user wants to record conversation, for Teams/Google Meet only)</li>
+                    <li><strong>notes</strong> - TEXT (optional notes from user, max 200 words)</li>
+                    <li><strong>status</strong> - TEXT DEFAULT 'requested' CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed')) (booking status)</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when booking was created)</li>
+                    <li><strong>updated_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when booking was last updated)</li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-2 italic">Purpose: Stores user booking requests for 20-minute chat sessions with the team. Status starts as 'requested' and is updated by admin to 'confirmed', 'cancelled', or 'completed'.</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">available_slots table (Chat Booking Availability)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (slot identifier)</li>
+                    <li><strong>slot_date</strong> - DATE NOT NULL (date of the available slot)</li>
+                    <li><strong>slot_time</strong> - TIME NOT NULL (time of the available slot, HH:MM:SS format)</li>
+                    <li><strong>is_available</strong> - BOOLEAN DEFAULT TRUE (whether this slot is marked as available by admin)</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when slot was created)</li>
+                    <li><strong>updated_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when slot availability was last updated)</li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-2 italic">Purpose: Admin-managed table for marking which date/time slots are available for booking. Each available hour generates 3 slots (20-minute intervals: :00, :20, :40).</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">survey_responses table (Feature Prioritization Survey)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (survey response identifier)</li>
+                    <li><strong>user_id</strong> - INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE (foreign key to users table)</li>
+                    <li><strong>q1_data</strong> - JSONB (Q1 responses: feature expectations with "Expect", "Use", "Love" columns)</li>
+                    <li><strong>q2_data</strong> - JSONB (Q2 responses: ranked priority list, with data security locked at #1)</li>
+                    <li><strong>q3_data</strong> - JSONB (Q3 responses: professional advisor interest selections)</li>
+                    <li><strong>q4_data</strong> - TEXT (Q4 response: access level preference, conditional on Q3)</li>
+                    <li><strong>q5_data</strong> - TEXT (Q5 response: free text comments, max 200 words)</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when survey was submitted)</li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-2 italic">Purpose: Stores user responses to the "What's Coming" feature prioritization survey. Used to inform product roadmap decisions.</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">admin_keywords table (Categorization Engine - Keywords)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (keyword identifier)</li>
+                    <li><strong>keyword</strong> - TEXT NOT NULL (keyword pattern to match in transaction descriptions)</li>
+                    <li><strong>category</strong> - TEXT NOT NULL (category to assign when keyword matches)</li>
+                    <li><strong>label</strong> - TEXT NOT NULL (sub-category label to assign when keyword matches)</li>
+                    <li><strong>is_active</strong> - BOOLEAN DEFAULT TRUE (whether this keyword is currently active)</li>
+                    <li><strong>notes</strong> - TEXT (optional admin notes about this keyword)</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when keyword was created)</li>
+                    <li><strong>updated_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when keyword was last updated)</li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-2 italic">Purpose: Generic keywords for auto-categorization (tier 3 priority). Used when user history and merchant matching don't apply. Searched in category priority order (Housing → Bills → Subscriptions → Food → etc.).</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">admin_merchants table (Categorization Engine - Merchants)</h3>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (merchant identifier)</li>
+                    <li><strong>merchant_pattern</strong> - TEXT NOT NULL UNIQUE (primary merchant name pattern)</li>
+                    <li><strong>alternate_patterns</strong> - TEXT[] (array of alternate spellings/variations, e.g., ['TIMHORT', 'TIM HORT', 'HORTONS'])</li>
+                    <li><strong>category</strong> - TEXT NOT NULL (category to assign when merchant matches)</li>
+                    <li><strong>label</strong> - TEXT NOT NULL (sub-category label to assign when merchant matches)</li>
+                    <li><strong>is_active</strong> - BOOLEAN DEFAULT TRUE (whether this merchant is currently active)</li>
+                    <li><strong>notes</strong> - TEXT (optional admin notes about this merchant)</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when merchant was created)</li>
+                    <li><strong>updated_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when merchant was last updated)</li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-2 italic">Purpose: Merchant patterns for auto-categorization (tier 2 priority). Supports space-insensitive matching and alternate spellings. 200+ Canadian merchants pre-loaded.</p>
                 </div>
               </div>
             </div>
