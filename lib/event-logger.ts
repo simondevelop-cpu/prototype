@@ -3,6 +3,8 @@
  */
 
 import { getPool } from './db';
+import { hashPassword } from './auth';
+import crypto from 'crypto';
 
 export interface BankStatementEventMetadata {
   bank: string;
@@ -203,12 +205,64 @@ export async function logAdminEvent(
   }
 
   try {
-    // Get admin user ID (use a special admin user ID or create a system user)
-    // For now, we'll use email as identifier and store in metadata
+    // Find or create admin user for event logging
+    // First, try to find a user with the admin email
+    let adminUserId: number | null = null;
+    
+    try {
+      const userResult = await pool.query(
+        'SELECT id FROM users WHERE email = $1 LIMIT 1',
+        [adminEmail.toLowerCase()]
+      );
+      
+      if (userResult.rows.length > 0) {
+        adminUserId = userResult.rows[0].id;
+      } else {
+        // Admin user doesn't exist - create a minimal admin user record for event logging
+        // This allows us to track admin events without requiring a full user account
+        try {
+          // Create a minimal admin user (password hash is required but won't be used for login)
+          // Use a secure random password hash that will never match any real password
+          const randomPassword = crypto.randomBytes(32).toString('hex');
+          const dummyHash = await hashPassword(randomPassword);
+          const createResult = await pool.query(
+            'INSERT INTO users (email, password_hash, display_name, email_validated) VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email RETURNING id',
+            [adminEmail.toLowerCase(), dummyHash, 'Admin User', true]
+          );
+          adminUserId = createResult.rows[0].id;
+          console.log(`[Event Logger] Created admin user record for ${adminEmail} with ID ${adminUserId}`);
+        } catch (createError: any) {
+          // If creation fails (e.g., email conflict), try to fetch again
+          if (createError.code === '23505') { // Unique violation
+            const retryResult = await pool.query(
+              'SELECT id FROM users WHERE email = $1 LIMIT 1',
+              [adminEmail.toLowerCase()]
+            );
+            if (retryResult.rows.length > 0) {
+              adminUserId = retryResult.rows[0].id;
+            }
+          }
+          if (!adminUserId) {
+            console.warn(`[Event Logger] Could not create or find admin user for ${adminEmail}, skipping event log`);
+            return;
+          }
+        }
+      }
+    } catch (userError) {
+      console.error('[Event Logger] Failed to find/create admin user:', userError);
+      return;
+    }
+
+    if (!adminUserId) {
+      console.warn(`[Event Logger] Could not determine admin user ID for ${adminEmail}`);
+      return;
+    }
+
+    // Insert the admin event with the valid user_id
     await pool.query(
       `INSERT INTO user_events (user_id, event_type, event_timestamp, metadata)
-       VALUES (0, $1, NOW(), $2::jsonb)`,
-      [eventType, JSON.stringify({
+       VALUES ($1, $2, NOW(), $3::jsonb)`,
+      [adminUserId, eventType, JSON.stringify({
         adminEmail,
         ...metadata,
         timestamp: new Date().toISOString(),
