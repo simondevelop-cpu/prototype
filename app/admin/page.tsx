@@ -2854,7 +2854,8 @@ export default function AdminDashboard() {
                   <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
                     <li><strong>id</strong> - SERIAL PRIMARY KEY (user identifier)</li>
                     <li><strong>email</strong> - TEXT UNIQUE NOT NULL (user email address)</li>
-                    <li><strong>password_hash</strong> - TEXT NOT NULL (hashed password for authentication)</li>
+                    <li><strong>password_hash</strong> - TEXT NOT NULL (hashed password for authentication, bcrypt hashed)</li>
+                    <li><strong>display_name</strong> - TEXT (user's display name, shown in UI)</li>
                     <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE (when user account was created)</li>
                     <li><strong>completed_at</strong> - TIMESTAMP WITH TIME ZONE (when onboarding was completed, NULL if not completed)</li>
                     <li><strong>last_step</strong> - INTEGER (last onboarding step reached, 0 if not started, 1-7 for steps)</li>
@@ -2874,20 +2875,51 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">transactions table (Transactions Data Source)</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">transactions table (Transactions Data Source - Legacy)</h3>
+                  <p className="text-xs text-gray-500 mb-2 italic">Note: After L0/L1/L2 migration, new transactions are stored in l1_transaction_facts. This table may still contain legacy data.</p>
                   <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
                     <li><strong>id</strong> - SERIAL PRIMARY KEY (transaction identifier)</li>
-                    <li><strong>user_id</strong> - INTEGER REFERENCES users(id) (foreign key to users table)</li>
+                    <li><strong>user_id</strong> - INTEGER REFERENCES users(id) ON DELETE CASCADE (foreign key to users table)</li>
                     <li><strong>date</strong> - DATE NOT NULL (transaction date from bank statement)</li>
                     <li><strong>description</strong> - TEXT NOT NULL (full transaction description from statement)</li>
                     <li><strong>merchant</strong> - TEXT (extracted merchant name, first part of description)</li>
                     <li><strong>amount</strong> - DECIMAL(10, 2) NOT NULL (transaction amount, positive for income, negative for expenses)</li>
-                    <li><strong>cashflow</strong> - VARCHAR(50) (type: 'income', 'expense', or 'other')</li>
+                    <li><strong>cashflow</strong> - VARCHAR(50) CHECK (cashflow IN ('income', 'expense', 'other')) (type: 'income', 'expense', or 'other')</li>
                     <li><strong>category</strong> - VARCHAR(255) (categorized transaction category, e.g., 'Food', 'Bills')</li>
                     <li><strong>account</strong> - VARCHAR(255) (bank/account name from statement, e.g., 'RBC Chequing')</li>
                     <li><strong>label</strong> - VARCHAR(255) (sub-category label, e.g., 'Groceries', 'Rent')</li>
                     <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when transaction was imported/uploaded)</li>
                     <li><strong>upload_session_id</strong> - TEXT (identifier for the upload session/batch, groups transactions from same PDF upload)</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">l1_transaction_facts table (Transactions Data Source - Post-Migration)</h3>
+                  <p className="text-xs text-gray-500 mb-2 italic">Note: This table is created during L0/L1/L2 migration. New transactions are written here after migration. Uses tokenized_user_id for privacy.</p>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (transaction identifier)</li>
+                    <li><strong>tokenized_user_id</strong> - TEXT NOT NULL REFERENCES l0_user_tokenization(tokenized_id) (tokenized user identifier for privacy)</li>
+                    <li><strong>transaction_date</strong> - DATE NOT NULL (transaction date from bank statement)</li>
+                    <li><strong>description</strong> - TEXT NOT NULL (full transaction description from statement)</li>
+                    <li><strong>merchant</strong> - TEXT (extracted merchant name, first part of description)</li>
+                    <li><strong>amount</strong> - DECIMAL(10, 2) NOT NULL (transaction amount, positive for income, negative for expenses)</li>
+                    <li><strong>cashflow</strong> - VARCHAR(50) CHECK (cashflow IN ('income', 'expense', 'other')) (type: 'income', 'expense', or 'other')</li>
+                    <li><strong>category</strong> - VARCHAR(255) (categorized transaction category, e.g., 'Food', 'Bills')</li>
+                    <li><strong>account</strong> - VARCHAR(255) (bank/account name from statement, e.g., 'RBC Chequing')</li>
+                    <li><strong>label</strong> - VARCHAR(255) (sub-category label, e.g., 'Groceries', 'Rent')</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when transaction was imported/uploaded)</li>
+                    <li><strong>upload_session_id</strong> - TEXT (identifier for the upload session/batch, groups transactions from same PDF upload)</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">l0_user_tokenization table (User Tokenization - Post-Migration)</h3>
+                  <p className="text-xs text-gray-500 mb-2 italic">Note: This table is created during L0/L1/L2 migration. Maps user_id to tokenized_id for privacy in analytics tables.</p>
+                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                    <li><strong>id</strong> - SERIAL PRIMARY KEY (tokenization record identifier)</li>
+                    <li><strong>user_id</strong> - INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE (links to users table)</li>
+                    <li><strong>tokenized_id</strong> - TEXT UNIQUE NOT NULL (tokenized identifier used in l1_transaction_facts)</li>
+                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when tokenization was created)</li>
                   </ul>
                 </div>
 
