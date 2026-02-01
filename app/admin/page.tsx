@@ -1867,6 +1867,85 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
+
+          {/* Drop Empty Unused Tables */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Drop Empty Unused Tables</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Drop empty tables that are not needed (l1_support_tickets will be kept).
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={fetchEmptyTablesVerification}
+                  disabled={emptyTablesLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {emptyTablesLoading ? 'Loading...' : 'Verify'}
+                </button>
+                {emptyTablesVerification && emptyTablesVerification.safeToDropCount > 0 && (
+                  <button
+                    onClick={dropEmptyTables}
+                    disabled={emptyTablesDropping}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-semibold"
+                  >
+                    {emptyTablesDropping ? 'Dropping...' : `Drop ${emptyTablesVerification.safeToDropCount} Tables`}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {emptyTablesVerification && (
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="p-4 bg-gray-50 border-b border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-gray-900">Empty Tables Verification</h4>
+                    <span className="text-sm font-medium text-gray-700">
+                      {emptyTablesVerification.safeToDropCount} / {emptyTablesVerification.totalTables} safe to drop
+                    </span>
+                  </div>
+                </div>
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Table</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purpose</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Row Count</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Referenced By</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {emptyTablesVerification.tables.map((table: any, index: number) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900 font-mono">{table.tableName}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{table.purpose}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{table.rowCount}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{table.referencedBy}</td>
+                        <td className="px-6 py-4 text-sm">
+                          {table.keep ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              🔒 Keep
+                            </span>
+                          ) : table.safeToDrop ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              ✓ Safe to Drop
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              ✗ Not Safe
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
