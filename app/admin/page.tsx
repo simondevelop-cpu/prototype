@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { invalidatePatternCache } from '@/lib/categorization-engine';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import CheckboxDropdown from '@/components/CheckboxDropdown';
+import { formatUserId, formatTransactionId, formatEventId } from '@/lib/id-formatter';
 
 type TabName = 'monitoring' | 'inbox' | 'categories' | 'analytics';
 type MonitoringSubTab = 'accounts' | 'health' | 'privacy-policy' | 'admin-logins';
@@ -1423,7 +1424,7 @@ export default function AdminDashboard() {
                 {users.map((user, index) => (
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-900">{users.length - index}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600 font-mono">{user.id}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600 font-mono">{formatUserId(user.id)}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{user.login_attempts || 0}</td>
                     <td className="px-6 py-4 text-sm">
@@ -3455,8 +3456,8 @@ export default function AdminDashboard() {
                     {eventsData.length > 0 ? (
                       eventsData.map((event) => (
                         <tr key={event.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm text-gray-600 font-mono">{event.id}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600 font-mono">{event.user_id}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600 font-mono">{formatEventId(event.id)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600 font-mono">{formatUserId(event.user_id)}</td>
                           <td className="px-6 py-4 text-sm text-gray-600">
                             {event.first_name || <span className="text-gray-400 italic">null</span>}
                           </td>

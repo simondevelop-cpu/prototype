@@ -301,42 +301,46 @@ export async function GET(request: NextRequest) {
       // Column doesn't exist
     }
 
-    // Enhanced Engagement query with more metrics - from appropriate table
-    // Build upload_counts subquery based on schema
-    const uploadCountsSubquery = hasUploadSession ? `
-      SELECT user_id, COUNT(DISTINCT upload_session_id) as upload_count
-      FROM transactions
-      WHERE upload_session_id IS NOT NULL
-      GROUP BY user_id
-    ` : `
-      SELECT user_id, 0 as upload_count
-      FROM transactions
-      GROUP BY user_id
+    // Enhanced Engagement query with more metrics - use l1_transaction_facts (preferred) with fallback to transactions (legacy)
+    // Build upload_counts subquery - note: upload_session_id not in l1_transaction_facts, use statement_upload events
+    const uploadCountsSubquery = `
+      SELECT 
+        COALESCE(ut.internal_user_id, t.user_id) as user_id,
+        COUNT(DISTINCT CASE WHEN tf.id IS NOT NULL THEN 1 WHEN t.upload_session_id IS NOT NULL THEN t.upload_session_id END) as upload_count
+      FROM users u
+      LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+      LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+      LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
+      WHERE tf.id IS NOT NULL OR t.id IS NOT NULL
+      GROUP BY COALESCE(ut.internal_user_id, t.user_id)
     `;
     
     // Build unique banks subquery - extract bank name from account field
     // Account field format: "RBC Credit Card", "TD Chequing", "Scotiabank Savings", etc.
     const uniqueBanksSubquery = `
       SELECT 
-        user_id,
+        COALESCE(ut.internal_user_id, t.user_id) as user_id,
         COUNT(DISTINCT 
           CASE 
-            WHEN account IS NOT NULL THEN
+            WHEN COALESCE(tf.account, t.account) IS NOT NULL THEN
               CASE 
-                WHEN account ILIKE 'RBC%' THEN 'RBC'
-                WHEN account ILIKE 'TD%' OR account ILIKE 'Toronto-Dominion%' THEN 'TD'
-                WHEN account ILIKE 'Scotiabank%' OR account ILIKE 'Bank of Nova Scotia%' THEN 'Scotiabank'
-                WHEN account ILIKE 'BMO%' OR account ILIKE 'Bank of Montreal%' THEN 'BMO'
-                WHEN account ILIKE 'CIBC%' OR account ILIKE 'Canadian Imperial%' THEN 'CIBC'
-                WHEN account ILIKE 'Tangerine%' OR account ILIKE 'ING Direct%' THEN 'Tangerine'
+                WHEN COALESCE(tf.account, t.account) ILIKE 'RBC%' THEN 'RBC'
+                WHEN COALESCE(tf.account, t.account) ILIKE 'TD%' OR COALESCE(tf.account, t.account) ILIKE 'Toronto-Dominion%' THEN 'TD'
+                WHEN COALESCE(tf.account, t.account) ILIKE 'Scotiabank%' OR COALESCE(tf.account, t.account) ILIKE 'Bank of Nova Scotia%' THEN 'Scotiabank'
+                WHEN COALESCE(tf.account, t.account) ILIKE 'BMO%' OR COALESCE(tf.account, t.account) ILIKE 'Bank of Montreal%' THEN 'BMO'
+                WHEN COALESCE(tf.account, t.account) ILIKE 'CIBC%' OR COALESCE(tf.account, t.account) ILIKE 'Canadian Imperial%' THEN 'CIBC'
+                WHEN COALESCE(tf.account, t.account) ILIKE 'Tangerine%' OR COALESCE(tf.account, t.account) ILIKE 'ING Direct%' THEN 'Tangerine'
                 ELSE NULL
               END
             ELSE NULL
           END
         ) as unique_bank_count
-      FROM transactions
-      WHERE account IS NOT NULL
-      GROUP BY user_id
+      FROM users u
+      LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+      LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+      LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
+      WHERE COALESCE(tf.account, t.account) IS NOT NULL
+      GROUP BY COALESCE(ut.internal_user_id, t.user_id)
     `;
     
     const engagementQuery = useUsersTable ? `
@@ -344,7 +348,7 @@ export async function GET(request: NextRequest) {
         DATE_TRUNC('week', u.created_at) as signup_week,
         -- Onboarding and data coverage
         COUNT(DISTINCT u.id) FILTER (WHERE u.completed_at IS NOT NULL) as onboarding_completed,
-        COUNT(DISTINCT t.user_id) FILTER (WHERE t.id IS NOT NULL) as uploaded_first_statement,
+        COUNT(DISTINCT CASE WHEN COALESCE(tf.id, t.id) IS NOT NULL THEN u.id END) as uploaded_first_statement,
         COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 2 THEN upload_counts.user_id END) as uploaded_two_statements,
         COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 3 THEN upload_counts.user_id END) as uploaded_three_plus_statements,
         -- Unique banks metrics
@@ -363,7 +367,9 @@ export async function GET(request: NextRequest) {
         AVG(transaction_counts.tx_count) FILTER (WHERE transaction_counts.tx_count > 0) as avg_transactions_per_user,
         COUNT(DISTINCT CASE WHEN transaction_counts.tx_count > 0 THEN u.id END) as users_with_transactions
       FROM users u
-      LEFT JOIN transactions t ON t.user_id = u.id
+      LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+      LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+      LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
       LEFT JOIN (
         ${uploadCountsSubquery}
       ) upload_counts ON upload_counts.user_id = u.id
@@ -371,14 +377,26 @@ export async function GET(request: NextRequest) {
         ${uniqueBanksSubquery}
       ) bank_counts ON bank_counts.user_id = u.id
       LEFT JOIN (
-        SELECT user_id, MIN(created_at) as first_transaction_date
-        FROM transactions
-        GROUP BY user_id
+        SELECT 
+          COALESCE(ut.internal_user_id, t.user_id) as user_id,
+          MIN(COALESCE(tf.created_at, t.created_at)) as first_transaction_date
+        FROM users u2
+        LEFT JOIN l0_user_tokenization ut ON u2.id = ut.internal_user_id
+        LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+        LEFT JOIN transactions t ON u2.id = t.user_id AND tf.id IS NULL
+        WHERE tf.id IS NOT NULL OR t.id IS NOT NULL
+        GROUP BY COALESCE(ut.internal_user_id, t.user_id)
       ) first_upload ON first_upload.user_id = u.id
       LEFT JOIN (
-        SELECT user_id, COUNT(*) as tx_count
-        FROM transactions
-        GROUP BY user_id
+        SELECT 
+          COALESCE(ut.internal_user_id, t.user_id) as user_id,
+          COUNT(*) as tx_count
+        FROM users u2
+        LEFT JOIN l0_user_tokenization ut ON u2.id = ut.internal_user_id
+        LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+        LEFT JOIN transactions t ON u2.id = t.user_id AND tf.id IS NULL
+        WHERE tf.id IS NOT NULL OR t.id IS NOT NULL
+        GROUP BY COALESCE(ut.internal_user_id, t.user_id)
       ) transaction_counts ON transaction_counts.user_id = u.id
       WHERE u.email != $${paramIndex}
         ${filterConditions}
@@ -392,7 +410,7 @@ export async function GET(request: NextRequest) {
           SELECT 1 FROM onboarding_responses o 
           WHERE o.user_id = u.id AND o.completed_at IS NOT NULL
         )) as onboarding_completed,
-        COUNT(DISTINCT t.user_id) FILTER (WHERE t.id IS NOT NULL) as uploaded_first_statement,
+        COUNT(DISTINCT CASE WHEN COALESCE(tf.id, t.id) IS NOT NULL THEN u.id END) as uploaded_first_statement,
         0 as uploaded_two_statements,
         0 as uploaded_three_plus_statements,
         0 as uploaded_more_than_one_bank,
@@ -402,7 +420,9 @@ export async function GET(request: NextRequest) {
         NULL as avg_transactions_per_user,
         0 as users_with_transactions
       FROM users u
-      LEFT JOIN transactions t ON t.user_id = u.id
+      LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+      LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+      LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
       WHERE u.email != $${paramIndex}
         ${filterConditions}
       GROUP BY DATE_TRUNC('week', u.created_at)

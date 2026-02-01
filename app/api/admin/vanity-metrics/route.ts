@@ -186,9 +186,11 @@ export async function GET(request: NextRequest) {
       // Apply data coverage filter to total users if specified
       if (filters.dataCoverage && filters.dataCoverage.length > 0 && totalUsers > 0) {
         const usersWithCoverageQuery = `
-          SELECT u.id, COUNT(DISTINCT t.id) as tx_count
+          SELECT u.id, COUNT(DISTINCT COALESCE(tf.id, t.id)) as tx_count
           FROM users u
-          LEFT JOIN transactions t ON t.user_id = u.id
+          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+          LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
           WHERE u.email != $${adminEmailParamIndex}
             AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex}::date)
             ${filterConditions}

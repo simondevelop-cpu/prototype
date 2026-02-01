@@ -161,13 +161,24 @@ export async function GET(request: NextRequest) {
     filterParams.push(ADMIN_EMAIL);
 
     // Get user data with signup date and intent
+    // Use l1_transaction_facts (preferred) with fallback to transactions (legacy)
+    // Note: upload_session_id not in l1_transaction_facts, use statement_upload events instead
     const uploadCountSubquery = hasUploadSessionId ? `
-      SELECT COUNT(DISTINCT upload_session_id)
-      FROM transactions t
-      WHERE t.user_id = u.id
-        AND t.upload_session_id IS NOT NULL
+      SELECT COUNT(DISTINCT CASE WHEN tf.id IS NOT NULL THEN 1 WHEN t.upload_session_id IS NOT NULL THEN t.upload_session_id END)
+      FROM users u2
+      LEFT JOIN l0_user_tokenization ut ON u2.id = ut.internal_user_id
+      LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+      LEFT JOIN transactions t ON u2.id = t.user_id AND tf.id IS NULL
+      WHERE u2.id = u.id
+        AND (tf.id IS NOT NULL OR t.upload_session_id IS NOT NULL)
     ` : `
-      0
+      SELECT COUNT(DISTINCT COALESCE(tf.id, t.id))
+      FROM users u2
+      LEFT JOIN l0_user_tokenization ut ON u2.id = ut.internal_user_id
+      LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+      LEFT JOIN transactions t ON u2.id = t.user_id AND tf.id IS NULL
+      WHERE u2.id = u.id
+        AND (tf.id IS NOT NULL OR t.id IS NOT NULL)
     `;
     
     const usersQuery = useUsersTable ? `
