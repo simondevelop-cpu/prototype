@@ -8,23 +8,93 @@
 
 -- Step 1: Migrate any remaining PII from onboarding_responses to l0_pii_users
 -- This ensures all PII is in l0_pii_users before we drop the columns
-UPDATE l0_pii_users pii
-SET 
-  first_name = COALESCE(pii.first_name, o.first_name),
-  last_name = COALESCE(pii.last_name, o.last_name),
-  date_of_birth = COALESCE(pii.date_of_birth, o.date_of_birth),
-  recovery_phone = COALESCE(pii.recovery_phone, o.recovery_phone),
-  province_region = COALESCE(pii.province_region, o.province_region),
-  updated_at = CURRENT_TIMESTAMP
-FROM onboarding_responses o
-WHERE pii.internal_user_id = o.user_id
-  AND (
-    (o.first_name IS NOT NULL AND pii.first_name IS NULL) OR
-    (o.last_name IS NOT NULL AND pii.last_name IS NULL) OR
-    (o.date_of_birth IS NOT NULL AND pii.date_of_birth IS NULL) OR
-    (o.recovery_phone IS NOT NULL AND pii.recovery_phone IS NULL) OR
-    (o.province_region IS NOT NULL AND pii.province_region IS NULL)
-  );
+-- Check if PII columns exist before migrating
+DO $$
+DECLARE
+  has_first_name BOOLEAN;
+  has_last_name BOOLEAN;
+  has_date_of_birth BOOLEAN;
+  has_recovery_phone BOOLEAN;
+  has_province_region BOOLEAN;
+BEGIN
+  -- Check which PII columns exist
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'onboarding_responses' AND column_name = 'first_name'
+  ) INTO has_first_name;
+  
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'onboarding_responses' AND column_name = 'last_name'
+  ) INTO has_last_name;
+  
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'onboarding_responses' AND column_name = 'date_of_birth'
+  ) INTO has_date_of_birth;
+  
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'onboarding_responses' AND column_name = 'recovery_phone'
+  ) INTO has_recovery_phone;
+  
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'onboarding_responses' AND column_name = 'province_region'
+  ) INTO has_province_region;
+  
+  -- Only migrate if at least one PII column exists
+  IF has_first_name OR has_last_name OR has_date_of_birth OR has_recovery_phone OR has_province_region THEN
+    -- Build dynamic UPDATE query based on which columns exist
+    EXECUTE format('
+      UPDATE l0_pii_users pii
+      SET 
+        %s
+        updated_at = CURRENT_TIMESTAMP
+      FROM onboarding_responses o
+      WHERE pii.internal_user_id = o.user_id
+        AND (
+          %s
+        )',
+      -- Build SET clause
+      CASE 
+        WHEN has_first_name THEN 'first_name = COALESCE(pii.first_name, o.first_name),' ELSE ''
+      END ||
+      CASE 
+        WHEN has_last_name THEN 'last_name = COALESCE(pii.last_name, o.last_name),' ELSE ''
+      END ||
+      CASE 
+        WHEN has_date_of_birth THEN 'date_of_birth = COALESCE(pii.date_of_birth, o.date_of_birth),' ELSE ''
+      END ||
+      CASE 
+        WHEN has_recovery_phone THEN 'recovery_phone = COALESCE(pii.recovery_phone, o.recovery_phone),' ELSE ''
+      END ||
+      CASE 
+        WHEN has_province_region THEN 'province_region = COALESCE(pii.province_region, o.province_region),' ELSE ''
+      END,
+      -- Build WHERE clause
+      CASE 
+        WHEN has_first_name THEN '(o.first_name IS NOT NULL AND pii.first_name IS NULL)' ELSE 'FALSE'
+      END ||
+      CASE 
+        WHEN has_last_name THEN ' OR (o.last_name IS NOT NULL AND pii.last_name IS NULL)' ELSE ''
+      END ||
+      CASE 
+        WHEN has_date_of_birth THEN ' OR (o.date_of_birth IS NOT NULL AND pii.date_of_birth IS NULL)' ELSE ''
+      END ||
+      CASE 
+        WHEN has_recovery_phone THEN ' OR (o.recovery_phone IS NOT NULL AND pii.recovery_phone IS NULL)' ELSE ''
+      END ||
+      CASE 
+        WHEN has_province_region THEN ' OR (o.province_region IS NOT NULL AND pii.province_region IS NULL)' ELSE ''
+      END
+    );
+    
+    RAISE NOTICE 'Migrated PII from onboarding_responses to l0_pii_users';
+  ELSE
+    RAISE NOTICE 'No PII columns found in onboarding_responses - skipping migration (columns may already be dropped)';
+  END IF;
+END $$;
 
 -- Step 2: Drop PII columns from onboarding_responses
 -- These columns should no longer exist in onboarding_responses
