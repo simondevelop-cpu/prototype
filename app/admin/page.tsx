@@ -2282,7 +2282,7 @@ export default function AdminDashboard() {
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.hasUserEventsTable 
                               ? (cohortData?.engagement?.[week]?.loggedInTwoPlusDays || 0)
-                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                              : <span className="text-gray-400 italic">Requires l1_events table</span>}
                           </td>
                         ))}
                       </tr>
@@ -2292,7 +2292,7 @@ export default function AdminDashboard() {
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.hasUserEventsTable 
                               ? (cohortData?.engagement?.[week]?.avgDaysLoggedInPerMonth || '-')
-                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                              : <span className="text-gray-400 italic">Requires l1_events table</span>}
                           </td>
                         ))}
                       </tr>
@@ -2302,7 +2302,7 @@ export default function AdminDashboard() {
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.hasUserEventsTable 
                               ? (cohortData?.engagement?.[week]?.loggedInTwoPlusMonths || 0)
-                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                              : <span className="text-gray-400 italic">Requires l1_events table</span>}
                           </td>
                         ))}
                       </tr>
@@ -2312,7 +2312,7 @@ export default function AdminDashboard() {
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.hasUserEventsTable 
                               ? (cohortData?.engagement?.[week]?.avgUniqueMonthsLoggedIn || '-')
-                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                              : <span className="text-gray-400 italic">Requires l1_events table</span>}
                           </td>
                         ))}
                       </tr>
@@ -2596,8 +2596,8 @@ export default function AdminDashboard() {
                   {!engagementChartData.hasUserEvents && (
                     <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                       <p className="text-sm text-yellow-800">
-                        ⚠️ <strong>Note:</strong> user_events table not found. Chart shows placeholder data (all zeros). 
-                        Login tracking data will appear once user_events table is created and login events are logged.
+                        ⚠️ <strong>Note:</strong> l1_events table not found. Chart shows placeholder data (all zeros). 
+                        Login tracking data will appear once l1_events table is created and login events are logged.
                       </p>
                     </div>
                   )}
@@ -2679,7 +2679,7 @@ export default function AdminDashboard() {
                   No engagement chart data available. Click "Refresh Chart" to load.
                   {!engagementChartData?.hasUserEvents && (
                     <p className="text-sm text-gray-400 mt-2">
-                      Note: Requires user_events table for login tracking data.
+                      Note: Requires l1_events table for login tracking data.
                     </p>
                   )}
                 </div>
@@ -3112,17 +3112,17 @@ export default function AdminDashboard() {
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Uploaded first statement</td>
                     <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE transaction EXISTS</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (JOIN with users table)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (JOIN with l0_user_tokenization)</td>
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Uploaded two statements</td>
                     <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE COUNT(DISTINCT upload_session_id) {'>='} 2</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (upload_session_id column)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (upload_session_id column)</td>
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Uploaded three or more statements</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE COUNT(DISTINCT upload_session_id) {'>='} 3</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (upload_session_id column)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT tokenized_user_id) FILTER WHERE COUNT(DISTINCT upload_session_id) {'>='} 3</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (upload_session_id column)</td>
                   </tr>
                   
                   {/* Engagement Metrics - Time to Achieve */}
@@ -3220,7 +3220,7 @@ export default function AdminDashboard() {
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Data Coverage</td>
                     <td className="px-6 py-4 text-sm text-gray-600">FILTER users based on transaction upload counts (1 upload, 2 uploads, 3+ uploads)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (upload_session_id column, COUNT DISTINCT per user)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (upload_session_id column, COUNT DISTINCT per tokenized_user_id)</td>
                   </tr>
                 </tbody>
                 </table>
@@ -3349,12 +3349,12 @@ export default function AdminDashboard() {
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">Event ID</td>
                       <td className="px-6 py-4 text-sm text-gray-600">e.id</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (id column)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_events table (id column)</td>
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">User ID</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">e.user_id</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (user_id column, foreign key to users table)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">e.tokenized_user_id</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_events table (tokenized_user_id column, links to l0_user_tokenization for PII isolation)</td>
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">First Name</td>
@@ -3364,17 +3364,22 @@ export default function AdminDashboard() {
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">Event Type</td>
                       <td className="px-6 py-4 text-sm text-gray-600">e.event_type</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (event_type column, e.g., 'login', 'dashboard_view', etc.)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_events table (event_type column, e.g., 'login', 'dashboard_view', 'consent', etc.)</td>
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">Event Timestamp</td>
                       <td className="px-6 py-4 text-sm text-gray-600">e.event_timestamp (displayed as created_at in UI)</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (event_timestamp column, TIMESTAMP WITH TIME ZONE)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_events table (event_timestamp column, TIMESTAMP WITH TIME ZONE)</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">Is Admin</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">e.is_admin</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_events table (is_admin column, BOOLEAN - true for admin events)</td>
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">Metadata</td>
                       <td className="px-6 py-4 text-sm text-gray-600">e.metadata (JSONB object)</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata column, JSONB - optional additional event data)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_events table (metadata column, JSONB - optional additional event data)</td>
                     </tr>
                   </tbody>
                 </table>
@@ -3406,7 +3411,7 @@ export default function AdminDashboard() {
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">Weekly active users</td>
                       <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) WHERE event_type = 'login' AND event_timestamp BETWEEN weekStart AND weekEnd</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (event_type, event_timestamp columns) JOIN users table</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_events table (event_type, event_timestamp columns) JOIN l0_user_tokenization</td>
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">New users</td>
@@ -3416,7 +3421,7 @@ export default function AdminDashboard() {
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">Monthly active users</td>
                       <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) WHERE event_type = 'login' AND event_timestamp BETWEEN monthStart AND monthEnd</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">user_events table (event_type, event_timestamp columns) JOIN users table, filtered by month containing the week</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_events table (event_type, event_timestamp columns) JOIN l0_user_tokenization, filtered by month containing the week</td>
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">New users per month</td>
@@ -3426,7 +3431,7 @@ export default function AdminDashboard() {
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">Total transactions uploaded (cumulative)</td>
                       <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at {'<='} weekEnd</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (created_at column, cumulative count up to end of week)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (created_at column, cumulative count up to end of week)</td>
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">New transactions uploaded</td>
@@ -3482,7 +3487,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">transactions table (Transactions Data Source - Legacy)</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">l1_transaction_facts table (Transactions Data Source - Single Source of Truth)</h3>
                   <p className="text-xs text-gray-500 mb-2 italic">Note: After L0/L1/L2 migration, new transactions are stored in l1_transaction_facts. This table may still contain legacy data.</p>
                   <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
                     <li><strong>id</strong> - SERIAL PRIMARY KEY (transaction identifier)</li>
@@ -3531,7 +3536,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">user_events table (Events Data Source)</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">l1_events table (Events Data Source - Single Source of Truth)</h3>
                   <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
                     <li><strong>id</strong> - SERIAL PRIMARY KEY (event identifier)</li>
                     <li><strong>user_id</strong> - INTEGER REFERENCES users(id) ON DELETE CASCADE (foreign key to users table)</li>
@@ -3616,8 +3621,8 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">user_events table metadata fields (Additional data collected in events)</h3>
-                  <p className="text-sm text-gray-600 mb-2">The user_events table's metadata JSONB field contains additional structured data depending on event_type:</p>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">l1_events table metadata fields (Additional data collected in events)</h3>
+                  <p className="text-sm text-gray-600 mb-2">The l1_events table's metadata JSONB field contains additional structured data depending on event_type:</p>
                   <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
                     <li><strong>consent events (event_type = 'consent'):</strong>
                       <ul className="ml-4 mt-1 space-y-1 list-disc list-inside">
@@ -3972,7 +3977,7 @@ export default function AdminDashboard() {
             <div className="p-6 border-b border-gray-200 flex justify-between items-center">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Events Data</h2>
-                <p className="text-gray-600 mt-1">User events and activity tracking from user_events table</p>
+                <p className="text-gray-600 mt-1">User events and activity tracking from l1_events table</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -4059,7 +4064,7 @@ export default function AdminDashboard() {
                             </svg>
                             <p className="text-lg font-medium mb-2">No events data available</p>
                             <p className="text-sm text-gray-400">
-                              Events will appear here once the user_events table is created and events are logged.
+                              Events will appear here once the l1_events table is created and events are logged.
                             </p>
                           </div>
                         </td>
