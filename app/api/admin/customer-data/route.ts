@@ -212,19 +212,18 @@ export async function GET(request: NextRequest) {
       console.error('[Customer Data API] Test query failed:', testError);
     }
     
-      // Build transaction stats subquery - use l1_transaction_facts (preferred) with fallback to transactions (legacy)
+      // Build transaction stats subquery - Single source of truth (l1_transaction_facts only)
       const transactionStatsQuery = `
         SELECT 
-          COALESCE(ut.internal_user_id, t.user_id) as user_id,
-          COUNT(DISTINCT COALESCE(tf.id, t.id)) as transaction_count,
+          ut.internal_user_id as user_id,
+          COUNT(DISTINCT tf.id) as transaction_count,
           0 as upload_session_count,
-          MIN(COALESCE(tf.created_at, t.created_at)) as first_transaction_date
+          MIN(tf.created_at) as first_transaction_date
         FROM users u
         LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
         LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-        LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
-        GROUP BY COALESCE(ut.internal_user_id, t.user_id)
-        HAVING COUNT(DISTINCT COALESCE(tf.id, t.id)) > 0
+        GROUP BY ut.internal_user_id
+        HAVING COUNT(DISTINCT tf.id) > 0
       `;
     
     try {
@@ -353,19 +352,18 @@ export async function GET(request: NextRequest) {
         : `FROM users u
            INNER JOIN onboarding_responses o ON o.user_id = u.id`;
 
-      // Build transaction stats subquery - use l1_transaction_facts (preferred) with fallback to transactions (legacy)
+      // Build transaction stats subquery - Single source of truth (l1_transaction_facts only)
       const transactionStatsQuery = `
         SELECT 
-          COALESCE(ut.internal_user_id, t.user_id) as user_id,
-          COUNT(DISTINCT COALESCE(tf.id, t.id)) as transaction_count,
+          ut.internal_user_id as user_id,
+          COUNT(DISTINCT tf.id) as transaction_count,
           0 as upload_session_count,
-          MIN(COALESCE(tf.created_at, t.created_at)) as first_transaction_date
+          MIN(tf.created_at) as first_transaction_date
         FROM users u
         LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
         LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-        LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
-        GROUP BY COALESCE(ut.internal_user_id, t.user_id)
-        HAVING COUNT(DISTINCT COALESCE(tf.id, t.id)) > 0
+        GROUP BY ut.internal_user_id
+        HAVING COUNT(DISTINCT tf.id) > 0
       `;
 
       result = await pool.query(`

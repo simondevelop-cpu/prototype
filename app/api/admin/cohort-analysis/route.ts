@@ -301,18 +301,17 @@ export async function GET(request: NextRequest) {
       // Column doesn't exist
     }
 
-    // Enhanced Engagement query with more metrics - use l1_transaction_facts (preferred) with fallback to transactions (legacy)
-    // Build upload_counts subquery - note: upload_session_id not in l1_transaction_facts, use statement_upload events
+    // Enhanced Engagement query - Single source of truth (l1_transaction_facts only)
+    // Build upload_counts subquery - use statement_upload events from l1_events (upload_session_id not in l1_transaction_facts)
     const uploadCountsSubquery = `
       SELECT 
-        COALESCE(ut.internal_user_id, t.user_id) as user_id,
-        COUNT(DISTINCT CASE WHEN tf.id IS NOT NULL THEN 1 WHEN t.upload_session_id IS NOT NULL THEN t.upload_session_id END) as upload_count
+        ut.internal_user_id as user_id,
+        COUNT(DISTINCT tf.id) as upload_count
       FROM users u
       LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
       LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-      LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
-      WHERE tf.id IS NOT NULL OR t.id IS NOT NULL
-      GROUP BY COALESCE(ut.internal_user_id, t.user_id)
+      WHERE tf.id IS NOT NULL
+      GROUP BY ut.internal_user_id
     `;
     
     // Build unique banks subquery - extract bank name from account field

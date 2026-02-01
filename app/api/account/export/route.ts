@@ -83,30 +83,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get tokenized user ID for analytics data
+    // Get tokenized user ID for analytics data (Single Source of Truth)
     const tokenizedUserId = await ensureTokenizedForAnalytics(userId);
-
-    // Get transactions (from L1 if available, otherwise legacy table)
-    let transactions: any[] = [];
-    if (hasL0 && tokenizedUserId) {
-      const txResult = await pool.query(`
-        SELECT id, transaction_date, description, merchant, amount,
-               cashflow, account, category, label, created_at
-        FROM l1_transaction_facts
-        WHERE tokenized_user_id = $1
-        ORDER BY transaction_date DESC, created_at DESC
-      `, [tokenizedUserId]);
-      transactions = txResult.rows;
-    } else {
-      const txResult = await pool.query(`
-        SELECT id, date as transaction_date, description, merchant, amount,
-               cashflow, account, category, label, created_at
-        FROM transactions
-        WHERE user_id = $1
-        ORDER BY date DESC, created_at DESC
-      `, [userId]);
-      transactions = txResult.rows;
+    if (!tokenizedUserId) {
+      return NextResponse.json({ error: 'Failed to get user identifier' }, { status: 500 });
     }
+
+    // Get transactions from l1_transaction_facts (Single Source of Truth)
+    const txResult = await pool.query(`
+      SELECT id, transaction_date, description, merchant, amount,
+             cashflow, account, category, label, created_at
+      FROM l1_transaction_facts
+      WHERE tokenized_user_id = $1
+      ORDER BY transaction_date DESC, created_at DESC
+    `, [tokenizedUserId]);
+    const transactions = txResult.rows;
 
     // Get onboarding responses - Schema-adaptive: check if columns exist in users table
     let onboarding: any = null;

@@ -93,33 +93,31 @@ export async function GET(request: NextRequest) {
 
     let result;
     if (useUsersTable) {
-      // Use users table (post-migration) - Single source of truth
+      // Use users table - Single source of truth (l1_transaction_facts only)
       result = await pool.query(`
         SELECT 
           ${selectFields}${activeFields},
-          COUNT(DISTINCT COALESCE(tf.id, t.id)) as transaction_count,
-          MAX(COALESCE(tf.created_at, t.created_at)) as last_activity,
+          COUNT(DISTINCT tf.id) as transaction_count,
+          MAX(tf.created_at) as last_activity,
           COUNT(DISTINCT CASE WHEN u.completed_at IS NOT NULL THEN u.id END) as completed_onboarding_count
         FROM users u
         LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
         LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-        LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
         WHERE u.email != $1
         GROUP BY ${groupByFields}${hasIsActive && hasEmailValidated ? ', u.is_active, u.email_validated' : ''}
         ORDER BY u.created_at DESC
       `, [ADMIN_EMAIL]);
     } else {
-      // Fallback to onboarding_responses table (pre-migration)
+      // Fallback to onboarding_responses table (pre-migration) - Single source of truth (l1_transaction_facts only)
       result = await pool.query(`
         SELECT 
           ${selectFields},
-          COUNT(DISTINCT COALESCE(tf.id, t.id)) as transaction_count,
-          MAX(COALESCE(tf.created_at, t.created_at)) as last_activity,
+          COUNT(DISTINCT tf.id) as transaction_count,
+          MAX(tf.created_at) as last_activity,
           COUNT(DISTINCT CASE WHEN o.completed_at IS NOT NULL THEN o.id END) as completed_onboarding_count
         FROM users u
         LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
         LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-        LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
         LEFT JOIN onboarding_responses o ON u.id = o.user_id
         GROUP BY ${groupByFields}
         ORDER BY u.created_at DESC

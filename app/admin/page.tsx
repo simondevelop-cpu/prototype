@@ -116,6 +116,8 @@ export default function AdminDashboard() {
   const [emptyTablesVerification, setEmptyTablesVerification] = useState<any>(null);
   const [emptyTablesLoading, setEmptyTablesLoading] = useState(false);
   const [emptyTablesDropping, setEmptyTablesDropping] = useState(false);
+  const [singleSourceTests, setSingleSourceTests] = useState<any>(null);
+  const [singleSourceTestsLoading, setSingleSourceTestsLoading] = useState(false);
   
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
@@ -516,6 +518,7 @@ export default function AdminDashboard() {
       fetchDropVerification();
       fetchInvestigation();
       fetchEmptyTablesVerification();
+      fetchSingleSourceTests();
     }
   }, [activeTab, inboxSubTab, authenticated]);
 
