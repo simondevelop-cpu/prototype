@@ -4022,6 +4022,67 @@ export default function AdminDashboard() {
     }
   };
 
+  // Fetch investigation data
+  const fetchInvestigation = async () => {
+    setInvestigationLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/investigate', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setInvestigationData(data.investigation);
+      } else {
+        alert(`Failed to fetch investigation: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error fetching investigation:', error);
+      alert(`Error fetching investigation: ${error.message || 'Unknown error'}`);
+    } finally {
+      setInvestigationLoading(false);
+    }
+  };
+
+  // Drop safe tables
+  const dropSafeTables = async (tableNames: string[]) => {
+    if (!confirm(`Are you sure you want to drop these tables: ${tableNames.join(', ')}? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/drop-safe-tables', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tableNames }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        alert(`Successfully dropped ${data.results.filter((r: any) => r.status === 'dropped').length} table(s)`);
+        fetchDropVerification(); // Refresh verification
+      } else {
+        alert(`Failed to drop tables: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error dropping tables:', error);
+      alert(`Error dropping tables: ${error.message || 'Unknown error'}`);
+    }
+  };
+
   // Fetch drop verification
   const fetchDropVerification = async () => {
     setDropVerificationLoading(true);
