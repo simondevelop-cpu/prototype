@@ -3133,23 +3133,23 @@ export default function AdminDashboard() {
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users who uploaded on the first day</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE DATE(first_transaction_date) = DATE(created_at)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (MIN(created_at) per user) JOIN users table (created_at)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT tokenized_user_id) FILTER WHERE DATE(first_transaction_date) = DATE(created_at)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (MIN(transaction_date) per tokenized_user_id) JOIN l0_user_tokenization JOIN users table (created_at)</td>
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Average time to first upload, who uploaded on their first day (minutes)</td>
                     <td className="px-6 py-4 text-sm text-gray-600">AVG(EXTRACT(EPOCH FROM (first_transaction_date - created_at)) / 60) FILTER WHERE DATE(first_transaction_date) = DATE(created_at)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (MIN(created_at) per user) JOIN users table (created_at)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (MIN(transaction_date) per tokenized_user_id) JOIN l0_user_tokenization JOIN users table (created_at)</td>
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users who uploaded after the first day</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE DATE(first_transaction_date) {'>'} DATE(created_at)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (MIN(created_at) per user) JOIN users table (created_at)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT tokenized_user_id) FILTER WHERE DATE(first_transaction_date) {'>'} DATE(created_at)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (MIN(transaction_date) per tokenized_user_id) JOIN l0_user_tokenization JOIN users table (created_at)</td>
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Average time to first upload, who uploaded after the first day (days)</td>
                     <td className="px-6 py-4 text-sm text-gray-600">AVG(EXTRACT(EPOCH FROM (first_transaction_date - created_at)) / 86400) FILTER WHERE DATE(first_transaction_date) {'>'} DATE(created_at)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (MIN(created_at) per user) JOIN users table (created_at)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (MIN(transaction_date) per tokenized_user_id) JOIN l0_user_tokenization JOIN users table (created_at)</td>
                   </tr>
                   
                   {/* Engagement Metrics - Engagement Signals */}
@@ -3551,8 +3551,7 @@ export default function AdminDashboard() {
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">l0_pii_users table (PII - Personally Identifiable Information)</h3>
                   <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
-                    <li><strong>id</strong> - SERIAL PRIMARY KEY (PII record identifier)</li>
-                    <li><strong>internal_user_id</strong> - INTEGER UNIQUE NOT NULL REFERENCES users(id) (links to users table, not exposed to analytics)</li>
+                    <li><strong>internal_user_id</strong> - INTEGER PRIMARY KEY REFERENCES users(id) (PRIMARY KEY, links to users table, not exposed to analytics)</li>
                     <li><strong>email</strong> - TEXT NOT NULL UNIQUE (user email address - PII)</li>
                     <li><strong>first_name</strong> - TEXT (user's first name - PII)</li>
                     <li><strong>last_name</strong> - TEXT (user's last name - PII)</li>
