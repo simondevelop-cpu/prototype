@@ -3161,12 +3161,12 @@ export default function AdminDashboard() {
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Average transactions per user</td>
                     <td className="px-6 py-4 text-sm text-gray-600">AVG(COUNT(*) per user) FILTER WHERE transaction_count {'>'} 0</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (COUNT(*) grouped by user_id)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (COUNT(*) grouped by tokenized_user_id)</td>
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Users with transactions</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE transaction_count {'>'} 0</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">transactions table (COUNT(*) grouped by user_id)</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT tokenized_user_id) FILTER WHERE transaction_count {'>'} 0</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (COUNT(*) grouped by tokenized_user_id)</td>
                   </tr>
                   
                   {/* Bank Statement Source Tracking */}
@@ -3177,18 +3177,18 @@ export default function AdminDashboard() {
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Bank</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'bank' FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'})</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'bank' FROM l1_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">l1_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'})</td>
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Account Type</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'accountType' FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'})</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'accountType' FROM l1_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">l1_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'})</td>
                   </tr>
                   <tr>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Uploaded or Linked</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'source' FROM user_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">user_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'}, source = {'uploaded'} or {'linked'})</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'source' FROM l1_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">l1_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'}, source = {'uploaded'} or {'linked'})</td>
                   </tr>
                   
                   {/* Filters */}
@@ -3488,29 +3488,10 @@ export default function AdminDashboard() {
 
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">l1_transaction_facts table (Transactions Data Source - Single Source of Truth)</h3>
-                  <p className="text-xs text-gray-500 mb-2 italic">Note: After L0/L1/L2 migration, new transactions are stored in l1_transaction_facts. This table may still contain legacy data.</p>
+                  <p className="text-xs text-gray-500 mb-2 italic">Single Source of Truth for all transaction data. Uses tokenized_user_id for PII isolation.</p>
                   <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
                     <li><strong>id</strong> - SERIAL PRIMARY KEY (transaction identifier)</li>
-                    <li><strong>user_id</strong> - INTEGER REFERENCES users(id) ON DELETE CASCADE (foreign key to users table)</li>
-                    <li><strong>date</strong> - DATE NOT NULL (transaction date from bank statement)</li>
-                    <li><strong>description</strong> - TEXT NOT NULL (full transaction description from statement)</li>
-                    <li><strong>merchant</strong> - TEXT (extracted merchant name, first part of description)</li>
-                    <li><strong>amount</strong> - DECIMAL(10, 2) NOT NULL (transaction amount, positive for income, negative for expenses)</li>
-                    <li><strong>cashflow</strong> - VARCHAR(50) CHECK (cashflow IN ('income', 'expense', 'other')) (type: 'income', 'expense', or 'other')</li>
-                    <li><strong>category</strong> - VARCHAR(255) (categorized transaction category, e.g., 'Food', 'Bills')</li>
-                    <li><strong>account</strong> - VARCHAR(255) (bank/account name from statement, e.g., 'RBC Chequing')</li>
-                    <li><strong>label</strong> - VARCHAR(255) (sub-category label, e.g., 'Groceries', 'Rent')</li>
-                    <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when transaction was imported/uploaded)</li>
-                    <li><strong>upload_session_id</strong> - TEXT (identifier for the upload session/batch, groups transactions from same PDF upload)</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">l1_transaction_facts table (Transactions Data Source - Post-Migration)</h3>
-                  <p className="text-xs text-gray-500 mb-2 italic">Note: This table is created during L0/L1/L2 migration. New transactions are written here after migration. Uses tokenized_user_id for privacy.</p>
-                  <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
-                    <li><strong>id</strong> - SERIAL PRIMARY KEY (transaction identifier)</li>
-                    <li><strong>tokenized_user_id</strong> - TEXT NOT NULL REFERENCES l0_user_tokenization(tokenized_id) (tokenized user identifier for privacy)</li>
+                    <li><strong>tokenized_user_id</strong> - TEXT NOT NULL REFERENCES l0_user_tokenization(tokenized_user_id) (tokenized user identifier for PII isolation)</li>
                     <li><strong>transaction_date</strong> - DATE NOT NULL (transaction date from bank statement)</li>
                     <li><strong>description</strong> - TEXT NOT NULL (full transaction description from statement)</li>
                     <li><strong>merchant</strong> - TEXT (extracted merchant name, first part of description)</li>
@@ -3521,27 +3502,29 @@ export default function AdminDashboard() {
                     <li><strong>label</strong> - VARCHAR(255) (sub-category label, e.g., 'Groceries', 'Rent')</li>
                     <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when transaction was imported/uploaded)</li>
                     <li><strong>upload_session_id</strong> - TEXT (identifier for the upload session/batch, groups transactions from same PDF upload)</li>
+                    <li><strong>legacy_transaction_id</strong> - INTEGER (reference to original transaction ID if migrated from legacy table)</li>
                   </ul>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">l0_user_tokenization table (User Tokenization - Post-Migration)</h3>
-                  <p className="text-xs text-gray-500 mb-2 italic">Note: This table is created during L0/L1/L2 migration. Maps user_id to tokenized_id for privacy in analytics tables.</p>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">l0_user_tokenization table (User Tokenization)</h3>
+                  <p className="text-xs text-gray-500 mb-2 italic">Maps internal_user_id to tokenized_user_id for PII isolation in analytics tables.</p>
                   <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
-                    <li><strong>id</strong> - SERIAL PRIMARY KEY (tokenization record identifier)</li>
-                    <li><strong>user_id</strong> - INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE (links to users table)</li>
-                    <li><strong>tokenized_id</strong> - TEXT UNIQUE NOT NULL (tokenized identifier used in l1_transaction_facts)</li>
+                    <li><strong>internal_user_id</strong> - INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE (links to users table)</li>
+                    <li><strong>tokenized_user_id</strong> - TEXT UNIQUE NOT NULL (SHA256 hash of internal_user_id + salt, used in l1_transaction_facts and l1_events)</li>
                     <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when tokenization was created)</li>
                   </ul>
                 </div>
 
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">l1_events table (Events Data Source - Single Source of Truth)</h3>
+                  <p className="text-xs text-gray-500 mb-2 italic">Single Source of Truth for all event data. Uses tokenized_user_id for PII isolation.</p>
                   <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
                     <li><strong>id</strong> - SERIAL PRIMARY KEY (event identifier)</li>
-                    <li><strong>user_id</strong> - INTEGER REFERENCES users(id) ON DELETE CASCADE (foreign key to users table)</li>
-                    <li><strong>event_type</strong> - TEXT NOT NULL (type of event, e.g., 'login', 'dashboard_view', 'transaction_uploaded')</li>
+                    <li><strong>tokenized_user_id</strong> - TEXT REFERENCES l0_user_tokenization(tokenized_user_id) (tokenized user identifier for PII isolation)</li>
+                    <li><strong>event_type</strong> - TEXT NOT NULL (type of event, e.g., 'login', 'consent', 'transaction_edit', 'admin_login')</li>
                     <li><strong>event_timestamp</strong> - TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP (when the event occurred)</li>
+                    <li><strong>is_admin</strong> - BOOLEAN DEFAULT false (true for admin events, false for user events)</li>
                     <li><strong>metadata</strong> - JSONB (optional JSON object containing additional event-specific data)</li>
                   </ul>
                 </div>
