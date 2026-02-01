@@ -121,7 +121,7 @@ function getTableDescription(tableName: string): string {
   const descriptions: { [key: string]: string } = {
     'users': 'Core user accounts table. Contains user authentication and basic profile information. Email stored here for auth (also in l0_pii_users).',
     'l0_pii_users': 'Personally Identifiable Information (PII) table. Stores sensitive user data separated for security compliance. PRIMARY KEY: internal_user_id.',
-    'l1_transaction_facts': 'Transaction facts table. Contains all financial transactions with normalized data. Uses tokenized_user_id for PII isolation. FK: tokenized_user_id → l0_user_tokenization.tokenized_user_id',
+    'l1_transaction_facts': 'Transaction facts table. Contains all financial transactions with normalized data. Uses tokenized_user_id for PII isolation. See Foreign Keys sheet for relationships.',
     'l2_aggregated_insights': 'Aggregated insights table. Pre-computed financial summaries and analytics.',
     'onboarding_responses': 'User onboarding responses. Stores answers from the onboarding flow (non-PII only - PII migrated to l0_pii_users).',
     'l1_events': 'Event facts table. Tracks all user and admin actions, consent events, and system events. Replaces user_events. Uses user_id for operational events. See Foreign Keys sheet for relationships.',
