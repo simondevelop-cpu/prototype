@@ -1541,6 +1541,209 @@ export default function AdminDashboard() {
     );
   };
 
+  // Render Migration Tab
+  const renderMigrationTab = () => {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Database Migration</h2>
+          <p className="text-gray-600 mb-6">
+            Run the comprehensive table consolidation migration and verify table drops.
+          </p>
+
+          {/* Pre-Migration Tests */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Pre-Migration Tests</h3>
+              <button
+                onClick={fetchMigrationTests}
+                disabled={migrationTestsLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {migrationTestsLoading ? 'Loading...' : 'Run Tests'}
+              </button>
+            </div>
+            
+            {migrationTests.length > 0 && (
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Test</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {migrationTests.map((test, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{test.name}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{test.description}</td>
+                        <td className="px-6 py-4 text-sm">
+                          {test.passed ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              ✓ Pass
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              ✗ Fail
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {test.actualValue !== null && test.actualValue !== undefined ? String(test.actualValue) : '-'}
+                          {test.error && <span className="text-red-600 ml-2">({test.error})</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Run Migration */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Run Migration</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Execute the comprehensive table consolidation migration script.
+                </p>
+              </div>
+              <button
+                onClick={runMigration}
+                disabled={migrationRunning}
+                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-semibold"
+              >
+                {migrationRunning ? 'Running...' : 'Run Migration'}
+              </button>
+            </div>
+
+            {migrationResults && (
+              <div className={`border rounded-lg p-4 ${migrationResults.success ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-semibold text-gray-900">
+                    Migration Results
+                  </h4>
+                  <span className={`text-sm font-medium ${migrationResults.success ? 'text-green-800' : 'text-yellow-800'}`}>
+                    {migrationResults.successful} / {migrationResults.executed} statements successful
+                  </span>
+                </div>
+                {migrationResults.errors > 0 && (
+                  <p className="text-sm text-yellow-800 mb-2">
+                    {migrationResults.errors} error(s) occurred. Check details below.
+                  </p>
+                )}
+                {migrationResults.error && (
+                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                    <p className="text-sm text-red-800 font-medium">Error:</p>
+                    <p className="text-sm text-red-700">{migrationResults.error}</p>
+                    {migrationResults.details && (
+                      <p className="text-xs text-red-600 mt-1">{migrationResults.details}</p>
+                    )}
+                  </div>
+                )}
+                {migrationResults.message && (
+                  <p className="text-sm text-green-800">{migrationResults.message}</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Drop Verification */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Table Drop Verification</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Verify if empty/unused tables can be safely dropped.
+                </p>
+              </div>
+              <button
+                onClick={fetchDropVerification}
+                disabled={dropVerificationLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {dropVerificationLoading ? 'Loading...' : 'Verify Drops'}
+              </button>
+            </div>
+
+            {dropVerification && (
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className={`p-4 ${dropVerification.allSafeToDrop ? 'bg-green-50' : 'bg-yellow-50'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-gray-900">Drop Verification Summary</h4>
+                    <span className={`text-sm font-medium ${dropVerification.allSafeToDrop ? 'text-green-800' : 'text-yellow-800'}`}>
+                      {dropVerification.summary.safeToDrop} / {dropVerification.summary.total} tables safe to drop
+                    </span>
+                  </div>
+                </div>
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Table</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Safe to Drop</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Row Count</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reasons</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {dropVerification.tables.map((table: any, index: number) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900 font-mono">{table.tableName}</td>
+                        <td className="px-6 py-4 text-sm">
+                          {table.safeToDrop ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              ✓ Safe
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              ✗ Not Safe
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{table.rowCount}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          <ul className="list-disc list-inside space-y-1">
+                            {table.reasons.map((reason: string, rIndex: number) => (
+                              <li key={rIndex}>{reason}</li>
+                            ))}
+                          </ul>
+                          {table.hasForeignKeys && (
+                            <div className="mt-2 text-xs text-red-600">
+                              <strong>Foreign Keys:</strong>
+                              <ul className="list-disc list-inside mt-1">
+                                {table.foreignKeyDetails.map((fk: any, fkIndex: number) => (
+                                  <li key={fkIndex}>{fk.referencedTable}.{fk.referencedColumn}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {table.hasDependentObjects && table.dependentObjects.length > 0 && (
+                            <div className="mt-2 text-xs text-orange-600">
+                              <strong>Dependencies:</strong>
+                              <ul className="list-disc list-inside mt-1">
+                                {table.dependentObjects.map((dep: string, depIndex: number) => (
+                                  <li key={depIndex}>{dep}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Render Analytics Tab
   const renderAnalyticsTab = () => {
     const renderPlaceholder = (title: string) => (
