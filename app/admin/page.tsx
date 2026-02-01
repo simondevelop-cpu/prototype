@@ -3206,7 +3206,7 @@ export default function AdminDashboard() {
               <div className="border border-gray-200 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Export all raw data</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Download all data from every table in the database. Each table will be a separate sheet in the Excel file.
+                  Download all data from every table in the database. Includes API documentation and table of contents as the first sheets. Each table will be a separate sheet in the Excel file.
                 </p>
                 <button
                   onClick={async () => {
@@ -3280,48 +3280,41 @@ export default function AdminDashboard() {
                 </button>
               </div>
               
-              {/* Customer Data Export (moved from customer-data tab) */}
+              {/* Cohort Analysis Export */}
               <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export customer data</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export cohort analysis</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Export customer onboarding and profile data to Excel (CSV format).
+                  Download cohort analysis data and metrics.
                 </p>
                 <button
-                  onClick={async () => {
-                    // Fetch customer data first if not loaded
-                    if (customerData.length === 0) {
-                      await fetchCustomerData();
-                    }
-                    
-                    // Export to Excel (CSV format) - no email or last name
-                    const headers = ['User ID', 'First Name', 'Province', 'Emotional State', 'Financial Context', 'Motivation', 'Acquisition', 'Insights Wanted', 'Account Created', 'Onboarding Completed', 'Onboarding Status'];
-                    const rows = customerData.map((user: any) => [
-                      user.user_id || user.id || '',
-                      user.first_name || '',
-                      user.province_region || '',
-                      (user.emotional_state || []).join('; '),
-                      (user.financial_context || []).join('; '),
-                      user.motivation || '',
-                      user.acquisition_source || '',
-                      (user.insight_preferences || []).join('; '),
-                      user.created_at ? new Date(user.created_at).toLocaleString() : '',
-                      user.completed_at ? new Date(user.completed_at).toLocaleString() : '',
-                      user.completed_at ? 'Completed' : user.last_step ? `Dropped after Step ${user.last_step}` : 'Not started',
-                    ]);
-                    const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
-                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                    const link = document.createElement('a');
-                    link.href = URL.createObjectURL(blob);
-                    link.download = `customer-data-${new Date().toISOString().split('T')[0]}.csv`;
-                    link.click();
+                  onClick={() => {
+                    alert('Cohort analysis export is not yet programmed. Coming soon!');
                   }}
-                  disabled={customerData.length === 0}
-                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  Export customer data to Excel
+                  Download cohort analysis
+                </button>
+              </div>
+              
+              {/* Vanity Metrics Export */}
+              <div className="border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export vanity metrics</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Download vanity metrics and dashboard analytics.
+                </p>
+                <button
+                  onClick={() => {
+                    alert('Vanity metrics export is not yet programmed. Coming soon!');
+                  }}
+                  className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download vanity metrics
                 </button>
               </div>
             </div>
