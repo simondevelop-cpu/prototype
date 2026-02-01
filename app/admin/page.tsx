@@ -518,13 +518,14 @@ export default function AdminDashboard() {
     if (activeTab === 'inbox' && inboxSubTab === 'whats-coming-survey' && authenticated) {
       fetchSurveyResponses();
     }
-    if (activeTab === 'migration' && authenticated) {
-      fetchMigrationTests();
-      fetchDropVerification();
-      fetchInvestigation();
-      fetchEmptyTablesVerification();
-      fetchSingleSourceTests();
-    }
+    // Migration tab removed - PII isolation complete
+    // if (activeTab === 'migration' && authenticated) {
+    //   fetchMigrationTests();
+    //   fetchDropVerification();
+    //   fetchInvestigation();
+    //   fetchEmptyTablesVerification();
+    //   fetchSingleSourceTests();
+    // }
   }, [activeTab, inboxSubTab, authenticated]);
 
   // Fetch available slots from database
