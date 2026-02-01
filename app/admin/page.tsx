@@ -121,6 +121,8 @@ export default function AdminDashboard() {
   const [droppingTables, setDroppingTables] = useState(false);
   const [migratingPII, setMigratingPII] = useState(false);
   const [piiMigrationResult, setPiiMigrationResult] = useState<any>(null);
+  const [completingPIIIsolation, setCompletingPIIIsolation] = useState(false);
+  const [completePIIIsolationResult, setCompletePIIIsolationResult] = useState<any>(null);
   
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
@@ -2128,6 +2130,65 @@ export default function AdminDashboard() {
                     <p className="text-sm text-red-700">{piiMigrationResult.error}</p>
                     {piiMigrationResult.details && (
                       <p className="text-xs text-red-600 mt-1">{piiMigrationResult.details}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Complete PII Isolation */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Complete PII Isolation</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Remove ALL PII from chat_bookings, onboarding_responses, and users tables. All PII will be consolidated in l0_pii_users only.
+                </p>
+              </div>
+              <button
+                onClick={completePIIIsolation}
+                disabled={completingPIIIsolation}
+                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 font-semibold"
+              >
+                {completingPIIIsolation ? 'Migrating...' : 'Complete PII Isolation'}
+              </button>
+            </div>
+
+            {completePIIIsolationResult && (
+              <div className={`border rounded-lg p-4 ${completePIIIsolationResult.success ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-semibold text-gray-900">
+                    Complete PII Isolation Results
+                  </h4>
+                  <span className={`text-sm font-medium ${completePIIIsolationResult.success ? 'text-green-800' : 'text-yellow-800'}`}>
+                    {completePIIIsolationResult.success ? '✓ Success' : '✗ Failed'}
+                  </span>
+                </div>
+                {completePIIIsolationResult.details && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-sm text-gray-700">
+                      Remaining PII columns in onboarding_responses: {completePIIIsolationResult.details.remainingPIIColumnsInOnboarding}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      PII records in l0_pii_users: {completePIIIsolationResult.details.piiRecordsCount}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      User records: {completePIIIsolationResult.details.userRecordsCount}
+                    </p>
+                    {completePIIIsolationResult.details.note && (
+                      <p className="text-sm text-blue-700 mt-2">
+                        {completePIIIsolationResult.details.note}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {completePIIIsolationResult.error && (
+                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                    <p className="text-sm text-red-800 font-medium">Error:</p>
+                    <p className="text-sm text-red-700">{completePIIIsolationResult.error}</p>
+                    {completePIIIsolationResult.details && (
+                      <p className="text-xs text-red-600 mt-1">{completePIIIsolationResult.details}</p>
                     )}
                   </div>
                 )}
