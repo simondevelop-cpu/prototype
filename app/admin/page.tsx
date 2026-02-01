@@ -3486,18 +3486,18 @@ export default function AdminDashboard() {
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">Transaction Count</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT t.id) per user</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (JOIN with users table, aggregated by user_id)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT tf.id) per user via tokenized_user_id</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (JOIN via l0_user_tokenization, aggregated by tokenized_user_id)</td>
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">Upload Session Count</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT upload_session_id) per user</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (upload_session_id column, aggregated by user_id)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT statement_upload events) per user</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_events table (event_type = 'statement_upload', aggregated by user_id)</td>
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">First Transaction Date</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">MIN(created_at) per user</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (created_at column, aggregated by user_id)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">MIN(created_at) per user via tokenized_user_id</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (created_at column, JOIN via l0_user_tokenization)</td>
                     </tr>
                   </tbody>
                 </table>
@@ -3528,8 +3528,8 @@ export default function AdminDashboard() {
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">User ID</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">e.tokenized_user_id</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">l1_events table (tokenized_user_id column, links to l0_user_tokenization for PII isolation)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">e.user_id</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_events table (user_id column, references users.id for operational events like admin logins, consent events)</td>
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">First Name</td>
@@ -3611,7 +3611,7 @@ export default function AdminDashboard() {
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">New transactions uploaded</td>
                       <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at BETWEEN weekStart AND weekEnd</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (created_at column, transactions uploaded during the week)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (created_at column, transactions uploaded during the week via tokenized_user_id)</td>
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">Total transactions recategorised</td>
@@ -3621,7 +3621,7 @@ export default function AdminDashboard() {
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">Total unique banks uploaded</td>
                       <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT account) WHERE created_at BETWEEN weekStart AND weekEnd</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">transactions table (account column, distinct bank/account names uploaded during the week)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (account column, distinct bank/account names uploaded during the week via tokenized_user_id)</td>
                     </tr>
                   </tbody>
                 </table>
