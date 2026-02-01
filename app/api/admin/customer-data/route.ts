@@ -321,11 +321,11 @@ export async function GET(request: NextRequest) {
       ` : `
         u.id as user_id,
         u.email,
-        o.first_name,
-        o.last_name,
-        o.date_of_birth,
-        o.recovery_phone,
-        o.province_region,
+        p.first_name,
+        p.last_name,
+        p.date_of_birth,
+        p.recovery_phone,
+        p.province_region,
         o.emotional_state,
         o.financial_context,
         o.motivation,
@@ -345,11 +345,8 @@ export async function GET(request: NextRequest) {
         transaction_stats.first_transaction_date
       `;
 
-      const fromClause = useL0PII 
-        ? `FROM users u
+      const fromClause = `FROM users u
            LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
-           INNER JOIN onboarding_responses o ON o.user_id = u.id`
-        : `FROM users u
            INNER JOIN onboarding_responses o ON o.user_id = u.id`;
 
       // Build transaction stats subquery - Single source of truth (l1_transaction_facts only)

@@ -3426,13 +3426,13 @@ export default function AdminDashboard() {
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">First Name</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">COALESCE(p.first_name, NULL) or o.first_name</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">l0_pii_users table (first_name column) OR onboarding_responses table (first_name column) - PII isolated</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">p.first_name</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l0_pii_users table (first_name column) - PII isolated</td>
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">Province/Region</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">p.province_region or o.province_region</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">l0_pii_users table OR onboarding_responses table (province_region column)</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">p.province_region</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">l0_pii_users table (province_region column) - PII isolated</td>
                     </tr>
                     <tr>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">Emotional State</td>
