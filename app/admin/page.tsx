@@ -3241,45 +3241,6 @@ export default function AdminDashboard() {
                 </button>
               </div>
               
-              {/* Export API Documentation */}
-              <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export API documentation</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Download documentation of all API endpoints including formulas, variables, area, and read/write access.
-                </p>
-                <button
-                  onClick={async () => {
-                    try {
-                      const token = localStorage.getItem('admin_token');
-                      const response = await fetch('/api/admin/export/api-docs', {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                      });
-                      
-                      if (!response.ok) {
-                        const error = await response.json();
-                        alert(`Error: ${error.error || 'Failed to export documentation'}`);
-                        return;
-                      }
-                      
-                      const blob = await response.blob();
-                      const link = document.createElement('a');
-                      link.href = URL.createObjectURL(blob);
-                      link.download = `api-documentation-${new Date().toISOString().split('T')[0]}.xlsx`;
-                      link.click();
-                    } catch (error) {
-                      console.error('Export error:', error);
-                      alert('Failed to export documentation. Please try again.');
-                    }
-                  }}
-                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Download API documentation
-                </button>
-              </div>
-              
               {/* Cohort Analysis Export */}
               <div className="border border-gray-200 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Export cohort analysis</h3>

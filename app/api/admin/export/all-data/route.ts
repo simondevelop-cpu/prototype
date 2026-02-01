@@ -137,6 +137,66 @@ function getTableDescription(tableName: string): string {
 }
 
 /**
+ * Check if a table contains PII columns (besides user_id)
+ */
+async function checkTableForPII(pool: any, tableName: string): Promise<boolean> {
+  try {
+    // l0_pii_users is explicitly the PII table
+    if (tableName === 'l0_pii_users') {
+      return true;
+    }
+    
+    const columnsResult = await pool.query(`
+      SELECT column_name, data_type
+      FROM information_schema.columns
+      WHERE table_name = $1 AND table_schema = 'public'
+    `, [tableName]);
+    
+    const piiKeywords = ['email', 'first_name', 'last_name', 'date_of_birth', 'recovery_phone', 'province_region', 'phone', 'address'];
+    
+    for (const col of columnsResult.rows) {
+      const colName = col.column_name.toLowerCase();
+      
+      // Check for explicit PII fields (excluding user_id, internal_user_id, tokenized_user_id)
+      if (colName === 'user_id' || colName === 'internal_user_id' || colName === 'tokenized_user_id') {
+        continue; // Skip user ID fields
+      }
+      
+      if (piiKeywords.some(keyword => colName.includes(keyword))) {
+        return true;
+      }
+      
+      // Check for free text fields that could contain PII in specific tables
+      // These are user-provided text that might contain personal information
+      if (['notes', 'comments', 'feedback', 'message', 'text', 'other'].some(keyword => colName.includes(keyword))) {
+        // Tables where free text could contain PII
+        if (['chat_bookings', 'survey_responses', 'user_feedback', 'onboarding_responses'].includes(tableName)) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error(`[Export] Error checking PII for table ${tableName}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Check if a table is empty
+ */
+async function isTableEmpty(pool: any, tableName: string): Promise<boolean> {
+  try {
+    const countResult = await pool.query(`SELECT COUNT(*) as count FROM "${tableName}"`);
+    return parseInt(countResult.rows[0].count) === 0;
+  } catch (error) {
+    console.error(`[Export] Error checking if table ${tableName} is empty:`, error);
+    return false;
+  }
+}
+
+/**
  * Export all database tables as Excel workbook (one sheet per table)
  * Includes API documentation and table of contents as first sheets
  */
@@ -200,23 +260,50 @@ export async function GET(request: NextRequest) {
 
     const tables = tablesResult.rows.map(row => row.table_name);
     
-    // 3. Add Table of Contents sheet (second sheet)
+    // 3. Check which tables are empty and contain PII
+    const tableInfo = await Promise.all(
+      tables.map(async (tableName) => {
+        const isEmpty = await isTableEmpty(pool, tableName);
+        const hasPII = await checkTableForPII(pool, tableName);
+        return {
+          name: tableName,
+          isEmpty,
+          hasPII,
+        };
+      })
+    );
+    
+    // 4. Add Table of Contents sheet (second sheet)
     const tocData = [
-      { 'Sheet Name': 'API Documentation', 'Description': 'Complete list of all API endpoints with methods, areas, access levels, and authentication requirements.' },
-      { 'Sheet Name': 'Table of Contents', 'Description': 'This sheet. Overview of all sheets in this workbook.' },
-      ...tables.map(tableName => ({
-        'Sheet Name': tableName.length > 31 ? tableName.substring(0, 31) : tableName,
-        'Description': getTableDescription(tableName),
+      { 
+        'Sheet Name': 'API Documentation', 
+        'Description': 'Complete list of all API endpoints with methods, areas, access levels, and authentication requirements.',
+        'Empty?': '',
+        'PII data?': ''
+      },
+      { 
+        'Sheet Name': 'Table of Contents', 
+        'Description': 'This sheet. Overview of all sheets in this workbook.',
+        'Empty?': '',
+        'PII data?': ''
+      },
+      ...tableInfo.map(info => ({
+        'Sheet Name': info.name.length > 31 ? info.name.substring(0, 31) : info.name,
+        'Description': getTableDescription(info.name),
+        'Empty?': info.isEmpty ? 'Yes' : 'No',
+        'PII data?': info.hasPII ? 'Yes' : 'No',
       })),
     ];
     const tocWorksheet = XLSX.utils.json_to_sheet(tocData);
     tocWorksheet['!cols'] = [
       { wch: 35 }, // Sheet Name
       { wch: 80 }, // Description
+      { wch: 10 }, // Empty?
+      { wch: 12 }, // PII data?
     ];
     XLSX.utils.book_append_sheet(workbook, tocWorksheet, 'Table of Contents');
 
-    // 4. Export each table as a sheet
+    // 5. Export each table as a sheet
     for (const tableName of tables) {
       try {
         // Get all data from the table
