@@ -190,21 +190,39 @@ export async function GET(request: NextRequest) {
         SELECT COUNT(DISTINCT tokenized_user_id) as user_count, COUNT(*) as tx_count
         FROM l1_transaction_facts
       `);
-      const legacyCount = await pool.query(`
-        SELECT COUNT(DISTINCT user_id) as user_count, COUNT(*) as tx_count
-        FROM transactions
-      `);
       const l1Users = parseInt(l1Count.rows[0]?.user_count || '0', 10);
       const l1Txs = parseInt(l1Count.rows[0]?.tx_count || '0', 10);
-      const legacyUsers = parseInt(legacyCount.rows[0]?.user_count || '0', 10);
-      const legacyTxs = parseInt(legacyCount.rows[0]?.tx_count || '0', 10);
       
-      tests.push({
-        name: 'Data consistency check',
-        status: l1Txs >= legacyTxs ? 'pass' : 'warn',
-        message: `L1: ${l1Txs} transactions, ${l1Users} users | Legacy: ${legacyTxs} transactions, ${legacyUsers} users`,
-        details: l1Txs >= legacyTxs ? 'All data migrated' : 'Some transactions may not be migrated',
-      });
+      // Check if transactions table exists
+      const tableExists = await pool.query(`
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'transactions'
+      `);
+      
+      if (tableExists.rows.length === 0) {
+        // Table doesn't exist - this is the desired state
+        tests.push({
+          name: 'Data consistency check',
+          status: 'pass',
+          message: `L1: ${l1Txs} transactions, ${l1Users} users | Legacy table dropped`,
+          details: 'Legacy transactions table removed - Single Source of Truth established',
+        });
+      } else {
+        // Table still exists - compare data
+        const legacyCount = await pool.query(`
+          SELECT COUNT(DISTINCT user_id) as user_count, COUNT(*) as tx_count
+          FROM transactions
+        `);
+        const legacyUsers = parseInt(legacyCount.rows[0]?.user_count || '0', 10);
+        const legacyTxs = parseInt(legacyCount.rows[0]?.tx_count || '0', 10);
+        
+        tests.push({
+          name: 'Data consistency check',
+          status: l1Txs >= legacyTxs ? 'pass' : 'warn',
+          message: `L1: ${l1Txs} transactions, ${l1Users} users | Legacy: ${legacyTxs} transactions, ${legacyUsers} users`,
+          details: l1Txs >= legacyTxs ? 'All data migrated' : 'Some transactions may not be migrated',
+        });
+      }
     } catch (error: any) {
       tests.push({
         name: 'Data consistency check',
