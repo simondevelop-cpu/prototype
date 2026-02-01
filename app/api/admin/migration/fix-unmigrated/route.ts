@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
           tx.cashflow,
           tx.account,
           tx.category,
-          COALESCE(tx.label, ''),
+          tx.label || '',
           tx.created_at,
           tx.id,
         ]);
