@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
         event_type,
         event_timestamp,
         metadata
-      FROM user_events
+      FROM l1_events
       WHERE event_type IN ('admin_login', 'admin_tab_access')
       ORDER BY event_timestamp DESC
       LIMIT 1000

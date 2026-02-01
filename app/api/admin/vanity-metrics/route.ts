@@ -205,18 +205,18 @@ export async function GET(request: NextRequest) {
       }
 
       // Weekly Active Users (users who logged in during the week)
-      // Check if user_events table exists
+      // Check if l1_events table exists
       let wau = 0;
       try {
         const eventsCheck = await pool.query(`
           SELECT 1 FROM information_schema.tables 
-          WHERE table_name = 'user_events'
+          WHERE table_name = 'l1_events'
           LIMIT 1
         `);
         if (eventsCheck.rows.length > 0) {
           const wauQuery = `
             SELECT COUNT(DISTINCT e.user_id) as count
-            FROM user_events e
+            FROM l1_events e
             JOIN users u ON u.id = e.user_id
             WHERE e.event_type = 'login'
               AND e.event_timestamp >= $${paramIndex}::timestamp
@@ -228,7 +228,7 @@ export async function GET(request: NextRequest) {
           wau = parseInt(wauResult.rows[0]?.count) || 0;
         }
       } catch (e) {
-        // user_events table doesn't exist, WAU = 0
+        // l1_events table doesn't exist, WAU = 0
       }
 
       // New users per week - use DATE_TRUNC to ensure proper date comparison
@@ -381,7 +381,7 @@ export async function GET(request: NextRequest) {
       try {
         const eventsCheck = await pool.query(`
           SELECT 1 FROM information_schema.tables 
-          WHERE table_name = 'user_events'
+          WHERE table_name = 'l1_events'
           LIMIT 1
         `);
         if (eventsCheck.rows.length > 0) {
@@ -396,7 +396,7 @@ export async function GET(request: NextRequest) {
           
           const mauQuery = `
             SELECT COUNT(DISTINCT e.user_id) as count
-            FROM user_events e
+            FROM l1_events e
             JOIN users u ON u.id = e.user_id
             WHERE e.event_type = 'login'
               AND e.event_timestamp >= $${paramIndex}::timestamp
@@ -408,7 +408,7 @@ export async function GET(request: NextRequest) {
           mau = parseInt(mauResult.rows[0]?.count) || 0;
         }
       } catch (e) {
-        // user_events table doesn't exist, MAU = 0
+        // l1_events table doesn't exist, MAU = 0
       }
 
       // New users per month - users who signed up in the month containing this week

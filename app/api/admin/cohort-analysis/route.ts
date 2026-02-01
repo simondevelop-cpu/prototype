@@ -273,12 +273,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Get engagement metrics
-    // Check if user_events table exists
+    // Check if l1_events table exists
     let hasUserEvents = false;
     try {
       const eventsCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'user_events'
+        WHERE table_name = 'l1_events'
         LIMIT 1
       `);
       hasUserEvents = eventsCheck.rows.length > 0;
@@ -410,12 +410,12 @@ export async function GET(request: NextRequest) {
       LIMIT 12
     `;
 
-    // Check if user_events table exists for engagement metrics
+    // Check if l1_events table exists for engagement metrics
     let hasUserEventsTable = false;
     try {
       const eventsTableCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'user_events'
+        WHERE table_name = 'l1_events'
         LIMIT 1
       `);
       hasUserEventsTable = eventsTableCheck.rows.length > 0;
@@ -439,7 +439,7 @@ export async function GET(request: NextRequest) {
       engagementResult = { rows: [] };
     }
 
-    // Get user_events data if table exists
+    // Get l1_events data if table exists
     let userEventsData: any = {};
     if (hasUserEventsTable) {
       try {
@@ -460,7 +460,7 @@ export async function GET(request: NextRequest) {
               THEN DATE(ue.created_at) 
             END) as unique_login_days_week_1
           FROM users u
-          LEFT JOIN user_events ue ON ue.user_id = u.id
+          LEFT JOIN l1_events ue ON ue.user_id = u.id
           WHERE u.email != $${paramIndex}
             ${filterConditions}
           GROUP BY DATE_TRUNC('week', u.created_at)
@@ -474,7 +474,7 @@ export async function GET(request: NextRequest) {
           }
         });
       } catch (e) {
-        // Could not fetch user_events data
+        // Could not fetch l1_events data
       }
     }
 

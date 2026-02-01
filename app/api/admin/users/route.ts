@@ -97,11 +97,13 @@ export async function GET(request: NextRequest) {
       result = await pool.query(`
         SELECT 
           ${selectFields}${activeFields},
-          COUNT(DISTINCT t.id) as transaction_count,
-          MAX(t.created_at) as last_activity,
+          COUNT(DISTINCT COALESCE(tf.id, t.id)) as transaction_count,
+          MAX(COALESCE(tf.created_at, t.created_at)) as last_activity,
           COUNT(DISTINCT CASE WHEN u.completed_at IS NOT NULL THEN u.id END) as completed_onboarding_count
         FROM users u
-        LEFT JOIN transactions t ON u.id = t.user_id
+        LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+        LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+        LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
         WHERE u.email != $1
         GROUP BY ${groupByFields}${hasIsActive && hasEmailValidated ? ', u.is_active, u.email_validated' : ''}
         ORDER BY u.created_at DESC
@@ -111,11 +113,13 @@ export async function GET(request: NextRequest) {
       result = await pool.query(`
         SELECT 
           ${selectFields},
-          COUNT(DISTINCT t.id) as transaction_count,
-          MAX(t.created_at) as last_activity,
+          COUNT(DISTINCT COALESCE(tf.id, t.id)) as transaction_count,
+          MAX(COALESCE(tf.created_at, t.created_at)) as last_activity,
           COUNT(DISTINCT CASE WHEN o.completed_at IS NOT NULL THEN o.id END) as completed_onboarding_count
         FROM users u
-        LEFT JOIN transactions t ON u.id = t.user_id
+        LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+        LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+        LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
         LEFT JOIN onboarding_responses o ON u.id = o.user_id
         GROUP BY ${groupByFields}
         ORDER BY u.created_at DESC
@@ -166,7 +170,7 @@ export async function GET(request: NextRequest) {
             metadata->>'choice' AS choice,
             event_timestamp,
             metadata
-          FROM user_events
+          FROM l1_events
           WHERE event_type = 'consent'
             AND user_id = ANY($1::int[])
           ORDER BY user_id, metadata->>'consentType', event_timestamp DESC

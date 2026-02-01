@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     // Fetch transaction editing events for this user
     const editResult = await pool.query(`
       SELECT metadata
-      FROM user_events
+      FROM l1_events
       WHERE user_id = $1
         AND event_type = 'transaction_edit'
     `, [userId]);
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     // Fetch bulk edit events for this user
     const bulkEditResult = await pool.query(`
       SELECT COUNT(*) as count
-      FROM user_events
+      FROM l1_events
       WHERE user_id = $1
         AND event_type = 'bulk_edit'
     `, [userId]);
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     // Fetch statement upload events for this user
     const statementResult = await pool.query(`
       SELECT COUNT(*) as count
-      FROM user_events
+      FROM l1_events
       WHERE user_id = $1
         AND event_type = 'statement_upload'
     `, [userId]);

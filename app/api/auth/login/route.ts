@@ -3,6 +3,7 @@ import { getPool } from '@/lib/db';
 import { verifyPassword, hashPassword, createToken } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { verifyRequestOrigin } from '@/lib/csrf';
+import { getClientIpAddress, updateUserIpAddress } from '@/lib/ip-address';
 
 // Force dynamic rendering (POST endpoint requires runtime request body)
 export const dynamic = 'force-dynamic';
@@ -139,6 +140,17 @@ export async function POST(request: NextRequest) {
     } catch (e: any) {
       // Column doesn't exist yet - skip increment (will be added by migration)
       console.log('[Login] login_attempts column not found, skipping increment');
+    }
+
+    // Log IP address
+    try {
+      const ipAddress = getClientIpAddress(request);
+      if (ipAddress) {
+        await updateUserIpAddress(user.id, ipAddress);
+      }
+    } catch (ipError) {
+      console.error('[Login] Failed to log IP address:', ipError);
+      // Don't fail login if IP logging fails
     }
 
     // Create token

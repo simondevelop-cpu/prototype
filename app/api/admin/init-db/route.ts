@@ -85,33 +85,37 @@ async function initializeTables() {
     `);
     console.log('[DB Init] ✅ categorization_learning table created');
     
-    // Create user_events table for login and dashboard access tracking
+    // Create l1_events table for login and dashboard access tracking (renamed from user_events)
     await client.query(`
-      CREATE TABLE IF NOT EXISTS user_events (
+      CREATE TABLE IF NOT EXISTS l1_events (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         event_type TEXT NOT NULL,
         event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         metadata JSONB,
+        is_admin BOOLEAN DEFAULT FALSE,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
-    console.log('[DB Init] ✅ user_events table created');
+    console.log('[DB Init] ✅ l1_events table created');
     
-    // Create indexes for user_events table
+    // Create indexes for l1_events table
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_user_events_user_id ON user_events(user_id)
+      CREATE INDEX IF NOT EXISTS idx_l1_events_user_id ON l1_events(user_id)
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_user_events_type ON user_events(event_type)
+      CREATE INDEX IF NOT EXISTS idx_l1_events_type ON l1_events(event_type)
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_user_events_timestamp ON user_events(event_timestamp)
+      CREATE INDEX IF NOT EXISTS idx_l1_events_timestamp ON l1_events(event_timestamp)
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_user_events_user_type ON user_events(user_id, event_type)
+      CREATE INDEX IF NOT EXISTS idx_l1_events_user_type ON l1_events(user_id, event_type)
     `);
-    console.log('[DB Init] ✅ user_events indexes created');
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_l1_events_is_admin ON l1_events(is_admin) WHERE is_admin = TRUE
+    `);
+    console.log('[DB Init] ✅ l1_events indexes created');
     
     // Create onboarding_responses table
     await client.query(`

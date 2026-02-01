@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { verifyRequestOrigin } from '@/lib/csrf';
+import { getClientIpAddress, updateUserIpAddress } from '@/lib/ip-address';
 
 export const dynamic = 'force-dynamic';
 
@@ -214,6 +215,12 @@ export async function PUT(request: NextRequest) {
             provinceRegion || null,
           ]
         );
+        
+        // Log IP address when PII is updated
+        const ipAddress = getClientIpAddress(request);
+        if (ipAddress) {
+          await updateUserIpAddress(userId, ipAddress);
+        }
       } catch (error: any) {
         // l0_pii_users might not exist (pre-migration), that's okay
         if (error.code !== '42P01') { // Not "table doesn't exist" error

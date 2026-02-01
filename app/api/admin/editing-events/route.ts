@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         e.event_type,
         e.metadata,
         e.event_timestamp as created_at
-      FROM user_events e
+      FROM l1_events e
       LEFT JOIN users u ON e.user_id = u.id
       LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
       WHERE e.event_type = 'transaction_edit'

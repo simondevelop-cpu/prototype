@@ -55,7 +55,7 @@ function getAPIEndpoints(): APIEndpoint[] {
     { endpoint: '/api/onboarding/status', method: 'GET', area: 'Onboarding', access: 'read', description: 'Check onboarding completion status', authentication: 'user' },
     { endpoint: '/api/onboarding/progress', method: 'GET', area: 'Onboarding', access: 'read', description: 'Get onboarding progress', authentication: 'user' },
     // Consent
-    { endpoint: '/api/consent', method: 'POST', area: 'Consent', access: 'write', description: 'Log consent event', authentication: 'user', variables: 'consentType, metadata', formula: 'INSERT INTO user_events' },
+    { endpoint: '/api/consent', method: 'POST', area: 'Consent', access: 'write', description: 'Log consent event', authentication: 'user', variables: 'consentType, metadata', formula: 'INSERT INTO l1_events' },
     { endpoint: '/api/consent/check', method: 'GET', area: 'Consent', access: 'read', description: 'Check if consent was given', authentication: 'user', variables: 'type', formula: 'SELECT from user_events WHERE event_type' },
     // Statement Upload
     { endpoint: '/api/statements/upload', method: 'POST', area: 'Statement Upload', access: 'write', description: 'Upload PDF statement', authentication: 'user', variables: 'file' },
@@ -97,7 +97,7 @@ function getAPIEndpoints(): APIEndpoint[] {
     { endpoint: '/api/admin/survey-responses', method: 'GET', area: 'Admin', access: 'read', description: 'Get all survey responses', authentication: 'admin', formula: 'SELECT from survey_responses JOIN users' },
     { endpoint: '/api/admin/user-feedback', method: 'GET', area: 'Admin', access: 'read', description: 'Get user feedback', authentication: 'admin', formula: 'SELECT from user_feedback' },
     { endpoint: '/api/admin/logins', method: 'GET', area: 'Admin', access: 'read', description: 'Get admin login events', authentication: 'admin', formula: 'SELECT from user_events WHERE event_type IN (admin_login, admin_tab_access)' },
-    { endpoint: '/api/admin/log-action', method: 'POST', area: 'Admin', access: 'write', description: 'Log admin action', authentication: 'admin', variables: 'actionType, tab', formula: 'INSERT INTO user_events' },
+    { endpoint: '/api/admin/log-action', method: 'POST', area: 'Admin', access: 'write', description: 'Log admin action', authentication: 'admin', variables: 'actionType, tab', formula: 'INSERT INTO l1_events' },
     { endpoint: '/api/admin/keywords', method: 'GET', area: 'Admin', access: 'read', description: 'Get categorization keywords', authentication: 'admin', formula: 'SELECT from admin_keywords' },
     { endpoint: '/api/admin/keywords', method: 'POST', area: 'Admin', access: 'write', description: 'Create keyword', authentication: 'admin', variables: 'keyword, category, label, isActive, notes', formula: 'INSERT INTO admin_keywords' },
     { endpoint: '/api/admin/keywords/[id]', method: 'PUT', area: 'Admin', access: 'write', description: 'Update keyword', authentication: 'admin', variables: 'id, keyword, category, label, isActive, notes', formula: 'UPDATE admin_keywords' },

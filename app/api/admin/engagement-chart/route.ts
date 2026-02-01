@@ -65,12 +65,12 @@ export async function GET(request: NextRequest) {
     const hasMotivation = schemaCheck.rows.some(row => row.column_name === 'motivation');
     const hasEmailValidated = schemaCheck.rows.some(row => row.column_name === 'email_validated');
 
-    // Check if user_events table exists
+    // Check if l1_events table exists
     let hasUserEvents = false;
     try {
       const eventsCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'user_events'
+        WHERE table_name = 'l1_events'
         LIMIT 1
       `);
       hasUserEvents = eventsCheck.rows.length > 0;
@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get login days per week for each user (if user_events table exists)
+    // Get login days per week for each user (if l1_events table exists)
     const userLines: any[] = [];
     
     for (const user of filteredUsers) {
@@ -229,7 +229,7 @@ export async function GET(request: NextRequest) {
           // Get unique login days in this week
           const loginDaysResult = await pool.query(`
             SELECT COUNT(DISTINCT DATE(event_timestamp)) as login_days
-            FROM user_events
+            FROM l1_events
             WHERE user_id = $1
               AND event_type = 'login'
               AND event_timestamp >= $2
@@ -240,7 +240,7 @@ export async function GET(request: NextRequest) {
           weeks.push({ week: weekNum, loginDays });
         }
       } else {
-        // No user_events table - return zeros for now
+        // No l1_events table - return zeros for now
         for (let weekNum = 0; weekNum < 12; weekNum++) {
           weeks.push({ week: weekNum, loginDays: 0 });
         }

@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     // Check for existing consent event
     const result = await pool.query(`
       SELECT event_timestamp, metadata->>'choice' as choice
-      FROM user_events
+      FROM l1_events
       WHERE user_id = $1
         AND event_type = 'consent'
         AND metadata->>'consentType' = $2

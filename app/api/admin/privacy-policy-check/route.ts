@@ -268,7 +268,7 @@ export async function GET(request: NextRequest) {
     try {
       const tableCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables
-        WHERE table_name = 'user_events'
+        WHERE table_name = 'l1_events'
         LIMIT 1
       `);
       
@@ -277,7 +277,7 @@ export async function GET(request: NextRequest) {
           SELECT COUNT(*) as count,
                  COUNT(DISTINCT user_id) as unique_users,
                  COUNT(DISTINCT metadata->>'consentType') as consent_types
-          FROM user_events
+          FROM l1_events
           WHERE event_type = 'consent'
         `);
         const consentCount = parseInt(consentEventsCheck.rows[0]?.count || '0');
@@ -300,8 +300,8 @@ export async function GET(request: NextRequest) {
           category: 'Consent',
           name: 'Consent events are logged',
           status: 'fail',
-          message: 'user_events table does not exist - CRITICAL: Consent cannot be logged',
-          details: 'Consent logging requires user_events table'
+          message: 'l1_events table does not exist - CRITICAL: Consent cannot be logged',
+          details: 'Consent logging requires l1_events table'
         });
       }
     } catch (e: any) {
@@ -323,10 +323,10 @@ export async function GET(request: NextRequest) {
         SELECT 
           COUNT(*) as total_users,
           COUNT(CASE WHEN EXISTS (
-            SELECT 1 FROM user_events 
-            WHERE user_events.user_id = users.id 
-            AND user_events.event_type = 'consent'
-            AND user_events.metadata->>'consentType' = 'account_creation'
+            SELECT 1 FROM l1_events 
+            WHERE l1_events.user_id = users.id 
+            AND l1_events.event_type = 'consent'
+            AND l1_events.metadata->>'consentType' = 'account_creation'
           ) THEN 1 END) as users_with_consent,
           COUNT(CASE WHEN created_at > NOW() - INTERVAL '7 days' THEN 1 END) as recent_users
         FROM users
@@ -343,10 +343,10 @@ export async function GET(request: NextRequest) {
         FROM users u
         WHERE u.created_at > NOW() - INTERVAL '7 days'
         AND NOT EXISTS (
-          SELECT 1 FROM user_events 
-          WHERE user_events.user_id = u.id 
-          AND user_events.event_type = 'consent'
-          AND user_events.metadata->>'consentType' = 'account_creation'
+          SELECT 1 FROM l1_events 
+          WHERE l1_events.user_id = u.id 
+          AND l1_events.event_type = 'consent'
+          AND l1_events.metadata->>'consentType' = 'account_creation'
         )
       `);
       const recentWithoutConsent = parseInt(recentConsentCheck.rows[0]?.count || '0');
@@ -382,7 +382,7 @@ export async function GET(request: NextRequest) {
           COUNT(DISTINCT CASE WHEN metadata->>'consentType' = 'cookie_banner' THEN user_id END) as cookie_consent_users,
           COUNT(DISTINCT CASE WHEN metadata->>'consentType' = 'first_upload' THEN user_id END) as upload_consent_users,
           COUNT(DISTINCT CASE WHEN metadata->>'consentType' = 'settings_update' THEN user_id END) as settings_consent_users
-        FROM user_events
+        FROM l1_events
         WHERE event_type = 'consent'
       `);
       
@@ -460,7 +460,7 @@ export async function GET(request: NextRequest) {
       // We can verify by checking if users have exported data
       const exportEventsCheck = await pool.query(`
         SELECT COUNT(*) as count
-        FROM user_events
+        FROM l1_events
         WHERE event_type = 'data_export'
         LIMIT 1
       `).catch(() => ({ rows: [{ count: '0' }] }));
@@ -659,7 +659,7 @@ export async function GET(request: NextRequest) {
     try {
       const eventsTableCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables
-        WHERE table_name = 'user_events'
+        WHERE table_name = 'l1_events'
         LIMIT 1
       `);
       
@@ -668,7 +668,7 @@ export async function GET(request: NextRequest) {
         const recentEventsCheck = await pool.query(`
           SELECT COUNT(*) as count,
                  MAX(event_timestamp) as latest_event
-          FROM user_events
+          FROM l1_events
           WHERE event_timestamp > NOW() - INTERVAL '7 days'
         `);
         
@@ -681,8 +681,8 @@ export async function GET(request: NextRequest) {
           name: 'Breach monitoring in place',
           status: recentEvents > 0 ? 'pass' : 'warning',
           message: recentEvents > 0
-            ? `user_events table active - ${recentEvents} event(s) in last 7 days (latest: ${latestEvent ? new Date(latestEvent).toLocaleString() : 'N/A'})`
-            : 'user_events table exists but no recent events - monitoring may not be working',
+            ? `l1_events table active - ${recentEvents} event(s) in last 7 days (latest: ${latestEvent ? new Date(latestEvent).toLocaleString() : 'N/A'})`
+            : 'l1_events table exists but no recent events - monitoring may not be working',
           details: 'Event logging enables breach detection and audit trails'
         });
       } else {
@@ -691,8 +691,8 @@ export async function GET(request: NextRequest) {
           category: 'Data Security',
           name: 'Breach monitoring in place',
           status: 'fail',
-          message: 'user_events table missing - CRITICAL: Breach monitoring cannot work',
-          details: 'Event logging requires user_events table for breach detection'
+          message: 'l1_events table missing - CRITICAL: Breach monitoring cannot work',
+          details: 'Event logging requires l1_events table for breach detection'
         });
       }
     } catch (e: any) {
@@ -721,7 +721,7 @@ export async function GET(request: NextRequest) {
           OR column_name ILIKE '%third_party%'
           OR column_name ILIKE '%partner%'
         )
-        AND table_name IN ('users', 'transactions', 'user_events')
+        AND table_name IN ('users', 'l1_transaction_facts', 'l1_events')
         LIMIT 10
       `);
       
@@ -826,7 +826,7 @@ export async function GET(request: NextRequest) {
           COUNT(DISTINCT user_id) as unique_users,
           COUNT(CASE WHEN metadata->>'choice' = 'accept_all' THEN 1 END) as accept_all,
           COUNT(CASE WHEN metadata->>'choice' = 'essential_only' THEN 1 END) as essential_only
-        FROM user_events
+        FROM l1_events
         WHERE event_type = 'consent'
         AND metadata->>'consentType' = 'cookie_banner'
       `);
@@ -862,7 +862,7 @@ export async function GET(request: NextRequest) {
       // We can verify by checking if settings_update consent events exist
       const settingsConsentCheck = await pool.query(`
         SELECT COUNT(*) as count
-        FROM user_events
+        FROM l1_events
         WHERE event_type = 'consent'
         AND metadata->>'consentType' = 'settings_update'
         AND metadata->>'setting' LIKE '%cookie%'

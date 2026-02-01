@@ -31,8 +31,8 @@ export async function logBankStatementEvent(
     const eventType = metadata.source === 'uploaded' ? 'statement_upload' : 'statement_linked';
     
     await pool.query(
-      `INSERT INTO user_events (user_id, event_type, event_timestamp, metadata)
-       VALUES ($1, $2, NOW(), $3::jsonb)`,
+      `INSERT INTO l1_events (user_id, event_type, event_timestamp, metadata, is_admin)
+       VALUES ($1, $2, NOW(), $3::jsonb, FALSE)`,
       [userId, eventType, JSON.stringify(metadata)]
     );
     
@@ -63,8 +63,8 @@ export async function logFeedbackEvent(
 
   try {
     await pool.query(
-      `INSERT INTO user_events (user_id, event_type, event_timestamp, metadata)
-       VALUES ($1, $2, NOW(), $3::jsonb)`,
+      `INSERT INTO l1_events (user_id, event_type, event_timestamp, metadata, is_admin)
+       VALUES ($1, $2, NOW(), $3::jsonb, FALSE)`,
       [userId, 'feedback', JSON.stringify(feedbackData)]
     );
     
@@ -104,8 +104,8 @@ export async function logConsentEvent(
     };
 
     await pool.query(
-      `INSERT INTO user_events (user_id, event_type, event_timestamp, metadata)
-       VALUES ($1, $2, NOW(), $3::jsonb)`,
+      `INSERT INTO l1_events (user_id, event_type, event_timestamp, metadata, is_admin)
+       VALUES ($1, $2, NOW(), $3::jsonb, FALSE)`,
       [userId, 'consent', JSON.stringify(eventMetadata)]
     );
     
@@ -136,8 +136,8 @@ export async function logTransactionEditEvent(
 
   try {
     await pool.query(
-      `INSERT INTO user_events (user_id, event_type, event_timestamp, metadata)
-       VALUES ($1, $2, NOW(), $3::jsonb)`,
+      `INSERT INTO l1_events (user_id, event_type, event_timestamp, metadata, is_admin)
+       VALUES ($1, $2, NOW(), $3::jsonb, FALSE)`,
       [userId, 'transaction_edit', JSON.stringify({
         transactionId,
         changes,
@@ -169,8 +169,8 @@ export async function logBulkEditEvent(
 
   try {
     await pool.query(
-      `INSERT INTO user_events (user_id, event_type, event_timestamp, metadata)
-       VALUES ($1, $2, NOW(), $3::jsonb)`,
+      `INSERT INTO l1_events (user_id, event_type, event_timestamp, metadata, is_admin)
+       VALUES ($1, $2, NOW(), $3::jsonb, FALSE)`,
       [userId, 'bulk_edit', JSON.stringify({
         transactionIds,
         fieldsUpdated,
@@ -258,10 +258,10 @@ export async function logAdminEvent(
       return;
     }
 
-    // Insert the admin event with the valid user_id
+    // Insert the admin event with the valid user_id and is_admin flag
     await pool.query(
-      `INSERT INTO user_events (user_id, event_type, event_timestamp, metadata)
-       VALUES ($1, $2, NOW(), $3::jsonb)`,
+      `INSERT INTO l1_events (user_id, event_type, event_timestamp, metadata, is_admin)
+       VALUES ($1, $2, NOW(), $3::jsonb, TRUE)`,
       [adminUserId, eventType, JSON.stringify({
         adminEmail,
         ...metadata,
