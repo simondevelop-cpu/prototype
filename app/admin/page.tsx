@@ -5330,21 +5330,6 @@ export default function AdminDashboard() {
                 💚 App health
               </button>
               <button
-                onClick={() => {
-                  setMonitoringSubTab('privacy-policy');
-                  if (!privacyCheckData && !privacyCheckLoading) {
-                    fetchPrivacyCheckData();
-                  }
-                }}
-                className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                  monitoringSubTab === 'privacy-policy'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                🔒 Privacy policy check
-              </button>
-              <button
                 onClick={() => setMonitoringSubTab('admin-logins')}
                 className={`px-4 py-2 rounded-md font-medium transition-colors ${
                   monitoringSubTab === 'admin-logins'
