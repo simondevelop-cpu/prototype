@@ -120,7 +120,6 @@ describe('Migration Functionality Verification', () => {
       'l0_privacy_metadata',
       'l1_file_ingestion',
       'l1_job_list',
-      'l1_support_tickets',
       'l1_event_facts',
     ];
 
@@ -137,6 +136,67 @@ describe('Migration Functionality Verification', () => {
           }
         }
       });
+    });
+
+    it('should verify l1_support_tickets exists (kept for future use)', async () => {
+      const result = await pool.query(`
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_support_tickets'
+      `);
+      expect(result.rows.length).toBe(1);
+    });
+  });
+
+  describe('Empty Tables Drop Verification', () => {
+    const tablesToDrop = [
+      'l0_admin_list',
+      'l0_privacy_metadata',
+      'l1_file_ingestion',
+      'l1_job_list',
+      'l0_insight_list',
+    ];
+
+    tablesToDrop.forEach((tableName) => {
+      it(`should verify ${tableName} can be dropped (empty, no references)`, async () => {
+        try {
+          // Check if table exists
+          const existsResult = await pool.query(`
+            SELECT 1 FROM information_schema.tables WHERE table_name = $1
+          `, [tableName]);
+          
+          if (existsResult.rows.length === 0) {
+            // Table already dropped, that's fine
+            return;
+          }
+
+          // Verify it's empty
+          const countResult = await pool.query(`SELECT COUNT(*) as count FROM "${tableName}"`);
+          const rowCount = parseInt(countResult.rows[0]?.count || '0', 10);
+          expect(rowCount).toBe(0);
+
+          // Check for foreign key references
+          const fkCheck = await pool.query(`
+            SELECT COUNT(*) as count
+            FROM information_schema.key_column_usage kcu
+            JOIN information_schema.table_constraints tc ON kcu.constraint_name = tc.constraint_name
+            WHERE tc.table_name != $1
+              AND kcu.referenced_table_name = $1
+          `, [tableName]);
+          const referencedBy = parseInt(fkCheck.rows[0]?.count || '0', 10);
+          expect(referencedBy).toBe(0);
+        } catch (error: any) {
+          // Table might not exist (already dropped), that's okay
+          if (!error.message.includes('does not exist')) {
+            throw error;
+          }
+        }
+      });
+    });
+
+    it('should verify l1_support_tickets is NOT dropped (kept for future use)', async () => {
+      const result = await pool.query(`
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_support_tickets'
+      `);
+      expect(result.rows.length).toBe(1);
     });
   });
 

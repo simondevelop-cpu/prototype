@@ -113,6 +113,9 @@ export default function AdminDashboard() {
   const [dropVerificationLoading, setDropVerificationLoading] = useState(false);
   const [investigationData, setInvestigationData] = useState<any>(null);
   const [investigationLoading, setInvestigationLoading] = useState(false);
+  const [emptyTablesVerification, setEmptyTablesVerification] = useState<any>(null);
+  const [emptyTablesLoading, setEmptyTablesLoading] = useState(false);
+  const [emptyTablesDropping, setEmptyTablesDropping] = useState(false);
   
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
@@ -512,6 +515,7 @@ export default function AdminDashboard() {
       fetchMigrationTests();
       fetchDropVerification();
       fetchInvestigation();
+      fetchEmptyTablesVerification();
     }
   }, [activeTab, inboxSubTab, authenticated]);
 
@@ -4080,6 +4084,70 @@ export default function AdminDashboard() {
     } catch (error: any) {
       console.error('Error dropping tables:', error);
       alert(`Error dropping tables: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  // Fetch empty tables verification
+  const fetchEmptyTablesVerification = async () => {
+    setEmptyTablesLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/drop-empty-tables', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setEmptyTablesVerification(data);
+      } else {
+        alert(`Failed to verify empty tables: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error fetching empty tables verification:', error);
+      alert(`Error fetching empty tables verification: ${error.message || 'Unknown error'}`);
+    } finally {
+      setEmptyTablesLoading(false);
+    }
+  };
+
+  // Drop empty tables
+  const dropEmptyTables = async () => {
+    if (!confirm('Are you sure you want to drop these empty unused tables? This cannot be undone.')) {
+      return;
+    }
+
+    setEmptyTablesDropping(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/drop-empty-tables', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        alert(`Successfully dropped ${data.droppedTables.length} empty table(s)`);
+        fetchEmptyTablesVerification(); // Refresh verification
+        fetchDropVerification(); // Also refresh main drop verification
+      } else {
+        alert(`Failed to drop empty tables: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error dropping empty tables:', error);
+      alert(`Error dropping empty tables: ${error.message || 'Unknown error'}`);
+    } finally {
+      setEmptyTablesDropping(false);
     }
   };
 
