@@ -46,35 +46,61 @@ export async function POST(request: NextRequest) {
       'l0_insight_list',
     ];
 
-    // Verify tables are empty before dropping
+    // Verify tables are empty before dropping (skip if table doesn't exist)
     const verificationResults: any[] = [];
+    const tablesToActuallyDrop: string[] = [];
+    
     for (const tableName of tablesToDrop) {
       try {
+        // Check if table exists
+        const tableExists = await pool.query(`
+          SELECT 1 FROM information_schema.tables 
+          WHERE table_name = $1
+        `, [tableName]);
+        
+        if (tableExists.rows.length === 0) {
+          // Table doesn't exist - skip it
+          verificationResults.push({
+            tableName,
+            rowCount: 0,
+            safeToDrop: true,
+            note: 'Table does not exist (already dropped)',
+          });
+          continue;
+        }
+        
         const countResult = await pool.query(`SELECT COUNT(*) as count FROM "${tableName}"`);
         const rowCount = parseInt(countResult.rows[0]?.count || '0', 10);
+        const safeToDrop = rowCount === 0;
+        
         verificationResults.push({
           tableName,
           rowCount,
-          safeToDrop: rowCount === 0,
+          safeToDrop,
         });
+        
+        if (safeToDrop) {
+          tablesToActuallyDrop.push(tableName);
+        }
       } catch (error: any) {
-        // Table might not exist
+        // Table might not exist or other error
         verificationResults.push({
           tableName,
           rowCount: 0,
           safeToDrop: true,
-          note: 'Table does not exist',
+          note: error.message.includes('does not exist') ? 'Table does not exist' : error.message,
         });
       }
     }
 
-    // Check if all tables are safe to drop
-    const allSafe = verificationResults.every((r) => r.safeToDrop);
-    if (!allSafe) {
+    // Only drop tables that actually exist and are empty
+    if (tablesToActuallyDrop.length === 0) {
       return NextResponse.json({
-        error: 'Not all tables are empty',
+        success: true,
+        message: 'No tables to drop (all either already dropped or not empty)',
+        droppedTables: [],
         verification: verificationResults,
-      }, { status: 400 });
+      });
     }
 
     let client;
@@ -82,8 +108,16 @@ export async function POST(request: NextRequest) {
       client = await pool.connect();
       await client.query('BEGIN'); // Start transaction
 
-      // Execute the migration script
-      await client.query(migrationScript);
+      // Drop each table individually
+      for (const tableName of tablesToActuallyDrop) {
+        try {
+          await client.query(`DROP TABLE IF EXISTS "${tableName}" CASCADE`);
+          console.log(`[Drop Empty Tables API] ✅ Dropped table: ${tableName}`);
+        } catch (error: any) {
+          console.error(`[Drop Empty Tables API] ❌ Error dropping ${tableName}:`, error);
+          throw error;
+        }
+      }
 
       await client.query('COMMIT'); // Commit transaction
       console.log('[Drop Empty Tables API] ✅ Tables dropped successfully.');
@@ -91,7 +125,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'Empty unused tables dropped successfully.',
-        droppedTables: tablesToDrop,
+        droppedTables: tablesToActuallyDrop,
         verification: verificationResults,
       });
     } catch (error: any) {
