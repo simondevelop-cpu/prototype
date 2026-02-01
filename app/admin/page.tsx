@@ -4815,7 +4815,7 @@ export default function AdminDashboard() {
         alert('Not authenticated. Please log in again.');
         return;
       }
-      const response = await fetch('/api/admin/health', {
+      const response = await fetch('/api/admin/health/security-compliance', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -4837,31 +4837,27 @@ export default function AdminDashboard() {
 
   // Render App Health Tab
   const renderAppHealth = () => {
-
-    const getStatusIcon = (status: string) => {
-      switch (status) {
-        case 'pass':
-          return '✅';
-        case 'fail':
-          return '❌';
-        case 'warning':
-          return '⚠️';
-        default:
-          return '❓';
-      }
-    };
-
-    const getStatusColor = (status: string) => {
-      switch (status) {
-        case 'pass':
-          return 'bg-green-50 border-green-200 text-green-800';
-        case 'fail':
-          return 'bg-red-50 border-red-200 text-red-800';
-        case 'warning':
-          return 'bg-yellow-50 border-yellow-200 text-yellow-800';
-        default:
-          return 'bg-gray-50 border-gray-200 text-gray-800';
-      }
+    const categoryLabels: { [key: string]: { title: string; icon: string; description: string } } = {
+      'data-isolation': {
+        title: 'Data Isolation & Privacy',
+        icon: '🔒',
+        description: 'Ensures personally identifiable information (PII) is properly isolated and protected',
+      },
+      'user-rights': {
+        title: 'User Rights & Compliance',
+        icon: '⚖️',
+        description: 'Verifies PIPEDA and Law 25 compliance - user rights to access, deletion, and consent tracking',
+      },
+      'data-integrity': {
+        title: 'Data Integrity',
+        icon: '🔗',
+        description: 'Ensures single source of truth is maintained and data consistency is preserved',
+      },
+      'infrastructure': {
+        title: 'Infrastructure Health',
+        icon: '🏗️',
+        description: 'Database availability and system responsiveness',
+      },
     };
 
     return (
@@ -4872,7 +4868,7 @@ export default function AdminDashboard() {
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">🏥 App health</h2>
               <p className="text-gray-600">
-                Comprehensive health checks for application and database infrastructure.
+                Security and compliance health checks to verify data protection and user rights are properly implemented.
               </p>
             </div>
             <button
@@ -4886,35 +4882,23 @@ export default function AdminDashboard() {
         </div>
 
         {/* Overall Status */}
-        {healthData && (
+        {healthData && healthData.summary && (
           <div className={`rounded-lg border-2 p-6 ${
-            (healthData.status === 'pass' || (healthData.success && !healthData.compliance?.summary?.fail && !healthData.operational?.summary?.fail && !healthData.infrastructure?.summary?.fail)) ? 'bg-green-50 border-green-300' :
-            (healthData.status === 'fail' || healthData.compliance?.summary?.fail > 0 || healthData.operational?.summary?.fail > 0 || healthData.infrastructure?.summary?.fail > 0) ? 'bg-red-50 border-red-300' :
+            healthData.success ? 'bg-green-50 border-green-300' :
+            healthData.summary.failed > 0 ? 'bg-red-50 border-red-300' :
             'bg-yellow-50 border-yellow-300'
           }`}>
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-bold mb-2">
-                  Overall Status: {(healthData.status === 'pass' || (healthData.success && !healthData.compliance?.summary?.fail && !healthData.operational?.summary?.fail && !healthData.infrastructure?.summary?.fail)) ? '✅ Healthy' : 
-                                   (healthData.status === 'fail' || healthData.compliance?.summary?.fail > 0 || healthData.operational?.summary?.fail > 0 || healthData.infrastructure?.summary?.fail > 0) ? '❌ Unhealthy' : 
-                                   '⚠️ Warning'}
+                  Overall Status: {healthData.success ? '✅ All Tests Passing' : 
+                                   healthData.summary.failed > 0 ? '❌ Issues Found' : 
+                                   '⚠️ Warnings'}
                 </h3>
-                {healthData.summary && (
-                  <p className="text-sm">
-                    {healthData.summary.passed || healthData.summary.pass || healthData.infrastructure?.summary?.pass || healthData.operational?.summary?.pass || healthData.compliance?.summary?.pass || 0} passed, {healthData.summary.warnings || healthData.summary.warning || healthData.infrastructure?.summary?.warning || healthData.operational?.summary?.warning || healthData.compliance?.summary?.warning || 0} warnings, {healthData.summary.failed || healthData.summary.fail || healthData.infrastructure?.summary?.fail || healthData.operational?.summary?.fail || healthData.compliance?.summary?.fail || 0} failed
-                  </p>
-                )}
-                {!healthData.summary && healthData.success && (
-                  <p className="text-sm">
-                    {(healthData.infrastructure?.summary?.pass || 0) + (healthData.operational?.summary?.pass || 0) + (healthData.compliance?.summary?.pass || 0)} passed, {(healthData.infrastructure?.summary?.warning || 0) + (healthData.operational?.summary?.warning || 0) + (healthData.compliance?.summary?.warning || 0)} warnings, {(healthData.infrastructure?.summary?.fail || 0) + (healthData.operational?.summary?.fail || 0) + (healthData.compliance?.summary?.fail || 0)} failed
-                  </p>
-                )}
+                <p className="text-sm">
+                  {healthData.summary.passed} passed, {healthData.summary.warnings} warnings, {healthData.summary.failed} failed
+                </p>
               </div>
-              {healthData.timestamp && (
-                <div className="text-sm text-gray-500">
-                  Last checked: {new Date(healthData.timestamp).toLocaleString()}
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -4923,62 +4907,24 @@ export default function AdminDashboard() {
         {healthLoading && (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-4 text-gray-600">Running health checks...</p>
+            <p className="mt-4 text-gray-600">Running security and compliance checks...</p>
           </div>
         )}
 
-        {healthData && (healthData.checks || healthData.infrastructure || healthData.operational || healthData.compliance) && (() => {
-          // Organize checks into sections
-          const infrastructureChecks = [
-            'Environment Variables',
-            'Database Connection',
-            'Database Performance',
-            'Schema Tables',
-            'Database Extensions',
-            'Database Disk Space',
-          ];
-          
-          const appHealthChecks = [
-            'Data Migration',
-            'Data Integrity',
-            'Password Security',
-          ];
-          
-          const pipedaChecks = [
-            'PII Isolation',
-            'Account Deletion Endpoint',
-            'Data Export Endpoint',
-            '30-Day Data Retention',
-            'User Tokenization',
-            'Data Residency (Law 25)',
-          ];
+        {healthData && healthData.tests && healthData.byCategory && (() => {
+          // Group tests by category
+          const testsByCategory: { [key: string]: any[] } = {
+            'data-isolation': [],
+            'user-rights': [],
+            'data-integrity': [],
+            'infrastructure': [],
+          };
 
-          // Handle both old and new API response formats
-          let infrastructure: any[] = [];
-          let appHealth: any[] = [];
-          let pipeda: any[] = [];
-          let implementedRequirements: any[] = [];
-          let documentationRequirements: any[] = [];
-
-          if (healthData.infrastructure || healthData.operational || healthData.compliance) {
-            // New API format - extract from nested structure
-            infrastructure = healthData.infrastructure?.checks || [];
-            appHealth = healthData.operational?.checks || [];
-            pipeda = healthData.compliance?.activeTests || [];
-            implementedRequirements = healthData.compliance?.implementedRequirements || [];
-            documentationRequirements = healthData.compliance?.documentationRequirements || [];
-          } else if (healthData.checks) {
-            // Old API format - organize checks into sections
-            infrastructure = healthData.checks.filter((c: any) => 
-              infrastructureChecks.includes(c.name)
-            );
-            appHealth = healthData.checks.filter((c: any) => 
-              appHealthChecks.includes(c.name)
-            );
-            pipeda = healthData.checks.filter((c: any) => 
-              pipedaChecks.includes(c.name)
-            );
-          }
+          healthData.tests.forEach((test: any) => {
+            if (testsByCategory[test.category]) {
+              testsByCategory[test.category].push(test);
+            }
+          });
 
           // PIPEDA requirements that don't need automated checks (use from API if available, otherwise use defaults)
           const pipedaNoCheck = (implementedRequirements && implementedRequirements.length > 0) ? implementedRequirements : [
@@ -5054,255 +5000,75 @@ export default function AdminDashboard() {
             },
           ];
 
-          const renderCheck = (check: any, index: number) => (
-            <div
-              key={index}
-              className={`border-2 rounded-lg p-6 ${getStatusColor(check.status)}`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-2xl">{getStatusIcon(check.status)}</span>
-                    <h3 className="text-lg font-bold">{check.name}</h3>
-                  </div>
-                  <p className="text-sm mb-3 opacity-90">{check.description}</p>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                      check.status === 'pass' ? 'bg-green-200 text-green-900' :
-                      check.status === 'fail' ? 'bg-red-200 text-red-900' :
-                      'bg-yellow-200 text-yellow-900'
-                    }`}>
-                      {check.message || check.note}
-                    </div>
-                    {check.responseTimeMs !== undefined && (
-                      <span className="text-xs text-gray-500">
-                        ({check.responseTimeMs}ms)
-                      </span>
-                    )}
-                  </div>
-                  {check.details && (
-                    <details className="mt-4">
-                      <summary className="cursor-pointer text-sm font-medium hover:underline">
-                        View Details
-                      </summary>
-                      <pre className="mt-2 p-3 bg-black bg-opacity-10 rounded text-xs overflow-x-auto">
-                        {JSON.stringify(check.details, null, 2)}
-                      </pre>
-                    </details>
-                  )}
-                  {check.action && (
-                    <div className="mt-2 text-xs text-gray-600 italic">
-                      Action: {check.action}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-
           return (
             <div className="space-y-8">
-              {/* Infrastructure Health */}
-              <div>
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                  <span>🏗️</span> Infrastructure Health
-                </h3>
-                <div className="grid gap-4">
-                  {infrastructure.map((check: any, index: number) => renderCheck(check, index))}
-                </div>
-              </div>
-
-              {/* App Health / Operational Correctness */}
-              <div>
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                  <span>⚙️</span> App Health / Operational Correctness
-                </h3>
-                <div className="grid gap-4">
-                  {appHealth.length > 0 ? (
-                    appHealth.map((check: any, index: number) => renderCheck(check, index))
-                  ) : (
-                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center text-gray-500">
-                      No operational health checks available
-                    </div>
-                  )}
-                </div>
-                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    <strong>Note:</strong> Product health metrics (ingestion latency, parsing rates, categorization accuracy) 
-                    will be added in future updates.
-                  </p>
-                </div>
-              </div>
-
-              {/* PIPEDA / Law 25 Requirements */}
-              <div>
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                  <span>🔒</span> PIPEDA / Law 25 Compliance
-                </h3>
+              {/* Render each category */}
+              {Object.entries(categoryLabels).map(([categoryKey, categoryInfo]) => {
+                const categoryTests = testsByCategory[categoryKey] || [];
+                const categorySummary = healthData.summary.byCategory[categoryKey];
                 
-                {/* Active Tests/Checks */}
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold mb-3 text-gray-700">Active Tests / Checks</h4>
-                  <div className="grid gap-4">
-                    {pipeda.length > 0 ? (
-                      pipeda.map((check: any, index: number) => renderCheck(check, index))
+                return (
+                  <div key={categoryKey}>
+                    <div className="mb-4">
+                      <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+                        <span>{categoryInfo.icon}</span>
+                        {categoryInfo.title}
+                        {categorySummary && (
+                          <span className={`text-sm font-normal ml-2 ${
+                            categorySummary.failed > 0 ? 'text-red-600' :
+                            categorySummary.passed === categorySummary.total ? 'text-green-600' :
+                            'text-yellow-600'
+                          }`}>
+                            ({categorySummary.passed}/{categorySummary.total} passing)
+                          </span>
+                        )}
+                      </h3>
+                      <p className="text-sm text-gray-600">{categoryInfo.description}</p>
+                    </div>
+                    
+                    {categoryTests.length > 0 ? (
+                      <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Test</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {categoryTests.map((test: any, index: number) => (
+                              <tr key={index}>
+                                <td className="px-6 py-4 text-sm font-medium text-gray-900">{test.name}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{test.description}</td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                    test.status === 'pass' ? 'bg-green-100 text-green-800' :
+                                    test.status === 'fail' ? 'bg-red-100 text-red-800' :
+                                    'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                    {test.status === 'pass' ? '✓ Pass' : 
+                                     test.status === 'fail' ? '✗ Fail' : 
+                                     '⚠ Warn'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{test.message}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{test.details || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     ) : (
                       <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center text-gray-500">
-                        No active compliance tests available
+                        No tests in this category
                       </div>
                     )}
                   </div>
-                </div>
-
-                {/* Requirements (No Checks Needed) */}
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold mb-3 text-gray-700">Implemented Requirements (No Automated Checks)</h4>
-                  <div className="grid gap-4">
-                    {pipedaNoCheck.map((req: any, index: number) => (
-                      <div
-                        key={index}
-                        className="border-2 rounded-lg p-4 bg-green-50 border-green-200"
-                      >
-                        <div className="flex items-start gap-3">
-                          <span className="text-xl">✅</span>
-                          <div className="flex-1">
-                            <h4 className="font-bold text-green-900 mb-1">{req.name}</h4>
-                            <p className="text-sm text-green-800 mb-2">{req.description}</p>
-                            <p className="text-xs text-green-700 italic">{req.note}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Requirements (Documentation/Process Needed) */}
-                <div>
-                  <h4 className="text-lg font-semibold mb-3 text-gray-700">Requirements Needing Documentation / Process</h4>
-                  <div className="grid gap-4">
-                    {pipedaDocumentation.map((req: any, index: number) => (
-                      <div
-                        key={index}
-                        className="border-2 rounded-lg p-4 bg-yellow-50 border-yellow-200"
-                      >
-                        <div className="flex items-start gap-3">
-                          <span className="text-xl">📝</span>
-                          <div className="flex-1">
-                            <h4 className="font-bold text-yellow-900 mb-1">{req.name}</h4>
-                            <p className="text-sm text-yellow-800 mb-2">{req.description}</p>
-                            <p className="text-xs text-yellow-700 italic mb-2">{req.note}</p>
-                            <div className="text-xs font-medium text-yellow-900">
-                              ⚠️ {req.action}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Single Source of Truth & PII Isolation Tests */}
-              <div>
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                  <span>🔗</span> Single Source of Truth & PII Isolation Tests
-                </h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Verify ongoing compliance: Single Source of Truth is maintained and PII is properly isolated.
-                </p>
-                <div className="mb-4">
-                  <button
-                    onClick={fetchSingleSourceTests}
-                    disabled={singleSourceTestsLoading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                  >
-                    {singleSourceTestsLoading ? 'Running...' : 'Run Tests'}
-                  </button>
-                </div>
-
-                {singleSourceTests && (
-                  <div className="space-y-4">
-                    <div className={`border rounded-lg p-4 ${
-                      singleSourceTests.success 
-                        ? 'bg-green-50 border-green-200' 
-                        : 'bg-yellow-50 border-yellow-200'
-                    }`}>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-semibold text-gray-900">Test Summary</h4>
-                        <span className={`text-sm font-medium ${
-                          singleSourceTests.success ? 'text-green-800' : 'text-yellow-800'
-                        }`}>
-                          {singleSourceTests.summary.passed} / {singleSourceTests.summary.total} tests passed
-                        </span>
-                      </div>
-                      <div className="flex gap-4 text-sm">
-                        <span className="text-green-700">✓ Passed: {singleSourceTests.summary.passed}</span>
-                        <span className="text-red-700">✗ Failed: {singleSourceTests.summary.failed}</span>
-                        <span className="text-yellow-700">⚠ Warnings: {singleSourceTests.summary.warnings}</span>
-                        <span className="text-gray-700">⚠ Errors: {singleSourceTests.summary.errors}</span>
-                      </div>
-                      {/* Action buttons */}
-                      <div className="mt-4 flex gap-2">
-                        {singleSourceTests.tests.some((t: any) => t.name === 'Tokenization coverage' && t.status === 'warn') && (
-                          <button
-                            onClick={fixTokenization}
-                            disabled={fixingTokenization}
-                            className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 text-sm"
-                          >
-                            {fixingTokenization ? 'Fixing...' : 'Fix Tokenization'}
-                          </button>
-                        )}
-                        {singleSourceTests.tests.some((t: any) => 
-                          (t.name === 'transactions table foreign keys removed' && t.status === 'fail') ||
-                          (t.name === 'accounts table foreign keys removed' && t.status === 'fail')
-                        ) && (
-                          <button
-                            onClick={dropTransactionsAndAccounts}
-                            disabled={droppingTables}
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm"
-                          >
-                            {droppingTables ? 'Dropping...' : 'Drop Tables & Establish SSOT'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Test</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {singleSourceTests.tests.map((test: any, index: number) => (
-                            <tr key={index}>
-                              <td className="px-6 py-4 text-sm font-medium text-gray-900">{test.name}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                  test.status === 'pass' ? 'bg-green-100 text-green-800' :
-                                  test.status === 'fail' ? 'bg-red-100 text-red-800' :
-                                  test.status === 'warn' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {test.status === 'pass' ? '✓ Pass' : 
-                                   test.status === 'fail' ? '✗ Fail' : 
-                                   test.status === 'warn' ? '⚠ Warn' : '⚠ Error'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{test.message}</td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{test.details || '-'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
+                );
+              })}
             </div>
           );
         })()}
@@ -5535,16 +5301,6 @@ export default function AdminDashboard() {
               }`}
             >
               🔍 App monitoring
-            </button>
-            <button
-              onClick={() => setActiveTab('migration')}
-              className={`px-6 py-4 font-medium text-sm transition-colors relative ${
-                activeTab === 'migration'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              🔄 Migration
             </button>
           </div>
         </div>
@@ -5874,7 +5630,6 @@ export default function AdminDashboard() {
         )}
         {activeTab === 'categories' && renderCategoriesTab()}
         {activeTab === 'analytics' && renderAnalyticsTab()}
-        {activeTab === 'migration' && renderMigrationTab()}
       </div>
       
       {/* Add Modal - only for keywords and merchants */}
