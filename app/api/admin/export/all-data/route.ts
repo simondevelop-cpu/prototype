@@ -56,10 +56,10 @@ function getAPIEndpoints(): APIEndpoint[] {
     { endpoint: '/api/onboarding/progress', method: 'GET', area: 'Onboarding', access: 'read', description: 'Get onboarding progress', authentication: 'user' },
     // Consent
     { endpoint: '/api/consent', method: 'POST', area: 'Consent', access: 'write', description: 'Log consent event', authentication: 'user', variables: 'consentType, metadata', formula: 'INSERT INTO l1_events' },
-    { endpoint: '/api/consent/check', method: 'GET', area: 'Consent', access: 'read', description: 'Check if consent was given', authentication: 'user', variables: 'type', formula: 'SELECT from user_events WHERE event_type' },
+    { endpoint: '/api/consent/check', method: 'GET', area: 'Consent', access: 'read', description: 'Check if consent was given', authentication: 'user', variables: 'type', formula: 'SELECT from l1_events WHERE event_type' },
     // Statement Upload
     { endpoint: '/api/statements/upload', method: 'POST', area: 'Statement Upload', access: 'write', description: 'Upload PDF statement', authentication: 'user', variables: 'file' },
-    { endpoint: '/api/statements/parse', method: 'POST', area: 'Statement Upload', access: 'write', description: 'Parse uploaded statement', authentication: 'user', variables: 'file', formula: 'PDF parsing, INSERT INTO transactions' },
+    { endpoint: '/api/statements/parse', method: 'POST', area: 'Statement Upload', access: 'write', description: 'Parse uploaded statement', authentication: 'user', variables: 'file', formula: 'PDF parsing, INSERT INTO l1_transaction_facts' },
     { endpoint: '/api/statements/import', method: 'POST', area: 'Statement Upload', access: 'write', description: 'Import parsed transactions', authentication: 'user', variables: 'transactions[]', formula: 'INSERT INTO l1_transaction_facts' },
     // Categorization
     { endpoint: '/api/categorization/learn', method: 'POST', area: 'Categorization', access: 'write', description: 'Learn from user correction', authentication: 'user', variables: 'description, category, label', formula: 'INSERT INTO categorization_learning' },
@@ -75,19 +75,19 @@ function getAPIEndpoints(): APIEndpoint[] {
     // Feedback
     { endpoint: '/api/feedback', method: 'POST', area: 'Feedback', access: 'write', description: 'Submit feedback', authentication: 'user', variables: 'usefulness, trust, problems, learnMore', formula: 'INSERT INTO user_feedback' },
     // User Activity
-    { endpoint: '/api/user/edit-counts', method: 'GET', area: 'User Activity', access: 'read', description: 'Get user edit activity counts', authentication: 'user', formula: 'SELECT COUNT from user_events WHERE event_type' },
+    { endpoint: '/api/user/edit-counts', method: 'GET', area: 'User Activity', access: 'read', description: 'Get user edit activity counts', authentication: 'user', formula: 'SELECT COUNT from l1_events WHERE event_type' },
     // Admin Endpoints
     { endpoint: '/api/admin/auth', method: 'POST', area: 'Admin', access: 'write', description: 'Admin login', authentication: 'public', variables: 'email, password' },
     { endpoint: '/api/admin/auth', method: 'GET', area: 'Admin', access: 'read', description: 'Verify admin token', authentication: 'admin' },
-    { endpoint: '/api/admin/users', method: 'GET', area: 'Admin', access: 'read', description: 'Get all users with consent info', authentication: 'admin', formula: 'SELECT from users, user_events' },
+    { endpoint: '/api/admin/users', method: 'GET', area: 'Admin', access: 'read', description: 'Get all users with consent info', authentication: 'admin', formula: 'SELECT from users, l1_events' },
     { endpoint: '/api/admin/users/block', method: 'POST', area: 'Admin', access: 'write', description: 'Block/unblock user', authentication: 'admin', variables: 'userId, isActive', formula: 'UPDATE users SET is_active' },
     { endpoint: '/api/admin/customer-data', method: 'GET', area: 'Admin', access: 'read', description: 'Get customer onboarding data', authentication: 'admin', formula: 'SELECT from users, l0_pii_users, onboarding_responses' },
-    { endpoint: '/api/admin/events-data', method: 'GET', area: 'Admin', access: 'read', description: 'Get all user events', authentication: 'admin', formula: 'SELECT from user_events' },
-    { endpoint: '/api/admin/editing-events', method: 'GET', area: 'Admin', access: 'read', description: 'Get transaction editing events', authentication: 'admin', formula: 'SELECT from user_events WHERE event_type = transaction_edit' },
+    { endpoint: '/api/admin/events-data', method: 'GET', area: 'Admin', access: 'read', description: 'Get all user events', authentication: 'admin', formula: 'SELECT from l1_events' },
+    { endpoint: '/api/admin/editing-events', method: 'GET', area: 'Admin', access: 'read', description: 'Get transaction editing events', authentication: 'admin', formula: 'SELECT from l1_events WHERE event_type = transaction_edit' },
     { endpoint: '/api/admin/recategorizations', method: 'GET', area: 'Admin', access: 'read', description: 'Get recategorization log', authentication: 'admin', formula: 'SELECT from categorization_learning' },
     { endpoint: '/api/admin/cohort-analysis', method: 'GET', area: 'Admin', access: 'read', description: 'Get cohort analysis data', authentication: 'admin', variables: 'totalAccounts, validatedEmails, cohorts, intentCategories, dataCoverage', formula: 'Complex aggregations from users, onboarding_responses, l1_transaction_facts' },
     { endpoint: '/api/admin/vanity-metrics', method: 'GET', area: 'Admin', access: 'read', description: 'Get vanity metrics', authentication: 'admin', variables: 'totalAccounts, validatedEmails, intentCategories, cohorts, dataCoverage', formula: 'Aggregations from users, onboarding_responses' },
-    { endpoint: '/api/admin/engagement-chart', method: 'GET', area: 'Admin', access: 'read', description: 'Get engagement chart data', authentication: 'admin', variables: 'totalAccounts, validatedEmails, cohorts, intentCategories, dataCoverage, userIds', formula: 'Time-series aggregations from l1_event_facts' },
+    { endpoint: '/api/admin/engagement-chart', method: 'GET', area: 'Admin', access: 'read', description: 'Get engagement chart data', authentication: 'admin', variables: 'totalAccounts, validatedEmails, cohorts, intentCategories, dataCoverage, userIds', formula: 'Time-series aggregations from l1_events' },
     { endpoint: '/api/admin/health', method: 'GET', area: 'Admin', access: 'read', description: 'App health checks', authentication: 'admin', formula: 'Various database and compliance checks' },
     { endpoint: '/api/admin/privacy-policy-check', method: 'GET', area: 'Admin', access: 'read', description: 'Privacy policy compliance checks', authentication: 'admin', formula: 'Dynamic tests against privacy commitments' },
     { endpoint: '/api/admin/bookings', method: 'GET', area: 'Admin', access: 'read', description: 'Get all chat bookings', authentication: 'admin', formula: 'SELECT from chat_bookings JOIN users' },
@@ -96,7 +96,7 @@ function getAPIEndpoints(): APIEndpoint[] {
     { endpoint: '/api/admin/available-slots', method: 'POST', area: 'Admin', access: 'write', description: 'Set available booking slots', authentication: 'admin', variables: 'slotDate, slotTime, isAvailable', formula: 'INSERT/UPDATE available_slots' },
     { endpoint: '/api/admin/survey-responses', method: 'GET', area: 'Admin', access: 'read', description: 'Get all survey responses', authentication: 'admin', formula: 'SELECT from survey_responses JOIN users' },
     { endpoint: '/api/admin/user-feedback', method: 'GET', area: 'Admin', access: 'read', description: 'Get user feedback', authentication: 'admin', formula: 'SELECT from user_feedback' },
-    { endpoint: '/api/admin/logins', method: 'GET', area: 'Admin', access: 'read', description: 'Get admin login events', authentication: 'admin', formula: 'SELECT from user_events WHERE event_type IN (admin_login, admin_tab_access)' },
+    { endpoint: '/api/admin/logins', method: 'GET', area: 'Admin', access: 'read', description: 'Get admin login events', authentication: 'admin', formula: 'SELECT from l1_events WHERE event_type IN (admin_login, admin_tab_access) AND is_admin = true' },
     { endpoint: '/api/admin/log-action', method: 'POST', area: 'Admin', access: 'write', description: 'Log admin action', authentication: 'admin', variables: 'actionType, tab', formula: 'INSERT INTO l1_events' },
     { endpoint: '/api/admin/keywords', method: 'GET', area: 'Admin', access: 'read', description: 'Get categorization keywords', authentication: 'admin', formula: 'SELECT from admin_keywords' },
     { endpoint: '/api/admin/keywords', method: 'POST', area: 'Admin', access: 'write', description: 'Create keyword', authentication: 'admin', variables: 'keyword, category, label, isActive, notes', formula: 'INSERT INTO admin_keywords' },
@@ -123,7 +123,10 @@ function getTableDescription(tableName: string): string {
     'l1_transaction_facts': 'Transaction facts table. Contains all financial transactions with normalized data.',
     'l2_aggregated_insights': 'Aggregated insights table. Pre-computed financial summaries and analytics.',
     'onboarding_responses': 'User onboarding responses. Stores answers from the onboarding flow.',
-    'user_events': 'User event log. Tracks all user actions, consent events, and system events.',
+    'l1_events': 'Event facts table. Tracks all user and admin actions, consent events, and system events. Replaces user_events.',
+    'l1_customer_facts': 'Customer facts table. Contains anonymized customer attributes and analytics classifications (user_segment).',
+    'l0_user_tokenization': 'User tokenization mapping. Maps internal_user_id to tokenized_user_id for analytics (PII isolation).',
+    'l2_customer_summary_view': 'Customer summary view. Aggregated metrics per user using l1_transaction_facts.',
     'categorization_learning': 'Categorization learning patterns. Stores user corrections for automatic categorization.',
     'admin_keywords': 'Admin-defined keyword patterns for transaction categorization.',
     'admin_merchants': 'Admin-defined merchant patterns for transaction categorization.',
@@ -131,6 +134,7 @@ function getTableDescription(tableName: string): string {
     'available_slots': 'Available chat slots. Admin-marked time slots available for booking.',
     'survey_responses': 'Survey responses. User responses to the "What\'s coming" feature prioritization survey.',
     'user_feedback': 'User feedback submissions. Stores user feedback and suggestions.',
+    'l1_support_tickets': 'Support tickets table. Reserved for future use.',
   };
   
   return descriptions[tableName] || `Database table: ${tableName}. Contains raw data from the application.`;

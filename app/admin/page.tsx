@@ -2106,7 +2106,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            📊 Cohort analysis
+            👥 Cohort analysis
           </button>
           <button
             onClick={() => setAnalyticsSubTab('customer-data')}
@@ -2126,7 +2126,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            📋 Events data
+            📊 Events data
           </button>
           <button
             onClick={() => setAnalyticsSubTab('editing-events-data')}
@@ -4443,7 +4443,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Fetch single source of truth tests
+  // Fetch maintenance tests (Single Source of Truth + PII Isolation)
   const fetchSingleSourceTests = async () => {
     setSingleSourceTestsLoading(true);
     try {
@@ -4452,7 +4452,7 @@ export default function AdminDashboard() {
         alert('Not authenticated. Please log in again.');
         return;
       }
-      const response = await fetch('/api/admin/migration/test-single-source', {
+      const response = await fetch('/api/admin/health/maintenance-tests', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -4464,7 +4464,7 @@ export default function AdminDashboard() {
         alert(`Failed to fetch tests: ${data.error || 'Unknown error'}`);
       }
     } catch (error: any) {
-      console.error('Error fetching single source tests:', error);
+      console.error('Error fetching maintenance tests:', error);
       alert(`Error fetching tests: ${error.message || 'Unknown error'}`);
     } finally {
       setSingleSourceTestsLoading(false);
@@ -4965,13 +4965,13 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Single Source of Truth Tests */}
+              {/* Single Source of Truth & PII Isolation Tests */}
               <div>
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                  <span>🔗</span> Single Source of Truth Tests
+                  <span>🔗</span> Single Source of Truth & PII Isolation Tests
                 </h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Verify that all code uses l1_transaction_facts and no fallbacks exist.
+                  Verify ongoing compliance: Single Source of Truth is maintained and PII is properly isolated.
                 </p>
                 <div className="mb-4">
                   <button
@@ -5297,7 +5297,7 @@ export default function AdminDashboard() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              📊 App monitoring
+              🔍 App monitoring
             </button>
             <button
               onClick={() => setActiveTab('migration')}
@@ -5455,7 +5455,7 @@ export default function AdminDashboard() {
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                📊 What's coming survey
+                🗳️ What's coming survey
               </button>
             </div>
             {/* Inbox Content */}
