@@ -2081,6 +2081,59 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
+
+          {/* PII Migration from Onboarding */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">PII Migration from Onboarding</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Migrate remaining PII from onboarding_responses to l0_pii_users and drop PII columns to complete PII isolation.
+                </p>
+              </div>
+              <button
+                onClick={migratePIIFromOnboarding}
+                disabled={migratingPII}
+                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 font-semibold"
+              >
+                {migratingPII ? 'Migrating...' : 'Migrate PII from Onboarding'}
+              </button>
+            </div>
+
+            {piiMigrationResult && (
+              <div className={`border rounded-lg p-4 ${piiMigrationResult.success ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-semibold text-gray-900">
+                    PII Migration Results
+                  </h4>
+                  <span className={`text-sm font-medium ${piiMigrationResult.success ? 'text-green-800' : 'text-yellow-800'}`}>
+                    {piiMigrationResult.success ? '✓ Success' : '✗ Failed'}
+                  </span>
+                </div>
+                {piiMigrationResult.details && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-sm text-gray-700">
+                      PII columns dropped: {piiMigrationResult.details.piiColumnsDropped ? 'Yes' : 'No'}
+                    </p>
+                    {piiMigrationResult.details.remainingPIIColumns && piiMigrationResult.details.remainingPIIColumns.length > 0 && (
+                      <p className="text-sm text-yellow-800">
+                        Remaining PII columns: {piiMigrationResult.details.remainingPIIColumns.join(', ')}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {piiMigrationResult.error && (
+                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                    <p className="text-sm text-red-800 font-medium">Error:</p>
+                    <p className="text-sm text-red-700">{piiMigrationResult.error}</p>
+                    {piiMigrationResult.details && (
+                      <p className="text-xs text-red-600 mt-1">{piiMigrationResult.details}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
