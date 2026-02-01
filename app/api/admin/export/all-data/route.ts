@@ -121,22 +121,22 @@ function getTableDescription(tableName: string): string {
   const descriptions: { [key: string]: string } = {
     'users': 'Core user accounts table. Contains user authentication and basic profile information. Email stored here for auth (also in l0_pii_users).',
     'l0_pii_users': 'Personally Identifiable Information (PII) table. Stores sensitive user data separated for security compliance. PRIMARY KEY: internal_user_id.',
-    'l1_transaction_facts': 'Transaction facts table. Contains all financial transactions with normalized data. Uses tokenized_user_id for PII isolation.',
+    'l1_transaction_facts': 'Transaction facts table. Contains all financial transactions with normalized data. Uses tokenized_user_id for PII isolation. FK: tokenized_user_id → l0_user_tokenization.tokenized_user_id',
     'l2_aggregated_insights': 'Aggregated insights table. Pre-computed financial summaries and analytics.',
     'onboarding_responses': 'User onboarding responses. Stores answers from the onboarding flow (non-PII only - PII migrated to l0_pii_users).',
-    'l1_events': 'Event facts table. Tracks all user and admin actions, consent events, and system events. Replaces user_events. Uses user_id for operational events.',
+    'l1_events': 'Event facts table. Tracks all user and admin actions, consent events, and system events. Replaces user_events. Uses user_id for operational events. FK: user_id → users.id',
     'l1_customer_facts': 'Customer facts table. Contains anonymized customer attributes and analytics classifications (user_segment). Uses tokenized_user_id.',
-    'l0_user_tokenization': 'User tokenization mapping. Maps internal_user_id to tokenized_user_id for analytics (PII isolation).',
+    'l0_user_tokenization': 'User tokenization mapping. Maps internal_user_id to tokenized_user_id for analytics (PII isolation). FK: internal_user_id → users.id',
     'l2_customer_summary_view': 'Customer summary view. Aggregated metrics per user using l1_transaction_facts.',
-    'categorization_learning': 'Categorization learning patterns. Stores user corrections for automatic categorization.',
+    'categorization_learning': 'Categorization learning patterns. Stores user corrections for automatic categorization. FK: user_id → users.id',
     'admin_keywords': 'Admin-defined keyword patterns for transaction categorization.',
     'admin_merchants': 'Admin-defined merchant patterns for transaction categorization.',
-    'chat_bookings': 'Chat booking requests. Stores user requests for 20-minute chat sessions. Notes field may contain unstructured PII.',
+    'chat_bookings': 'Chat booking requests. Stores user requests for 20-minute chat sessions. Notes field may contain unstructured PII. FK: user_id → users.id',
     'available_slots': 'Available chat slots. Admin-marked time slots available for booking.',
     'survey_responses': 'Survey responses. User responses to the "What\'s coming" feature prioritization survey. Free text fields may contain unstructured PII.',
     'user_feedback': 'User feedback submissions. Stores user feedback and suggestions. Free text fields may contain unstructured PII.',
     'l1_support_tickets': 'Support tickets table. Reserved for future use.',
-    'l0_category_list': 'Category configuration table. Admin-defined transaction categories.',
+    'l0_category_list': 'Category configuration table. Admin-defined transaction categories. FK: parent_category_key → l0_category_list.category_key (self-referencing)',
     'l0_insight_list': 'Insight configuration table. Admin-defined financial insights.',
     'l0_admin_list': 'Admin user list. Configuration table for admin users.',
     'l0_privacy_metadata': 'Privacy metadata table. Privacy compliance tracking and configuration.',
@@ -202,6 +202,47 @@ async function isTableEmpty(pool: any, tableName: string): Promise<boolean> {
   } catch (error) {
     console.error(`[Export] Error checking if table ${tableName} is empty:`, error);
     return false;
+  }
+}
+
+/**
+ * Get all foreign key relationships in the database
+ */
+async function getForeignKeyRelationships(pool: any): Promise<Array<{
+  from_table: string;
+  from_column: string;
+  to_table: string;
+  to_column: string;
+  constraint_name: string;
+  on_delete: string;
+}>> {
+  try {
+    const result = await pool.query(`
+      SELECT
+        tc.table_name AS from_table,
+        kcu.column_name AS from_column,
+        ccu.table_name AS to_table,
+        ccu.column_name AS to_column,
+        tc.constraint_name,
+        rc.delete_rule AS on_delete
+      FROM information_schema.table_constraints AS tc
+      JOIN information_schema.key_column_usage AS kcu
+        ON tc.constraint_name = kcu.constraint_name
+        AND tc.table_schema = kcu.table_schema
+      JOIN information_schema.constraint_column_usage AS ccu
+        ON ccu.constraint_name = tc.constraint_name
+        AND ccu.table_schema = tc.table_schema
+      LEFT JOIN information_schema.referential_constraints AS rc
+        ON rc.constraint_name = tc.constraint_name
+        AND rc.constraint_schema = tc.table_schema
+      WHERE tc.constraint_type = 'FOREIGN KEY'
+        AND tc.table_schema = 'public'
+      ORDER BY tc.table_name, kcu.column_name
+    `);
+    return result.rows;
+  } catch (error) {
+    console.error('[Export] Error getting foreign key relationships:', error);
+    return [];
   }
 }
 
@@ -273,7 +314,30 @@ export async function GET(request: NextRequest) {
     ];
     XLSX.utils.book_append_sheet(workbook, apiWorksheet, 'API Documentation');
 
-    // 2. Get list of all tables and views for table of contents
+    // 2. Get foreign key relationships and add as a sheet
+    const foreignKeys = await getForeignKeyRelationships(pool);
+    if (foreignKeys.length > 0) {
+      const fkData = foreignKeys.map(fk => ({
+        'From Table': fk.from_table,
+        'From Column': fk.from_column,
+        'To Table': fk.to_table,
+        'To Column': fk.to_column,
+        'On Delete': fk.on_delete || 'NO ACTION',
+        'Constraint Name': fk.constraint_name,
+      }));
+      const fkWorksheet = XLSX.utils.json_to_sheet(fkData);
+      fkWorksheet['!cols'] = [
+        { wch: 25 }, // From Table
+        { wch: 20 }, // From Column
+        { wch: 25 }, // To Table
+        { wch: 20 }, // To Column
+        { wch: 15 }, // On Delete
+        { wch: 40 }, // Constraint Name
+      ];
+      XLSX.utils.book_append_sheet(workbook, fkWorksheet, 'Foreign Keys');
+    }
+
+    // 3. Get list of all tables and views for table of contents
     const tablesResult = await pool.query(`
       SELECT table_name, table_type
       FROM information_schema.tables 
@@ -285,7 +349,7 @@ export async function GET(request: NextRequest) {
     const tables = tablesResult.rows.filter(row => row.table_type === 'BASE TABLE').map(row => row.table_name);
     const views = tablesResult.rows.filter(row => row.table_type === 'VIEW').map(row => row.table_name);
     
-    // 3. Check which tables are empty and contain PII (views don't need PII check)
+    // 4. Check which tables are empty and contain PII (views don't need PII check)
     const tableInfo = await Promise.all(
       tables.map(async (tableName) => {
         const isEmpty = await isTableEmpty(pool, tableName);
@@ -309,11 +373,17 @@ export async function GET(request: NextRequest) {
 
     const allTableInfo = [...tableInfo, ...viewInfo];
     
-    // 4. Add Table of Contents sheet (second sheet)
+    // 5. Add Table of Contents sheet
     const tocData = [
       { 
         'Sheet Name': 'API Documentation', 
         'Description': 'Complete list of all API endpoints with methods, areas, access levels, and authentication requirements.',
+        'Empty?': '',
+        'PII data?': ''
+      },
+      { 
+        'Sheet Name': 'Foreign Keys', 
+        'Description': 'All foreign key relationships between tables. Shows how tables are linked together.',
         'Empty?': '',
         'PII data?': ''
       },
@@ -341,7 +411,7 @@ export async function GET(request: NextRequest) {
     ];
     XLSX.utils.book_append_sheet(workbook, tocWorksheet, 'Table of Contents');
 
-    // 5. Export each table and view as a sheet
+    // 6. Export each table and view as a sheet
     const allDataObjects = [...tables, ...views];
     for (const objectName of allDataObjects) {
       try {
