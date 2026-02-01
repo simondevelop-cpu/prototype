@@ -120,6 +120,8 @@ export default function AdminDashboard() {
   const [singleSourceTestsLoading, setSingleSourceTestsLoading] = useState(false);
   const [fixingUnmigrated, setFixingUnmigrated] = useState(false);
   const [deletingOrphaned, setDeletingOrphaned] = useState(false);
+  const [fixingTokenization, setFixingTokenization] = useState(false);
+  const [droppingTables, setDroppingTables] = useState(false);
   
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
@@ -2017,6 +2019,30 @@ export default function AdminDashboard() {
                     <span className="text-red-700">✗ Failed: {singleSourceTests.summary.failed}</span>
                     <span className="text-yellow-700">⚠ Warnings: {singleSourceTests.summary.warnings}</span>
                     <span className="text-gray-700">⚠ Errors: {singleSourceTests.summary.errors}</span>
+                  </div>
+                  {/* Action buttons */}
+                  <div className="mt-4 flex gap-2">
+                    {singleSourceTests.tests.some((t: any) => t.name === 'Tokenization coverage' && t.status === 'warn') && (
+                      <button
+                        onClick={fixTokenization}
+                        disabled={fixingTokenization}
+                        className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 text-sm"
+                      >
+                        {fixingTokenization ? 'Fixing...' : 'Fix Tokenization'}
+                      </button>
+                    )}
+                    {singleSourceTests.tests.some((t: any) => 
+                      (t.name === 'transactions table foreign keys removed' && t.status === 'fail') ||
+                      (t.name === 'accounts table foreign keys removed' && t.status === 'fail')
+                    ) && (
+                      <button
+                        onClick={dropTransactionsAndAccounts}
+                        disabled={droppingTables}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm"
+                      >
+                        {droppingTables ? 'Dropping...' : 'Drop Tables & Establish SSOT'}
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -4445,6 +4471,76 @@ export default function AdminDashboard() {
       alert(`Error fetching tests: ${error.message || 'Unknown error'}`);
     } finally {
       setSingleSourceTestsLoading(false);
+    }
+  };
+
+  const fixTokenization = async () => {
+    if (!confirm('Fix tokenization for all users missing it? This will create tokenization entries for users that don\'t have them.')) {
+      return;
+    }
+    setFixingTokenization(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/fix-tokenization', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        alert(`Successfully fixed tokenization for ${data.fixed} user(s).`);
+        // Refresh tests
+        await fetchSingleSourceTests();
+      } else {
+        alert(`Failed to fix tokenization: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error fixing tokenization:', error);
+      alert(`Error fixing tokenization: ${error.message || 'Unknown error'}`);
+    } finally {
+      setFixingTokenization(false);
+    }
+  };
+
+  const dropTransactionsAndAccounts = async () => {
+    if (!confirm('Are you sure you want to drop the transactions and accounts tables? This will:\n\n1. Verify all transactions are migrated\n2. Update l2_customer_summary_view\n3. Drop foreign keys\n4. Drop transactions and accounts tables\n\nThis action CANNOT be undone!')) {
+      return;
+    }
+    if (!confirm('This is your final warning. Dropping these tables establishes Single Source of Truth. Are you absolutely sure?')) {
+      return;
+    }
+    setDroppingTables(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/drop-transactions-accounts', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        alert('Successfully dropped transactions and accounts tables. Single Source of Truth established!');
+        // Refresh tests
+        await fetchSingleSourceTests();
+        await fetchDropVerification();
+      } else {
+        alert(`Failed to drop tables: ${data.error || 'Unknown error'}\n\nDetails: ${data.details || ''}`);
+      }
+    } catch (error: any) {
+      console.error('Error dropping tables:', error);
+      alert(`Error dropping tables: ${error.message || 'Unknown error'}`);
+    } finally {
+      setDroppingTables(false);
     }
   };
 
