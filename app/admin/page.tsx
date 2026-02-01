@@ -4233,6 +4233,34 @@ export default function AdminDashboard() {
     }
   };
 
+  // Fetch single source of truth tests
+  const fetchSingleSourceTests = async () => {
+    setSingleSourceTestsLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/test-single-source', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setSingleSourceTests(data);
+      } else {
+        alert(`Failed to fetch tests: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error fetching single source tests:', error);
+      alert(`Error fetching tests: ${error.message || 'Unknown error'}`);
+    } finally {
+      setSingleSourceTestsLoading(false);
+    }
+  };
+
   // Fetch drop verification
   const fetchDropVerification = async () => {
     setDropVerificationLoading(true);
