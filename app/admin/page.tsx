@@ -8,7 +8,7 @@ import CheckboxDropdown from '@/components/CheckboxDropdown';
 import { formatUserId, formatTransactionId, formatEventId } from '@/lib/id-formatter';
 
 type TabName = 'monitoring' | 'inbox' | 'categories' | 'analytics' | 'migration';
-type MonitoringSubTab = 'accounts' | 'health' | 'privacy-policy' | 'admin-logins';
+type MonitoringSubTab = 'accounts' | 'health' | 'admin-logins';
 type InboxSubTab = 'chat-scheduler' | 'feedback' | 'whats-coming-survey';
 
 interface Keyword {
@@ -96,9 +96,6 @@ export default function AdminDashboard() {
   const [healthData, setHealthData] = useState<any>(null);
   const [healthLoading, setHealthLoading] = useState(false);
   
-  // State for Privacy Policy Check tab
-  const [privacyCheckData, setPrivacyCheckData] = useState<any>(null);
-  const [privacyCheckLoading, setPrivacyCheckLoading] = useState(false);
   
   // State for Admin Logins tab
   const [adminLogins, setAdminLogins] = useState<any[]>([]);
@@ -4600,34 +4597,8 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchPrivacyCheckData = async () => {
-    setPrivacyCheckLoading(true);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/privacy-policy-check', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setPrivacyCheckData(data);
-      } else {
-        alert(`Failed to fetch privacy policy check: ${data.error || 'Unknown error'}`);
-      }
-    } catch (error: any) {
-      console.error('Error fetching privacy policy check:', error);
-      alert(`Error fetching privacy policy check: ${error.message || 'Unknown error'}`);
-    } finally {
-      setPrivacyCheckLoading(false);
-    }
-  };
-
-  // Render Privacy Policy Check Tab
+  // Render Privacy Policy Check Tab - REMOVED
+  // Useful tests have been moved to App Health
   const renderPrivacyPolicyCheck = () => {
     const getStatusIcon = (status: string) => {
       switch (status) {
@@ -5320,7 +5291,6 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Admin dashboard</h1>
-              <p className="text-gray-600 mt-1">Manage categorization, analytics, and user accounts</p>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -5457,7 +5427,6 @@ export default function AdminDashboard() {
             {/* Monitoring Content */}
             {monitoringSubTab === 'accounts' && renderAccountsTab()}
             {monitoringSubTab === 'health' && renderAppHealth()}
-            {monitoringSubTab === 'privacy-policy' && renderPrivacyPolicyCheck()}
             {monitoringSubTab === 'admin-logins' && (
               <div className="space-y-6">
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">

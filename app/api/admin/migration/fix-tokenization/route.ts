@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Find users without tokenization
     const missingTokenization = await pool.query(`
-      SELECT u.id, u.email, u.internal_user_id
+      SELECT u.id, u.email
       FROM users u
       LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
       WHERE ut.tokenized_user_id IS NULL
