@@ -4342,7 +4342,7 @@ export default function AdminDashboard() {
 
   // Delete orphaned transactions
   const deleteOrphanedTransactions = async (transactionIds: number[]) => {
-    if (!confirm(`Delete ${transactionIds.length} orphaned transaction(s)? This cannot be undone.`)) {
+    if (!confirm(`Delete ${transactionIds.length} orphaned transaction(s) from transactions table? These transactions have no valid user and cannot be migrated. This cannot be undone.`)) {
       return;
     }
 
@@ -4363,7 +4363,7 @@ export default function AdminDashboard() {
       });
       const data = await response.json();
       if (response.ok) {
-        alert(`Successfully deleted ${data.deleted} orphaned transaction(s)`);
+        alert(`Successfully deleted ${data.deleted} orphaned transaction(s) from transactions table.`);
         fetchInvestigation(); // Refresh investigation
         fetchDropVerification(); // Refresh drop verification
         fetchSingleSourceTests(); // Refresh tests
