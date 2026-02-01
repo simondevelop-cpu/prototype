@@ -111,6 +111,8 @@ export default function AdminDashboard() {
   const [migrationRunning, setMigrationRunning] = useState(false);
   const [dropVerification, setDropVerification] = useState<any>(null);
   const [dropVerificationLoading, setDropVerificationLoading] = useState(false);
+  const [investigationData, setInvestigationData] = useState<any>(null);
+  const [investigationLoading, setInvestigationLoading] = useState(false);
   
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
@@ -509,6 +511,7 @@ export default function AdminDashboard() {
     if (activeTab === 'migration' && authenticated) {
       fetchMigrationTests();
       fetchDropVerification();
+      fetchInvestigation();
     }
   }, [activeTab, inboxSubTab, authenticated]);
 
@@ -1652,6 +1655,102 @@ export default function AdminDashboard() {
             )}
           </div>
 
+          {/* Investigation */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Investigation</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Investigate unmigrated transactions and table dependencies.
+                </p>
+              </div>
+              <button
+                onClick={fetchInvestigation}
+                disabled={investigationLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {investigationLoading ? 'Loading...' : 'Investigate'}
+              </button>
+            </div>
+
+            {investigationData && (
+              <div className="space-y-4">
+                {investigationData.unmigratedTransactions && investigationData.unmigratedTransactions.length > 0 && (
+                  <div className="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
+                    <h4 className="font-semibold text-yellow-900 mb-2">
+                      Unmigrated Transactions ({investigationData.unmigratedTransactions.length})
+                    </h4>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr>
+                            <th className="text-left font-medium text-yellow-900">ID</th>
+                            <th className="text-left font-medium text-yellow-900">User</th>
+                            <th className="text-left font-medium text-yellow-900">Date</th>
+                            <th className="text-left font-medium text-yellow-900">Description</th>
+                            <th className="text-left font-medium text-yellow-900">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-yellow-200">
+                          {investigationData.unmigratedTransactions.slice(0, 10).map((tx: any, idx: number) => (
+                            <tr key={idx}>
+                              <td className="py-2 text-yellow-800">{tx.id}</td>
+                              <td className="py-2 text-yellow-800">{tx.email || tx.user_id}</td>
+                              <td className="py-2 text-yellow-800">{tx.date}</td>
+                              <td className="py-2 text-yellow-800">{tx.description?.substring(0, 30)}...</td>
+                              <td className="py-2 text-yellow-800">{tx.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {investigationData.viewsUsingTransactions && investigationData.viewsUsingTransactions.length > 0 && (
+                  <div className="border border-orange-200 rounded-lg p-4 bg-orange-50">
+                    <h4 className="font-semibold text-orange-900 mb-2">
+                      Views Using Transactions Table
+                    </h4>
+                    <ul className="list-disc list-inside text-sm text-orange-800">
+                      {investigationData.viewsUsingTransactions.map((view: any, idx: number) => (
+                        <li key={idx} className="font-mono">{view.viewname}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {investigationData.emptyTablesAnalysis && (
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">Empty Tables Analysis</h4>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr>
+                            <th className="text-left font-medium text-gray-700">Table</th>
+                            <th className="text-left font-medium text-gray-700">Row Count</th>
+                            <th className="text-left font-medium text-gray-700">Foreign Keys</th>
+                            <th className="text-left font-medium text-gray-700">Referenced By</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {investigationData.emptyTablesAnalysis.map((table: any, idx: number) => (
+                            <tr key={idx}>
+                              <td className="py-2 font-mono text-gray-900">{table.tableName}</td>
+                              <td className="py-2 text-gray-600">{table.rowCount || 0}</td>
+                              <td className="py-2 text-gray-600">{table.foreignKeysFrom?.length || 0}</td>
+                              <td className="py-2 text-gray-600">{table.referencedBy || 0}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Drop Verification */}
           <div>
             <div className="flex items-center justify-between mb-4">
@@ -1694,15 +1793,25 @@ export default function AdminDashboard() {
                       <tr key={index}>
                         <td className="px-6 py-4 text-sm font-medium text-gray-900 font-mono">{table.tableName}</td>
                         <td className="px-6 py-4 text-sm">
-                          {table.safeToDrop ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              ✓ Safe
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              ✗ Not Safe
-                            </span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {table.safeToDrop ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                ✓ Safe
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                ✗ Not Safe
+                              </span>
+                            )}
+                            {table.safeToDrop && (
+                              <button
+                                onClick={() => dropSafeTables([table.tableName])}
+                                className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                              >
+                                Drop
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">{table.rowCount}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">
@@ -1736,6 +1845,21 @@ export default function AdminDashboard() {
                     ))}
                   </tbody>
                 </table>
+                {dropVerification && dropVerification.summary.safeToDrop > 0 && (
+                  <div className="p-4 bg-green-50 border-t border-green-200">
+                    <button
+                      onClick={() => {
+                        const safeTables = dropVerification.tables
+                          .filter((t: any) => t.safeToDrop)
+                          .map((t: any) => t.tableName);
+                        dropSafeTables(safeTables);
+                      }}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+                    >
+                      Drop All Safe Tables ({dropVerification.summary.safeToDrop})
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
