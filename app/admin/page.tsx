@@ -1684,9 +1684,18 @@ export default function AdminDashboard() {
               <div className="space-y-4">
                 {investigationData.unmigratedTransactions && investigationData.unmigratedTransactions.length > 0 && (
                   <div className="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
-                    <h4 className="font-semibold text-yellow-900 mb-2">
-                      Unmigrated Transactions ({investigationData.unmigratedTransactions.length})
-                    </h4>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-yellow-900">
+                        Unmigrated Transactions ({investigationData.unmigratedTransactions.length})
+                      </h4>
+                      <button
+                        onClick={fixUnmigratedTransactions}
+                        disabled={fixingUnmigrated}
+                        className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 font-semibold"
+                      >
+                        {fixingUnmigrated ? 'Fixing...' : 'Fix Unmigrated'}
+                      </button>
+                    </div>
                     <div className="overflow-x-auto">
                       <table className="min-w-full text-sm">
                         <thead>
@@ -1946,6 +1955,84 @@ export default function AdminDashboard() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+
+          {/* Single Source of Truth Tests */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Single Source of Truth Tests</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Verify that all code uses l1_transaction_facts and no fallbacks exist.
+                </p>
+              </div>
+              <button
+                onClick={fetchSingleSourceTests}
+                disabled={singleSourceTestsLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {singleSourceTestsLoading ? 'Running...' : 'Run Tests'}
+              </button>
+            </div>
+
+            {singleSourceTests && (
+              <div className="space-y-4">
+                <div className={`border rounded-lg p-4 ${
+                  singleSourceTests.success 
+                    ? 'bg-green-50 border-green-200' 
+                    : 'bg-yellow-50 border-yellow-200'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-gray-900">Test Summary</h4>
+                    <span className={`text-sm font-medium ${
+                      singleSourceTests.success ? 'text-green-800' : 'text-yellow-800'
+                    }`}>
+                      {singleSourceTests.summary.passed} / {singleSourceTests.summary.total} tests passed
+                    </span>
+                  </div>
+                  <div className="flex gap-4 text-sm">
+                    <span className="text-green-700">✓ Passed: {singleSourceTests.summary.passed}</span>
+                    <span className="text-red-700">✗ Failed: {singleSourceTests.summary.failed}</span>
+                    <span className="text-yellow-700">⚠ Warnings: {singleSourceTests.summary.warnings}</span>
+                    <span className="text-gray-700">⚠ Errors: {singleSourceTests.summary.errors}</span>
+                  </div>
+                </div>
+
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Test</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {singleSourceTests.tests.map((test: any, index: number) => (
+                        <tr key={index}>
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{test.name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              test.status === 'pass' ? 'bg-green-100 text-green-800' :
+                              test.status === 'fail' ? 'bg-red-100 text-red-800' :
+                              test.status === 'warn' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {test.status === 'pass' ? '✓ Pass' : 
+                               test.status === 'fail' ? '✗ Fail' : 
+                               test.status === 'warn' ? '⚠ Warn' : '⚠ Error'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{test.message}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{test.details || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
