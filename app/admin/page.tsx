@@ -7,7 +7,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import CheckboxDropdown from '@/components/CheckboxDropdown';
 import { formatUserId, formatTransactionId, formatEventId } from '@/lib/id-formatter';
 
-type TabName = 'monitoring' | 'inbox' | 'categories' | 'analytics';
+type TabName = 'monitoring' | 'inbox' | 'categories' | 'analytics' | 'migration';
 type MonitoringSubTab = 'accounts' | 'health' | 'privacy-policy' | 'admin-logins';
 type InboxSubTab = 'chat-scheduler' | 'feedback' | 'whats-coming-survey';
 
@@ -103,6 +103,14 @@ export default function AdminDashboard() {
   // State for Admin Logins tab
   const [adminLogins, setAdminLogins] = useState<any[]>([]);
   const [adminLoginsLoading, setAdminLoginsLoading] = useState(false);
+  
+  // State for Migration tab
+  const [migrationTests, setMigrationTests] = useState<any[]>([]);
+  const [migrationTestsLoading, setMigrationTestsLoading] = useState(false);
+  const [migrationResults, setMigrationResults] = useState<any>(null);
+  const [migrationRunning, setMigrationRunning] = useState(false);
+  const [dropVerification, setDropVerification] = useState<any>(null);
+  const [dropVerificationLoading, setDropVerificationLoading] = useState(false);
   
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
@@ -497,6 +505,10 @@ export default function AdminDashboard() {
     }
     if (activeTab === 'inbox' && inboxSubTab === 'whats-coming-survey' && authenticated) {
       fetchSurveyResponses();
+    }
+    if (activeTab === 'migration' && authenticated) {
+      fetchMigrationTests();
+      fetchDropVerification();
     }
   }, [activeTab, inboxSubTab, authenticated]);
 
@@ -3616,6 +3628,101 @@ export default function AdminDashboard() {
     );
   };
 
+  // Fetch migration pre-tests
+  const fetchMigrationTests = async () => {
+    setMigrationTestsLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/run', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setMigrationTests(data.tests || []);
+      } else {
+        alert(`Failed to fetch migration tests: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error fetching migration tests:', error);
+      alert(`Error fetching migration tests: ${error.message || 'Unknown error'}`);
+    } finally {
+      setMigrationTestsLoading(false);
+    }
+  };
+
+  // Run migration
+  const runMigration = async () => {
+    if (!confirm('Are you sure you want to run the migration? This will modify the database structure.')) {
+      return;
+    }
+    
+    setMigrationRunning(true);
+    setMigrationResults(null);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/run', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      setMigrationResults(data);
+      if (response.ok && data.success) {
+        alert('Migration completed successfully!');
+        // Refresh tests
+        fetchMigrationTests();
+        fetchDropVerification();
+      } else {
+        alert(`Migration completed with ${data.errors || 0} error(s). Check results below.`);
+      }
+    } catch (error: any) {
+      console.error('Error running migration:', error);
+      alert(`Error running migration: ${error.message || 'Unknown error'}`);
+    } finally {
+      setMigrationRunning(false);
+    }
+  };
+
+  // Fetch drop verification
+  const fetchDropVerification = async () => {
+    setDropVerificationLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/verify-drop', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setDropVerification(data);
+      } else {
+        alert(`Failed to verify table drops: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error fetching drop verification:', error);
+      alert(`Error fetching drop verification: ${error.message || 'Unknown error'}`);
+    } finally {
+      setDropVerificationLoading(false);
+    }
+  };
+
   // Fetch health check data
   const fetchHealthData = async () => {
     setHealthLoading(true);
@@ -4776,6 +4883,7 @@ export default function AdminDashboard() {
         )}
         {activeTab === 'categories' && renderCategoriesTab()}
         {activeTab === 'analytics' && renderAnalyticsTab()}
+        {activeTab === 'migration' && renderMigrationTab()}
       </div>
       
       {/* Add Modal - only for keywords and merchants */}
