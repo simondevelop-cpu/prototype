@@ -43,11 +43,11 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [authenticated, setAuthenticated] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabName>('monitoring');
-  const [monitoringSubTab, setMonitoringSubTab] = useState<MonitoringSubTab>('accounts');
+  const [activeTab, setActiveTab] = useState<TabName>('inbox');
+  const [monitoringSubTab, setMonitoringSubTab] = useState<MonitoringSubTab>('health');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
   const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'editing-events-data' | 'vanity-metrics' | 'data-details' | 'download'>('cohort-analysis');
-  const [inboxSubTab, setInboxSubTab] = useState<InboxSubTab>('chat-scheduler');
+  const [inboxSubTab, setInboxSubTab] = useState<InboxSubTab>('feedback');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
   const [stats, setStats] = useState<any>(null);
@@ -4425,7 +4425,10 @@ export default function AdminDashboard() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex gap-1">
             <button
-              onClick={() => setActiveTab('inbox')}
+              onClick={() => {
+                setActiveTab('inbox');
+                setInboxSubTab('feedback');
+              }}
               className={`px-6 py-4 font-medium text-sm transition-colors relative ${
                 activeTab === 'inbox'
                   ? 'text-blue-600 border-b-2 border-blue-600'
@@ -4455,7 +4458,10 @@ export default function AdminDashboard() {
               📊 Analytics
             </button>
             <button
-              onClick={() => setActiveTab('monitoring')}
+              onClick={() => {
+                setActiveTab('monitoring');
+                setMonitoringSubTab('health');
+              }}
               className={`px-6 py-4 font-medium text-sm transition-colors relative ${
                 activeTab === 'monitoring'
                   ? 'text-blue-600 border-b-2 border-blue-600'
@@ -4474,16 +4480,6 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             {/* Monitoring Sub-tabs */}
             <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
-              <button
-                onClick={() => setMonitoringSubTab('accounts')}
-                className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                  monitoringSubTab === 'accounts'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                👥 Accounts
-              </button>
               <button
                 onClick={() => setMonitoringSubTab('health')}
                 className={`px-4 py-2 rounded-md font-medium transition-colors ${
@@ -4518,6 +4514,16 @@ export default function AdminDashboard() {
                 }`}
               >
                 🔐 Admin logins
+              </button>
+              <button
+                onClick={() => setMonitoringSubTab('accounts')}
+                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                  monitoringSubTab === 'accounts'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                👥 Accounts
               </button>
             </div>
             {/* Monitoring Content */}
@@ -4599,16 +4605,6 @@ export default function AdminDashboard() {
             {/* Inbox Sub-tabs */}
             <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
               <button
-                onClick={() => setInboxSubTab('chat-scheduler')}
-                className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                  inboxSubTab === 'chat-scheduler'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                📅 Chat scheduler
-              </button>
-              <button
                 onClick={() => setInboxSubTab('feedback')}
                 className={`px-4 py-2 rounded-md font-medium transition-colors ${
                   inboxSubTab === 'feedback'
@@ -4617,6 +4613,16 @@ export default function AdminDashboard() {
                 }`}
               >
                 💬 Feedback
+              </button>
+              <button
+                onClick={() => setInboxSubTab('chat-scheduler')}
+                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                  inboxSubTab === 'chat-scheduler'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                📅 Chat scheduler
               </button>
               <button
                 onClick={() => setInboxSubTab('whats-coming-survey')}
