@@ -1690,13 +1690,31 @@ export default function AdminDashboard() {
                       <h4 className="font-semibold text-yellow-900">
                         Unmigrated Transactions ({investigationData.unmigratedTransactions.length})
                       </h4>
-                      <button
-                        onClick={fixUnmigratedTransactions}
-                        disabled={fixingUnmigrated}
-                        className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 font-semibold"
-                      >
-                        {fixingUnmigrated ? 'Fixing...' : 'Fix Unmigrated'}
-                      </button>
+                      <div className="flex gap-2">
+                        {investigationData.unmigratedTransactions.some((tx: any) => !tx.user_id || tx.status?.includes('orphaned') || tx.status === 'No tokenization record') && (
+                          <button
+                            onClick={() => {
+                              const orphanedIds = investigationData.unmigratedTransactions
+                                .filter((tx: any) => !tx.user_id || tx.status?.includes('orphaned') || tx.status === 'No tokenization record')
+                                .map((tx: any) => tx.id);
+                              if (orphanedIds.length > 0) {
+                                deleteOrphanedTransactions(orphanedIds);
+                              }
+                            }}
+                            disabled={deletingOrphaned}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-semibold"
+                          >
+                            {deletingOrphaned ? 'Deleting...' : 'Delete Orphaned'}
+                          </button>
+                        )}
+                        <button
+                          onClick={fixUnmigratedTransactions}
+                          disabled={fixingUnmigrated}
+                          className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 font-semibold"
+                        >
+                          {fixingUnmigrated ? 'Fixing...' : 'Fix Unmigrated'}
+                        </button>
+                      </div>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="min-w-full text-sm">
@@ -1713,7 +1731,7 @@ export default function AdminDashboard() {
                           {investigationData.unmigratedTransactions.slice(0, 10).map((tx: any, idx: number) => (
                             <tr key={idx}>
                               <td className="py-2 text-yellow-800">{tx.id}</td>
-                              <td className="py-2 text-yellow-800">{tx.email || tx.user_id}</td>
+                              <td className="py-2 text-yellow-800">{tx.email || tx.user_id || 'null (orphaned)'}</td>
                               <td className="py-2 text-yellow-800">{tx.date}</td>
                               <td className="py-2 text-yellow-800">{tx.description?.substring(0, 30)}...</td>
                               <td className="py-2 text-yellow-800">{tx.status}</td>
