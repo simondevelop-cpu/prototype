@@ -337,7 +337,6 @@ export async function GET(request: NextRequest) {
       FROM users u
       LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
       LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-      LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
       WHERE COALESCE(tf.account, t.account) IS NOT NULL
       GROUP BY COALESCE(ut.internal_user_id, t.user_id)
     `;
@@ -347,7 +346,7 @@ export async function GET(request: NextRequest) {
         DATE_TRUNC('week', u.created_at) as signup_week,
         -- Onboarding and data coverage
         COUNT(DISTINCT u.id) FILTER (WHERE u.completed_at IS NOT NULL) as onboarding_completed,
-        COUNT(DISTINCT CASE WHEN COALESCE(tf.id, t.id) IS NOT NULL THEN u.id END) as uploaded_first_statement,
+        COUNT(DISTINCT CASE WHEN tf.id IS NOT NULL THEN u.id END) as uploaded_first_statement,
         COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 2 THEN upload_counts.user_id END) as uploaded_two_statements,
         COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 3 THEN upload_counts.user_id END) as uploaded_three_plus_statements,
         -- Unique banks metrics
@@ -368,7 +367,6 @@ export async function GET(request: NextRequest) {
       FROM users u
       LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
       LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-      LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
       LEFT JOIN (
         ${uploadCountsSubquery}
       ) upload_counts ON upload_counts.user_id = u.id
@@ -378,13 +376,12 @@ export async function GET(request: NextRequest) {
       LEFT JOIN (
         SELECT 
           COALESCE(ut.internal_user_id, t.user_id) as user_id,
-          MIN(COALESCE(tf.created_at, t.created_at)) as first_transaction_date
+          MIN(tf.created_at) as first_transaction_date
         FROM users u2
         LEFT JOIN l0_user_tokenization ut ON u2.id = ut.internal_user_id
         LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-        LEFT JOIN transactions t ON u2.id = t.user_id AND tf.id IS NULL
-        WHERE tf.id IS NOT NULL OR t.id IS NOT NULL
-        GROUP BY COALESCE(ut.internal_user_id, t.user_id)
+        WHERE tf.id IS NOT NULL
+        GROUP BY ut.internal_user_id
       ) first_upload ON first_upload.user_id = u.id
       LEFT JOIN (
         SELECT 
@@ -393,9 +390,8 @@ export async function GET(request: NextRequest) {
         FROM users u2
         LEFT JOIN l0_user_tokenization ut ON u2.id = ut.internal_user_id
         LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-        LEFT JOIN transactions t ON u2.id = t.user_id AND tf.id IS NULL
-        WHERE tf.id IS NOT NULL OR t.id IS NOT NULL
-        GROUP BY COALESCE(ut.internal_user_id, t.user_id)
+        WHERE tf.id IS NOT NULL
+        GROUP BY ut.internal_user_id
       ) transaction_counts ON transaction_counts.user_id = u.id
       WHERE u.email != $${paramIndex}
         ${filterConditions}
@@ -409,7 +405,7 @@ export async function GET(request: NextRequest) {
           SELECT 1 FROM onboarding_responses o 
           WHERE o.user_id = u.id AND o.completed_at IS NOT NULL
         )) as onboarding_completed,
-        COUNT(DISTINCT CASE WHEN COALESCE(tf.id, t.id) IS NOT NULL THEN u.id END) as uploaded_first_statement,
+        COUNT(DISTINCT CASE WHEN tf.id IS NOT NULL THEN u.id END) as uploaded_first_statement,
         0 as uploaded_two_statements,
         0 as uploaded_three_plus_statements,
         0 as uploaded_more_than_one_bank,
@@ -421,7 +417,6 @@ export async function GET(request: NextRequest) {
       FROM users u
       LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
       LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-      LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
       WHERE u.email != $${paramIndex}
         ${filterConditions}
       GROUP BY DATE_TRUNC('week', u.created_at)
