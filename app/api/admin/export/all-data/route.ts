@@ -289,7 +289,49 @@ export async function GET(request: NextRequest) {
       databaseType = 'Not Configured';
     }
 
-    // 2. Add API Documentation sheet (first sheet)
+    // 2. Get list of all tables and views first (needed for ordering)
+    const tablesResult = await pool.query(`
+      SELECT table_name, table_type
+      FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_type IN ('BASE TABLE', 'VIEW')
+      ORDER BY table_type, table_name
+    `);
+
+    const allTables = tablesResult.rows.filter(row => row.table_type === 'BASE TABLE').map(row => row.table_name);
+    const allViews = tablesResult.rows.filter(row => row.table_type === 'VIEW').map(row => row.table_name);
+
+    // Define sheet order based on categories
+    const sheetOrder = [
+      // Documentation sheets first
+      'Table of Contents',
+      'API Documentation',
+      'Foreign Keys',
+      // Raw user data
+      'l0_pii_users',
+      'l0_user_tokenization',
+      'users',
+      'l1_customer_facts',
+      'onboarding_responses',
+      'survey_responses',
+      // Transaction and events
+      'l1_transaction_facts',
+      'l1_events',
+      // Admin tooling
+      'admin_keywords',
+      'admin_merchants',
+      'available_slots',
+      'categorization_learning',
+      'chat_bookings',
+      // TBC
+      'l0_category_list',
+      'l0_insight_list',
+      'l1_support_tickets',
+      'l2_customer_summary_view',
+      'l2_transactions_view',
+    ];
+
+    // 3. Add API Documentation sheet
     const endpoints = getAPIEndpoints();
     const apiData = endpoints.map(ep => ({
       'Endpoint': ep.endpoint,
@@ -312,9 +354,11 @@ export async function GET(request: NextRequest) {
       { wch: 15 }, // Authentication
       { wch: 20 }, // Database
     ];
-    XLSX.utils.book_append_sheet(workbook, apiWorksheet, 'API Documentation');
+    // Store worksheets in a map first, then add in order
+    const worksheets = new Map<string, any>();
+    worksheets.set('API Documentation', apiWorksheet);
 
-    // 2. Get foreign key relationships and add as a sheet
+    // 4. Get foreign key relationships and add as a sheet
     const foreignKeys = await getForeignKeyRelationships(pool);
     if (foreignKeys.length > 0) {
       const fkData = foreignKeys.map(fk => ({
@@ -334,24 +378,14 @@ export async function GET(request: NextRequest) {
         { wch: 15 }, // On Delete
         { wch: 40 }, // Constraint Name
       ];
-      XLSX.utils.book_append_sheet(workbook, fkWorksheet, 'Foreign Keys');
+      worksheets.set('Foreign Keys', fkWorksheet);
     }
 
-    // 3. Get list of all tables and views for table of contents
-    const tablesResult = await pool.query(`
-      SELECT table_name, table_type
-      FROM information_schema.tables 
-      WHERE table_schema = 'public' 
-      AND table_type IN ('BASE TABLE', 'VIEW')
-      ORDER BY table_type, table_name
-    `);
-
-    const tables = tablesResult.rows.filter(row => row.table_type === 'BASE TABLE').map(row => row.table_name);
-    const views = tablesResult.rows.filter(row => row.table_type === 'VIEW').map(row => row.table_name);
+    // 5. Get table info for table of contents
     
-    // 4. Check which tables are empty and contain PII (views don't need PII check)
+    // 6. Check which tables are empty and contain PII (views don't need PII check)
     const tableInfo = await Promise.all(
-      tables.map(async (tableName) => {
+      allTables.map(async (tableName) => {
         const isEmpty = await isTableEmpty(pool, tableName);
         const hasPII = await checkTableForPII(pool, tableName);
         return {
@@ -364,7 +398,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Add views to table info (no PII check needed for views)
-    const viewInfo = views.map(viewName => ({
+    const viewInfo = allViews.map(viewName => ({
       name: viewName,
       isEmpty: false, // Views are computed, not "empty"
       hasPII: false, // Views don't store data, they query it
@@ -373,7 +407,7 @@ export async function GET(request: NextRequest) {
 
     const allTableInfo = [...tableInfo, ...viewInfo];
     
-    // 5. Add Table of Contents sheet
+    // 7. Add Table of Contents sheet
     const tocData = [
       { 
         'Sheet Name': 'API Documentation', 
@@ -409,10 +443,10 @@ export async function GET(request: NextRequest) {
       { wch: 10 }, // Empty?
       { wch: 12 }, // PII data?
     ];
-    XLSX.utils.book_append_sheet(workbook, tocWorksheet, 'Table of Contents');
+    worksheets.set('Table of Contents', tocWorksheet);
 
-    // 6. Export each table and view as a sheet
-    const allDataObjects = [...tables, ...views];
+    // 8. Export each table and view as a sheet (store in map, then add in order)
+    const allDataObjects = [...allTables, ...allViews];
     for (const objectName of allDataObjects) {
       try {
         // Get all data from the table/view
@@ -422,10 +456,10 @@ export async function GET(request: NextRequest) {
           // Convert to worksheet
           const worksheet = XLSX.utils.json_to_sheet(dataResult.rows);
           
-          // Add worksheet to workbook with table name as sheet name
+          // Store worksheet in map (will add in order later)
           // Excel sheet names are limited to 31 characters
           const sheetName = objectName.length > 31 ? objectName.substring(0, 31) : objectName;
-          XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+          worksheets.set(sheetName, worksheet);
         } else {
           // Create empty sheet with just headers if table is empty
           const columnResult = await pool.query(`
@@ -439,12 +473,30 @@ export async function GET(request: NextRequest) {
             const headers = columnResult.rows.map(row => row.column_name);
             const worksheet = XLSX.utils.aoa_to_sheet([headers]);
             const sheetName = objectName.length > 31 ? objectName.substring(0, 31) : objectName;
-            XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+            worksheets.set(sheetName, worksheet);
           }
         }
       } catch (tableError: any) {
         console.error(`[Export] Error exporting table/view ${objectName}:`, tableError);
         // Continue with other tables even if one fails
+      }
+    }
+
+    // 9. Add all worksheets to workbook in the specified order
+    for (const sheetName of sheetOrder) {
+      const worksheet = worksheets.get(sheetName);
+      if (worksheet) {
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+        worksheets.delete(sheetName); // Remove from map after adding
+      }
+    }
+
+    // 10. Add any remaining worksheets that weren't in the order list (in alphabetical order)
+    const remainingSheets = Array.from(worksheets.keys()).sort();
+    for (const sheetName of remainingSheets) {
+      const worksheet = worksheets.get(sheetName);
+      if (worksheet) {
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
       }
     }
 
