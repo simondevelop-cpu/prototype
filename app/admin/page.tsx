@@ -119,6 +119,7 @@ export default function AdminDashboard() {
   const [singleSourceTests, setSingleSourceTests] = useState<any>(null);
   const [singleSourceTestsLoading, setSingleSourceTestsLoading] = useState(false);
   const [fixingUnmigrated, setFixingUnmigrated] = useState(false);
+  const [deletingOrphaned, setDeletingOrphaned] = useState(false);
   
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
@@ -4318,6 +4319,44 @@ export default function AdminDashboard() {
       alert(`Error dropping empty tables: ${error.message || 'Unknown error'}`);
     } finally {
       setEmptyTablesDropping(false);
+    }
+  };
+
+  // Delete orphaned transactions
+  const deleteOrphanedTransactions = async (transactionIds: number[]) => {
+    if (!confirm(`Delete ${transactionIds.length} orphaned transaction(s)? This cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingOrphaned(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/delete-orphaned', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ transactionIds }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        alert(`Successfully deleted ${data.deleted} orphaned transaction(s)`);
+        fetchInvestigation(); // Refresh investigation
+        fetchDropVerification(); // Refresh drop verification
+        fetchSingleSourceTests(); // Refresh tests
+      } else {
+        alert(`Failed to delete orphaned transactions: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error deleting orphaned transactions:', error);
+      alert(`Error deleting orphaned transactions: ${error.message || 'Unknown error'}`);
+    } finally {
+      setDeletingOrphaned(false);
     }
   };
 

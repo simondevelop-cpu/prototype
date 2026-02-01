@@ -59,13 +59,26 @@ export async function POST(request: NextRequest) {
 
     for (const tx of unmigrated.rows) {
       try {
+        // Check if user_id is null or invalid
+        if (!tx.user_id || tx.user_id === null) {
+          results.push({
+            transactionId: tx.id,
+            status: 'orphaned',
+            error: 'Transaction has null user_id - orphaned transaction',
+            recommendation: 'Delete this orphaned transaction from transactions table',
+          });
+          errorCount++;
+          continue;
+        }
+
         // First, verify the user exists
         const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [tx.user_id]);
         if (userCheck.rows.length === 0) {
           results.push({
             transactionId: tx.id,
-            status: 'error',
-            error: `User ${tx.user_id} does not exist in users table`,
+            status: 'orphaned',
+            error: `User ${tx.user_id} does not exist in users table - orphaned transaction`,
+            recommendation: 'Delete this orphaned transaction from transactions table',
           });
           errorCount++;
           continue;
