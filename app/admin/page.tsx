@@ -118,6 +118,7 @@ export default function AdminDashboard() {
   const [emptyTablesDropping, setEmptyTablesDropping] = useState(false);
   const [singleSourceTests, setSingleSourceTests] = useState<any>(null);
   const [singleSourceTestsLoading, setSingleSourceTestsLoading] = useState(false);
+  const [fixingUnmigrated, setFixingUnmigrated] = useState(false);
   
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
