@@ -119,6 +119,8 @@ export default function AdminDashboard() {
   const [deletingOrphaned, setDeletingOrphaned] = useState(false);
   const [fixingTokenization, setFixingTokenization] = useState(false);
   const [droppingTables, setDroppingTables] = useState(false);
+  const [migratingPII, setMigratingPII] = useState(false);
+  const [piiMigrationResult, setPiiMigrationResult] = useState<any>(null);
   
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
@@ -2116,7 +2118,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            👥 Customer data
+            👤 Customer data
           </button>
           <button
             onClick={() => setAnalyticsSubTab('events-data')}
@@ -2126,7 +2128,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            📊 Events data
+            📅 Events data
           </button>
           <button
             onClick={() => setAnalyticsSubTab('editing-events-data')}
@@ -4489,6 +4491,43 @@ export default function AdminDashboard() {
       alert(`Error fixing tokenization: ${error.message || 'Unknown error'}`);
     } finally {
       setFixingTokenization(false);
+    }
+  };
+
+  const migratePIIFromOnboarding = async () => {
+    if (!confirm('Migrate PII from onboarding_responses to l0_pii_users and drop PII columns? This will complete PII isolation.')) {
+      return;
+    }
+    setMigratingPII(true);
+    setPiiMigrationResult(null);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/migrate-pii-onboarding', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setPiiMigrationResult(data);
+        alert('PII migration completed successfully! PII columns have been dropped from onboarding_responses.');
+        // Refresh maintenance tests to see updated PII isolation status
+        await fetchSingleSourceTests();
+      } else {
+        alert(`Failed to migrate PII: ${data.error || 'Unknown error'}\n\nDetails: ${data.details || ''}`);
+        setPiiMigrationResult({ success: false, error: data.error, details: data.details });
+      }
+    } catch (error: any) {
+      console.error('Error migrating PII:', error);
+      alert(`Error migrating PII: ${error.message || 'Unknown error'}`);
+      setPiiMigrationResult({ success: false, error: error.message });
+    } finally {
+      setMigratingPII(false);
     }
   };
 
