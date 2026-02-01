@@ -318,17 +318,17 @@ export async function GET(request: NextRequest) {
     // Account field format: "RBC Credit Card", "TD Chequing", "Scotiabank Savings", etc.
     const uniqueBanksSubquery = `
       SELECT 
-        COALESCE(ut.internal_user_id, t.user_id) as user_id,
+        ut.internal_user_id as user_id,
         COUNT(DISTINCT 
           CASE 
-            WHEN COALESCE(tf.account, t.account) IS NOT NULL THEN
+            WHEN tf.account IS NOT NULL THEN
               CASE 
-                WHEN COALESCE(tf.account, t.account) ILIKE 'RBC%' THEN 'RBC'
-                WHEN COALESCE(tf.account, t.account) ILIKE 'TD%' OR COALESCE(tf.account, t.account) ILIKE 'Toronto-Dominion%' THEN 'TD'
-                WHEN COALESCE(tf.account, t.account) ILIKE 'Scotiabank%' OR COALESCE(tf.account, t.account) ILIKE 'Bank of Nova Scotia%' THEN 'Scotiabank'
-                WHEN COALESCE(tf.account, t.account) ILIKE 'BMO%' OR COALESCE(tf.account, t.account) ILIKE 'Bank of Montreal%' THEN 'BMO'
-                WHEN COALESCE(tf.account, t.account) ILIKE 'CIBC%' OR COALESCE(tf.account, t.account) ILIKE 'Canadian Imperial%' THEN 'CIBC'
-                WHEN COALESCE(tf.account, t.account) ILIKE 'Tangerine%' OR COALESCE(tf.account, t.account) ILIKE 'ING Direct%' THEN 'Tangerine'
+                WHEN tf.account ILIKE 'RBC%' THEN 'RBC'
+                WHEN tf.account ILIKE 'TD%' OR tf.account ILIKE 'Toronto-Dominion%' THEN 'TD'
+                WHEN tf.account ILIKE 'Scotiabank%' OR tf.account ILIKE 'Bank of Nova Scotia%' THEN 'Scotiabank'
+                WHEN tf.account ILIKE 'BMO%' OR tf.account ILIKE 'Bank of Montreal%' THEN 'BMO'
+                WHEN tf.account ILIKE 'CIBC%' OR tf.account ILIKE 'Canadian Imperial%' THEN 'CIBC'
+                WHEN tf.account ILIKE 'Tangerine%' OR tf.account ILIKE 'ING Direct%' THEN 'Tangerine'
                 ELSE NULL
               END
             ELSE NULL
@@ -337,8 +337,8 @@ export async function GET(request: NextRequest) {
       FROM users u
       LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
       LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-      WHERE COALESCE(tf.account, t.account) IS NOT NULL
-      GROUP BY COALESCE(ut.internal_user_id, t.user_id)
+      WHERE tf.account IS NOT NULL
+      GROUP BY ut.internal_user_id
     `;
     
     const engagementQuery = useUsersTable ? `
@@ -375,7 +375,7 @@ export async function GET(request: NextRequest) {
       ) bank_counts ON bank_counts.user_id = u.id
       LEFT JOIN (
         SELECT 
-          COALESCE(ut.internal_user_id, t.user_id) as user_id,
+          ut.internal_user_id as user_id,
           MIN(tf.created_at) as first_transaction_date
         FROM users u2
         LEFT JOIN l0_user_tokenization ut ON u2.id = ut.internal_user_id
@@ -385,7 +385,7 @@ export async function GET(request: NextRequest) {
       ) first_upload ON first_upload.user_id = u.id
       LEFT JOIN (
         SELECT 
-          COALESCE(ut.internal_user_id, t.user_id) as user_id,
+          ut.internal_user_id as user_id,
           COUNT(*) as tx_count
         FROM users u2
         LEFT JOIN l0_user_tokenization ut ON u2.id = ut.internal_user_id
