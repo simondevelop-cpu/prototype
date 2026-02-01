@@ -56,7 +56,7 @@ function getAPIEndpoints(): APIEndpoint[] {
     
     // Consent
     { endpoint: '/api/consent', method: 'POST', area: 'Consent', access: 'write', description: 'Log consent event', authentication: 'user', variables: 'consentType, metadata', formula: 'INSERT INTO l1_events' },
-    { endpoint: '/api/consent/check', method: 'GET', area: 'Consent', access: 'read', description: 'Check if consent was given', authentication: 'user', variables: 'type', formula: 'SELECT from user_events WHERE event_type' },
+    { endpoint: '/api/consent/check', method: 'GET', area: 'Consent', access: 'read', description: 'Check if consent was given', authentication: 'user', variables: 'type', formula: 'SELECT from l1_events WHERE event_type' },
     
     // Statement Upload
     { endpoint: '/api/statements/upload', method: 'POST', area: 'Statement Upload', access: 'write', description: 'Upload PDF statement', authentication: 'user', variables: 'file' },
