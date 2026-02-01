@@ -59,6 +59,18 @@ export async function POST(request: NextRequest) {
 
     for (const tx of unmigrated.rows) {
       try {
+        // First, verify the user exists
+        const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [tx.user_id]);
+        if (userCheck.rows.length === 0) {
+          results.push({
+            transactionId: tx.id,
+            status: 'error',
+            error: `User ${tx.user_id} does not exist in users table`,
+          });
+          errorCount++;
+          continue;
+        }
+
         if (!tx.tokenized_user_id) {
           // User doesn't have tokenization - create it
           const { getTokenizedUserId } = await import('@/lib/tokenization');
@@ -67,7 +79,7 @@ export async function POST(request: NextRequest) {
             results.push({
               transactionId: tx.id,
               status: 'error',
-              error: 'Could not create tokenized user ID',
+              error: 'Could not create tokenized user ID - check database connection and l0_user_tokenization table',
             });
             errorCount++;
             continue;
@@ -76,7 +88,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Attempt to migrate
-        await pool.query(`
+        const insertResult = await pool.query(`
           INSERT INTO l1_transaction_facts (
             tokenized_user_id,
             transaction_date,
@@ -91,6 +103,7 @@ export async function POST(request: NextRequest) {
             legacy_transaction_id
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
           ON CONFLICT DO NOTHING
+          RETURNING id
         `, [
           tx.tokenized_user_id,
           tx.date,
@@ -105,16 +118,45 @@ export async function POST(request: NextRequest) {
           tx.id,
         ]);
 
+        // Check if insert actually happened (ON CONFLICT might have prevented it)
+        if (insertResult.rows.length === 0) {
+          // Check if it already exists
+          const existingCheck = await pool.query(
+            'SELECT id FROM l1_transaction_facts WHERE legacy_transaction_id = $1',
+            [tx.id]
+          );
+          if (existingCheck.rows.length > 0) {
+            results.push({
+              transactionId: tx.id,
+              status: 'already_migrated',
+              message: 'Transaction already exists in l1_transaction_facts',
+            });
+            // Don't count as error, but also don't count as migrated
+            continue;
+          } else {
+            results.push({
+              transactionId: tx.id,
+              status: 'error',
+              error: 'Insert failed but transaction does not exist - possible constraint violation',
+            });
+            errorCount++;
+            continue;
+          }
+        }
+
         results.push({
           transactionId: tx.id,
           status: 'migrated',
+          newId: insertResult.rows[0].id,
         });
         successCount++;
       } catch (error: any) {
+        console.error(`[Fix Unmigrated] Error migrating transaction ${tx.id}:`, error);
         results.push({
           transactionId: tx.id,
           status: 'error',
-          error: error.message,
+          error: error.message || 'Unknown error',
+          details: error.code || error.detail || '',
         });
         errorCount++;
       }
@@ -126,6 +168,7 @@ export async function POST(request: NextRequest) {
       migrated: successCount,
       errors: errorCount,
       results,
+      errorDetails: results.filter((r: any) => r.status === 'error'),
     });
   } catch (error: any) {
     console.error('[Fix Unmigrated API] Error:', error);

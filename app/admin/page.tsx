@@ -4343,9 +4343,15 @@ export default function AdminDashboard() {
       });
       const data = await response.json();
       if (response.ok) {
-        alert(`Successfully migrated ${data.migrated} transaction(s). ${data.errors > 0 ? `${data.errors} error(s) occurred.` : ''}`);
+        if (data.errors > 0) {
+          const errorDetails = data.errorDetails?.map((e: any) => `Transaction ${e.transactionId}: ${e.error}`).join('\n') || 'Unknown error';
+          alert(`Migration completed with errors:\n\n${errorDetails}\n\nSuccessfully migrated: ${data.migrated} transaction(s)`);
+        } else {
+          alert(`Successfully migrated ${data.migrated} transaction(s)!`);
+        }
         fetchInvestigation(); // Refresh investigation
         fetchDropVerification(); // Refresh drop verification
+        fetchSingleSourceTests(); // Refresh tests
       } else {
         alert(`Failed to fix unmigrated transactions: ${data.error || 'Unknown error'}`);
       }
