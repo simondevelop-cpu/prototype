@@ -4597,167 +4597,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Render Privacy Policy Check Tab - REMOVED
-  // Useful tests have been moved to App Health
-  const renderPrivacyPolicyCheck = () => {
-    const getStatusIcon = (status: string) => {
-      switch (status) {
-        case 'pass':
-          return '✅';
-        case 'fail':
-          return '❌';
-        case 'warning':
-          return '⚠️';
-        default:
-          return '❓';
-      }
-    };
-
-    const getStatusColor = (status: string) => {
-      switch (status) {
-        case 'pass':
-          return 'bg-green-50 border-green-200 text-green-800';
-        case 'fail':
-          return 'bg-red-50 border-red-200 text-red-800';
-        case 'warning':
-          return 'bg-yellow-50 border-yellow-200 text-yellow-800';
-        default:
-          return 'bg-gray-50 border-gray-200 text-gray-800';
-      }
-    };
-
-    if (!privacyCheckData && !privacyCheckLoading) {
-      return (
-        <div className="text-center py-12">
-          <p className="text-gray-600 mb-4">Click "Run Privacy Policy Check" to verify compliance</p>
-          <button
-            onClick={fetchPrivacyCheckData}
-            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            Run Privacy policy check
-          </button>
-        </div>
-      );
-    }
-
-    if (privacyCheckLoading) {
-      return (
-        <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-          <p className="mt-4 text-gray-600">Running privacy policy checks...</p>
-        </div>
-      );
-    }
-
-    const { status, summary, checks, lastChecked } = privacyCheckData || {};
-
-    // Group checks by category
-    const checksByCategory: { [key: string]: any[] } = {};
-    checks?.forEach((check: any) => {
-      if (!checksByCategory[check.category]) {
-        checksByCategory[check.category] = [];
-      }
-      checksByCategory[check.category].push(check);
-    });
-
-    return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">🔒 Privacy policy check</h2>
-              <p className="text-gray-600">
-                Automated compliance verification for Privacy Policy commitments.
-              </p>
-            </div>
-            <button
-              onClick={fetchPrivacyCheckData}
-              disabled={privacyCheckLoading}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {privacyCheckLoading ? 'Checking...' : '🔄 Refresh'}
-            </button>
-          </div>
-        </div>
-
-        {/* Overall Status */}
-        {summary && (
-          <div className={`rounded-lg border-2 p-6 ${
-            status === 'pass' 
-              ? 'bg-green-50 border-green-300' 
-              : status === 'fail'
-              ? 'bg-red-50 border-red-300'
-              : 'bg-yellow-50 border-yellow-300'
-          }`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-bold mb-2">
-                  Overall Status: {getStatusIcon(status)} {status.toUpperCase()}
-                </h3>
-                <div className="grid grid-cols-4 gap-4 mt-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{summary.passed}</div>
-                    <div className="text-sm text-gray-600">Passed</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-red-600">{summary.failed}</div>
-                    <div className="text-sm text-gray-600">Failed</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-yellow-600">{summary.warnings}</div>
-                    <div className="text-sm text-gray-600">Warnings</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-gray-600">{summary.total}</div>
-                    <div className="text-sm text-gray-600">Total</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            {lastChecked && (
-              <p className="text-sm text-gray-500 mt-4">
-                Last checked: {new Date(lastChecked).toLocaleString()}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Checks by Category */}
-        <div className="space-y-6">
-          {Object.entries(checksByCategory).map(([category, categoryChecks]) => (
-            <div key={category} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">{category}</h3>
-              <div className="space-y-3">
-                {categoryChecks.map((check: any, index: number) => (
-                  <div
-                    key={check.id}
-                    className={`border rounded-lg p-4 ${getStatusColor(check.status)}`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-lg">{getStatusIcon(check.status)}</span>
-                          <h4 className="font-semibold">{check.name}</h4>
-                          <span className="text-xs font-mono bg-white bg-opacity-50 px-2 py-1 rounded">
-                            {check.id}
-                          </span>
-                        </div>
-                        <p className="text-sm mb-1">{check.message}</p>
-                        {check.details && (
-                          <p className="text-xs opacity-75 mt-2 italic">{check.details}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
 
   // Render App Health Tab
   const renderAppHealth = () => {
@@ -5124,6 +4963,108 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 </div>
+              </div>
+
+              {/* Single Source of Truth Tests */}
+              <div>
+                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                  <span>🔗</span> Single Source of Truth Tests
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Verify that all code uses l1_transaction_facts and no fallbacks exist.
+                </p>
+                <div className="mb-4">
+                  <button
+                    onClick={fetchSingleSourceTests}
+                    disabled={singleSourceTestsLoading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {singleSourceTestsLoading ? 'Running...' : 'Run Tests'}
+                  </button>
+                </div>
+
+                {singleSourceTests && (
+                  <div className="space-y-4">
+                    <div className={`border rounded-lg p-4 ${
+                      singleSourceTests.success 
+                        ? 'bg-green-50 border-green-200' 
+                        : 'bg-yellow-50 border-yellow-200'
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold text-gray-900">Test Summary</h4>
+                        <span className={`text-sm font-medium ${
+                          singleSourceTests.success ? 'text-green-800' : 'text-yellow-800'
+                        }`}>
+                          {singleSourceTests.summary.passed} / {singleSourceTests.summary.total} tests passed
+                        </span>
+                      </div>
+                      <div className="flex gap-4 text-sm">
+                        <span className="text-green-700">✓ Passed: {singleSourceTests.summary.passed}</span>
+                        <span className="text-red-700">✗ Failed: {singleSourceTests.summary.failed}</span>
+                        <span className="text-yellow-700">⚠ Warnings: {singleSourceTests.summary.warnings}</span>
+                        <span className="text-gray-700">⚠ Errors: {singleSourceTests.summary.errors}</span>
+                      </div>
+                      {/* Action buttons */}
+                      <div className="mt-4 flex gap-2">
+                        {singleSourceTests.tests.some((t: any) => t.name === 'Tokenization coverage' && t.status === 'warn') && (
+                          <button
+                            onClick={fixTokenization}
+                            disabled={fixingTokenization}
+                            className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 text-sm"
+                          >
+                            {fixingTokenization ? 'Fixing...' : 'Fix Tokenization'}
+                          </button>
+                        )}
+                        {singleSourceTests.tests.some((t: any) => 
+                          (t.name === 'transactions table foreign keys removed' && t.status === 'fail') ||
+                          (t.name === 'accounts table foreign keys removed' && t.status === 'fail')
+                        ) && (
+                          <button
+                            onClick={dropTransactionsAndAccounts}
+                            disabled={droppingTables}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm"
+                          >
+                            {droppingTables ? 'Dropping...' : 'Drop Tables & Establish SSOT'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Test</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {singleSourceTests.tests.map((test: any, index: number) => (
+                            <tr key={index}>
+                              <td className="px-6 py-4 text-sm font-medium text-gray-900">{test.name}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  test.status === 'pass' ? 'bg-green-100 text-green-800' :
+                                  test.status === 'fail' ? 'bg-red-100 text-red-800' :
+                                  test.status === 'warn' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {test.status === 'pass' ? '✓ Pass' : 
+                                   test.status === 'fail' ? '✗ Fail' : 
+                                   test.status === 'warn' ? '⚠ Warn' : '⚠ Error'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{test.message}</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{test.details || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           );
