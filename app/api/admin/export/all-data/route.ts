@@ -237,9 +237,30 @@ async function getForeignKeyRelationships(pool: any): Promise<Array<{
         AND rc.constraint_schema = tc.table_schema
       WHERE tc.constraint_type = 'FOREIGN KEY'
         AND tc.table_schema = 'public'
-      ORDER BY tc.table_name, kcu.column_name
+      ORDER BY tc.table_name, kcu.column_name, tc.constraint_name
     `);
-    return result.rows;
+    
+    // Deduplicate: If multiple constraints reference the same relationship, keep only one
+    const seen = new Map<string, any>();
+    const deduplicated: any[] = [];
+    
+    for (const row of result.rows) {
+      const key = `${row.from_table}.${row.from_column} → ${row.to_table}.${row.to_column}`;
+      if (!seen.has(key)) {
+        seen.set(key, row);
+        deduplicated.push(row);
+      } else {
+        // Keep the constraint with the shorter name (usually the correct one)
+        const existing = seen.get(key);
+        if (row.constraint_name.length < existing.constraint_name.length) {
+          const index = deduplicated.indexOf(existing);
+          deduplicated[index] = row;
+          seen.set(key, row);
+        }
+      }
+    }
+    
+    return deduplicated;
   } catch (error) {
     console.error('[Export] Error getting foreign key relationships:', error);
     return [];
@@ -423,7 +444,7 @@ export async function GET(request: NextRequest) {
       },
       { 
         'Sheet Name': 'Table of Contents', 
-        'Description': 'This sheet. Overview of all sheets in this workbook.',
+        'Description': 'This sheet. Overview of all sheets in this workbook. See "Foreign Keys" sheet for all table relationships.',
         'Empty?': '',
         'PII data?': ''
       },
