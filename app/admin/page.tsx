@@ -3558,6 +3558,7 @@ export default function AdminDashboard() {
                     <li><strong>date_of_birth</strong> - DATE (user's date of birth - PII)</li>
                     <li><strong>recovery_phone</strong> - TEXT (user's recovery phone number - PII)</li>
                     <li><strong>province_region</strong> - TEXT (user's province/region - PII)</li>
+                    <li><strong>ip_address</strong> - TEXT (IP address logged when PII is created/updated, for security/compliance)</li>
                     <li><strong>created_at</strong> - TIMESTAMP WITH TIME ZONE (when PII record was created)</li>
                     <li><strong>updated_at</strong> - TIMESTAMP WITH TIME ZONE (when PII record was last updated)</li>
                     <li><strong>deleted_at</strong> - TIMESTAMP WITH TIME ZONE (soft delete timestamp for PIPEDA compliance - 30 day retention)</li>
