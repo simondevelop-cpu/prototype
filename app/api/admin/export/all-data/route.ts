@@ -22,6 +22,7 @@ interface APIEndpoint {
   formula?: string;
   variables?: string;
   authentication: 'user' | 'admin' | 'public';
+  database?: string; // 'Neon', 'Vercel Postgres', or 'Both/Unknown'
 }
 
 /**
@@ -118,23 +119,27 @@ function getAPIEndpoints(): APIEndpoint[] {
  */
 function getTableDescription(tableName: string): string {
   const descriptions: { [key: string]: string } = {
-    'users': 'Core user accounts table. Contains user authentication and basic profile information.',
-    'l0_pii_users': 'Personally Identifiable Information (PII) table. Stores sensitive user data separated for security compliance.',
-    'l1_transaction_facts': 'Transaction facts table. Contains all financial transactions with normalized data.',
+    'users': 'Core user accounts table. Contains user authentication and basic profile information. Email stored here for auth (also in l0_pii_users).',
+    'l0_pii_users': 'Personally Identifiable Information (PII) table. Stores sensitive user data separated for security compliance. PRIMARY KEY: internal_user_id.',
+    'l1_transaction_facts': 'Transaction facts table. Contains all financial transactions with normalized data. Uses tokenized_user_id for PII isolation.',
     'l2_aggregated_insights': 'Aggregated insights table. Pre-computed financial summaries and analytics.',
-    'onboarding_responses': 'User onboarding responses. Stores answers from the onboarding flow.',
-    'l1_events': 'Event facts table. Tracks all user and admin actions, consent events, and system events. Replaces user_events.',
-    'l1_customer_facts': 'Customer facts table. Contains anonymized customer attributes and analytics classifications (user_segment).',
+    'onboarding_responses': 'User onboarding responses. Stores answers from the onboarding flow (non-PII only - PII migrated to l0_pii_users).',
+    'l1_events': 'Event facts table. Tracks all user and admin actions, consent events, and system events. Replaces user_events. Uses user_id for operational events.',
+    'l1_customer_facts': 'Customer facts table. Contains anonymized customer attributes and analytics classifications (user_segment). Uses tokenized_user_id.',
     'l0_user_tokenization': 'User tokenization mapping. Maps internal_user_id to tokenized_user_id for analytics (PII isolation).',
     'l2_customer_summary_view': 'Customer summary view. Aggregated metrics per user using l1_transaction_facts.',
     'categorization_learning': 'Categorization learning patterns. Stores user corrections for automatic categorization.',
     'admin_keywords': 'Admin-defined keyword patterns for transaction categorization.',
     'admin_merchants': 'Admin-defined merchant patterns for transaction categorization.',
-    'chat_bookings': 'Chat booking requests. Stores user requests for 20-minute chat sessions.',
+    'chat_bookings': 'Chat booking requests. Stores user requests for 20-minute chat sessions. Notes field may contain unstructured PII.',
     'available_slots': 'Available chat slots. Admin-marked time slots available for booking.',
-    'survey_responses': 'Survey responses. User responses to the "What\'s coming" feature prioritization survey.',
-    'user_feedback': 'User feedback submissions. Stores user feedback and suggestions.',
+    'survey_responses': 'Survey responses. User responses to the "What\'s coming" feature prioritization survey. Free text fields may contain unstructured PII.',
+    'user_feedback': 'User feedback submissions. Stores user feedback and suggestions. Free text fields may contain unstructured PII.',
     'l1_support_tickets': 'Support tickets table. Reserved for future use.',
+    'l0_category_list': 'Category configuration table. Admin-defined transaction categories.',
+    'l0_insight_list': 'Insight configuration table. Admin-defined financial insights.',
+    'l0_admin_list': 'Admin user list. Configuration table for admin users.',
+    'l0_privacy_metadata': 'Privacy metadata table. Privacy compliance tracking and configuration.',
   };
   
   return descriptions[tableName] || `Database table: ${tableName}. Contains raw data from the application.`;
@@ -230,7 +235,20 @@ export async function GET(request: NextRequest) {
     // Create a new workbook
     const workbook = XLSX.utils.book_new();
 
-    // 1. Add API Documentation sheet (first sheet)
+    // 1. Detect database type from connection string
+    const dbUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
+    let databaseType = 'Unknown';
+    if (dbUrl.includes('neon.tech') || dbUrl.includes('neon')) {
+      databaseType = 'Neon';
+    } else if (dbUrl.includes('vercel') || dbUrl.includes('vercel-storage')) {
+      databaseType = 'Vercel Postgres';
+    } else if (dbUrl) {
+      databaseType = 'PostgreSQL (Unknown Provider)';
+    } else {
+      databaseType = 'Not Configured';
+    }
+
+    // 2. Add API Documentation sheet (first sheet)
     const endpoints = getAPIEndpoints();
     const apiData = endpoints.map(ep => ({
       'Endpoint': ep.endpoint,
@@ -240,6 +258,7 @@ export async function GET(request: NextRequest) {
       'Description': ep.description,
       'Formula/Variables': ep.formula || ep.variables || '',
       'Authentication': ep.authentication,
+      'Database': ep.database || databaseType, // Use endpoint-specific database if specified, otherwise use detected type
     }));
     const apiWorksheet = XLSX.utils.json_to_sheet(apiData);
     apiWorksheet['!cols'] = [
@@ -250,21 +269,23 @@ export async function GET(request: NextRequest) {
       { wch: 30 }, // Description
       { wch: 50 }, // Formula/Variables
       { wch: 15 }, // Authentication
+      { wch: 20 }, // Database
     ];
     XLSX.utils.book_append_sheet(workbook, apiWorksheet, 'API Documentation');
 
-    // 2. Get list of all tables for table of contents
+    // 2. Get list of all tables and views for table of contents
     const tablesResult = await pool.query(`
-      SELECT table_name 
+      SELECT table_name, table_type
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
-      AND table_type = 'BASE TABLE'
-      ORDER BY table_name
+      AND table_type IN ('BASE TABLE', 'VIEW')
+      ORDER BY table_type, table_name
     `);
 
-    const tables = tablesResult.rows.map(row => row.table_name);
+    const tables = tablesResult.rows.filter(row => row.table_type === 'BASE TABLE').map(row => row.table_name);
+    const views = tablesResult.rows.filter(row => row.table_type === 'VIEW').map(row => row.table_name);
     
-    // 3. Check which tables are empty and contain PII
+    // 3. Check which tables are empty and contain PII (views don't need PII check)
     const tableInfo = await Promise.all(
       tables.map(async (tableName) => {
         const isEmpty = await isTableEmpty(pool, tableName);
@@ -273,9 +294,20 @@ export async function GET(request: NextRequest) {
           name: tableName,
           isEmpty,
           hasPII,
+          type: 'TABLE',
         };
       })
     );
+
+    // Add views to table info (no PII check needed for views)
+    const viewInfo = views.map(viewName => ({
+      name: viewName,
+      isEmpty: false, // Views are computed, not "empty"
+      hasPII: false, // Views don't store data, they query it
+      type: 'VIEW',
+    }));
+
+    const allTableInfo = [...tableInfo, ...viewInfo];
     
     // 4. Add Table of Contents sheet (second sheet)
     const tocData = [
@@ -291,10 +323,12 @@ export async function GET(request: NextRequest) {
         'Empty?': '',
         'PII data?': ''
       },
-      ...tableInfo.map(info => ({
+      ...allTableInfo.map(info => ({
         'Sheet Name': info.name.length > 31 ? info.name.substring(0, 31) : info.name,
-        'Description': getTableDescription(info.name),
-        'Empty?': info.isEmpty ? 'Yes' : 'No',
+        'Description': info.type === 'VIEW' 
+          ? `Database view: ${info.name}. Computed from base tables.`
+          : getTableDescription(info.name),
+        'Empty?': info.type === 'VIEW' ? 'N/A (View)' : (info.isEmpty ? 'Yes' : 'No'),
         'PII data?': info.hasPII ? 'Yes' : 'No',
       })),
     ];
@@ -307,11 +341,12 @@ export async function GET(request: NextRequest) {
     ];
     XLSX.utils.book_append_sheet(workbook, tocWorksheet, 'Table of Contents');
 
-    // 5. Export each table as a sheet
-    for (const tableName of tables) {
+    // 5. Export each table and view as a sheet
+    const allDataObjects = [...tables, ...views];
+    for (const objectName of allDataObjects) {
       try {
-        // Get all data from the table
-        const dataResult = await pool.query(`SELECT * FROM "${tableName}"`);
+        // Get all data from the table/view
+        const dataResult = await pool.query(`SELECT * FROM "${objectName}"`);
         
         if (dataResult.rows.length > 0) {
           // Convert to worksheet
@@ -319,24 +354,26 @@ export async function GET(request: NextRequest) {
           
           // Add worksheet to workbook with table name as sheet name
           // Excel sheet names are limited to 31 characters
-          const sheetName = tableName.length > 31 ? tableName.substring(0, 31) : tableName;
+          const sheetName = objectName.length > 31 ? objectName.substring(0, 31) : objectName;
           XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
         } else {
           // Create empty sheet with just headers if table is empty
           const columnResult = await pool.query(`
             SELECT column_name 
             FROM information_schema.columns 
-            WHERE table_name = $1
+            WHERE table_name = $1 AND table_schema = 'public'
             ORDER BY ordinal_position
-          `, [tableName]);
+          `, [objectName]);
           
-          const headers = columnResult.rows.map(row => row.column_name);
-          const worksheet = XLSX.utils.aoa_to_sheet([headers]);
-          const sheetName = tableName.length > 31 ? tableName.substring(0, 31) : tableName;
-          XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+          if (columnResult.rows.length > 0) {
+            const headers = columnResult.rows.map(row => row.column_name);
+            const worksheet = XLSX.utils.aoa_to_sheet([headers]);
+            const sheetName = objectName.length > 31 ? objectName.substring(0, 31) : objectName;
+            XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+          }
         }
       } catch (tableError: any) {
-        console.error(`[Export] Error exporting table ${tableName}:`, tableError);
+        console.error(`[Export] Error exporting table/view ${objectName}:`, tableError);
         // Continue with other tables even if one fails
       }
     }

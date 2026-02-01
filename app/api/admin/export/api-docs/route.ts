@@ -17,6 +17,7 @@ interface APIEndpoint {
   formula?: string;
   variables?: string;
   authentication: 'user' | 'admin' | 'public';
+  database?: string; // 'Neon', 'Vercel Postgres', or 'Both/Unknown'
 }
 
 /**
@@ -59,7 +60,7 @@ function getAPIEndpoints(): APIEndpoint[] {
     
     // Statement Upload
     { endpoint: '/api/statements/upload', method: 'POST', area: 'Statement Upload', access: 'write', description: 'Upload PDF statement', authentication: 'user', variables: 'file' },
-    { endpoint: '/api/statements/parse', method: 'POST', area: 'Statement Upload', access: 'write', description: 'Parse uploaded statement', authentication: 'user', variables: 'file', formula: 'PDF parsing, INSERT INTO transactions' },
+    { endpoint: '/api/statements/parse', method: 'POST', area: 'Statement Upload', access: 'write', description: 'Parse uploaded statement', authentication: 'user', variables: 'file', formula: 'PDF parsing, INSERT INTO l1_transaction_facts' },
     { endpoint: '/api/statements/import', method: 'POST', area: 'Statement Upload', access: 'write', description: 'Import parsed transactions', authentication: 'user', variables: 'transactions[]', formula: 'INSERT INTO l1_transaction_facts' },
     
     // Categorization
@@ -80,20 +81,20 @@ function getAPIEndpoints(): APIEndpoint[] {
     { endpoint: '/api/feedback', method: 'POST', area: 'Feedback', access: 'write', description: 'Submit feedback', authentication: 'user', variables: 'usefulness, trust, problems, learnMore', formula: 'INSERT INTO user_feedback' },
     
     // User Activity
-    { endpoint: '/api/user/edit-counts', method: 'GET', area: 'User Activity', access: 'read', description: 'Get user edit activity counts', authentication: 'user', formula: 'SELECT COUNT from user_events WHERE event_type' },
+    { endpoint: '/api/user/edit-counts', method: 'GET', area: 'User Activity', access: 'read', description: 'Get user edit activity counts', authentication: 'user', formula: 'SELECT COUNT from l1_events WHERE event_type' },
     
     // Admin Endpoints
     { endpoint: '/api/admin/auth', method: 'POST', area: 'Admin', access: 'write', description: 'Admin login', authentication: 'public', variables: 'email, password' },
     { endpoint: '/api/admin/auth', method: 'GET', area: 'Admin', access: 'read', description: 'Verify admin token', authentication: 'admin' },
-    { endpoint: '/api/admin/users', method: 'GET', area: 'Admin', access: 'read', description: 'Get all users with consent info', authentication: 'admin', formula: 'SELECT from users, user_events' },
+    { endpoint: '/api/admin/users', method: 'GET', area: 'Admin', access: 'read', description: 'Get all users with consent info', authentication: 'admin', formula: 'SELECT from users, l1_events' },
     { endpoint: '/api/admin/users/block', method: 'POST', area: 'Admin', access: 'write', description: 'Block/unblock user', authentication: 'admin', variables: 'userId, isActive', formula: 'UPDATE users SET is_active' },
     { endpoint: '/api/admin/customer-data', method: 'GET', area: 'Admin', access: 'read', description: 'Get customer onboarding data', authentication: 'admin', formula: 'SELECT from users, l0_pii_users, onboarding_responses' },
-    { endpoint: '/api/admin/events-data', method: 'GET', area: 'Admin', access: 'read', description: 'Get all user events', authentication: 'admin', formula: 'SELECT from user_events' },
-    { endpoint: '/api/admin/editing-events', method: 'GET', area: 'Admin', access: 'read', description: 'Get transaction editing events', authentication: 'admin', formula: 'SELECT from user_events WHERE event_type = transaction_edit' },
+    { endpoint: '/api/admin/events-data', method: 'GET', area: 'Admin', access: 'read', description: 'Get all user events', authentication: 'admin', formula: 'SELECT from l1_events' },
+    { endpoint: '/api/admin/editing-events', method: 'GET', area: 'Admin', access: 'read', description: 'Get transaction editing events', authentication: 'admin', formula: 'SELECT from l1_events WHERE event_type = transaction_edit' },
     { endpoint: '/api/admin/recategorizations', method: 'GET', area: 'Admin', access: 'read', description: 'Get recategorization log', authentication: 'admin', formula: 'SELECT from categorization_learning' },
     { endpoint: '/api/admin/cohort-analysis', method: 'GET', area: 'Admin', access: 'read', description: 'Get cohort analysis data', authentication: 'admin', variables: 'totalAccounts, validatedEmails, cohorts, intentCategories, dataCoverage', formula: 'Complex aggregations from users (non-PII only), l1_transaction_facts (tokenized_user_id), l1_events (tokenized_user_id). NO PII access.' },
     { endpoint: '/api/admin/vanity-metrics', method: 'GET', area: 'Admin', access: 'read', description: 'Get vanity metrics', authentication: 'admin', variables: 'totalAccounts, validatedEmails, intentCategories, cohorts, dataCoverage', formula: 'Aggregations from users (non-PII only), l1_transaction_facts (tokenized_user_id). NO PII access.' },
-    { endpoint: '/api/admin/engagement-chart', method: 'GET', area: 'Admin', access: 'read', description: 'Get engagement chart data', authentication: 'admin', variables: 'totalAccounts, validatedEmails, cohorts, intentCategories, dataCoverage, userIds', formula: 'Time-series aggregations from l1_event_facts' },
+    { endpoint: '/api/admin/engagement-chart', method: 'GET', area: 'Admin', access: 'read', description: 'Get engagement chart data', authentication: 'admin', variables: 'totalAccounts, validatedEmails, cohorts, intentCategories, dataCoverage, userIds', formula: 'Time-series aggregations from l1_events (tokenized_user_id), users (non-PII only). NO PII access.' },
     { endpoint: '/api/admin/health', method: 'GET', area: 'Admin', access: 'read', description: 'App health checks', authentication: 'admin', formula: 'Various database and compliance checks' },
     { endpoint: '/api/admin/privacy-policy-check', method: 'GET', area: 'Admin', access: 'read', description: 'Privacy policy compliance checks', authentication: 'admin', formula: 'Dynamic tests against privacy commitments' },
     { endpoint: '/api/admin/bookings', method: 'GET', area: 'Admin', access: 'read', description: 'Get all chat bookings', authentication: 'admin', formula: 'SELECT from chat_bookings JOIN users' },
@@ -102,7 +103,7 @@ function getAPIEndpoints(): APIEndpoint[] {
     { endpoint: '/api/admin/available-slots', method: 'POST', area: 'Admin', access: 'write', description: 'Set available booking slots', authentication: 'admin', variables: 'slotDate, slotTime, isAvailable', formula: 'INSERT/UPDATE available_slots' },
     { endpoint: '/api/admin/survey-responses', method: 'GET', area: 'Admin', access: 'read', description: 'Get all survey responses', authentication: 'admin', formula: 'SELECT from survey_responses JOIN users' },
     { endpoint: '/api/admin/user-feedback', method: 'GET', area: 'Admin', access: 'read', description: 'Get user feedback', authentication: 'admin', formula: 'SELECT from user_feedback' },
-    { endpoint: '/api/admin/logins', method: 'GET', area: 'Admin', access: 'read', description: 'Get admin login events', authentication: 'admin', formula: 'SELECT from user_events WHERE event_type IN (admin_login, admin_tab_access)' },
+    { endpoint: '/api/admin/logins', method: 'GET', area: 'Admin', access: 'read', description: 'Get admin login events', authentication: 'admin', formula: 'SELECT from l1_events WHERE event_type IN (admin_login, admin_tab_access) AND is_admin = true' },
     { endpoint: '/api/admin/log-action', method: 'POST', area: 'Admin', access: 'write', description: 'Log admin action', authentication: 'admin', variables: 'actionType, tab', formula: 'INSERT INTO l1_events' },
     { endpoint: '/api/admin/keywords', method: 'GET', area: 'Admin', access: 'read', description: 'Get categorization keywords', authentication: 'admin', formula: 'SELECT from admin_keywords' },
     { endpoint: '/api/admin/keywords', method: 'POST', area: 'Admin', access: 'write', description: 'Create keyword', authentication: 'admin', variables: 'keyword, category, label, isActive, notes', formula: 'INSERT INTO admin_keywords' },
@@ -141,8 +142,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    // Detect database type from connection string
+    const dbUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
+    let databaseType = 'Unknown';
+    if (dbUrl.includes('neon.tech') || dbUrl.includes('neon')) {
+      databaseType = 'Neon';
+    } else if (dbUrl.includes('vercel') || dbUrl.includes('vercel-storage')) {
+      databaseType = 'Vercel Postgres';
+    } else if (dbUrl) {
+      databaseType = 'PostgreSQL (Unknown Provider)';
+    } else {
+      databaseType = 'Not Configured';
+    }
+
     // Get all API endpoints
-    const endpoints = await getAPIEndpoints();
+    const endpoints = getAPIEndpoints();
     
     // Prepare data for Excel
     const excelData = endpoints.map(ep => ({
@@ -153,6 +167,7 @@ export async function GET(request: NextRequest) {
       'Description': ep.description,
       'Formula/Variables': ep.formula || ep.variables || '',
       'Authentication': ep.authentication,
+      'Database': ep.database || databaseType, // Use endpoint-specific database if specified, otherwise use detected type
     }));
 
     // Create worksheet
@@ -167,6 +182,7 @@ export async function GET(request: NextRequest) {
       { wch: 30 }, // Description
       { wch: 50 }, // Formula/Variables
       { wch: 15 }, // Authentication
+      { wch: 20 }, // Database
     ];
     
     // Create workbook
