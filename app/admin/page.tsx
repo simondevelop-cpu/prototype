@@ -4742,6 +4742,16 @@ export default function AdminDashboard() {
             >
               📊 App monitoring
             </button>
+            <button
+              onClick={() => setActiveTab('migration')}
+              className={`px-6 py-4 font-medium text-sm transition-colors relative ${
+                activeTab === 'migration'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              🔄 Migration
+            </button>
           </div>
         </div>
       </div>
