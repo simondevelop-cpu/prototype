@@ -4667,6 +4667,43 @@ export default function AdminDashboard() {
     }
   };
 
+  const completePIIIsolation = async () => {
+    if (!confirm('Complete PII isolation by removing ALL PII from chat_bookings, onboarding_responses, and users tables? This will migrate all PII to l0_pii_users only.')) {
+      return;
+    }
+    setCompletingPIIIsolation(true);
+    setCompletePIIIsolationResult(null);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/complete-pii-isolation', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setCompletePIIIsolationResult(data);
+        alert('Complete PII isolation migration completed successfully! All PII is now only in l0_pii_users.');
+        // Refresh maintenance tests to see updated PII isolation status
+        await fetchSingleSourceTests();
+      } else {
+        alert(`Failed to complete PII isolation: ${data.error || 'Unknown error'}\n\nDetails: ${data.details || ''}`);
+        setCompletePIIIsolationResult({ success: false, error: data.error, details: data.details });
+      }
+    } catch (error: any) {
+      console.error('Error completing PII isolation:', error);
+      alert(`Error completing PII isolation: ${error.message || 'Unknown error'}`);
+      setCompletePIIIsolationResult({ success: false, error: error.message });
+    } finally {
+      setCompletingPIIIsolation(false);
+    }
+  };
+
   const migratePIIFromOnboarding = async () => {
     if (!confirm('Migrate PII from onboarding_responses to l0_pii_users and drop PII columns? This will complete PII isolation.')) {
       return;
