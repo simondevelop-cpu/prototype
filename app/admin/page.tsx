@@ -4320,6 +4320,42 @@ export default function AdminDashboard() {
     }
   };
 
+  // Fix unmigrated transactions
+  const fixUnmigratedTransactions = async () => {
+    if (!confirm('Fix the unmigrated transaction? This will create tokenization if needed and migrate it.')) {
+      return;
+    }
+
+    setFixingUnmigrated(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/fix-unmigrated', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        alert(`Successfully migrated ${data.migrated} transaction(s). ${data.errors > 0 ? `${data.errors} error(s) occurred.` : ''}`);
+        fetchInvestigation(); // Refresh investigation
+        fetchDropVerification(); // Refresh drop verification
+      } else {
+        alert(`Failed to fix unmigrated transactions: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error fixing unmigrated transactions:', error);
+      alert(`Error fixing unmigrated transactions: ${error.message || 'Unknown error'}`);
+    } finally {
+      setFixingUnmigrated(false);
+    }
+  };
+
   // Fetch single source of truth tests
   const fetchSingleSourceTests = async () => {
     setSingleSourceTestsLoading(true);
