@@ -35,22 +35,45 @@ export async function GET(request: NextRequest) {
 
     const tests: any[] = [];
 
-    // Test 1: Verify all transactions migrated
+    // Test 1: Verify all transactions migrated (or table dropped)
     try {
-      const legacyCount = await pool.query('SELECT COUNT(*) as count FROM transactions');
-      const migratedCount = await pool.query(`
-        SELECT COUNT(*) as count 
-        FROM l1_transaction_facts 
-        WHERE legacy_transaction_id IS NOT NULL
+      // Check if transactions table exists
+      const tableExists = await pool.query(`
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'transactions'
       `);
-      const legacy = parseInt(legacyCount.rows[0]?.count || '0', 10);
-      const migrated = parseInt(migratedCount.rows[0]?.count || '0', 10);
-      tests.push({
-        name: 'All transactions migrated',
-        status: migrated >= legacy ? 'pass' : 'fail',
-        message: `${migrated} of ${legacy} transactions migrated`,
-        details: legacy > 0 ? `Legacy table has ${legacy} rows, ${migrated} migrated` : 'No legacy transactions',
-      });
+      
+      if (tableExists.rows.length === 0) {
+        // Table doesn't exist - this is the desired state after migration
+        const migratedCount = await pool.query(`
+          SELECT COUNT(*) as count 
+          FROM l1_transaction_facts 
+          WHERE legacy_transaction_id IS NOT NULL
+        `);
+        const migrated = parseInt(migratedCount.rows[0]?.count || '0', 10);
+        tests.push({
+          name: 'All transactions migrated',
+          status: 'pass',
+          message: `Legacy transactions table dropped (${migrated} transactions migrated to l1_transaction_facts)`,
+          details: 'Transactions table successfully removed - Single Source of Truth established',
+        });
+      } else {
+        // Table still exists - check migration status
+        const legacyCount = await pool.query('SELECT COUNT(*) as count FROM transactions');
+        const migratedCount = await pool.query(`
+          SELECT COUNT(*) as count 
+          FROM l1_transaction_facts 
+          WHERE legacy_transaction_id IS NOT NULL
+        `);
+        const legacy = parseInt(legacyCount.rows[0]?.count || '0', 10);
+        const migrated = parseInt(migratedCount.rows[0]?.count || '0', 10);
+        tests.push({
+          name: 'All transactions migrated',
+          status: migrated >= legacy ? 'pass' : 'fail',
+          message: `${migrated} of ${legacy} transactions migrated`,
+          details: legacy > 0 ? `Legacy table has ${legacy} rows, ${migrated} migrated` : 'No legacy transactions',
+        });
+      }
     } catch (error: any) {
       tests.push({
         name: 'All transactions migrated',
