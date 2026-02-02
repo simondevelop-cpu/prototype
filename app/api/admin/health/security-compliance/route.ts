@@ -204,7 +204,7 @@ export async function GET(request: NextRequest) {
         name: 'Event Logging Integrity',
         description: 'All user actions and system events are logged in a single, consistent location',
         category: 'data-integrity',
-        status: hasL1 && !hasLegacy && hasDualColumns ? 'pass' : hasL1 && !hasLegacy ? 'warn' : 'fail',
+        status: hasL1 && !hasLegacy && hasDualColumns ? 'pass' : hasL1 && !hasLegacy ? 'warning' : 'fail',
         message: hasL1 && !hasLegacy && hasDualColumns
           ? 'All events logged in secure, centralized system with dual-column support'
           : hasL1 && !hasLegacy
