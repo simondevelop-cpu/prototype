@@ -92,7 +92,14 @@ describe('Event Logging', () => {
       [passwordHash]
     );
     testUserId = userResult.rows[0].id;
-    testTokenizedUserId = `token_user_${testUserId}`;
+    
+    // Generate tokenized user ID using the same method as the app (SHA256 hash)
+    const crypto = await import('crypto');
+    const TOKENIZATION_SALT = process.env.TOKENIZATION_SALT || 'default_salt_change_in_production';
+    testTokenizedUserId = crypto
+      .createHash('sha256')
+      .update(`${testUserId}${TOKENIZATION_SALT}`)
+      .digest('hex');
 
     // Create tokenized user ID
     await testClient.query(
