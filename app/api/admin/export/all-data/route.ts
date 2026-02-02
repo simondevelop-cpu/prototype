@@ -119,7 +119,7 @@ function getAPIEndpoints(): APIEndpoint[] {
  */
 function getTableDescription(tableName: string): string {
   const descriptions: { [key: string]: string } = {
-    'users': 'Core user accounts table. Contains user authentication and basic profile information. Email stored here for auth (also in l0_pii_users).',
+    'users': 'Core user accounts table (exported as l1_users). Contains user authentication and basic profile information. Email stored here for auth (also in l0_pii_users).',
     'l0_pii_users': 'Personally Identifiable Information (PII) table. Stores sensitive user data separated for security compliance. PRIMARY KEY: internal_user_id.',
     'l1_transaction_facts': 'Transaction facts table. Contains all financial transactions with normalized data. Uses tokenized_user_id for PII isolation. See Foreign Keys sheet for relationships.',
     'l2_aggregated_insights': 'Aggregated insights table. Pre-computed financial summaries and analytics.',
@@ -128,11 +128,11 @@ function getTableDescription(tableName: string): string {
     'l1_customer_facts': 'Customer facts table. Contains anonymized customer attributes and analytics classifications (user_segment). Uses tokenized_user_id. See Foreign Keys sheet for relationships.',
     'l0_user_tokenization': 'User tokenization mapping. Maps internal_user_id to tokenized_user_id for analytics (PII isolation). See Foreign Keys sheet for relationships.',
     'l2_customer_summary_view': 'Customer summary view. Aggregated metrics per user using l1_transaction_facts.',
-    'categorization_learning': 'Categorization learning patterns. Stores user corrections for automatic categorization. See Foreign Keys sheet for relationships.',
+    'categorization_learning': 'Categorization learning patterns (exported as admin_categorization_learning). Stores user corrections for automatic categorization. See Foreign Keys sheet for relationships.',
     'admin_keywords': 'Admin-defined keyword patterns for transaction categorization.',
     'admin_merchants': 'Admin-defined merchant patterns for transaction categorization.',
-    'chat_bookings': 'Chat booking requests. Stores user requests for 20-minute chat sessions. Notes field may contain unstructured PII. See Foreign Keys sheet for relationships.',
-    'available_slots': 'Available chat slots. Admin-marked time slots available for booking.',
+    'chat_bookings': 'Chat booking requests (exported as admin_chat_bookings). Stores user requests for 20-minute chat sessions. Notes field may contain unstructured PII. See Foreign Keys sheet for relationships.',
+    'available_slots': 'Available chat slots (exported as admin_available_slots). Admin-marked time slots available for booking.',
     'survey_responses': 'Survey responses. User responses to the "What\'s coming" feature prioritization survey. Free text fields may contain unstructured PII. See Foreign Keys sheet for relationships.',
     'user_feedback': 'User feedback submissions. Stores user feedback and suggestions. Free text fields may contain unstructured PII.',
     'l1_support_tickets': 'Support tickets table. Reserved for future use. See Foreign Keys sheet for relationships.',
