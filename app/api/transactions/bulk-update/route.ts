@@ -89,17 +89,20 @@ export async function POST(request: NextRequest) {
     values.push(tokenizedUserId);
     const userIdParam = paramCount++;
 
-    // Add transaction IDs to values (as integer array)
-    values.push(numericTransactionIds);
-    const idsParam = paramCount;
+    // Build WHERE clause for transaction IDs
+    // Use IN clause with individual parameters for better pg-mem compatibility
+    const idPlaceholders = numericTransactionIds.map((_, index) => {
+      values.push(numericTransactionIds[index]);
+      return `$${paramCount++}`;
+    }).join(', ');
 
     // Bulk update transactions in L1 fact table (only if they belong to the user)
-    // Explicitly cast the array to integer[] to ensure proper type handling
+    // Use IN clause instead of ANY() for better compatibility with pg-mem
     const result = await pool.query(
       `UPDATE l1_transaction_facts 
        SET ${updateFields.join(', ')}
        WHERE tokenized_user_id = $${userIdParam} 
-         AND id = ANY($${idsParam}::int[])
+         AND id IN (${idPlaceholders})
        RETURNING id`,
       values
     );
