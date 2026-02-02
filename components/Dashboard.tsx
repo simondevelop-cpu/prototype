@@ -24,6 +24,28 @@ interface DashboardProps {
 export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [currentToken, setCurrentToken] = useState(token);
   const [activeTab, setActiveTab] = useState('dashboard');
+  
+  // Track user activity for 30-minute inactivity timeout
+  useEffect(() => {
+    const updateActivity = () => {
+      localStorage.setItem('ci.session.lastActivity', Date.now().toString());
+    };
+    
+    // Update activity on user interactions
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(event => {
+      window.addEventListener(event, updateActivity, { passive: true });
+    });
+    
+    // Initial activity update
+    updateActivity();
+    
+    return () => {
+      events.forEach(event => {
+        window.removeEventListener(event, updateActivity);
+      });
+    };
+  }, []);
   const [timeframe, setTimeframe] = useState('3m');
   const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
   const [customMonthRange, setCustomMonthRange] = useState({ start: '', end: '' }); // Store YYYY-MM for month picker
