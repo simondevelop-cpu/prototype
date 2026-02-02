@@ -146,7 +146,23 @@ function getTableDescription(tableName: string): string {
 }
 
 /**
+ * Map database table names to Excel sheet names
+ * Some tables get prefixes for better organization
+ */
+function getSheetName(tableName: string): string {
+  const sheetNameMap: { [key: string]: string } = {
+    'users': 'l1_users',
+    'available_slots': 'admin_available_slots',
+    'categorization_learning': 'admin_categorization_learning',
+    'chat_bookings': 'admin_chat_bookings',
+  };
+  
+  return sheetNameMap[tableName] || tableName;
+}
+
+/**
  * Check if a table contains PII columns (besides user_id)
+ * Only checks for structured PII columns, not unstructured free text fields
  */
 async function checkTableForPII(pool: any, tableName: string): Promise<boolean> {
   try {
@@ -161,29 +177,27 @@ async function checkTableForPII(pool: any, tableName: string): Promise<boolean> 
       WHERE table_name = $1 AND table_schema = 'public'
     `, [tableName]);
     
-    const piiKeywords = ['email', 'first_name', 'last_name', 'date_of_birth', 'recovery_phone', 'province_region', 'phone', 'address'];
+    // Only check for structured PII columns (not unstructured free text)
+    const piiKeywords = ['first_name', 'last_name', 'date_of_birth', 'recovery_phone', 'province_region', 'phone', 'address'];
     
     for (const col of columnsResult.rows) {
       const colName = col.column_name.toLowerCase();
       
-      // Check for explicit PII fields (excluding user_id, internal_user_id, tokenized_user_id)
-      if (colName === 'user_id' || colName === 'internal_user_id' || colName === 'tokenized_user_id') {
-        continue; // Skip user ID fields
+      // Check for explicit PII fields (excluding user_id, internal_user_id, tokenized_user_id, email)
+      // Note: email is kept in users table for auth but is not considered PII for detection purposes
+      // since all PII operations use l0_pii_users.email
+      if (colName === 'user_id' || colName === 'internal_user_id' || colName === 'tokenized_user_id' || colName === 'email') {
+        continue; // Skip user ID fields and email (handled separately)
       }
       
       if (piiKeywords.some(keyword => colName.includes(keyword))) {
         return true;
       }
-      
-      // Check for free text fields that could contain PII in specific tables
-      // These are user-provided text that might contain personal information
-      if (['notes', 'comments', 'feedback', 'message', 'text', 'other'].some(keyword => colName.includes(keyword))) {
-        // Tables where free text could contain PII
-        if (['chat_bookings', 'survey_responses', 'user_feedback', 'onboarding_responses'].includes(tableName)) {
-          return true;
-        }
-      }
     }
+    
+    // onboarding_responses had PII migrated out, so it should not be flagged
+    // chat_bookings, survey_responses, user_feedback have unstructured free text (notes/comments)
+    // but no structured PII columns, so they are not flagged
     
     return false;
   } catch (error) {
@@ -331,7 +345,7 @@ export async function GET(request: NextRequest) {
       // Raw user data
       'l0_pii_users',
       'l0_user_tokenization',
-      'users',
+      'l1_users',
       'l1_customer_facts',
       'onboarding_responses',
       'survey_responses',
@@ -341,9 +355,9 @@ export async function GET(request: NextRequest) {
       // Admin tooling
       'admin_keywords',
       'admin_merchants',
-      'available_slots',
-      'categorization_learning',
-      'chat_bookings',
+      'admin_available_slots',
+      'admin_categorization_learning',
+      'admin_chat_bookings',
       // TBC
       'l0_category_list',
       'l0_insight_list',
@@ -448,14 +462,18 @@ export async function GET(request: NextRequest) {
         'Empty?': '',
         'PII data?': ''
       },
-      ...allTableInfo.map(info => ({
-        'Sheet Name': info.name.length > 31 ? info.name.substring(0, 31) : info.name,
-        'Description': info.type === 'VIEW' 
-          ? `Database view: ${info.name}. Computed from base tables.`
-          : getTableDescription(info.name),
-        'Empty?': info.type === 'VIEW' ? 'N/A (View)' : (info.isEmpty ? 'Yes' : 'No'),
-        'PII data?': info.hasPII ? 'Yes' : 'No',
-      })),
+      ...allTableInfo.map(info => {
+        // Map table name to sheet name for display
+        const sheetName = getSheetName(info.name);
+        return {
+          'Sheet Name': sheetName.length > 31 ? sheetName.substring(0, 31) : sheetName,
+          'Description': info.type === 'VIEW' 
+            ? `Database view: ${info.name}. Computed from base tables.`
+            : getTableDescription(info.name),
+          'Empty?': info.type === 'VIEW' ? 'N/A (View)' : (info.isEmpty ? 'Yes' : 'No'),
+          'PII data?': info.hasPII ? 'Yes' : 'No',
+        };
+      }),
     ];
     const tocWorksheet = XLSX.utils.json_to_sheet(tocData);
     tocWorksheet['!cols'] = [
@@ -477,13 +495,16 @@ export async function GET(request: NextRequest) {
         // Get all data from the table/view
         const dataResult = await pool.query(`SELECT * FROM "${objectName}"`);
         
+        // Map table name to sheet name (with prefixes if needed)
+        const mappedSheetName = getSheetName(objectName);
+        
         if (dataResult.rows.length > 0) {
           // Convert to worksheet
           const worksheet = XLSX.utils.json_to_sheet(dataResult.rows);
           
           // Store worksheet in map (will add in order later)
           // Excel sheet names are limited to 31 characters
-          const sheetName = objectName.length > 31 ? objectName.substring(0, 31) : objectName;
+          const sheetName = mappedSheetName.length > 31 ? mappedSheetName.substring(0, 31) : mappedSheetName;
           worksheets.set(sheetName, worksheet);
         } else {
           // Create empty sheet with just headers if table is empty
@@ -497,7 +518,7 @@ export async function GET(request: NextRequest) {
           if (columnResult.rows.length > 0) {
             const headers = columnResult.rows.map(row => row.column_name);
             const worksheet = XLSX.utils.aoa_to_sheet([headers]);
-            const sheetName = objectName.length > 31 ? objectName.substring(0, 31) : objectName;
+            const sheetName = mappedSheetName.length > 31 ? mappedSheetName.substring(0, 31) : mappedSheetName;
             worksheets.set(sheetName, worksheet);
           }
         }
