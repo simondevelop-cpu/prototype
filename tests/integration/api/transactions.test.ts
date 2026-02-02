@@ -69,12 +69,15 @@ describe('Transactions API', () => {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
       
-      CREATE TABLE IF NOT EXISTS user_events (
+      CREATE TABLE IF NOT EXISTS l1_events (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        tokenized_user_id TEXT REFERENCES l0_user_tokenization(tokenized_user_id),
         event_type TEXT NOT NULL,
         event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        metadata JSONB
+        metadata JSONB,
+        is_admin BOOLEAN DEFAULT FALSE,
+        session_id TEXT
       );
     `);
 
@@ -90,7 +93,7 @@ describe('Transactions API', () => {
 
   beforeEach(async () => {
     // Delete in order to respect foreign key constraints (child tables first)
-    await testClient.query('DELETE FROM user_events');
+    await testClient.query('DELETE FROM l1_events');
     await testClient.query('DELETE FROM l1_transaction_facts');
     await testClient.query('DELETE FROM l0_user_tokenization');
     await testClient.query('DELETE FROM users');
