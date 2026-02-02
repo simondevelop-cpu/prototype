@@ -46,6 +46,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Transaction IDs array required' }, { status: 400 });
     }
 
+    // Convert transaction IDs to integers to ensure proper type casting
+    const numericTransactionIds = transactionIds.map((id: any) => {
+      const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+      if (isNaN(numId)) {
+        throw new Error(`Invalid transaction ID: ${id}`);
+      }
+      return numId;
+    });
+
     if (!updates || Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'Updates object required' }, { status: 400 });
     }
@@ -80,8 +89,8 @@ export async function POST(request: NextRequest) {
     values.push(tokenizedUserId);
     const userIdParam = paramCount++;
 
-    // Add transaction IDs to values
-    values.push(transactionIds);
+    // Add transaction IDs to values (as integer array)
+    values.push(numericTransactionIds);
     const idsParam = paramCount;
 
     // Bulk update transactions in L1 fact table (only if they belong to the user)
@@ -97,7 +106,7 @@ export async function POST(request: NextRequest) {
     // Log bulk edit event (count as single event, not per transaction)
     if (result.rowCount && result.rowCount > 0) {
       const fieldsUpdated = Object.keys(updates).filter(key => updates[key] !== undefined);
-      await logBulkEditEvent(userId, transactionIds, fieldsUpdated, result.rowCount);
+      await logBulkEditEvent(userId, numericTransactionIds, fieldsUpdated, result.rowCount);
     }
 
     return NextResponse.json({ 
