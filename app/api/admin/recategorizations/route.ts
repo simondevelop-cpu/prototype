@@ -62,16 +62,14 @@ export async function GET(request: NextRequest) {
     const selectFields = ['cl.id', 'cl.description_pattern', 'u.email as user_email'];
     
     // Handle both old and new schema for category/label
+    if (columns.includes('original_category')) {
+      selectFields.push('cl.original_category');
+    }
+    
     if (columns.includes('corrected_category')) {
       selectFields.push('cl.corrected_category');
     } else if (columns.includes('category')) {
       selectFields.push('cl.category as corrected_category'); // Alias for consistency
-    }
-    
-    if (columns.includes('corrected_label')) {
-      selectFields.push('cl.corrected_label');
-    } else if (columns.includes('label')) {
-      selectFields.push('cl.label as corrected_label'); // Alias for consistency
     }
     
     if (columns.includes('frequency')) selectFields.push('cl.frequency');

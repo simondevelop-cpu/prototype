@@ -3,6 +3,8 @@ import { getPool } from '@/lib/db';
 import { verifyPassword, hashPassword, createToken } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { verifyRequestOrigin } from '@/lib/csrf';
+import { getClientIpAddress, updateUserIpAddress } from '@/lib/ip-address';
+import { logUserLoginEvent } from '@/lib/event-logger';
 
 // Force dynamic rendering (POST endpoint requires runtime request body)
 export const dynamic = 'force-dynamic';
@@ -127,27 +129,8 @@ export async function POST(request: NextRequest) {
       console.log('[Login] Migrated legacy password hash to bcrypt for user:', user.id);
     }
 
-    // Check if user has completed onboarding (except for special accounts)
-    const specialAccounts = ['test@gmail.com', 'test2@gmail.com', 'demo@canadianinsights.ca'];
-    const isSpecialAccount = specialAccounts.includes(email.toLowerCase());
-    
-    if (!isSpecialAccount) {
-      const onboardingCheck = await pool.query(
-        `SELECT COUNT(*) as completed_count 
-         FROM onboarding_responses 
-         WHERE user_id = $1 AND completed_at IS NOT NULL`,
-        [user.id]
-      );
-      
-      const hasCompletedOnboarding = parseInt(onboardingCheck.rows[0]?.completed_count || '0') > 0;
-      
-      if (!hasCompletedOnboarding) {
-        return NextResponse.json(
-          { error: 'Please complete your account setup first. Click "Create Account" to continue.' },
-          { status: 403 }
-        );
-      }
-    }
+    // Note: Onboarding completion check removed - frontend will handle redirecting to onboarding if needed
+    // This allows users to log in and complete onboarding at their own pace
 
     // Increment login attempts counter - schema-adaptive
     try {
@@ -160,8 +143,27 @@ export async function POST(request: NextRequest) {
       console.log('[Login] login_attempts column not found, skipping increment');
     }
 
+    // Log IP address
+    try {
+      const ipAddress = getClientIpAddress(request);
+      if (ipAddress) {
+        await updateUserIpAddress(user.id, ipAddress);
+      }
+    } catch (ipError) {
+      console.error('[Login] Failed to log IP address:', ipError);
+      // Don't fail login if IP logging fails
+    }
+
     // Create token
     const token = createToken(user.id);
+
+    // Log login event for analytics (WAU/MAU tracking)
+    try {
+      await logUserLoginEvent(user.id);
+    } catch (loginEventError) {
+      // Don't fail login if event logging fails
+      console.error('[Login] Failed to log login event:', loginEventError);
+    }
 
     return NextResponse.json({
       token,

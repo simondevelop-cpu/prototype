@@ -29,6 +29,7 @@ export default function BulkRecategorizeModal({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,17 +67,16 @@ export default function BulkRecategorizeModal({
     }
   };
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
     if (!onDelete) return;
-    
-    const confirmed = confirm(
-      `Are you sure you want to delete ${selectedCount} ${selectedCount === 1 ? 'transaction' : 'transactions'}? This cannot be undone.`
-    );
-    
-    if (!confirmed) return;
     
     setError('');
     setIsDeleting(true);
+    setShowDeleteConfirm(false);
 
     try {
       await onDelete();
@@ -88,6 +88,10 @@ export default function BulkRecategorizeModal({
     }
   };
 
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -96,7 +100,7 @@ export default function BulkRecategorizeModal({
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Bulk Update</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Bulk update</h2>
             <p className="text-sm text-gray-600 mt-1">
               Updating {selectedCount} {selectedCount === 1 ? 'transaction' : 'transactions'}
             </p>
@@ -131,30 +135,38 @@ export default function BulkRecategorizeModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Category
             </label>
-            <input
-              type="text"
-              list="bulk-categories-list"
+            <select
               value={updates.category}
-              onChange={(e) => setUpdates({ ...updates, category: e.target.value })}
-              placeholder="Leave empty to keep current"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <datalist id="bulk-categories-list">
+              onChange={(e) => {
+                const newVal = e.target.value;
+                if (newVal === '__ADD_NEW__') {
+                  const newCat = prompt('Enter new category name:');
+                  if (newCat && newCat.trim()) {
+                    setUpdates({ ...updates, category: newCat.trim() });
+                  }
+                } else {
+                  setUpdates({ ...updates, category: newVal });
+                }
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            >
+              <option value="">Leave empty to keep current</option>
               {categories.map((cat) => (
-                <option key={cat} value={cat} />
+                <option key={cat} value={cat}>{cat}</option>
               ))}
-            </datalist>
+              <option value="__ADD_NEW__" className="text-blue-600 font-medium">+ Add new category</option>
+            </select>
           </div>
 
-          {/* Cashflow Type */}
+          {/* Cashflow type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Cashflow Type
+              Cashflow type
             </label>
             <select
               value={updates.cashflow}
               onChange={(e) => setUpdates({ ...updates, cashflow: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
             >
               <option value="">Keep current</option>
               <option value="expense">Expense</option>
@@ -199,33 +211,56 @@ export default function BulkRecategorizeModal({
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-              disabled={isSubmitting || isDeleting}
-            >
-              Cancel
-            </button>
-            
-            {onDelete && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isSubmitting || isDeleting}
-              >
-                {isDeleting ? 'Deleting...' : 'Delete'}
-              </button>
+            {!showDeleteConfirm ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                  disabled={isSubmitting || isDeleting}
+                >
+                  Cancel
+                </button>
+                
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteClick}
+                    className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isSubmitting || isDeleting}
+                  >
+                    Delete
+                  </button>
+                )}
+                
+                <button
+                  type="submit"
+                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isSubmitting || isDeleting}
+                >
+                  {isSubmitting ? 'Updating...' : 'Update'}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleDeleteCancel}
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteConfirm}
+                  className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Deleting...' : 'Yes, delete'}
+                </button>
+              </>
             )}
-            
-            <button
-              type="submit"
-              className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isSubmitting || isDeleting}
-            >
-              {isSubmitting ? 'Updating...' : 'Update'}
-            </button>
           </div>
         </form>
       </div>

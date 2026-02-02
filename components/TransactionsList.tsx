@@ -39,11 +39,21 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
   
+  // Inline editing state
+  const [editingCell, setEditingCell] = useState<{ txId: string; field: string } | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
+  const editInputRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
+  
   // Dropdown visibility states
   const [showCashflowDropdown, setShowCashflowDropdown] = useState(false);
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showLabelDropdown, setShowLabelDropdown] = useState(false);
+  const [showAddCategoryInput, setShowAddCategoryInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [deleteConfirmTxId, setDeleteConfirmTxId] = useState<number | null>(null);
+  const [editCounts, setEditCounts] = useState({ description: 0, category: 0, label: 0, date: 0, amount: 0, statementsUploaded: 0, bulkEdit: 0 });
+  const [editCountsLoading, setEditCountsLoading] = useState(false);
   
   const cashflowDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
   const accountDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
@@ -65,29 +75,62 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       if (labelDropdownRef.current && !labelDropdownRef.current.contains(event.target as Node)) {
         setShowLabelDropdown(false);
       }
+      // Close inline edit if clicking outside (handled by onBlur on inputs)
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Apply initial filters when they change
-  if (initialCategoryFilter && !selectedCategories.includes(initialCategoryFilter)) {
-    setSelectedCategories([initialCategoryFilter]);
-  }
-  if (initialCashflowFilter && !selectedCashflows.includes(initialCashflowFilter)) {
-    setSelectedCashflows([initialCashflowFilter]);
-  }
+  // Apply initial filters when they change (must be in useEffect, not during render)
+  useEffect(() => {
+    if (initialCategoryFilter) {
+      setSelectedCategories(prev => {
+        if (!prev.includes(initialCategoryFilter)) {
+          return [initialCategoryFilter];
+        }
+        return prev;
+      });
+    }
+  }, [initialCategoryFilter]);
+  
+  useEffect(() => {
+    if (initialCashflowFilter) {
+      setSelectedCashflows(prev => {
+        if (!prev.includes(initialCashflowFilter)) {
+          return [initialCashflowFilter];
+        }
+        return prev;
+      });
+    }
+  }, [initialCashflowFilter]);
 
-  if (loading) {
-    return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-        <div className="text-center text-gray-500">Loading transactions...</div>
-      </div>
-    );
-  }
+  // Fetch edit counts
+  const fetchEditCounts = async () => {
+    setEditCountsLoading(true);
+    try {
+      const response = await fetch('/api/user/edit-counts', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setEditCounts(data);
+      }
+    } catch (error) {
+      console.error('Error fetching edit counts:', error);
+    } finally {
+      setEditCountsLoading(false);
+    }
+  };
 
-  // Filter transactions
-  const filteredTransactions = transactions.filter(tx => {
+  useEffect(() => {
+    fetchEditCounts();
+  }, [token]);
+
+  // Filter transactions (calculate even when loading to maintain hook order)
+  const filteredTransactions = (transactions || []).filter(tx => {
     const matchesSearch = searchTerm === '' || 
       tx.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.merchant?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -106,14 +149,21 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   });
 
   // Get unique values for each filter
-  // Include all predefined categories plus any custom ones from transactions
-  const allPredefinedCategories = Object.keys(CATEGORIES);
-  const transactionCategories = Array.from(new Set(transactions.map(tx => tx.category).filter(Boolean)));
-  const categories = Array.from(new Set([...allPredefinedCategories, ...transactionCategories, 'Uncategorised'])).sort();
+  // Default categories for new users (only show these if user has no custom categories)
+  const defaultCategories = ['Housing', 'Bills', 'Subscriptions', 'Food', 'Travel', 'Health', 'Transport', 'Education', 'Personal', 'Shopping', 'Work', 'Uncategorised'];
+  const transactionCategories = Array.from(new Set((transactions || []).map(tx => tx.category).filter(Boolean)));
   
-  const accounts = Array.from(new Set(transactions.map(tx => tx.account).filter(Boolean))).sort();
-  const cashflows = Array.from(new Set(transactions.map(tx => tx.cashflow).filter(Boolean))).sort();
-  const labels = Array.from(new Set(transactions.map(tx => tx.label).filter(Boolean))).sort();
+  // Check if user has any custom categories (categories not in default list)
+  const hasCustomCategories = transactionCategories.some(cat => !defaultCategories.includes(cat));
+  
+  // For new users (no custom categories), only show defaults. Otherwise, show all.
+  const categories = hasCustomCategories 
+    ? Array.from(new Set([...defaultCategories, ...transactionCategories])).sort()
+    : defaultCategories;
+  
+  const accounts = Array.from(new Set((transactions || []).map(tx => tx.account).filter(Boolean))).sort();
+  const cashflows = Array.from(new Set((transactions || []).map(tx => tx.cashflow).filter(Boolean))).sort();
+  const labels = Array.from(new Set((transactions || []).map(tx => tx.label).filter(Boolean))).sort();
   
   // Multi-select toggle handlers
   const toggleFilter = (value: string, selected: string[], setSelected: (vals: string[]) => void) => {
@@ -151,13 +201,13 @@ export default function TransactionsList({ transactions, loading, token, onRefre
     setSelectedTransactionIds(newSelected);
   };
 
-  const selectedTotal = transactions
+  const selectedTotal = (transactions || [])
     .filter(tx => selectedTransactionIds.has(getTxId(tx)))
     .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
   // Get IDs of selected transactions
   const getSelectedIds = () => {
-    return transactions
+    return (transactions || [])
       .filter(tx => selectedTransactionIds.has(getTxId(tx)))
       .map(tx => tx.id)
       .filter(Boolean);
@@ -195,13 +245,13 @@ export default function TransactionsList({ transactions, loading, token, onRefre
     }
   };
 
-  const handleUpdateTransaction = async (transactionData: any) => {
+  const handleUpdateTransaction = async (transactionData: any, originalTx?: any) => {
     try {
       // Check if category or label changed (for learning)
-      const originalTx = editingTransaction;
-      const categoryChanged = originalTx && (
-        originalTx.category !== transactionData.category ||
-        originalTx.label !== transactionData.label
+      const txToCheck = originalTx || editingTransaction;
+      const categoryChanged = txToCheck && (
+        txToCheck.category !== transactionData.category ||
+        txToCheck.label !== transactionData.label
       );
 
       const response = await fetch('/api/transactions/update', {
@@ -219,7 +269,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       }
 
       // If category changed, save to learning database
-      if (categoryChanged && originalTx.description) {
+      if (categoryChanged && txToCheck.description) {
         try {
           const learnResponse = await fetch('/api/categorization/learn', {
             method: 'POST',
@@ -228,9 +278,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
               'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify({
-              description: originalTx.description,
-              originalCategory: originalTx.category,
-              originalLabel: originalTx.label,
+              description: txToCheck.description,
+              originalCategory: txToCheck.category,
+              originalLabel: txToCheck.label,
               correctedCategory: transactionData.category,
               correctedLabel: transactionData.label,
             }),
@@ -248,14 +298,114 @@ export default function TransactionsList({ transactions, loading, token, onRefre
 
       setEditingTransaction(null);
       onRefresh(); // Refresh the list
+      // Refresh edit counts after successful update
+      fetchEditCounts();
     } catch (error: any) {
       console.error('Update transaction error:', error);
       throw error;
     }
   };
+  
+  // Inline edit handlers
+  const startInlineEdit = (tx: any, field: string) => {
+    const txId = getTxId(tx);
+    setEditingCell({ txId, field });
+    
+    // Format value based on field type
+    if (field === 'date') {
+      // Convert date to YYYY-MM-DD format for input
+      const date = dayjs.utc(tx.date);
+      setEditValue(date.format('YYYY-MM-DD'));
+    } else if (field === 'amount') {
+      // Store amount as string without sign for editing
+      setEditValue(Math.abs(tx.amount || 0).toString());
+    } else {
+      setEditValue(tx[field] || '');
+    }
+  };
+  
+  const saveInlineEdit = async (tx: any, field: string, directValue?: string) => {
+    if (!editingCell) return;
+    
+    const originalValue = tx[field];
+    // Use directValue if provided (for dropdowns), otherwise use editValue from state
+    let newValue: any = directValue !== undefined ? directValue : editValue.trim();
+    
+    // Convert value based on field type
+    if (field === 'date') {
+      // Date is already in YYYY-MM-DD format, keep as is
+      if (!newValue) {
+        setEditingCell(null);
+        return;
+      }
+    } else if (field === 'amount') {
+      // Convert amount string to number, preserve sign from original
+      const numValue = parseFloat(newValue);
+      if (isNaN(numValue) || numValue < 0) {
+        setEditingCell(null);
+        return;
+      }
+      // Preserve the original sign (positive or negative)
+      newValue = tx.amount >= 0 ? numValue : -numValue;
+    } else {
+      // For other fields, use trimmed string
+      newValue = newValue || null;
+    }
+    
+    // Don't save if value hasn't changed
+    if (field === 'amount') {
+      if (Math.abs(originalValue) === Math.abs(newValue) && (originalValue >= 0) === (newValue >= 0)) {
+        setEditingCell(null);
+        return;
+      }
+    } else if (originalValue === newValue) {
+      setEditingCell(null);
+      return;
+    }
+    
+    try {
+      const updatedTx = { ...tx, [field]: newValue };
+      await handleUpdateTransaction(updatedTx, tx);
+      setEditingCell(null);
+      // Refresh edit counts after successful edit
+      fetchEditCounts();
+    } catch (error) {
+      console.error('Failed to save inline edit:', error);
+      // Revert on error
+      setEditingCell(null);
+    }
+  };
+  
+  const cancelInlineEdit = (tx: any, field: string) => {
+    setEditingCell(null);
+    setEditValue('');
+  };
+  
+  // Focus input when editing starts
+  useEffect(() => {
+    if (editingCell && editInputRef.current) {
+      // Use setTimeout to ensure DOM is ready
+      const timer = setTimeout(() => {
+        if (editInputRef.current) {
+          editInputRef.current.focus();
+          if (editInputRef.current instanceof HTMLInputElement) {
+            editInputRef.current.select();
+          }
+        }
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [editingCell]);
 
-  const handleDeleteTransaction = async (txId: number) => {
-    if (!confirm('Are you sure you want to delete this transaction?')) return;
+  const handleDeleteTransactionClick = (txId: number) => {
+    setDeleteConfirmTxId(txId);
+  };
+
+  const handleDeleteTransactionConfirm = async () => {
+    if (!deleteConfirmTxId) return;
+
+    const txId = deleteConfirmTxId;
+    setDeleteConfirmTxId(null);
 
     try {
       const response = await fetch(`/api/transactions/delete?id=${txId}`, {
@@ -275,6 +425,10 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       console.error('Delete transaction error:', error);
       alert(error.message);
     }
+  };
+
+  const handleDeleteTransactionCancel = () => {
+    setDeleteConfirmTxId(null);
   };
 
   const handleBulkUpdate = async (updates: any) => {
@@ -303,6 +457,8 @@ export default function TransactionsList({ transactions, loading, token, onRefre
 
       setSelectedTransactionIds(new Set()); // Clear selection
       onRefresh(); // Refresh the list
+      // Refresh edit counts after successful bulk update
+      fetchEditCounts();
     } catch (error: any) {
       console.error('Bulk update error:', error);
       throw error;
@@ -371,7 +527,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   };
 
   // Empty state content
-  const emptyStateContent = !transactions.length ? (
+  const emptyStateContent = !transactions || transactions.length === 0 ? (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
       <div className="text-center">
         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -389,13 +545,13 @@ export default function TransactionsList({ transactions, loading, token, onRefre
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            Upload Statements
+            Upload statements
           </button>
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
           >
-            Add Transaction
+            Add transaction
           </button>
         </div>
       </div>
@@ -407,10 +563,54 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       {/* Show empty state or normal content */}
       {emptyStateContent || (
         <>
+          {/* Your Activity Section */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Your monthly activity... measuring just how much we got wrong (and can get better)!</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Let's play a game - you try and get these numbers as high as you can, and we'll try and bring the blue ones down over time!
+            </p>
+            {editCountsLoading ? (
+              <div className="text-center py-4">
+                <div className="animate-spin w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600">{editCounts.description}</div>
+                  <div className="text-sm text-gray-600 mt-1">Description</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600">{editCounts.category}</div>
+                  <div className="text-sm text-gray-600 mt-1">Category</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600">{editCounts.label}</div>
+                  <div className="text-sm text-gray-600 mt-1">Label</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600">{editCounts.date}</div>
+                  <div className="text-sm text-gray-600 mt-1">Date</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600">{editCounts.amount}</div>
+                  <div className="text-sm text-gray-600 mt-1">Amount</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-green-600">{editCounts.statementsUploaded}</div>
+                  <div className="text-sm text-gray-600 mt-1">Statements uploaded</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600">{editCounts.bulkEdit}</div>
+                  <div className="text-sm text-gray-600 mt-1">Bulk edit</div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Header with Title and Action Buttons */}
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">All Transactions</h2>
+              <h2 className="text-2xl font-bold text-gray-900">All transactions</h2>
               {selectedTransactionIds.size > 0 && (
                 <p className="text-sm text-gray-600 mt-1">
                   {selectedTransactionIds.size} transaction{selectedTransactionIds.size !== 1 ? 's' : ''} selected 
@@ -420,17 +620,20 @@ export default function TransactionsList({ transactions, loading, token, onRefre
             </div>
             
             <div className="flex items-center gap-3">
-              {selectedTransactionIds.size > 0 && (
-                <button
-                  onClick={() => setIsBulkModalOpen(true)}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Bulk Update ({selectedTransactionIds.size})
-                </button>
-              )}
+              <button
+                onClick={() => setIsBulkModalOpen(true)}
+                disabled={selectedTransactionIds.size === 0}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                  selectedTransactionIds.size > 0
+                    ? 'bg-purple-600 text-white hover:bg-purple-700'
+                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Bulk edit or delete {selectedTransactionIds.size > 0 && `(${selectedTransactionIds.size})`}
+              </button>
               
               <button
                 onClick={() => setIsUploadModalOpen(true)}
@@ -439,7 +642,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                Upload Statements
+                Upload statements
               </button>
               
               <button
@@ -449,24 +652,14 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                Add Transaction
+                Add transaction
               </button>
             </div>
           </div>
 
       {/* Filters */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="lg:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Search Everything</label>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Description, amount, category, label..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
             <input
@@ -486,7 +679,16 @@ export default function TransactionsList({ transactions, loading, token, onRefre
             />
           </div>
         </div>
-        <div className="mt-4 flex justify-end">
+        <div className="flex items-end gap-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Description, amount, category, label..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
           <button
             onClick={() => {
               setSearchTerm('');
@@ -508,7 +710,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
             }}
             className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
           >
-            Clear All Filters
+            Clear all filters
           </button>
         </div>
       </div>
@@ -533,7 +735,18 @@ export default function TransactionsList({ transactions, loading, token, onRefre
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full table-fixed">
+            <colgroup>
+              <col className="w-12" /> {/* Checkbox */}
+              <col className="w-32" /> {/* Date */}
+              <col className="w-64" /> {/* Description */}
+              <col className="w-32" /> {/* Cashflow */}
+              <col className="w-40" /> {/* Account */}
+              <col className="w-40" /> {/* Category */}
+              <col className="w-40" /> {/* Label */}
+              <col className="w-32" /> {/* Amount */}
+              <col className="w-32" /> {/* Actions */}
+            </colgroup>
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left">
@@ -553,9 +766,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left relative" ref={cashflowDropdownRef}>
                   <button
                     onClick={() => setShowCashflowDropdown(!showCashflowDropdown)}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap flex items-center gap-1"
                   >
-                    CASHFLOW {selectedCashflows.length > 0 && `(${selectedCashflows.length})`} ▾
+                    CASHFLOW {selectedCashflows.length > 0 && `(${selectedCashflows.length})`} <span className="text-5xl font-bold">▾</span>
                   </button>
                   {showCashflowDropdown && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
@@ -601,9 +814,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left relative" ref={accountDropdownRef}>
                   <button
                     onClick={() => setShowAccountDropdown(!showAccountDropdown)}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap flex items-center gap-1"
                   >
-                    ACCOUNT {selectedAccounts.length > 0 && `(${selectedAccounts.length})`} ▾
+                    ACCOUNT {selectedAccounts.length > 0 && `(${selectedAccounts.length})`} <span className="text-5xl font-bold">▾</span>
                   </button>
                   {showAccountDropdown && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
@@ -641,9 +854,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left relative" ref={categoryDropdownRef}>
                   <button
                     onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap flex items-center gap-1"
                   >
-                    CATEGORY {selectedCategories.length > 0 && `(${selectedCategories.length})`} ▾
+                    CATEGORY {selectedCategories.length > 0 && `(${selectedCategories.length})`} <span className="text-5xl font-bold">▾</span>
                   </button>
                   {showCategoryDropdown && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
@@ -682,6 +895,65 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                             <span className="text-sm">{cat}</span>
                           </label>
                         ))}
+                        {/* Add new category option */}
+                        {!showAddCategoryInput ? (
+                          <button
+                            onClick={() => setShowAddCategoryInput(true)}
+                            className="w-full px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded border-t border-gray-200 mt-2 font-medium"
+                          >
+                            + Add new category
+                          </button>
+                        ) : (
+                          <div className="px-3 py-2 border-t border-gray-200 mt-2">
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={newCategoryName}
+                                onChange={(e) => setNewCategoryName(e.target.value)}
+                                placeholder="Category name"
+                                className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && newCategoryName.trim()) {
+                                    const trimmedName = newCategoryName.trim();
+                                    if (!categories.includes(trimmedName)) {
+                                      setSelectedCategories([...selectedCategories, trimmedName]);
+                                    }
+                                    setNewCategoryName('');
+                                    setShowAddCategoryInput(false);
+                                  } else if (e.key === 'Escape') {
+                                    setNewCategoryName('');
+                                    setShowAddCategoryInput(false);
+                                  }
+                                }}
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => {
+                                  if (newCategoryName.trim()) {
+                                    const trimmedName = newCategoryName.trim();
+                                    if (!categories.includes(trimmedName)) {
+                                      setSelectedCategories([...selectedCategories, trimmedName]);
+                                    }
+                                  }
+                                  setNewCategoryName('');
+                                  setShowAddCategoryInput(false);
+                                }}
+                                className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                              >
+                                Add
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setNewCategoryName('');
+                                  setShowAddCategoryInput(false);
+                                }}
+                                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -689,9 +961,9 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <th className="px-6 py-3 text-left relative" ref={labelDropdownRef}>
                   <button
                     onClick={() => setShowLabelDropdown(!showLabelDropdown)}
-                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap"
+                    className="text-xs font-medium text-gray-700 uppercase tracking-wider bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 whitespace-nowrap flex items-center gap-1"
                   >
-                    LABEL {selectedLabels.length > 0 && `(${selectedLabels.length})`} ▾
+                    LABEL {selectedLabels.length > 0 && `(${selectedLabels.length})`} <span className="text-5xl font-bold">▾</span>
                   </button>
                   {showLabelDropdown && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px] max-h-[400px] overflow-y-auto">
@@ -755,30 +1027,210 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {dayjs.utc(tx.date).format('MMM D, YYYY')}
+                      {editingCell?.txId === txId && editingCell?.field === 'date' ? (
+                        <input
+                          ref={editInputRef as React.RefObject<HTMLInputElement>}
+                          type="date"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => saveInlineEdit(tx, 'date')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveInlineEdit(tx, 'date');
+                            if (e.key === 'Escape') cancelInlineEdit(tx, 'date');
+                          }}
+                          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <span 
+                          onClick={() => startInlineEdit(tx, 'date')}
+                          className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded"
+                          title="Click to edit"
+                        >
+                          {dayjs.utc(tx.date).format('MMM D, YYYY')}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      <div className="font-medium">{tx.description}</div>
-                      {tx.merchant && tx.merchant !== tx.description && (
-                        <div className="text-gray-500 text-xs mt-1">{tx.merchant}</div>
+                      {editingCell?.txId === txId && editingCell?.field === 'description' ? (
+                        <input
+                          ref={editInputRef as React.RefObject<HTMLInputElement>}
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => saveInlineEdit(tx, 'description')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveInlineEdit(tx, 'description');
+                            if (e.key === 'Escape') cancelInlineEdit(tx, 'description');
+                          }}
+                          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <div 
+                          onClick={() => startInlineEdit(tx, 'description')}
+                          className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded"
+                          title="Click to edit"
+                        >
+                          <div className="font-medium truncate" title={tx.description}>{tx.description}</div>
+                          {tx.merchant && tx.merchant !== tx.description && (
+                            <div className="text-gray-500 text-xs mt-1 truncate" title={tx.merchant}>{tx.merchant}</div>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getCashflowBadge(tx.cashflow)}
+                      {editingCell?.txId === txId && editingCell?.field === 'cashflow' ? (
+                        <select
+                          ref={editInputRef as React.RefObject<HTMLSelectElement>}
+                          value={editValue}
+                          onChange={(e) => {
+                            const newVal = e.target.value;
+                            setEditValue(newVal);
+                            saveInlineEdit(tx, 'cashflow', newVal);
+                          }}
+                          onBlur={() => saveInlineEdit(tx, 'cashflow')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') cancelInlineEdit(tx, 'cashflow');
+                          }}
+                          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="income">income</option>
+                          <option value="expense">expense</option>
+                          <option value="other">other</option>
+                        </select>
+                      ) : (
+                        <span 
+                          onClick={() => startInlineEdit(tx, 'cashflow')}
+                          className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded inline-block"
+                          title="Click to edit"
+                        >
+                          {getCashflowBadge(tx.cashflow)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {tx.account || '-'}
+                      {editingCell?.txId === txId && editingCell?.field === 'account' ? (
+                        <select
+                          ref={editInputRef as React.RefObject<HTMLSelectElement>}
+                          value={editValue}
+                          onChange={(e) => {
+                            const newVal = e.target.value;
+                            setEditValue(newVal);
+                            saveInlineEdit(tx, 'account', newVal);
+                          }}
+                          onBlur={() => saveInlineEdit(tx, 'account')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') cancelInlineEdit(tx, 'account');
+                          }}
+                          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">-</option>
+                          {accounts.map(acc => (
+                            <option key={acc} value={acc}>{acc}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span 
+                          onClick={() => startInlineEdit(tx, 'account')}
+                          className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded truncate block"
+                          title={tx.account || 'Click to edit'}
+                        >
+                          {tx.account || '-'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {tx.category || '-'}
+                      {editingCell?.txId === txId && editingCell?.field === 'category' ? (
+                        <div className="relative">
+                          <select
+                            ref={editInputRef as React.RefObject<HTMLSelectElement>}
+                            value={editValue}
+                            onChange={(e) => {
+                              const newVal = e.target.value;
+                              if (newVal === '__ADD_NEW__') {
+                                const newCat = prompt('Enter new category name:');
+                                if (newCat && newCat.trim() && !categories.includes(newCat.trim())) {
+                                  setEditValue(newCat.trim());
+                                  saveInlineEdit(tx, 'category', newCat.trim());
+                                } else {
+                                  setEditValue('');
+                                }
+                              } else {
+                                setEditValue(newVal);
+                                saveInlineEdit(tx, 'category', newVal);
+                              }
+                            }}
+                            onBlur={() => saveInlineEdit(tx, 'category')}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') cancelInlineEdit(tx, 'category');
+                            }}
+                            className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">-</option>
+                            {categories.map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                            <option value="__ADD_NEW__" className="text-blue-600 font-medium">+ Add new category</option>
+                          </select>
+                        </div>
+                      ) : (
+                        <span 
+                          onClick={() => startInlineEdit(tx, 'category')}
+                          className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded truncate block"
+                          title={tx.category || 'Click to edit'}
+                        >
+                          {tx.category || '-'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {tx.label || '-'}
+                      {editingCell?.txId === txId && editingCell?.field === 'label' ? (
+                        <input
+                          ref={editInputRef as React.RefObject<HTMLInputElement>}
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => saveInlineEdit(tx, 'label')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveInlineEdit(tx, 'label');
+                            if (e.key === 'Escape') cancelInlineEdit(tx, 'label');
+                          }}
+                          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <span 
+                          onClick={() => startInlineEdit(tx, 'label')}
+                          className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded truncate block"
+                          title={tx.label || 'Click to edit'}
+                        >
+                          {tx.label || '-'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold">
-                      <span className={tx.amount >= 0 ? 'text-green-600' : 'text-red-600'}>
-                        {tx.amount >= 0 ? '+' : ''}${Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
+                      {editingCell?.txId === txId && editingCell?.field === 'amount' ? (
+                        <input
+                          ref={editInputRef as React.RefObject<HTMLInputElement>}
+                          type="number"
+                          step="0.01"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => saveInlineEdit(tx, 'amount')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveInlineEdit(tx, 'amount');
+                            if (e.key === 'Escape') cancelInlineEdit(tx, 'amount');
+                          }}
+                          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-right"
+                          placeholder="0.00"
+                        />
+                      ) : (
+                        <span 
+                          onClick={() => startInlineEdit(tx, 'amount')}
+                          className={`cursor-pointer hover:bg-blue-50 px-2 py-1 rounded inline-block ${tx.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                          title="Click to edit"
+                        >
+                          {tx.amount >= 0 ? '+' : ''}${Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
@@ -790,15 +1242,35 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </button>
-                      <button
-                        onClick={() => handleDeleteTransaction(tx.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+                      {deleteConfirmTxId === tx.id ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-red-700 font-medium">Delete?</span>
+                          <button
+                            onClick={handleDeleteTransactionConfirm}
+                            className="text-red-600 hover:text-red-900 font-medium text-xs"
+                            title="Confirm delete"
+                          >
+                            Yes
+                          </button>
+                          <button
+                            onClick={handleDeleteTransactionCancel}
+                            className="text-gray-600 hover:text-gray-900 font-medium text-xs"
+                            title="Cancel"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleDeleteTransactionClick(tx.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

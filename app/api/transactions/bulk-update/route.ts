@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { ensureTokenizedForAnalytics } from '@/lib/tokenization';
+import { logBulkEditEvent } from '@/lib/event-logger';
 
 // Force dynamic rendering (POST endpoint requires runtime request body)
 export const dynamic = 'force-dynamic';
@@ -20,7 +21,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const userId = payload.sub;
+    const userId = typeof payload.sub === 'number' ? payload.sub : parseInt(payload.sub, 10);
+    if (isNaN(userId)) {
+      return NextResponse.json({ error: 'Invalid user ID' }, { status: 401 });
+    }
+    
     const pool = getPool();
     if (!pool) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
@@ -40,6 +45,15 @@ export async function POST(request: NextRequest) {
     if (!transactionIds || !Array.isArray(transactionIds) || transactionIds.length === 0) {
       return NextResponse.json({ error: 'Transaction IDs array required' }, { status: 400 });
     }
+
+    // Convert transaction IDs to integers to ensure proper type casting
+    const numericTransactionIds = transactionIds.map((id: any) => {
+      const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+      if (isNaN(numId)) {
+        throw new Error(`Invalid transaction ID: ${id}`);
+      }
+      return numId;
+    });
 
     if (!updates || Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'Updates object required' }, { status: 400 });
@@ -75,19 +89,29 @@ export async function POST(request: NextRequest) {
     values.push(tokenizedUserId);
     const userIdParam = paramCount++;
 
-    // Add transaction IDs to values
-    values.push(transactionIds);
-    const idsParam = paramCount;
+    // Build WHERE clause for transaction IDs
+    // Use IN clause with individual parameters for better pg-mem compatibility
+    const idPlaceholders = numericTransactionIds.map((_, index) => {
+      values.push(numericTransactionIds[index]);
+      return `$${paramCount++}`;
+    }).join(', ');
 
     // Bulk update transactions in L1 fact table (only if they belong to the user)
+    // Use IN clause instead of ANY() for better compatibility with pg-mem
     const result = await pool.query(
       `UPDATE l1_transaction_facts 
        SET ${updateFields.join(', ')}
        WHERE tokenized_user_id = $${userIdParam} 
-         AND id = ANY($${idsParam})
+         AND id IN (${idPlaceholders})
        RETURNING id`,
       values
     );
+
+    // Log bulk edit event (count as single event, not per transaction)
+    if (result.rowCount && result.rowCount > 0) {
+      const fieldsUpdated = Object.keys(updates).filter(key => updates[key] !== undefined);
+      await logBulkEditEvent(userId, numericTransactionIds, fieldsUpdated, result.rowCount);
+    }
 
     return NextResponse.json({ 
       success: true, 

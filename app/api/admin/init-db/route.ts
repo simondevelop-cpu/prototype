@@ -85,33 +85,76 @@ async function initializeTables() {
     `);
     console.log('[DB Init] ✅ categorization_learning table created');
     
-    // Create user_events table for login and dashboard access tracking
+    // Create l1_events table for login and dashboard access tracking (renamed from user_events)
     await client.query(`
-      CREATE TABLE IF NOT EXISTS user_events (
+      CREATE TABLE IF NOT EXISTS l1_events (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        tokenized_user_id TEXT,
         event_type TEXT NOT NULL,
         event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         metadata JSONB,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        is_admin BOOLEAN DEFAULT FALSE,
+        session_id TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (tokenized_user_id) REFERENCES l0_user_tokenization(tokenized_user_id)
       )
     `);
-    console.log('[DB Init] ✅ user_events table created');
     
-    // Create indexes for user_events table
+    // Add session_id column if it doesn't exist (for existing tables)
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_user_events_user_id ON user_events(user_id)
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'l1_events' AND column_name = 'session_id'
+        ) THEN
+          ALTER TABLE l1_events ADD COLUMN session_id TEXT;
+        END IF;
+      END $$;
+    `);
+    
+    // Create index for session queries
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_l1_events_session_id 
+      ON l1_events(session_id) 
+      WHERE session_id IS NOT NULL;
+    `);
+    console.log('[DB Init] ✅ l1_events table created');
+    
+    // Populate tokenized_user_id for existing events
+    await client.query(`
+      UPDATE l1_events e
+      SET tokenized_user_id = ut.tokenized_user_id
+      FROM l0_user_tokenization ut
+      WHERE ut.internal_user_id = e.user_id
+        AND e.tokenized_user_id IS NULL
+    `);
+    
+    // Create index for analytics queries
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_l1_events_tokenized_user_id 
+      ON l1_events(tokenized_user_id) 
+      WHERE tokenized_user_id IS NOT NULL
+    `);
+    
+    // Create indexes for l1_events table
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_l1_events_user_id ON l1_events(user_id)
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_user_events_type ON user_events(event_type)
+      CREATE INDEX IF NOT EXISTS idx_l1_events_type ON l1_events(event_type)
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_user_events_timestamp ON user_events(event_timestamp)
+      CREATE INDEX IF NOT EXISTS idx_l1_events_timestamp ON l1_events(event_timestamp)
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_user_events_user_type ON user_events(user_id, event_type)
+      CREATE INDEX IF NOT EXISTS idx_l1_events_user_type ON l1_events(user_id, event_type)
     `);
-    console.log('[DB Init] ✅ user_events indexes created');
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_l1_events_is_admin ON l1_events(is_admin) WHERE is_admin = TRUE
+    `);
+    console.log('[DB Init] ✅ l1_events indexes created');
     
     // Create onboarding_responses table
     await client.query(`
@@ -137,12 +180,8 @@ async function initializeTables() {
         insight_preferences TEXT[],
         insight_other TEXT,
         
-        -- Q9: Account profile
-        first_name TEXT,
-        last_name TEXT,
-        date_of_birth DATE,
-        recovery_phone TEXT,
-        province_region TEXT,
+        -- Note: PII fields (first_name, last_name, date_of_birth, recovery_phone, province_region)
+        -- have been moved to l0_pii_users table for PII isolation
         
         -- Metadata
         last_step INTEGER DEFAULT 0,
@@ -152,6 +191,58 @@ async function initializeTables() {
       )
     `);
     console.log('[DB Init] ✅ onboarding_responses table created');
+    
+    // Create available_slots table for admin-managed booking availability
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS available_slots (
+        id SERIAL PRIMARY KEY,
+        slot_date DATE NOT NULL,
+        slot_time TIME NOT NULL,
+        is_available BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(slot_date, slot_time)
+      )
+    `);
+    console.log('[DB Init] ✅ available_slots table created');
+    
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_available_slots_date_time ON available_slots(slot_date, slot_time)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_available_slots_available ON available_slots(is_available)
+    `);
+    console.log('[DB Init] ✅ available_slots indexes created');
+    
+    // Create chat_bookings table for user bookings
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_bookings (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        booking_date DATE NOT NULL,
+        booking_time TIME NOT NULL,
+        preferred_method TEXT NOT NULL CHECK (preferred_method IN ('teams', 'google-meet', 'phone')),
+        share_screen BOOLEAN,
+        record_conversation BOOLEAN,
+        notes TEXT,
+          status TEXT DEFAULT 'requested' CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed')),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(booking_date, booking_time)
+      )
+    `);
+    console.log('[DB Init] ✅ chat_bookings table created');
+    
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_chat_bookings_user_id ON chat_bookings(user_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_chat_bookings_date_time ON chat_bookings(booking_date, booking_time)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_chat_bookings_status ON chat_bookings(status)
+    `);
+    console.log('[DB Init] ✅ chat_bookings indexes created');
     
     // Check if data exists
     const keywordCount = await client.query('SELECT COUNT(*) as count FROM admin_keywords');

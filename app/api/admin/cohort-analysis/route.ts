@@ -273,12 +273,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Get engagement metrics
-    // Check if user_events table exists
+    // Check if l1_events table exists
     let hasUserEvents = false;
     try {
       const eventsCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'user_events'
+        WHERE table_name = 'l1_events'
         LIMIT 1
       `);
       hasUserEvents = eventsCheck.rows.length > 0;
@@ -301,42 +301,44 @@ export async function GET(request: NextRequest) {
       // Column doesn't exist
     }
 
-    // Enhanced Engagement query with more metrics - from appropriate table
-    // Build upload_counts subquery based on schema
-    const uploadCountsSubquery = hasUploadSession ? `
-      SELECT user_id, COUNT(DISTINCT upload_session_id) as upload_count
-      FROM transactions
-      WHERE upload_session_id IS NOT NULL
-      GROUP BY user_id
-    ` : `
-      SELECT user_id, 0 as upload_count
-      FROM transactions
-      GROUP BY user_id
+    // Enhanced Engagement query - Single source of truth (l1_transaction_facts only)
+    // Build upload_counts subquery - use statement_upload events from l1_events (upload_session_id not in l1_transaction_facts)
+    const uploadCountsSubquery = `
+      SELECT 
+        ut.internal_user_id as user_id,
+        COUNT(DISTINCT tf.id) as upload_count
+      FROM users u
+      LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+      LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+      WHERE tf.id IS NOT NULL
+      GROUP BY ut.internal_user_id
     `;
     
     // Build unique banks subquery - extract bank name from account field
     // Account field format: "RBC Credit Card", "TD Chequing", "Scotiabank Savings", etc.
     const uniqueBanksSubquery = `
       SELECT 
-        user_id,
+        ut.internal_user_id as user_id,
         COUNT(DISTINCT 
           CASE 
-            WHEN account IS NOT NULL THEN
+            WHEN tf.account IS NOT NULL THEN
               CASE 
-                WHEN account ILIKE 'RBC%' THEN 'RBC'
-                WHEN account ILIKE 'TD%' OR account ILIKE 'Toronto-Dominion%' THEN 'TD'
-                WHEN account ILIKE 'Scotiabank%' OR account ILIKE 'Bank of Nova Scotia%' THEN 'Scotiabank'
-                WHEN account ILIKE 'BMO%' OR account ILIKE 'Bank of Montreal%' THEN 'BMO'
-                WHEN account ILIKE 'CIBC%' OR account ILIKE 'Canadian Imperial%' THEN 'CIBC'
-                WHEN account ILIKE 'Tangerine%' OR account ILIKE 'ING Direct%' THEN 'Tangerine'
+                WHEN tf.account ILIKE 'RBC%' THEN 'RBC'
+                WHEN tf.account ILIKE 'TD%' OR tf.account ILIKE 'Toronto-Dominion%' THEN 'TD'
+                WHEN tf.account ILIKE 'Scotiabank%' OR tf.account ILIKE 'Bank of Nova Scotia%' THEN 'Scotiabank'
+                WHEN tf.account ILIKE 'BMO%' OR tf.account ILIKE 'Bank of Montreal%' THEN 'BMO'
+                WHEN tf.account ILIKE 'CIBC%' OR tf.account ILIKE 'Canadian Imperial%' THEN 'CIBC'
+                WHEN tf.account ILIKE 'Tangerine%' OR tf.account ILIKE 'ING Direct%' THEN 'Tangerine'
                 ELSE NULL
               END
             ELSE NULL
           END
         ) as unique_bank_count
-      FROM transactions
-      WHERE account IS NOT NULL
-      GROUP BY user_id
+      FROM users u
+      LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+      LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+      WHERE tf.account IS NOT NULL
+      GROUP BY ut.internal_user_id
     `;
     
     const engagementQuery = useUsersTable ? `
@@ -344,7 +346,7 @@ export async function GET(request: NextRequest) {
         DATE_TRUNC('week', u.created_at) as signup_week,
         -- Onboarding and data coverage
         COUNT(DISTINCT u.id) FILTER (WHERE u.completed_at IS NOT NULL) as onboarding_completed,
-        COUNT(DISTINCT t.user_id) FILTER (WHERE t.id IS NOT NULL) as uploaded_first_statement,
+        COUNT(DISTINCT CASE WHEN tf.id IS NOT NULL THEN u.id END) as uploaded_first_statement,
         COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 2 THEN upload_counts.user_id END) as uploaded_two_statements,
         COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 3 THEN upload_counts.user_id END) as uploaded_three_plus_statements,
         -- Unique banks metrics
@@ -363,7 +365,8 @@ export async function GET(request: NextRequest) {
         AVG(transaction_counts.tx_count) FILTER (WHERE transaction_counts.tx_count > 0) as avg_transactions_per_user,
         COUNT(DISTINCT CASE WHEN transaction_counts.tx_count > 0 THEN u.id END) as users_with_transactions
       FROM users u
-      LEFT JOIN transactions t ON t.user_id = u.id
+      LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+      LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
       LEFT JOIN (
         ${uploadCountsSubquery}
       ) upload_counts ON upload_counts.user_id = u.id
@@ -371,14 +374,24 @@ export async function GET(request: NextRequest) {
         ${uniqueBanksSubquery}
       ) bank_counts ON bank_counts.user_id = u.id
       LEFT JOIN (
-        SELECT user_id, MIN(created_at) as first_transaction_date
-        FROM transactions
-        GROUP BY user_id
+        SELECT 
+          ut.internal_user_id as user_id,
+          MIN(tf.created_at) as first_transaction_date
+        FROM users u2
+        LEFT JOIN l0_user_tokenization ut ON u2.id = ut.internal_user_id
+        LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+        WHERE tf.id IS NOT NULL
+        GROUP BY ut.internal_user_id
       ) first_upload ON first_upload.user_id = u.id
       LEFT JOIN (
-        SELECT user_id, COUNT(*) as tx_count
-        FROM transactions
-        GROUP BY user_id
+        SELECT 
+          ut.internal_user_id as user_id,
+          COUNT(*) as tx_count
+        FROM users u2
+        LEFT JOIN l0_user_tokenization ut ON u2.id = ut.internal_user_id
+        LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+        WHERE tf.id IS NOT NULL
+        GROUP BY ut.internal_user_id
       ) transaction_counts ON transaction_counts.user_id = u.id
       WHERE u.email != $${paramIndex}
         ${filterConditions}
@@ -392,7 +405,7 @@ export async function GET(request: NextRequest) {
           SELECT 1 FROM onboarding_responses o 
           WHERE o.user_id = u.id AND o.completed_at IS NOT NULL
         )) as onboarding_completed,
-        COUNT(DISTINCT t.user_id) FILTER (WHERE t.id IS NOT NULL) as uploaded_first_statement,
+        COUNT(DISTINCT CASE WHEN tf.id IS NOT NULL THEN u.id END) as uploaded_first_statement,
         0 as uploaded_two_statements,
         0 as uploaded_three_plus_statements,
         0 as uploaded_more_than_one_bank,
@@ -402,7 +415,8 @@ export async function GET(request: NextRequest) {
         NULL as avg_transactions_per_user,
         0 as users_with_transactions
       FROM users u
-      LEFT JOIN transactions t ON t.user_id = u.id
+      LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+      LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
       WHERE u.email != $${paramIndex}
         ${filterConditions}
       GROUP BY DATE_TRUNC('week', u.created_at)
@@ -410,12 +424,12 @@ export async function GET(request: NextRequest) {
       LIMIT 12
     `;
 
-    // Check if user_events table exists for engagement metrics
+    // Check if l1_events table exists for engagement metrics
     let hasUserEventsTable = false;
     try {
       const eventsTableCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'user_events'
+        WHERE table_name = 'l1_events'
         LIMIT 1
       `);
       hasUserEventsTable = eventsTableCheck.rows.length > 0;
@@ -439,7 +453,7 @@ export async function GET(request: NextRequest) {
       engagementResult = { rows: [] };
     }
 
-    // Get user_events data if table exists
+    // Get l1_events data if table exists
     let userEventsData: any = {};
     if (hasUserEventsTable) {
       try {
@@ -448,19 +462,20 @@ export async function GET(request: NextRequest) {
           SELECT 
             DATE_TRUNC('week', u.created_at) as signup_week,
             COUNT(DISTINCT CASE 
-              WHEN ue.created_at >= u.created_at 
-              AND ue.created_at < u.created_at + INTERVAL '7 days'
+              WHEN ue.event_timestamp >= u.created_at 
+              AND ue.event_timestamp < u.created_at + INTERVAL '7 days'
               AND ue.event_type = 'login' 
-              THEN DATE(ue.created_at) 
+              THEN DATE(ue.event_timestamp) 
             END) as unique_login_days_week_0,
             COUNT(DISTINCT CASE 
-              WHEN ue.created_at >= u.created_at + INTERVAL '7 days'
-              AND ue.created_at < u.created_at + INTERVAL '14 days'
+              WHEN ue.event_timestamp >= u.created_at + INTERVAL '7 days'
+              AND ue.event_timestamp < u.created_at + INTERVAL '14 days'
               AND ue.event_type = 'login' 
-              THEN DATE(ue.created_at) 
+              THEN DATE(ue.event_timestamp) 
             END) as unique_login_days_week_1
           FROM users u
-          LEFT JOIN user_events ue ON ue.user_id = u.id
+          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          LEFT JOIN l1_events ue ON ue.tokenized_user_id = ut.tokenized_user_id
           WHERE u.email != $${paramIndex}
             ${filterConditions}
           GROUP BY DATE_TRUNC('week', u.created_at)
@@ -474,7 +489,7 @@ export async function GET(request: NextRequest) {
           }
         });
       } catch (e) {
-        // Could not fetch user_events data
+        // Could not fetch l1_events data
       }
     }
 

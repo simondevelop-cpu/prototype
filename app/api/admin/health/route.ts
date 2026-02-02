@@ -212,6 +212,7 @@ async function checkAPIEndpoints(): Promise<HealthCheck> {
       '/api/transactions',
       '/api/onboarding',
       '/api/admin/health',
+      '/api/consent',
     ];
 
     // Note: We can't actually test if routes exist without making HTTP requests
@@ -236,6 +237,78 @@ async function checkAPIEndpoints(): Promise<HealthCheck> {
       description: 'Verifies critical API endpoints are accessible',
       status: 'warning',
       message: `Could not verify endpoints: ${error.message}`,
+      details: error.message,
+      responseTimeMs: Date.now() - startTime,
+    };
+  }
+}
+
+async function checkConsentEvents(): Promise<HealthCheck> {
+  const startTime = Date.now();
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return {
+        name: 'Consent Events',
+        description: 'Verifies consent events are being logged in l1_events',
+        status: 'fail',
+        message: 'Database pool not available',
+        responseTimeMs: Date.now() - startTime,
+      };
+    }
+
+    // Check if l1_events table exists
+    const tableCheck = await pool.query(`
+      SELECT 1 
+      FROM information_schema.tables 
+      WHERE table_name = 'l1_events'
+      LIMIT 1
+    `);
+
+    if (tableCheck.rows.length === 0) {
+      return {
+        name: 'Consent Events',
+        description: 'Verifies consent events are being logged in l1_events',
+        status: 'warning',
+        message: 'l1_events table does not exist yet. Consent events will appear after migration and first usage.',
+        responseTimeMs: Date.now() - startTime,
+      };
+    }
+
+    const result = await pool.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE event_type = 'consent') AS total_consent_events,
+        COUNT(*) FILTER (WHERE event_type = 'consent' AND metadata->>'consentType' = 'account_creation') AS account_creation_events,
+        COUNT(*) FILTER (WHERE event_type = 'consent' AND metadata->>'consentType' = 'cookie_banner') AS cookie_banner_events,
+        COUNT(*) FILTER (WHERE event_type = 'consent' AND metadata->>'consentType' = 'first_upload') AS first_upload_events
+      FROM l1_events
+    `);
+
+    const row = result.rows[0] || {};
+    const totalConsent = parseInt(row.total_consent_events || '0', 10);
+    const status: HealthCheck['status'] = totalConsent === 0 ? 'warning' : 'pass';
+
+    return {
+      name: 'Consent Events',
+      description: 'Verifies consent events (account creation, cookies, first upload) are being logged',
+      status,
+      message: totalConsent === 0
+        ? 'No consent events recorded yet in l1_events. This may be expected in a brand-new environment.'
+        : `Consent events recorded: ${totalConsent} total`,
+      details: {
+        totalConsentEvents: totalConsent,
+        accountCreationEvents: parseInt(row.account_creation_events || '0', 10),
+        cookieBannerEvents: parseInt(row.cookie_banner_events || '0', 10),
+        firstUploadEvents: parseInt(row.first_upload_events || '0', 10),
+      },
+      responseTimeMs: Date.now() - startTime,
+    };
+  } catch (error: any) {
+    return {
+      name: 'Consent Events',
+      description: 'Verifies consent events are being logged in l1_events',
+      status: 'warning',
+      message: `Consent events check failed: ${error.message}`,
       details: error.message,
       responseTimeMs: Date.now() - startTime,
     };
@@ -668,20 +741,20 @@ async function checkDataFlowVerification(): Promise<HealthCheck> {
       }
     }
 
-    // 2. Check that user_events table exists (for engagement tracking)
+    // 2. Check that l1_events table exists (for engagement tracking)
     try {
       const userEventsCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'user_events'
+        WHERE table_name = 'l1_events'
         LIMIT 1
       `);
-      checks['user_events_exists'] = userEventsCheck.rows.length > 0;
+      checks['l1_events_exists'] = userEventsCheck.rows.length > 0;
       if (userEventsCheck.rows.length === 0) {
-        issues.push('user_events table does not exist (run /api/admin/init-db to create it)');
+        issues.push('l1_events table does not exist (run /api/admin/init-db to create it)');
       }
     } catch (e) {
-      checks['user_events_exists'] = false;
-      issues.push(`Could not check user_events table: ${(e as Error).message}`);
+      checks['l1_events_exists'] = false;
+      issues.push(`Could not check l1_events table: ${(e as Error).message}`);
     }
 
     // 3. Check that analytics endpoints can read from source tables
@@ -855,6 +928,7 @@ export async function GET() {
       checkDatabasePerformance(),
       checkSchemaTables(),
       checkAPIEndpoints(),
+      checkConsentEvents(),
     ]);
 
     // App Health / Operational Correctness

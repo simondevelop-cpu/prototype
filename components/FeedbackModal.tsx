@@ -16,8 +16,22 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
   const [learnMore, setLearnMore] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   if (!isOpen) return null;
+
+  // Count words in text
+  const countWords = (text: string): number => {
+    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+  };
+
+  // Handle text input with word limit
+  const handleTextChange = (setter: (value: string) => void, currentValue: string, newValue: string) => {
+    const wordCount = countWords(newValue);
+    if (wordCount <= 250) {
+      setter(newValue);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,17 +64,21 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
         throw new Error(result.error || 'Failed to submit feedback');
       }
 
-      // Reset form
-      setUsefulness(null);
-      setTrust(null);
-      setProblems('');
-      setLearnMore('');
+      // Show success message
+      setShowSuccess(true);
       
-      if (onSubmitSuccess) {
-        onSubmitSuccess();
-      }
-      
-      onClose();
+      // Reset form after a delay
+      setTimeout(() => {
+        setUsefulness(null);
+        setTrust(null);
+        setProblems('');
+        setLearnMore('');
+        setShowSuccess(false);
+        if (onSubmitSuccess) {
+          onSubmitSuccess();
+        }
+        onClose();
+      }, 3000);
     } catch (err: any) {
       setError(err.message || 'Failed to submit feedback. Please try again.');
     } finally {
@@ -82,13 +100,13 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
     return (
       <div className="space-y-3">
         <label className="block text-sm font-medium text-gray-700">{label}</label>
-        <div className="flex items-start gap-2">
+        <div className="flex items-stretch gap-2">
           {[1, 2, 3, 4, 5].map((num) => (
             <button
               key={num}
               type="button"
               onClick={() => onChange(num)}
-              className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${
+              className={`flex-1 flex flex-col items-center justify-center gap-2 p-3 rounded-lg border-2 transition-all min-h-[60px] ${
                 value === num
                   ? 'bg-blue-50 border-blue-500 shadow-md'
                   : 'bg-white border-gray-200 hover:border-blue-300 hover:bg-blue-50'
@@ -109,11 +127,11 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">Feedback</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Thanks in advance for helping us improve the App!</h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
-              disabled={submitting}
+              disabled={submitting || showSuccess}
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -122,6 +140,13 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
           </div>
         </div>
 
+        {showSuccess ? (
+          <div className="p-6 text-center">
+            <div className="bg-green-50 border border-green-200 text-green-700 px-6 py-4 rounded-lg">
+              <p className="text-lg font-medium">Feedback collected. Thank you for taking the time to help us improve the App!</p>
+            </div>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -150,11 +175,21 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
             <textarea
               id="problems"
               value={problems}
-              onChange={(e) => setProblems(e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              onChange={(e) => handleTextChange(setProblems, problems, e.target.value)}
+              rows={2}
+              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-none overflow-y-auto ${
+                countWords(problems) >= 250 ? 'border-red-300' : 'border-gray-300'
+              }`}
               placeholder="Let us know about any issues..."
             />
+            <div className="flex justify-between items-center mt-1">
+              {countWords(problems) >= 250 && (
+                <p className="text-xs text-red-600">250 word maximum</p>
+              )}
+              <div className={`text-xs ml-auto ${countWords(problems) >= 250 ? 'text-red-600' : 'text-gray-500'}`}>
+                {countWords(problems)} / 250 words
+              </div>
+            </div>
           </div>
 
           <div>
@@ -164,11 +199,21 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
             <textarea
               id="learnMore"
               value={learnMore}
-              onChange={(e) => setLearnMore(e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              onChange={(e) => handleTextChange(setLearnMore, learnMore, e.target.value)}
+              rows={2}
+              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-none overflow-y-auto ${
+                countWords(learnMore) >= 250 ? 'border-red-300' : 'border-gray-300'
+              }`}
               placeholder="Share your thoughts..."
             />
+            <div className="flex justify-between items-center mt-1">
+              {countWords(learnMore) >= 250 && (
+                <p className="text-xs text-red-600">250 word maximum</p>
+              )}
+              <div className={`text-xs ml-auto ${countWords(learnMore) >= 250 ? 'text-red-600' : 'text-gray-500'}`}>
+                {countWords(learnMore)} / 250 words
+              </div>
+            </div>
           </div>
 
           <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
@@ -189,6 +234,7 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

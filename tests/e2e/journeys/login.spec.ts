@@ -14,7 +14,7 @@ test.describe('Login Flow', () => {
     await page.goto('/admin/login');
     
     // Check that page loaded
-    await expect(page).toHaveTitle(/Canadian Insights|Login/i);
+    await expect(page).toHaveTitle(/Hummingbird Finance|Login/i);
     
     // Check for email input field
     const emailInput = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i]');

@@ -4,15 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import { ADMIN_EMAIL, JWT_SECRET } from '@/lib/admin-constants';
+import { getPool } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
-
-const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL,
-});
 
 interface VanityFilters {
   totalAccounts?: boolean;
@@ -39,6 +35,11 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    const pool = getPool();
+    if (!pool) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
     // Parse query parameters
@@ -108,7 +109,22 @@ export async function GET(request: NextRequest) {
     const adminEmailParamIndex = paramIndex;
     paramIndex++;
 
-    // Find the earliest user creation date to start from
+    // Use the same week calculation as cohort analysis
+    // Helper function to format week consistently (adjust PostgreSQL Monday-start to Sunday-start for display)
+    const formatWeekLabel = (weekDate: any): string => {
+      if (!weekDate) return '';
+      const weekStart = new Date(weekDate);
+      const dayOfWeek = weekStart.getDay();
+      const adjustedWeekStart = new Date(weekStart);
+      if (dayOfWeek !== 0) {
+        adjustedWeekStart.setDate(weekStart.getDate() - dayOfWeek);
+      }
+      adjustedWeekStart.setHours(0, 0, 0, 0);
+      return `w/c ${adjustedWeekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    };
+
+    // Generate all weeks from earliest user to current week (same week calculation as cohort analysis)
+    // Find the earliest user creation date
     const earliestUserCheck = await pool.query(`
       SELECT MIN(created_at) as earliest_date
       FROM users
@@ -116,41 +132,62 @@ export async function GET(request: NextRequest) {
     `, [ADMIN_EMAIL]);
     
     const earliestDateStr = earliestUserCheck.rows[0]?.earliest_date;
-    let weekStartDate: Date;
+    let earliestWeekStart: Date;
     
     if (earliestDateStr) {
-      // Start from the earliest user's creation date (rounded to start of week)
-      weekStartDate = new Date(earliestDateStr);
-      // Round to start of week (Sunday)
-      const dayOfWeek = weekStartDate.getDay();
-      weekStartDate.setDate(weekStartDate.getDate() - dayOfWeek);
-      weekStartDate.setHours(0, 0, 0, 0);
+      // Use DATE_TRUNC to get the week start (Monday in PostgreSQL)
+      const earliestWeekResult = await pool.query(`
+        SELECT DATE_TRUNC('week', $1::timestamp) as week_start
+      `, [earliestDateStr]);
+      earliestWeekStart = new Date(earliestWeekResult.rows[0].week_start);
     } else {
       // Fallback: if no users, start from 12 weeks ago
-      weekStartDate = new Date();
-      weekStartDate.setDate(weekStartDate.getDate() - (12 * 7));
-      weekStartDate.setDate(weekStartDate.getDate() - weekStartDate.getDay()); // Round to Sunday
-      weekStartDate.setHours(0, 0, 0, 0);
+      earliestWeekStart = new Date();
+      earliestWeekStart.setDate(earliestWeekStart.getDate() - (12 * 7));
+      const dayOfWeek = earliestWeekStart.getDay();
+      earliestWeekStart.setDate(earliestWeekStart.getDate() - dayOfWeek);
+      earliestWeekStart.setHours(0, 0, 0, 0);
     }
 
-    // Calculate weeks from earliest user to current week
+    // Get current week start using DATE_TRUNC
     const now = new Date();
-    const currentWeekStart = new Date(now);
-    currentWeekStart.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
-    currentWeekStart.setHours(0, 0, 0, 0);
+    const currentWeekResult = await pool.query(`
+      SELECT DATE_TRUNC('week', $1::timestamp) as week_start
+    `, [now]);
+    const currentWeekStart = new Date(currentWeekResult.rows[0].week_start);
 
-    // Calculate number of weeks
-    const weeksDiff = Math.ceil((currentWeekStart.getTime() - weekStartDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
-    const numWeeks = Math.max(1, weeksDiff + 1); // At least 1 week
-
-    // Generate all possible weeks
-    const allWeeks: string[] = [];
-    for (let i = 0; i < numWeeks; i++) {
-      const weekStart = new Date(weekStartDate);
-      weekStart.setDate(weekStartDate.getDate() + (i * 7));
-      const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-      allWeeks.push(weekLabel);
+    // Generate all weeks from earliest to current
+    const weeksSet = new Set<string>();
+    const weekDate = new Date(earliestWeekStart);
+    while (weekDate <= currentWeekStart) {
+      weeksSet.add(formatWeekLabel(weekDate));
+      weekDate.setDate(weekDate.getDate() + 7);
     }
+    
+    // Sort weeks (most recent first) and ensure unique
+    const allWeeks = Array.from(weeksSet).sort((a, b) => {
+      // Parse dates more carefully - handle format "DD MMM YYYY" (e.g., "20 Oct 2025")
+      const parseWeekDate = (weekStr: string): Date | null => {
+        const match = weekStr.match(/w\/c (\d+) (\w+) (\d+)/);
+        if (match) {
+          const day = parseInt(match[1]);
+          const monthName = match[2];
+          const year = parseInt(match[3]);
+          const monthMap: { [key: string]: number } = {
+            'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+            'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+          };
+          const month = monthMap[monthName] ?? 0;
+          return new Date(year, month, day);
+        }
+        return null;
+      };
+      
+      const dateA = parseWeekDate(a);
+      const dateB = parseWeekDate(b);
+      if (!dateA || !dateB) return 0;
+      return dateB.getTime() - dateA.getTime(); // Most recent first
+    });
     
     // Filter weeks based on cohort filter (if specified)
     // If cohorts filter is empty, show all weeks
@@ -158,17 +195,36 @@ export async function GET(request: NextRequest) {
       ? allWeeks.filter(week => filters.cohorts!.includes(week))
       : allWeeks;
 
+    // Helper function to parse week label back to dates
+    const parseWeekLabel = (weekStr: string): { weekStart: Date; weekEnd: Date } | null => {
+      const match = weekStr.match(/w\/c (\d+) (\w+) (\d+)/);
+      if (match) {
+        const day = parseInt(match[1]);
+        const monthName = match[2];
+        const year = parseInt(match[3]);
+        const monthMap: { [key: string]: number } = {
+          'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+          'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+        };
+        const month = monthMap[monthName] ?? 0;
+        const weekStart = new Date(year, month, day);
+        weekStart.setHours(0, 0, 0, 0);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+        return { weekStart, weekEnd };
+      }
+      return null;
+    };
+
     // Get metrics for each week (only for weeks that should be displayed)
     const metrics: { [week: string]: any } = {};
 
-    for (let i = 0; i < numWeeks; i++) {
-      const weekStart = new Date(weekStartDate);
-      weekStart.setDate(weekStartDate.getDate() + (i * 7));
-      weekStart.setHours(0, 0, 0, 0);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
-      const weekKey = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    for (const weekKey of weeks) {
+      const weekDates = parseWeekLabel(weekKey);
+      if (!weekDates) continue;
+      
+      const { weekStart, weekEnd } = weekDates;
 
       // Total users (cumulative up to end of week)
       // Use DATE_TRUNC to ensure we're comparing dates correctly
@@ -186,9 +242,10 @@ export async function GET(request: NextRequest) {
       // Apply data coverage filter to total users if specified
       if (filters.dataCoverage && filters.dataCoverage.length > 0 && totalUsers > 0) {
         const usersWithCoverageQuery = `
-          SELECT u.id, COUNT(DISTINCT t.id) as tx_count
+          SELECT u.id, COUNT(DISTINCT tf.id) as tx_count
           FROM users u
-          LEFT JOIN transactions t ON t.user_id = u.id
+          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
           WHERE u.email != $${adminEmailParamIndex}
             AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex}::date)
             ${filterConditions}
@@ -205,30 +262,33 @@ export async function GET(request: NextRequest) {
       }
 
       // Weekly Active Users (users who logged in during the week)
-      // Check if user_events table exists
+      // Check if l1_events table exists
       let wau = 0;
       try {
         const eventsCheck = await pool.query(`
           SELECT 1 FROM information_schema.tables 
-          WHERE table_name = 'user_events'
+          WHERE table_name = 'l1_events'
           LIMIT 1
         `);
         if (eventsCheck.rows.length > 0) {
+          // Build WAU query with correct parameter order
+          // filterParams come first, then weekStart and weekEnd
+          const wauParamIndex = filterParams.length + 1;
           const wauQuery = `
             SELECT COUNT(DISTINCT e.user_id) as count
-            FROM user_events e
+            FROM l1_events e
             JOIN users u ON u.id = e.user_id
             WHERE e.event_type = 'login'
-              AND e.event_timestamp >= $${paramIndex}::timestamp
-              AND e.event_timestamp <= $${paramIndex + 1}::timestamp
+              AND e.event_timestamp >= $${wauParamIndex}::timestamp
+              AND e.event_timestamp <= $${wauParamIndex + 1}::timestamp
               AND u.email != $${adminEmailParamIndex}
               ${filterConditions}
           `;
-          const wauResult = await pool.query(wauQuery, [weekStart, weekEnd, ...filterParams]);
+          const wauResult = await pool.query(wauQuery, [...filterParams, weekStart, weekEnd]);
           wau = parseInt(wauResult.rows[0]?.count) || 0;
         }
       } catch (e) {
-        // user_events table doesn't exist, WAU = 0
+        // l1_events table doesn't exist, WAU = 0
       }
 
       // New users per week - use DATE_TRUNC to ensure proper date comparison
@@ -246,9 +306,10 @@ export async function GET(request: NextRequest) {
       // Apply data coverage filter to new users if specified
       if (filters.dataCoverage && filters.dataCoverage.length > 0 && newUsers > 0) {
         const newUsersWithCoverageQuery = `
-          SELECT u.id, COUNT(DISTINCT t.id) as tx_count
+          SELECT u.id, COUNT(DISTINCT tf.id) as tx_count
           FROM users u
-          LEFT JOIN transactions t ON t.user_id = u.id
+          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
           WHERE u.email != $${adminEmailParamIndex}
             AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
             AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
@@ -266,29 +327,31 @@ export async function GET(request: NextRequest) {
       }
 
       // New transactions uploaded (in the week) - apply data coverage filter if specified
-      // filterParams length tells us how many params are already in the array
-      // weekStart and weekEnd will be at positions filterParams.length and filterParams.length+1
-      const newTransactionsParamIndex = filterParams.length;
+      // filterParams already includes ADMIN_EMAIL and any filter params
+      // weekStart and weekEnd will be appended, so they're at positions filterParams.length + 1 and filterParams.length + 2
+      const newTransactionsDateParamIndex = filterParams.length + 1;
       let newTransactionsQuery = `
         SELECT COUNT(*) as count
-        FROM transactions t
-        JOIN users u ON u.id = t.user_id
+        FROM l1_transaction_facts tf
+        JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
+        JOIN users u ON ut.internal_user_id = u.id
         WHERE u.email != $${adminEmailParamIndex}
-          AND t.created_at >= $${newTransactionsParamIndex + 1}::timestamp
-          AND t.created_at <= $${newTransactionsParamIndex + 2}::timestamp
+          AND tf.created_at >= $${newTransactionsDateParamIndex}::timestamp
+          AND tf.created_at <= $${newTransactionsDateParamIndex + 1}::timestamp
           ${filterConditions}
       `;
       let newTransactions = 0;
       
       // Total transactions uploaded (cumulative up to end of week) - apply data coverage filter if specified
-      // weekEnd will be at position filterParams.length
-      const totalTransactionsParamIndex = filterParams.length;
+      // weekEnd will be appended to filterParams, so it's at position filterParams.length + 1
+      const totalTransactionsDateParamIndex = filterParams.length + 1;
       let totalTransactionsQuery = `
         SELECT COUNT(*) as count
-        FROM transactions t
-        JOIN users u ON u.id = t.user_id
+        FROM l1_transaction_facts tf
+        JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
+        JOIN users u ON ut.internal_user_id = u.id
         WHERE u.email != $${adminEmailParamIndex}
-          AND t.created_at <= $${totalTransactionsParamIndex + 1}::timestamp
+          AND tf.created_at <= $${totalTransactionsDateParamIndex}::timestamp
           ${filterConditions}
       `;
       let totalTransactions = 0;
@@ -299,24 +362,26 @@ export async function GET(request: NextRequest) {
         const usersWithCoverageQuery = `
           SELECT DISTINCT u.id
           FROM users u
-          LEFT JOIN transactions t2 ON t2.user_id = u.id
+          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
           WHERE u.email != $${adminEmailParamIndex}
             ${filterConditions}
           GROUP BY u.id
           HAVING 
-            ${filters.dataCoverage.includes('1 upload') ? 'COUNT(DISTINCT t2.id) >= 1' : 'false'}
-            ${filters.dataCoverage.includes('2 uploads') ? 'OR COUNT(DISTINCT t2.id) >= 2' : ''}
-            ${filters.dataCoverage.includes('3+ uploads') ? 'OR COUNT(DISTINCT t2.id) >= 3' : ''}
+            ${filters.dataCoverage.includes('1 upload') ? 'COUNT(DISTINCT tf.id) >= 1' : 'false'}
+            ${filters.dataCoverage.includes('2 uploads') ? 'OR COUNT(DISTINCT tf.id) >= 2' : ''}
+            ${filters.dataCoverage.includes('3+ uploads') ? 'OR COUNT(DISTINCT tf.id) >= 3' : ''}
         `;
         const usersWithCoverage = await pool.query(usersWithCoverageQuery, filterParams);
         const userIds = usersWithCoverage.rows.map((r: any) => r.id);
         if (userIds.length > 0) {
           const filteredNewTransactionsQuery = `
             SELECT COUNT(*) as count
-            FROM transactions t
-            WHERE t.user_id = ANY($1::int[])
-              AND t.created_at >= $2::timestamp
-              AND t.created_at <= $3::timestamp
+            FROM l1_transaction_facts tf
+            JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
+            WHERE ut.internal_user_id = ANY($1::int[])
+              AND tf.created_at >= $2::timestamp
+              AND tf.created_at <= $3::timestamp
           `;
           const filteredResult = await pool.query(filteredNewTransactionsQuery, [userIds, weekStart.toISOString(), weekEnd.toISOString()]);
           newTransactions = parseInt(filteredResult.rows[0]?.count) || 0;
@@ -335,23 +400,25 @@ export async function GET(request: NextRequest) {
         const usersWithCoverageQuery = `
           SELECT DISTINCT u.id
           FROM users u
-          LEFT JOIN transactions t2 ON t2.user_id = u.id
+          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
           WHERE u.email != $${adminEmailParamIndex}
             ${filterConditions}
           GROUP BY u.id
           HAVING 
-            ${filters.dataCoverage.includes('1 upload') ? 'COUNT(DISTINCT t2.id) >= 1' : 'false'}
-            ${filters.dataCoverage.includes('2 uploads') ? 'OR COUNT(DISTINCT t2.id) >= 2' : ''}
-            ${filters.dataCoverage.includes('3+ uploads') ? 'OR COUNT(DISTINCT t2.id) >= 3' : ''}
+            ${filters.dataCoverage.includes('1 upload') ? 'COUNT(DISTINCT tf.id) >= 1' : 'false'}
+            ${filters.dataCoverage.includes('2 uploads') ? 'OR COUNT(DISTINCT tf.id) >= 2' : ''}
+            ${filters.dataCoverage.includes('3+ uploads') ? 'OR COUNT(DISTINCT tf.id) >= 3' : ''}
         `;
         const usersWithCoverage = await pool.query(usersWithCoverageQuery, filterParams);
         const userIds = usersWithCoverage.rows.map((r: any) => r.id);
         if (userIds.length > 0) {
           const filteredTotalTransactionsQuery = `
             SELECT COUNT(*) as count
-            FROM transactions t
-            WHERE t.user_id = ANY($1::int[])
-              AND t.created_at <= $2::timestamp
+            FROM l1_transaction_facts tf
+            JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
+            WHERE ut.internal_user_id = ANY($1::int[])
+              AND tf.created_at <= $2::timestamp
           `;
           const filteredResult = await pool.query(filteredTotalTransactionsQuery, [userIds, weekEnd.toISOString()]);
           totalTransactions = parseInt(filteredResult.rows[0]?.count) || 0;
@@ -364,13 +431,14 @@ export async function GET(request: NextRequest) {
 
       // Total unique banks uploaded (in the week)
       const banksQuery = `
-        SELECT COUNT(DISTINCT t.account) as count
-        FROM transactions t
-        JOIN users u ON u.id = t.user_id
+        SELECT COUNT(DISTINCT tf.account) as count
+        FROM l1_transaction_facts tf
+        JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
+        JOIN users u ON ut.internal_user_id = u.id
         WHERE u.email != $${adminEmailParamIndex}
-          AND t.created_at >= $${paramIndex}::timestamp
-          AND t.created_at <= $${paramIndex + 1}::timestamp
-          AND t.account IS NOT NULL
+          AND tf.created_at >= $${paramIndex}::timestamp
+          AND tf.created_at <= $${paramIndex + 1}::timestamp
+          AND tf.account IS NOT NULL
           ${filterConditions}
       `;
       const banksResult = await pool.query(banksQuery, [...filterParams, weekStart, weekEnd]);
@@ -381,7 +449,7 @@ export async function GET(request: NextRequest) {
       try {
         const eventsCheck = await pool.query(`
           SELECT 1 FROM information_schema.tables 
-          WHERE table_name = 'user_events'
+          WHERE table_name = 'l1_events'
           LIMIT 1
         `);
         if (eventsCheck.rows.length > 0) {
@@ -394,21 +462,24 @@ export async function GET(request: NextRequest) {
           monthEnd.setDate(0); // Last day of month
           monthEnd.setHours(23, 59, 59, 999);
           
+          // Build MAU query with correct parameter order
+          // filterParams come first, then monthStart and monthEnd
+          const mauParamIndex = filterParams.length + 1;
           const mauQuery = `
             SELECT COUNT(DISTINCT e.user_id) as count
-            FROM user_events e
+            FROM l1_events e
             JOIN users u ON u.id = e.user_id
             WHERE e.event_type = 'login'
-              AND e.event_timestamp >= $${paramIndex}::timestamp
-              AND e.event_timestamp <= $${paramIndex + 1}::timestamp
+              AND e.event_timestamp >= $${mauParamIndex}::timestamp
+              AND e.event_timestamp <= $${mauParamIndex + 1}::timestamp
               AND u.email != $${adminEmailParamIndex}
               ${filterConditions}
           `;
-          const mauResult = await pool.query(mauQuery, [monthStart, monthEnd, ...filterParams]);
+          const mauResult = await pool.query(mauQuery, [...filterParams, monthStart, monthEnd]);
           mau = parseInt(mauResult.rows[0]?.count) || 0;
         }
       } catch (e) {
-        // user_events table doesn't exist, MAU = 0
+        // l1_events table doesn't exist, MAU = 0
       }
 
       // New users per month - users who signed up in the month containing this week
@@ -431,29 +502,101 @@ export async function GET(request: NextRequest) {
       const newUsersPerMonthResult = await pool.query(newUsersPerMonthQuery, [...filterParams, monthStart.toISOString().split('T')[0], monthEnd.toISOString().split('T')[0]]);
       const newUsersPerMonth = parseInt(newUsersPerMonthResult.rows[0]?.count) || 0;
 
-      // Total transactions recategorised (from categorization_learning table)
+      // Total transactions recategorised (unique transactions with at least one edit)
+      // Count distinct transaction IDs from transaction_edit and bulk_edit events
       let totalTransactionsRecategorised = 0;
       try {
-        const recatCheck = await pool.query(`
+        const eventsCheck = await pool.query(`
           SELECT 1 FROM information_schema.tables 
-          WHERE table_name = 'categorization_learning'
+          WHERE table_name = 'l1_events'
           LIMIT 1
         `);
-        if (recatCheck.rows.length > 0) {
-          const recatQuery = `
-            SELECT COUNT(*) as count
-            FROM categorization_learning cl
-            JOIN users u ON u.id = cl.user_id
-            WHERE u.email != $${adminEmailParamIndex}
-              AND cl.created_at >= $${paramIndex}::timestamp
-              AND cl.created_at <= $${paramIndex + 1}::timestamp
+        if (eventsCheck.rows.length > 0) {
+          // Get all transaction_edit events (single transaction per event)
+          const recatParamIndex = filterParams.length + 1;
+          const singleEditQuery = `
+            SELECT DISTINCT (e.metadata->>'transactionId')::int as transaction_id
+            FROM l1_events e
+            JOIN users u ON u.id = e.user_id
+            WHERE e.event_type = 'transaction_edit'
+              AND e.event_timestamp >= $${recatParamIndex}::timestamp
+              AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
+              AND u.email != $${adminEmailParamIndex}
+              AND e.metadata->>'transactionId' IS NOT NULL
               ${filterConditions}
           `;
-          const recatResult = await pool.query(recatQuery, [...filterParams, weekStart, weekEnd]);
-          totalTransactionsRecategorised = parseInt(recatResult.rows[0]?.count) || 0;
+          const singleEditResult = await pool.query(singleEditQuery, [...filterParams, weekStart, weekEnd]);
+          const singleEditIds = new Set(singleEditResult.rows.map((r: any) => r.transaction_id).filter((id: any) => id !== null));
+          
+          // Get all bulk_edit events (multiple transactions per event)
+          const bulkEditQuery = `
+            SELECT e.metadata->'transactionIds' as transaction_ids
+            FROM l1_events e
+            JOIN users u ON u.id = e.user_id
+            WHERE e.event_type = 'bulk_edit'
+              AND e.event_timestamp >= $${recatParamIndex}::timestamp
+              AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
+              AND u.email != $${adminEmailParamIndex}
+              AND e.metadata->'transactionIds' IS NOT NULL
+              ${filterConditions}
+          `;
+          const bulkEditResult = await pool.query(bulkEditQuery, [...filterParams, weekStart, weekEnd]);
+          bulkEditResult.rows.forEach((row: any) => {
+            const ids = row.transaction_ids;
+            if (Array.isArray(ids)) {
+              ids.forEach((id: any) => {
+                if (id !== null && id !== undefined) {
+                  singleEditIds.add(parseInt(id));
+                }
+              });
+            }
+          });
+          
+          totalTransactionsRecategorised = singleEditIds.size;
         }
       } catch (e) {
-        // categorization_learning table doesn't exist, recategorised = 0
+        // l1_events table doesn't exist or error, recategorised = 0
+        console.error('[Vanity Metrics] Error counting recategorised transactions:', e);
+      }
+
+      // Total statements uploaded (in the week)
+      let totalStatementsUploaded = 0;
+      try {
+        const statementsParamIndex = filterParams.length + 1;
+        const statementsQuery = `
+          SELECT COUNT(*) as count
+          FROM l1_events e
+          JOIN users u ON u.id = e.user_id
+          WHERE e.event_type = 'statement_upload'
+            AND e.event_timestamp >= $${statementsParamIndex}::timestamp
+            AND e.event_timestamp <= $${statementsParamIndex + 1}::timestamp
+            AND u.email != $${adminEmailParamIndex}
+            ${filterConditions}
+        `;
+        const statementsResult = await pool.query(statementsQuery, [...filterParams, weekStart, weekEnd]);
+        totalStatementsUploaded = parseInt(statementsResult.rows[0]?.count) || 0;
+      } catch (e) {
+        // l1_events table doesn't exist, statements = 0
+      }
+
+      // Total statements uploaded by unique person (in the week)
+      let totalStatementsByUniquePerson = 0;
+      try {
+        const uniqueStatementsParamIndex = filterParams.length + 1;
+        const uniqueStatementsQuery = `
+          SELECT COUNT(DISTINCT e.user_id) as count
+          FROM l1_events e
+          JOIN users u ON u.id = e.user_id
+          WHERE e.event_type = 'statement_upload'
+            AND e.event_timestamp >= $${uniqueStatementsParamIndex}::timestamp
+            AND e.event_timestamp <= $${uniqueStatementsParamIndex + 1}::timestamp
+            AND u.email != $${adminEmailParamIndex}
+            ${filterConditions}
+        `;
+        const uniqueStatementsResult = await pool.query(uniqueStatementsQuery, [...filterParams, weekStart, weekEnd]);
+        totalStatementsByUniquePerson = parseInt(uniqueStatementsResult.rows[0]?.count) || 0;
+      } catch (e) {
+        // l1_events table doesn't exist, unique statements = 0
       }
 
       metrics[weekKey] = {
@@ -463,7 +606,10 @@ export async function GET(request: NextRequest) {
         monthlyActiveUsers: mau,
         newUsersPerMonth,
         totalTransactionsUploaded: totalTransactions,
+        newTransactionsUploaded: newTransactions,
         totalTransactionsRecategorised,
+        totalStatementsUploaded,
+        totalStatementsByUniquePerson,
         totalUniqueBanksUploaded: uniqueBanks,
       };
     }

@@ -113,7 +113,7 @@ export default function TransactionModal({
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
           <h2 className="text-2xl font-bold text-gray-900">
-            {transaction ? 'Edit Transaction' : 'Add New Transaction'}
+            {transaction ? 'Edit transaction' : 'Add New Transaction'}
           </h2>
           <button
             onClick={onClose}
@@ -181,41 +181,25 @@ export default function TransactionModal({
             />
           </div>
 
-          {/* Amount */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Amount <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-4 top-2.5 text-gray-500">$</span>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                placeholder="0.00"
-                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Category */}
+          {/* Amount, Account, and Label in one row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Amount */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Category
+                Amount <span className="text-red-500">*</span>
               </label>
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-              >
-                <option value="">Select a category...</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <span className="absolute left-4 top-2.5 text-gray-500">$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.amount}
+                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  placeholder="0.00"
+                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
             </div>
 
             {/* Account */}
@@ -237,20 +221,48 @@ export default function TransactionModal({
                 ))}
               </datalist>
             </div>
+
+            {/* Label */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Label
+              </label>
+              <input
+                type="text"
+                value={formData.label}
+                onChange={(e) => setFormData({ ...formData, label: e.target.value })}
+                placeholder="e.g., Weekly Shopping"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
           </div>
 
-          {/* Label */}
+          {/* Category */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Label
+              Category
             </label>
-            <input
-              type="text"
-              value={formData.label}
-              onChange={(e) => setFormData({ ...formData, label: e.target.value })}
-              placeholder="e.g., Weekly Shopping"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <select
+              value={formData.category}
+              onChange={(e) => {
+                const newVal = e.target.value;
+                if (newVal === '__ADD_NEW__') {
+                  const newCat = prompt('Enter new category name:');
+                  if (newCat && newCat.trim()) {
+                    setFormData({ ...formData, category: newCat.trim() });
+                  }
+                } else {
+                  setFormData({ ...formData, category: newVal });
+                }
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            >
+              <option value="">Select a category...</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+              <option value="__ADD_NEW__" className="text-blue-600 font-medium">+ Add new category</option>
+            </select>
           </div>
 
           {/* Actions */}

@@ -93,29 +93,31 @@ export async function GET(request: NextRequest) {
 
     let result;
     if (useUsersTable) {
-      // Use users table (post-migration) - Single source of truth
+      // Use users table - Single source of truth (l1_transaction_facts only)
       result = await pool.query(`
         SELECT 
           ${selectFields}${activeFields},
-          COUNT(DISTINCT t.id) as transaction_count,
-          MAX(t.created_at) as last_activity,
+          COUNT(DISTINCT tf.id) as transaction_count,
+          MAX(tf.created_at) as last_activity,
           COUNT(DISTINCT CASE WHEN u.completed_at IS NOT NULL THEN u.id END) as completed_onboarding_count
         FROM users u
-        LEFT JOIN transactions t ON u.id = t.user_id
+        LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+        LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
         WHERE u.email != $1
         GROUP BY ${groupByFields}${hasIsActive && hasEmailValidated ? ', u.is_active, u.email_validated' : ''}
         ORDER BY u.created_at DESC
       `, [ADMIN_EMAIL]);
     } else {
-      // Fallback to onboarding_responses table (pre-migration)
+      // Fallback to onboarding_responses table (pre-migration) - Single source of truth (l1_transaction_facts only)
       result = await pool.query(`
         SELECT 
           ${selectFields},
-          COUNT(DISTINCT t.id) as transaction_count,
-          MAX(t.created_at) as last_activity,
+          COUNT(DISTINCT tf.id) as transaction_count,
+          MAX(tf.created_at) as last_activity,
           COUNT(DISTINCT CASE WHEN o.completed_at IS NOT NULL THEN o.id END) as completed_onboarding_count
         FROM users u
-        LEFT JOIN transactions t ON u.id = t.user_id
+        LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+        LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
         LEFT JOIN onboarding_responses o ON u.id = o.user_id
         GROUP BY ${groupByFields}
         ORDER BY u.created_at DESC
@@ -137,8 +139,75 @@ export async function GET(request: NextRequest) {
         status: (transactionCount > 0 || completedOnboarding > 0) ? 'Active Account' : 'Failed to log in',
         is_active: row.is_active !== undefined ? row.is_active : true, // Include is_active if available
         email_validated: row.email_validated !== undefined ? row.email_validated : false, // Include email_validated if available
+        // Consent-related fields are populated in a follow-up step below (schema-adaptive)
+        account_creation_consent_at: null,
+        cookie_consent_choice: null,
+        cookie_consent_at: null,
+        first_upload_consent_at: null,
       };
     });
+
+    // Enrich users with consent information from l1_events (schema-adaptive)
+    try {
+      // Check if l1_events table exists (or legacy user_events for backward compatibility)
+      const tableCheck = await pool.query(`
+        SELECT 1 
+        FROM information_schema.tables 
+        WHERE table_name IN ('l1_events', 'user_events')
+        LIMIT 1
+      `);
+
+      if (tableCheck.rows.length > 0 && users.length > 0) {
+        const userIds = users.map(u => u.id);
+
+        // Fetch latest consent events per user and consentType
+        const consentResult = await pool.query(`
+          SELECT DISTINCT ON (user_id, metadata->>'consentType')
+            user_id,
+            metadata->>'consentType' AS consent_type,
+            metadata->>'choice' AS choice,
+            event_timestamp,
+            metadata
+          FROM l1_events
+          WHERE event_type = 'consent'
+            AND user_id = ANY($1::int[])
+          ORDER BY user_id, metadata->>'consentType', event_timestamp DESC
+        `, [userIds]);
+
+        const consentByUser: Record<number, any> = {};
+        for (const row of consentResult.rows) {
+          const uid = row.user_id as number;
+          if (!consentByUser[uid]) consentByUser[uid] = {};
+          consentByUser[uid][row.consent_type] = {
+            choice: row.choice,
+            event_timestamp: row.event_timestamp,
+          };
+        }
+
+        // Attach consent info to users
+        users.forEach(user => {
+          const info = consentByUser[user.id] || {};
+          const accountCreation = info['account_creation'];
+          const cookieBanner = info['cookie_banner'];
+          const firstUpload = info['first_upload'];
+
+          user.account_creation_consent_at = accountCreation?.event_timestamp || null;
+          user.cookie_consent_choice = cookieBanner?.choice || null;
+          user.cookie_consent_at = cookieBanner?.event_timestamp || null;
+          
+          // If user has transactions but no first_upload consent event, they likely gave consent before logging was added
+          // Show a note that consent was given (implied by having transactions) but timestamp is unavailable
+          if (!firstUpload && user.transaction_count > 0) {
+            user.first_upload_consent_at = 'Consent given (pre-logging)';
+          } else {
+            user.first_upload_consent_at = firstUpload?.event_timestamp || null;
+          }
+        });
+      }
+    } catch (e) {
+      console.log('[Users API] Could not enrich users with consent events:', e);
+      // Continue without consent enrichment
+    }
 
     return NextResponse.json({
       users,

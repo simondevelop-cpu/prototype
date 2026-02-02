@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { ensureTokenizedForAnalytics } from '@/lib/tokenization';
+import { logTransactionEditEvent } from '@/lib/event-logger';
 
 // Force dynamic rendering (PUT endpoint requires runtime request body)
 export const dynamic = 'force-dynamic';
@@ -20,7 +21,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const userId = payload.sub;
+    const userId = typeof payload.sub === 'number' ? payload.sub : parseInt(payload.sub, 10);
+    if (isNaN(userId)) {
+      return NextResponse.json({ error: 'Invalid user ID' }, { status: 401 });
+    }
+    
     const pool = getPool();
     if (!pool) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
@@ -41,42 +46,65 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Transaction ID required' }, { status: 400 });
     }
 
-    // Build dynamic update query
+    // Fetch current transaction values to track changes
+    const currentTxResult = await pool.query(
+      `SELECT transaction_date as date, description, merchant, amount, cashflow, category, account, label
+       FROM l1_transaction_facts
+       WHERE tokenized_user_id = $1 AND id = $2`,
+      [tokenizedUserId, id]
+    );
+
+    if (currentTxResult.rows.length === 0) {
+      return NextResponse.json({ error: 'Transaction not found or access denied' }, { status: 404 });
+    }
+
+    const currentTx = currentTxResult.rows[0];
+    const changes: { field: string; oldValue: any; newValue: any }[] = [];
+
+    // Build dynamic update query and track changes
     const updates: string[] = [];
     const values: any[] = [];
     let paramCount = 1;
 
-    if (date !== undefined) {
+    if (date !== undefined && date !== currentTx.date) {
       updates.push(`transaction_date = $${paramCount++}`);
       values.push(date);
+      changes.push({ field: 'date', oldValue: currentTx.date, newValue: date });
     }
-    if (description !== undefined) {
+    if (description !== undefined && description !== currentTx.description) {
       updates.push(`description = $${paramCount++}`);
       values.push(description);
+      changes.push({ field: 'description', oldValue: currentTx.description, newValue: description });
     }
-    if (merchant !== undefined) {
+    if (merchant !== undefined && merchant !== currentTx.merchant) {
       updates.push(`merchant = $${paramCount++}`);
       values.push(merchant);
+      changes.push({ field: 'merchant', oldValue: currentTx.merchant, newValue: merchant });
     }
-    if (amount !== undefined) {
+    if (amount !== undefined && parseFloat(amount) !== parseFloat(currentTx.amount)) {
       updates.push(`amount = $${paramCount++}`);
       values.push(amount);
+      changes.push({ field: 'amount', oldValue: currentTx.amount, newValue: amount });
     }
-    if (cashflow !== undefined) {
+    if (cashflow !== undefined && cashflow !== currentTx.cashflow) {
       updates.push(`cashflow = $${paramCount++}`);
       values.push(cashflow);
+      changes.push({ field: 'cashflow', oldValue: currentTx.cashflow, newValue: cashflow });
     }
-    if (category !== undefined) {
+    if (category !== undefined && category !== currentTx.category) {
       updates.push(`category = $${paramCount++}`);
       values.push(category);
+      changes.push({ field: 'category', oldValue: currentTx.category, newValue: category });
     }
-    if (account !== undefined) {
+    if (account !== undefined && account !== currentTx.account) {
       updates.push(`account = $${paramCount++}`);
       values.push(account);
+      changes.push({ field: 'account', oldValue: currentTx.account, newValue: account });
     }
-    if (label !== undefined) {
+    if (label !== undefined && label !== currentTx.label) {
       updates.push(`label = $${paramCount++}`);
       values.push(label);
+      changes.push({ field: 'label', oldValue: currentTx.label, newValue: label });
     }
 
     if (updates.length === 0) {
@@ -101,6 +129,11 @@ export async function PUT(request: NextRequest) {
     }
 
     const transaction = result.rows[0];
+
+    // Log editing event if there were changes
+    if (changes.length > 0) {
+      await logTransactionEditEvent(userId, id, changes);
+    }
 
     return NextResponse.json({ 
       success: true, 

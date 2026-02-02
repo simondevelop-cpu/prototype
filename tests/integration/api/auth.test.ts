@@ -64,6 +64,45 @@ describe('Authentication API', () => {
         completed_at TIMESTAMP WITH TIME ZONE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS l0_user_tokenization (
+        internal_user_id INTEGER PRIMARY KEY REFERENCES users(id),
+        tokenized_user_id TEXT NOT NULL UNIQUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS l0_pii_users (
+        internal_user_id INTEGER PRIMARY KEY REFERENCES users(id),
+        email TEXT NOT NULL,
+        ip_address TEXT,
+        ip_address_updated_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS l1_events (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        tokenized_user_id TEXT REFERENCES l0_user_tokenization(tokenized_user_id),
+        event_type TEXT NOT NULL,
+        event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        metadata JSONB,
+        is_admin BOOLEAN DEFAULT FALSE,
+        session_id TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS l1_transaction_facts (
+        id SERIAL PRIMARY KEY,
+        tokenized_user_id TEXT NOT NULL REFERENCES l0_user_tokenization(tokenized_user_id),
+        transaction_date DATE NOT NULL,
+        description TEXT NOT NULL,
+        merchant TEXT,
+        amount NUMERIC(12, 2) NOT NULL,
+        cashflow TEXT NOT NULL,
+        account TEXT,
+        category TEXT NOT NULL,
+        label TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Mock getPool to return our test pool
@@ -79,6 +118,9 @@ describe('Authentication API', () => {
 
   beforeEach(async () => {
     // Clear all tables before each test
+    // Delete in order to respect foreign key constraints (child tables first)
+    await testClient.query('DELETE FROM l1_events');
+    await testClient.query('DELETE FROM l0_user_tokenization');
     await testClient.query('DELETE FROM onboarding_responses');
     await testClient.query('DELETE FROM transactions');
     await testClient.query('DELETE FROM users');
@@ -97,6 +139,7 @@ describe('Authentication API', () => {
             email: 'newuser@test.com',
             password: 'StrongP@ss1',
             name: 'Test User',
+            consentAccepted: true,
           }),
         });
 
@@ -120,6 +163,7 @@ describe('Authentication API', () => {
             email: 'hashtest@test.com',
             password: 'StrongP@ss1',
             name: 'Test User',
+            consentAccepted: true,
           }),
         });
 
@@ -147,6 +191,7 @@ describe('Authentication API', () => {
             email: 'weak@test.com',
             password: 'weak',
             name: 'Test User',
+            consentAccepted: true,
           }),
         });
 
@@ -169,6 +214,7 @@ describe('Authentication API', () => {
             email: 'duplicate@test.com',
             password: 'StrongP@ss1',
             name: 'Test User',
+            consentAccepted: true,
           }),
         });
         const response1 = await registerHandler(request1);
@@ -192,6 +238,7 @@ describe('Authentication API', () => {
             email: 'duplicate@test.com',
             password: 'StrongP@ss2',
             name: 'Test User 2',
+            consentAccepted: true,
           }),
         });
 
@@ -200,6 +247,28 @@ describe('Authentication API', () => {
 
         expect(response.status).toBe(400);
         expect(data.error).toContain('already registered');
+      });
+
+      it('should require consentAccepted for registration', async () => {
+        const request = new NextRequest('http://localhost/api/auth/register', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'origin': 'http://localhost',
+          },
+          body: JSON.stringify({
+            email: 'noconsent@test.com',
+            password: 'StrongP@ss1',
+            name: 'No Consent User',
+            // consentAccepted omitted on purpose
+          }),
+        });
+
+        const response = await registerHandler(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(String(data.error)).toContain('accept the Terms and Conditions and Privacy Policy');
       });
     });
   });

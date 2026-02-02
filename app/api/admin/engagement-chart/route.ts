@@ -4,15 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import { ADMIN_EMAIL, JWT_SECRET } from '@/lib/admin-constants';
+import { getPool } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
-
-const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL,
-});
 
 interface ChartFilters {
   totalAccounts?: boolean;
@@ -42,6 +38,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const pool = getPool();
+    if (!pool) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 500 });
+    }
+
     // Parse query parameters
     const url = new URL(request.url);
     const filters: ChartFilters = {
@@ -65,12 +66,12 @@ export async function GET(request: NextRequest) {
     const hasMotivation = schemaCheck.rows.some(row => row.column_name === 'motivation');
     const hasEmailValidated = schemaCheck.rows.some(row => row.column_name === 'email_validated');
 
-    // Check if user_events table exists
+    // Check if l1_events table exists
     let hasUserEvents = false;
     try {
       const eventsCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'user_events'
+        WHERE table_name = 'l1_events'
         LIMIT 1
       `);
       hasUserEvents = eventsCheck.rows.length > 0;
@@ -161,13 +162,15 @@ export async function GET(request: NextRequest) {
     filterParams.push(ADMIN_EMAIL);
 
     // Get user data with signup date and intent
-    const uploadCountSubquery = hasUploadSessionId ? `
-      SELECT COUNT(DISTINCT upload_session_id)
-      FROM transactions t
-      WHERE t.user_id = u.id
-        AND t.upload_session_id IS NOT NULL
-    ` : `
-      0
+    // Single source of truth (l1_transaction_facts only)
+    // Note: upload_session_id not in l1_transaction_facts, use statement_upload events from l1_events instead
+    const uploadCountSubquery = `
+      SELECT COUNT(DISTINCT tf.id)
+      FROM users u2
+      LEFT JOIN l0_user_tokenization ut ON u2.id = ut.internal_user_id
+      LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+      WHERE u2.id = u.id
+        AND tf.id IS NOT NULL
     `;
     
     const usersQuery = useUsersTable ? `
@@ -208,7 +211,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get login days per week for each user (if user_events table exists)
+    // Get login days per week for each user (if l1_events table exists)
     const userLines: any[] = [];
     
     for (const user of filteredUsers) {
@@ -227,20 +230,23 @@ export async function GET(request: NextRequest) {
           weekEnd.setHours(23, 59, 59, 999);
           
           // Get unique login days in this week
+          // Note: We use user_id (internal ID) since login events are logged with internal user_id
+          // Use DATE_TRUNC('day', ...) instead of DATE() for better PostgreSQL compatibility
+          // Cast user.id to integer to ensure type consistency
           const loginDaysResult = await pool.query(`
-            SELECT COUNT(DISTINCT DATE(event_timestamp)) as login_days
-            FROM user_events
-            WHERE user_id = $1
+            SELECT COUNT(DISTINCT DATE_TRUNC('day', event_timestamp)) as login_days
+            FROM l1_events
+            WHERE user_id = $1::integer
               AND event_type = 'login'
-              AND event_timestamp >= $2
-              AND event_timestamp <= $3
-          `, [user.id, weekStart, weekEnd]);
+              AND event_timestamp >= $2::timestamp
+              AND event_timestamp <= $3::timestamp
+          `, [user.id, weekStart.toISOString(), weekEnd.toISOString()]);
           
           const loginDays = parseInt(loginDaysResult.rows[0]?.login_days) || 0;
           weeks.push({ week: weekNum, loginDays });
         }
       } else {
-        // No user_events table - return zeros for now
+        // No l1_events table - return zeros for now
         for (let weekNum = 0; weekNum < 12; weekNum++) {
           weeks.push({ week: weekNum, loginDays: 0 });
         }
@@ -268,11 +274,40 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Debug: Log summary of what we found
+    const totalLoginEvents = hasUserEvents ? await pool.query(
+      'SELECT COUNT(*) as count FROM l1_events WHERE event_type = $1',
+      ['login']
+    ).then((r: any) => parseInt(r.rows[0]?.count || '0')) : 0;
+    
+    // Check if login events exist for the filtered users
+    let loginEventsForFilteredUsers = 0;
+    if (hasUserEvents && filteredUsers.length > 0) {
+      const userIds = filteredUsers.map((u: any) => u.id);
+      const loginCheck = await pool.query(
+        'SELECT COUNT(*) as count FROM l1_events WHERE event_type = $1 AND user_id = ANY($2::int[])',
+        ['login', userIds]
+      );
+      loginEventsForFilteredUsers = parseInt(loginCheck.rows[0]?.count || '0');
+    }
+    
+    const usersWithLogins = userLines.filter((ul: any) => 
+      ul.weeks.some((w: any) => w.loginDays > 0)
+    ).length;
+
+    console.log(`[Engagement Chart] Found ${userLines.length} users, ${usersWithLogins} with login data, ${totalLoginEvents} total login events in l1_events, ${loginEventsForFilteredUsers} login events for filtered users`);
+    console.log(`[Engagement Chart] Filters: cohorts=${filters.cohorts?.length || 0}, dataCoverage=${filters.dataCoverage?.length || 0}, validatedEmails=${filters.validatedEmails}, intentCategories=${filters.intentCategories?.length || 0}`);
+
     return NextResponse.json({
       success: true,
       userLines,
       filters,
       hasUserEvents,
+      debug: {
+        totalUsers: userLines.length,
+        usersWithLogins,
+        totalLoginEvents,
+      },
     }, { status: 200 });
 
   } catch (error: any) {

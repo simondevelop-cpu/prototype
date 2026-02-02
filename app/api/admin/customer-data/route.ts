@@ -212,24 +212,19 @@ export async function GET(request: NextRequest) {
       console.error('[Customer Data API] Test query failed:', testError);
     }
     
-    // Build transaction stats subquery based on schema
-    const transactionStatsQuery = hasUploadSessionId ? `
-      SELECT 
-        user_id,
-        COUNT(DISTINCT id) as transaction_count,
-        COUNT(DISTINCT upload_session_id) FILTER (WHERE upload_session_id IS NOT NULL) as upload_session_count,
-        MIN(created_at) as first_transaction_date
-      FROM transactions
-      GROUP BY user_id
-    ` : `
-      SELECT 
-        user_id,
-        COUNT(DISTINCT id) as transaction_count,
-        0 as upload_session_count,
-        MIN(created_at) as first_transaction_date
-      FROM transactions
-      GROUP BY user_id
-    `;
+      // Build transaction stats subquery - Single source of truth (l1_transaction_facts only)
+      const transactionStatsQuery = `
+        SELECT 
+          ut.internal_user_id as user_id,
+          COUNT(DISTINCT tf.id) as transaction_count,
+          0 as upload_session_count,
+          MIN(tf.created_at) as first_transaction_date
+        FROM users u
+        LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+        LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+        GROUP BY ut.internal_user_id
+        HAVING COUNT(DISTINCT tf.id) > 0
+      `;
     
     try {
       // Log the actual query for debugging (first 500 chars)
@@ -326,11 +321,11 @@ export async function GET(request: NextRequest) {
       ` : `
         u.id as user_id,
         u.email,
-        o.first_name,
-        o.last_name,
-        o.date_of_birth,
-        o.recovery_phone,
-        o.province_region,
+        p.first_name,
+        p.last_name,
+        p.date_of_birth,
+        p.recovery_phone,
+        p.province_region,
         o.emotional_state,
         o.financial_context,
         o.motivation,
@@ -350,30 +345,22 @@ export async function GET(request: NextRequest) {
         transaction_stats.first_transaction_date
       `;
 
-      const fromClause = useL0PII 
-        ? `FROM users u
+      const fromClause = `FROM users u
            LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
-           INNER JOIN onboarding_responses o ON o.user_id = u.id`
-        : `FROM users u
            INNER JOIN onboarding_responses o ON o.user_id = u.id`;
 
-      // Build transaction stats subquery based on schema
-      const transactionStatsQuery = hasUploadSessionId ? `
+      // Build transaction stats subquery - Single source of truth (l1_transaction_facts only)
+      const transactionStatsQuery = `
         SELECT 
-          user_id,
-          COUNT(DISTINCT id) as transaction_count,
-          COUNT(DISTINCT upload_session_id) FILTER (WHERE upload_session_id IS NOT NULL) as upload_session_count,
-          MIN(created_at) as first_transaction_date
-        FROM transactions
-        GROUP BY user_id
-      ` : `
-        SELECT 
-          user_id,
-          COUNT(DISTINCT id) as transaction_count,
+          ut.internal_user_id as user_id,
+          COUNT(DISTINCT tf.id) as transaction_count,
           0 as upload_session_count,
-          MIN(created_at) as first_transaction_date
-        FROM transactions
-        GROUP BY user_id
+          MIN(tf.created_at) as first_transaction_date
+        FROM users u
+        LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+        LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
+        GROUP BY ut.internal_user_id
+        HAVING COUNT(DISTINCT tf.id) > 0
       `;
 
       result = await pool.query(`

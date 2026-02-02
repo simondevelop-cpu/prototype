@@ -31,40 +31,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Check if user_events table exists
+    // Check if l1_events table exists
     let hasUserEventsTable = false;
     try {
       const tableCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'user_events'
+        WHERE table_name = 'l1_events'
         LIMIT 1
       `);
       hasUserEventsTable = tableCheck.rows.length > 0;
     } catch (e) {
-      console.log('[Events Data API] Could not check for user_events table');
+      console.log('[Events Data API] Could not check for l1_events table');
     }
 
     if (!hasUserEventsTable) {
       return NextResponse.json({ 
         success: true,
         eventsData: [],
-        message: 'user_events table does not exist. Events will appear once the table is created and events are logged.'
+        message: 'l1_events table does not exist. Events will appear once the table is created and events are logged.'
       }, { status: 200 });
     }
 
     // Check how many events exist total
-    const countCheck = await pool.query(`SELECT COUNT(*) as count FROM user_events`);
+    const countCheck = await pool.query(`SELECT COUNT(*) as count FROM l1_events`);
     const totalEvents = parseInt(countCheck.rows[0]?.count || '0', 10);
-    console.log('[Events Data API] Found', totalEvents, 'total events in user_events table');
+    console.log('[Events Data API] Found', totalEvents, 'total events in l1_events table');
 
-    // Check what columns exist in user_events table
+    // Check what columns exist in l1_events table
     let hasEventData = false;
     let hasMetadata = false;
     try {
       const columnCheck = await pool.query(`
         SELECT column_name 
         FROM information_schema.columns 
-        WHERE table_name = 'user_events' 
+        WHERE table_name = 'l1_events' 
         AND column_name IN ('event_data', 'metadata')
       `);
       hasEventData = columnCheck.rows.some(row => row.column_name === 'event_data');
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build select fields based on what columns exist
-    // Note: user_events table has event_timestamp (not created_at) and metadata (not event_data)
+    // Note: l1_events table has event_timestamp (not created_at) and metadata (not event_data)
     const eventFields = [
       'e.id',
       'e.user_id',
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
     const result = await pool.query(`
       SELECT 
         ${eventFields}
-      FROM user_events e
+      FROM l1_events e
       LEFT JOIN users u ON e.user_id = u.id
       LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
       WHERE (u.email != $1 OR u.email IS NULL)

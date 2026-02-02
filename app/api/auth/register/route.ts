@@ -4,6 +4,9 @@ import { hashPassword, createToken } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { verifyRequestOrigin } from '@/lib/csrf';
 import { validatePasswordStrength } from '@/lib/password-validation';
+import { logConsentEvent } from '@/lib/event-logger';
+import { getClientIpAddress, updateUserIpAddress } from '@/lib/ip-address';
+import { getTokenizedUserId } from '@/lib/tokenization';
 
 // Force dynamic rendering (POST endpoint requires runtime request body)
 export const dynamic = 'force-dynamic';
@@ -23,7 +26,15 @@ export async function POST(request: NextRequest) {
     }
     
     const body = await request.json();
-    const { email, password, name } = body;
+    const { email, password, name, consentAccepted } = body;
+    
+    // Require consent for registration
+    if (!consentAccepted) {
+      return NextResponse.json(
+        { error: 'You must accept the Terms and Conditions and Privacy Policy to create an account.' },
+        { status: 400 }
+      );
+    }
     
     // Rate limiting check (use email or IP)
     const identifier = email || request.headers.get('x-forwarded-for') || 'unknown';
@@ -92,13 +103,67 @@ export async function POST(request: NextRequest) {
     if (userResult.rows.length === 0) {
       // User doesn't exist, proceed with registration
       const passwordHash = await hashPassword(password);
-      const result = await pool.query(
-        'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id, email, display_name',
-        [email.toLowerCase(), passwordHash, name || email]
-      );
+      
+      // Check if email_validated column exists, and set it to true by default
+      // Schema-adaptive: handle both cases
+      let hasEmailValidated = false;
+      try {
+        const columnCheck = await pool.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'users' 
+          AND column_name = 'email_validated'
+        `);
+        hasEmailValidated = columnCheck.rows.length > 0;
+      } catch (e) {
+        console.log('[Register] Could not check email_validated column, skipping');
+      }
+      
+      const result = hasEmailValidated
+        ? await pool.query(
+            'INSERT INTO users (email, password_hash, display_name, email_validated) VALUES ($1, $2, $3, $4) RETURNING id, email, display_name',
+            [email.toLowerCase(), passwordHash, name || email, true]
+          )
+        : await pool.query(
+            'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id, email, display_name',
+            [email.toLowerCase(), passwordHash, name || email]
+          );
 
       const user = result.rows[0];
       const token = createToken(user.id);
+
+      // Log IP address
+      try {
+        const ipAddress = getClientIpAddress(request);
+        if (ipAddress) {
+          // Create PII record if it doesn't exist, and log IP
+          const pool = getPool();
+          if (pool) {
+            await pool.query(
+              `INSERT INTO l0_pii_users (internal_user_id, email, ip_address, ip_address_updated_at)
+               VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+               ON CONFLICT (internal_user_id) 
+               DO UPDATE SET ip_address = EXCLUDED.ip_address, ip_address_updated_at = CURRENT_TIMESTAMP`,
+              [user.id, email.toLowerCase(), ipAddress]
+            );
+          }
+        }
+      } catch (ipError) {
+        console.error('[Register] Failed to log IP address:', ipError);
+        // Don't fail registration if IP logging fails
+      }
+
+      // Log consent event
+      try {
+        await logConsentEvent(user.id, 'account_creation', {
+          version: '1.0', // TODO: Update with actual version from database
+          scope: 'terms_and_privacy',
+          timestamp: new Date().toISOString(),
+        });
+      } catch (consentError) {
+        console.error('[Register] Failed to log consent event:', consentError);
+        // Don't fail registration if consent logging fails
+      }
 
       return NextResponse.json({
         token,
@@ -112,10 +177,21 @@ export async function POST(request: NextRequest) {
 
     // User exists - check transactions and onboarding
     const userId = userResult.rows[0].id;
-    const transactionCount = await pool.query(
-      'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1',
-      [userId]
-    );
+    // Check l1_transaction_facts (preferred) or transactions (legacy)
+    const tokenizedUserId = await getTokenizedUserId(userId);
+    let transactionCount;
+    if (tokenizedUserId) {
+      transactionCount = await pool.query(
+        'SELECT COUNT(*) as count FROM l1_transaction_facts WHERE tokenized_user_id = $1',
+        [tokenizedUserId]
+      );
+    } else {
+      // Fallback to legacy transactions table
+      transactionCount = await pool.query(
+        'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1',
+        [userId]
+      );
+    }
     const onboardingCount = await pool.query(
       'SELECT COUNT(*) as count FROM onboarding_responses WHERE user_id = $1 AND completed_at IS NOT NULL',
       [userId]

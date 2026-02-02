@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react';
 import CashflowChart from './CashflowChart';
 import TransactionsList from './TransactionsList';
 import FeedbackModal from './FeedbackModal';
+import CookieBanner from './CookieBanner';
+import BookingModal from './BookingModal';
+import BookingItem from './BookingItem';
+import SurveyModal from './SurveyModal';
+import TokenExpirationWarning from './TokenExpirationWarning';
+import { apiFetch } from '@/lib/api-client';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
@@ -16,7 +22,30 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ user, token, onLogout }: DashboardProps) {
+  const [currentToken, setCurrentToken] = useState(token);
   const [activeTab, setActiveTab] = useState('dashboard');
+  
+  // Track user activity for 30-minute inactivity timeout
+  useEffect(() => {
+    const updateActivity = () => {
+      localStorage.setItem('ci.session.lastActivity', Date.now().toString());
+    };
+    
+    // Update activity on user interactions
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(event => {
+      window.addEventListener(event, updateActivity, { passive: true });
+    });
+    
+    // Initial activity update
+    updateActivity();
+    
+    return () => {
+      events.forEach(event => {
+        window.removeEventListener(event, updateActivity);
+      });
+    };
+  }, []);
   const [timeframe, setTimeframe] = useState('3m');
   const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
   const [customMonthRange, setCustomMonthRange] = useState({ start: '', end: '' }); // Store YYYY-MM for month picker
@@ -30,15 +59,25 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const [loading, setLoading] = useState(true);
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [hasLoadedTransactions, setHasLoadedTransactions] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showSurveyModal, setShowSurveyModal] = useState(false);
+  const [selectedBookingSlot, setSelectedBookingSlot] = useState<{ date: string; time: string } | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<Array<{ date: string; time: string }>>([]);
+  const [myBookings, setMyBookings] = useState<any[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [cashflowFilter, setCashflowFilter] = useState<string | null>(null);
   const [dateRangeFilter, setDateRangeFilter] = useState<{ start: string; end: string } | null>(null);
 
+  // Update currentToken when token prop changes
+  useEffect(() => {
+    setCurrentToken(token);
+  }, [token]);
+
   useEffect(() => {
     fetchData();
-  }, [timeframe, token]);
+  }, [timeframe, currentToken]);
 
   useEffect(() => {
     if (selectedCashflow) {
@@ -66,13 +105,21 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     if (activeTab === 'transactions' && !hasLoadedTransactions) {
       fetchAllTransactions();
     }
-  }, [activeTab, token]);
+  }, [activeTab, currentToken]);
 
   // Reset loaded state when token changes (user logs in/out)
   useEffect(() => {
     setHasLoadedTransactions(false);
     setAllTransactions([]);
-  }, [token]);
+  }, [currentToken]);
+
+  // Fetch available slots and bookings when Schedule a chat tab is active
+  useEffect(() => {
+    if (activeTab === 'budget') {
+      fetchAvailableSlots();
+      fetchMyBookings();
+    }
+  }, [activeTab, currentToken]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -86,19 +133,23 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         txUrl = `/api/transactions?start=${customDateRange.start}&end=${customDateRange.end}`;
       }
 
-      // Fetch summary
-      const summaryRes = await fetch(summaryUrl, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const summaryData = await summaryRes.json();
-      setSummary(summaryData.summary || []);
+      // Fetch summary using apiFetch
+      const summaryResponse = await apiFetch(summaryUrl, {
+        method: 'GET',
+      }, onLogout);
+      
+      if (summaryResponse.data) {
+        setSummary(summaryResponse.data.summary || []);
+      }
 
       // Fetch transactions (filtered by timeframe for dashboard)
-      const txRes = await fetch(txUrl, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const txData = await txRes.json();
-      setTransactions(txData.transactions || []);
+      const txResponse = await apiFetch(txUrl, {
+        method: 'GET',
+      }, onLogout);
+      
+      if (txResponse.data) {
+        setTransactions(txResponse.data.transactions || []);
+      }
 
       // Fetch categories for selected month/cashflow
       await fetchCategories();
@@ -113,11 +164,13 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
     setTransactionsLoading(true);
     try {
       // Fetch ALL transactions (no date filter) for transactions tab
-      const txRes = await fetch('/api/transactions', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const txData = await txRes.json();
-      setAllTransactions(txData.transactions || []);
+      const txResponse = await apiFetch('/api/transactions', {
+        method: 'GET',
+      }, onLogout);
+      
+      if (txResponse.data) {
+        setAllTransactions(txResponse.data.transactions || []);
+      }
       setHasLoadedTransactions(true); // Mark as loaded
     } catch (err) {
       console.error('Error fetching all transactions:', err);
@@ -152,13 +205,55 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         catUrl += `?${params.toString()}`;
       }
       
-      const catRes = await fetch(catUrl, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const catData = await catRes.json();
-      setCategories(catData.categories || []);
+      const catResponse = await apiFetch(catUrl, {
+        method: 'GET',
+      }, onLogout);
+      
+      if (catResponse.data) {
+        setCategories(catResponse.data.categories || []);
+      }
     } catch (err) {
       console.error('Error fetching categories:', err);
+    }
+  };
+
+  const fetchAvailableSlots = async () => {
+    setBookingsLoading(true);
+    try {
+      const response = await apiFetch('/api/bookings/available', {
+        method: 'GET',
+      }, onLogout);
+      
+      if (response.data) {
+        console.log('Fetched available slots:', response.data.availableSlots?.length || 0);
+        setAvailableSlots(response.data.availableSlots || []);
+      } else {
+        console.error('Failed to fetch available slots:', response.status, response.error);
+        setAvailableSlots([]);
+      }
+    } catch (err) {
+      console.error('Error fetching available slots:', err);
+      setAvailableSlots([]);
+    } finally {
+      setBookingsLoading(false);
+    }
+  };
+
+  const fetchMyBookings = async () => {
+    try {
+      const response = await apiFetch('/api/bookings/my-bookings', {
+        method: 'GET',
+      }, onLogout);
+      
+      if (response.data) {
+        setMyBookings(response.data.bookings || []);
+      } else {
+        console.error('Failed to fetch my bookings:', response.status, response.error);
+        setMyBookings([]);
+      }
+    } catch (err) {
+      console.error('Error fetching my bookings:', err);
+      setMyBookings([]);
     }
   };
 
@@ -303,7 +398,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 flex items-center justify-center">
-                <img src="/Hummingbird_logo_square.png" alt="Hummingbird Finance" className="w-10 h-10 object-contain" />
+                <img src="/Humminbird_logo_blue_rounded.png" alt="Hummingbird Finance" className="w-10 h-10 object-contain" />
               </div>
               <h1 className="text-xl font-bold text-gray-900">Hummingbird Finance</h1>
             </div>
@@ -311,16 +406,16 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
               <span className="text-sm text-gray-600">
                 {user.name || user.email}
               </span>
-              <button
-                onClick={() => setShowSettings(true)}
+              <a
+                href="/settings"
                 className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
-                title="Settings"
+                title="Account Settings"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-              </button>
+              </a>
               <button
                 onClick={onLogout}
                 className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900 transition-colors"
@@ -365,7 +460,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
-              Insights
+              What's coming
             </button>
             <button
               onClick={() => setActiveTab('budget')}
@@ -375,14 +470,14 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
-              Budget
+              Schedule a chat
             </button>
             </div>
             <button
               onClick={() => setShowFeedback(true)}
               className="py-4 px-4 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
             >
-              Give us feedback
+              Feedback
             </button>
           </nav>
         </div>
@@ -463,7 +558,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
             {/* Chart */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">Cash Flow</h2>
+                <h2 className="text-xl font-bold text-gray-900">Cashflow</h2>
                 {!loading && summary.length > 0 && (
                   <span className="text-xs text-gray-500">{getDateRangeDisplay()}</span>
                 )}
@@ -485,7 +580,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Total Income</p>
+                    <p className="text-sm text-gray-600">Total income</p>
                     <p className="text-2xl font-bold text-green-600 mt-1">
                       ${Math.round(summary.reduce((sum, m) => sum + (m.income || 0), 0)).toLocaleString()}
                     </p>
@@ -505,7 +600,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Total Expenses</p>
+                    <p className="text-sm text-gray-600">Total expenses</p>
                     <p className="text-2xl font-bold text-red-600 mt-1">
                       ${Math.round(summary.reduce((sum, m) => sum + (m.expense || 0), 0)).toLocaleString()}
                     </p>
@@ -526,7 +621,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600 flex items-center gap-1">
-                      Total Other
+                      Total other
                       <span className="inline-block w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" title="Transfers between accounts, credit card payments, and other internal movements">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -557,7 +652,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mt-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-bold text-gray-900">
-                    {selectedCashflow.charAt(0).toUpperCase() + selectedCashflow.slice(1)} Breakdown
+                    {selectedCashflow.charAt(0).toUpperCase() + selectedCashflow.slice(1)} breakdown
                   </h2>
                   <span className="text-sm text-gray-600">
                     {selectedMonth 
@@ -660,7 +755,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
           <TransactionsList 
             transactions={allTransactions} 
             loading={transactionsLoading}
-            token={token}
+            token={currentToken}
             onRefresh={fetchAllTransactions}
             initialCategoryFilter={categoryFilter}
             onClearCategoryFilter={() => setCategoryFilter(null)}
@@ -672,90 +767,144 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         )}
 
         {activeTab === 'insights' && (
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center max-w-md">
-              <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
+          <div className="flex items-center justify-center min-h-[60vh] py-12">
+            <div className="max-w-2xl w-full text-center">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                  Instead of telling you our feature roadmap over the next few months, we'd love to hear from you!
+                </h2>
+                <p className="text-gray-700 text-lg mb-8 leading-relaxed">
+                  The survey will take 2 minutes and will directly inform what we build next. Thanks in advance for helping us out!
+                </p>
+                <button
+                  onClick={() => setShowSurveyModal(true)}
+                  className="px-8 py-4 bg-blue-600 text-white rounded-lg font-medium text-lg hover:bg-blue-700 transition-colors shadow-md"
+                >
+                  Begin 2 minute survey
+                </button>
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-3">Insights Coming Soon</h2>
-              <p className="text-gray-600 mb-2">
-                We're building powerful AI-driven insights to help you understand your spending patterns, identify savings opportunities, and make smarter financial decisions.
-              </p>
-              <p className="text-sm text-gray-500">
-                Stay tuned for automated categorization, spending predictions, and personalized recommendations!
-              </p>
             </div>
           </div>
         )}
 
         {activeTab === 'budget' && (
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center max-w-md">
-              <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+          <div className="space-y-6">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Schedule a chat</h2>
+              <p className="text-gray-600">
+                Do you need any support with the App, some money therapy or just want to chat? Book a 20 minute chat with the team.
+              </p>
+            </div>
+
+            {/* My Bookings */}
+            {myBookings.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">My scheduled chats</h3>
+                <div className="space-y-3">
+                  {myBookings.map((booking: any) => (
+                    <BookingItem
+                      key={booking.id}
+                      booking={booking}
+                      token={currentToken}
+                      onUpdate={fetchMyBookings}
+                    />
+                  ))}
+                </div>
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-3">Budget Coming Soon</h2>
-              <p className="text-gray-600 mb-2">
-                Set spending limits, track progress, and get alerts when you're approaching your budget goals.
-              </p>
-              <p className="text-sm text-gray-500">
-                Stay tuned for category-based budgets, monthly tracking, and overspending alerts!
-              </p>
+            )}
+
+            {/* Available Slots */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Available time slots</h3>
+              {bookingsLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                  <p className="text-gray-600 mt-4">Loading available slots...</p>
+                </div>
+              ) : availableSlots.length === 0 ? (
+                <p className="text-gray-600 text-center py-8">No available slots at this time. Please check back later.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {availableSlots.slice(0, 30).map((slot, idx) => {
+                    const slotDate = dayjs(slot.date);
+                    const isPast = slotDate.isBefore(dayjs(), 'day') || (slotDate.isSame(dayjs(), 'day') && slot.time < dayjs().format('HH:mm'));
+                    const isBooked = myBookings.some((b: any) => b.date === slot.date && b.time === slot.time);
+                    
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          if (!isPast && !isBooked) {
+                            setSelectedBookingSlot(slot);
+                            setShowBookingModal(true);
+                          }
+                        }}
+                        disabled={isPast || isBooked}
+                        className={`p-4 border rounded-lg text-left transition-colors ${
+                          isPast || isBooked
+                            ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-50'
+                            : 'bg-white border-gray-300 hover:border-blue-500 hover:bg-blue-50'
+                        }`}
+                      >
+                        <p className="font-medium text-gray-900">
+                          {slotDate.format('ddd, MMM D')}
+                        </p>
+                        <p className="text-sm text-gray-600">{slot.time}</p>
+                        {isBooked && <p className="text-xs text-blue-600 mt-1">Already booked</p>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
       </main>
 
-      {/* Settings Modal */}
-      {showSettings && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
-              <button
-                onClick={() => setShowSettings(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="text-center py-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Settings Coming Soon</h3>
-              <p className="text-gray-600 mb-2">
-                Customize your experience with account preferences, notification settings, data export options, and more.
-              </p>
-              <p className="text-sm text-gray-500 mb-6">
-                We're working on bringing you full control over your Canadian Insights experience!
-              </p>
-              <button
-                onClick={() => setShowSettings(false)}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Feedback Modal */}
       <FeedbackModal
         isOpen={showFeedback}
         onClose={() => setShowFeedback(false)}
-        token={token}
+        token={currentToken}
       />
+
+      {/* Booking Modal */}
+      {selectedBookingSlot && (
+        <BookingModal
+          isOpen={showBookingModal}
+          onClose={() => {
+            setShowBookingModal(false);
+            setSelectedBookingSlot(null);
+            // Refresh slots and bookings after closing
+            fetchAvailableSlots();
+            fetchMyBookings();
+          }}
+          date={selectedBookingSlot.date}
+          time={selectedBookingSlot.time}
+          token={currentToken}
+        />
+      )}
+
+      {/* Survey Modal */}
+      <SurveyModal
+        isOpen={showSurveyModal}
+        onClose={() => setShowSurveyModal(false)}
+        token={currentToken}
+      />
+
+      {/* Token Expiration Warning */}
+      <TokenExpirationWarning 
+        token={currentToken} 
+        onRefresh={(newToken) => {
+          setCurrentToken(newToken);
+          // Update localStorage
+          localStorage.setItem('ci.session.token', newToken);
+        }}
+      />
+
+      {/* Cookie Banner - shown for signed-in users until choice recorded */}
+      <CookieBanner token={currentToken} userId={user?.id} />
     </div>
   );
 }
