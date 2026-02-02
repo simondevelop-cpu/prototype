@@ -2,8 +2,9 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'canadian-insights-demo-secret-key-change-in-production';
-// Session timeout: 30 minutes (1800 seconds) - users must re-authenticate after inactivity
-const SESSION_TTL_SECONDS = Number(process.env.JWT_TTL_SECONDS || 30 * 60); // 30 minutes
+// Session timeout: 5 minutes 20 seconds (320 seconds) - users must re-authenticate after inactivity
+// Warning shown at 5 minutes, logout at 5 min 20 sec
+const SESSION_TTL_SECONDS = Number(process.env.JWT_TTL_SECONDS || 5 * 60 + 20); // 5 minutes 20 seconds
 const BCRYPT_ROUNDS = 12;
 
 /**

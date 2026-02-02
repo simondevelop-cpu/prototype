@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Dashboard from '@/components/Dashboard';
 import Login from '@/components/Login';
+import InactivityWarning from '@/components/InactivityWarning';
 import { apiFetch } from '@/lib/api-client';
 
 export default function Home() {
@@ -11,6 +12,8 @@ export default function Home() {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showInactivityWarning, setShowInactivityWarning] = useState(false);
+  const [warningCountdown, setWarningCountdown] = useState(20);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -18,7 +21,8 @@ export default function Home() {
       const storedToken = localStorage.getItem('ci.session.token');
       const storedUser = localStorage.getItem('ci.session.user');
       const lastActivityKey = 'ci.session.lastActivity';
-      const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+      const INACTIVITY_WARNING_MS = 5 * 60 * 1000; // 5 minutes - show warning
+      const INACTIVITY_TIMEOUT_MS = INACTIVITY_WARNING_MS + 20 * 1000; // 5 min 20 sec - force logout
       
       // Check for inactivity timeout
       const lastActivity = localStorage.getItem(lastActivityKey);
@@ -34,8 +38,14 @@ export default function Home() {
           localStorage.removeItem(lastActivityKey);
           setToken(null);
           setUser(null);
+          setShowInactivityWarning(false);
           setLoading(false);
           return;
+        } else if (timeSinceActivity > INACTIVITY_WARNING_MS) {
+          // Show warning if inactive for 5+ minutes
+          const remainingTime = Math.ceil((INACTIVITY_TIMEOUT_MS - timeSinceActivity) / 1000);
+          setWarningCountdown(Math.max(0, remainingTime));
+          setShowInactivityWarning(true);
         }
       }
       
@@ -77,27 +87,45 @@ export default function Home() {
     
     checkSession();
     
-    // Set up inactivity monitoring - check every minute
+    // Set up inactivity monitoring - check every 10 seconds for more responsive warnings
     const inactivityCheckInterval = setInterval(() => {
       const lastActivityKey = 'ci.session.lastActivity';
       const lastActivity = localStorage.getItem(lastActivityKey);
-      const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
+      const INACTIVITY_WARNING_MS = 5 * 60 * 1000; // 5 minutes
+      const INACTIVITY_TIMEOUT_MS = INACTIVITY_WARNING_MS + 20 * 1000; // 5 min 20 sec
       
       if (lastActivity && token) {
         const lastActivityTime = parseInt(lastActivity, 10);
         const timeSinceActivity = Date.now() - lastActivityTime;
         
         if (timeSinceActivity > INACTIVITY_TIMEOUT_MS) {
-          // Force logout after 30 minutes of inactivity
+          // Force logout after 5 minutes 20 seconds of inactivity
           console.log('[Home] Auto-logout due to inactivity');
           handleLogout();
           clearInterval(inactivityCheckInterval);
+        } else if (timeSinceActivity > INACTIVITY_WARNING_MS) {
+          // Show warning if inactive for 5+ minutes
+          const remainingTime = Math.ceil((INACTIVITY_TIMEOUT_MS - timeSinceActivity) / 1000);
+          setWarningCountdown(Math.max(0, remainingTime));
+          setShowInactivityWarning(true);
+        } else {
+          setShowInactivityWarning(false);
         }
       }
-    }, 60 * 1000); // Check every minute
+    }, 10 * 1000); // Check every 10 seconds
     
     return () => clearInterval(inactivityCheckInterval);
   }, [router, token]);
+  
+  const handleContinueSession = () => {
+    // Update last activity time to reset the timer
+    localStorage.setItem('ci.session.lastActivity', Date.now().toString());
+    setShowInactivityWarning(false);
+  };
+  
+  const handleInactivityTimeout = () => {
+    handleLogout();
+  };
 
   const handleLogin = (token: string, user: any) => {
     setToken(token);
@@ -131,6 +159,17 @@ export default function Home() {
     return <Login onLogin={handleLogin} />;
   }
 
-  return <Dashboard user={user} token={token} onLogout={handleLogout} />;
+  return (
+    <>
+      {showInactivityWarning && (
+        <InactivityWarning
+          onContinue={handleContinueSession}
+          onTimeout={handleInactivityTimeout}
+          timeRemaining={warningCountdown}
+        />
+      )}
+      <Dashboard user={user} token={token} onLogout={handleLogout} />
+    </>
+  );
 }
 

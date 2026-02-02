@@ -46,9 +46,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check token age - if it's older than 30 minutes, don't refresh (force re-login)
-    const tokenAge = Date.now() / 1000 - (payload.iat || payload.exp - 30 * 60);
-    const MAX_TOKEN_AGE_SECONDS = 30 * 60; // 30 minutes
+    // Check token age - if it's older than 5 minutes 20 seconds, don't refresh (force re-login)
+    const tokenAge = Date.now() / 1000 - (payload.iat || payload.exp - (5 * 60 + 20));
+    const MAX_TOKEN_AGE_SECONDS = 5 * 60 + 20; // 5 minutes 20 seconds
     
     if (tokenAge > MAX_TOKEN_AGE_SECONDS) {
       return NextResponse.json(
@@ -57,12 +57,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create new token with 30-minute expiration
+    // Create new token with 5-minute 20-second expiration
     const newToken = createToken(userId);
 
     return NextResponse.json({
       token: newToken,
-      expiresIn: 30 * 60, // 30 minutes in seconds
+      expiresIn: 5 * 60 + 20, // 5 minutes 20 seconds in seconds
     });
   } catch (error: any) {
     console.error('[API] Token refresh error:', error);

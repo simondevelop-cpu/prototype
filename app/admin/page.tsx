@@ -47,7 +47,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabName>('inbox');
   const [monitoringSubTab, setMonitoringSubTab] = useState<MonitoringSubTab>('health');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
-  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'editing-events-data' | 'vanity-metrics' | 'download'>('cohort-analysis');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'editing-events-data' | 'sessions' | 'vanity-metrics' | 'download'>('cohort-analysis');
   const [inboxSubTab, setInboxSubTab] = useState<InboxSubTab>('feedback');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
@@ -490,6 +490,36 @@ export default function AdminDashboard() {
       fetchEditingEventsData();
     }
   }, [activeTab, analyticsSubTab, authenticated]);
+
+  useEffect(() => {
+    if (activeTab === 'analytics' && analyticsSubTab === 'sessions' && authenticated) {
+      fetchSessionsData();
+    }
+  }, [activeTab, analyticsSubTab, authenticated]);
+  
+  const fetchSessionsData = async () => {
+    setSessionsLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch('/api/admin/sessions', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch sessions');
+      }
+
+      const data = await response.json();
+      setSessionsData(data.sessions || []);
+    } catch (error: any) {
+      console.error('Error fetching sessions:', error);
+      setError(error.message);
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
 
   const fetchSurveyResponses = async () => {
     setSurveyResponsesLoading(true);
@@ -2358,7 +2388,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            📅 Events data
+            📅 All user events
           </button>
           <button
             onClick={() => setAnalyticsSubTab('editing-events-data')}
@@ -2368,7 +2398,17 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            ✏️ Editing events data
+            ✏️ Editing events
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('sessions')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'sessions'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            🔐 Sessions
           </button>
           <button
             onClick={() => setAnalyticsSubTab('vanity-metrics')}
@@ -3720,7 +3760,7 @@ export default function AdminDashboard() {
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="p-6 border-b border-gray-200 flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Editing events data</h2>
+                <h2 className="text-xl font-bold text-gray-900">Editing events</h2>
                 <p className="text-gray-600 mt-1">Transaction editing events - all changes made to transactions</p>
               </div>
               <div className="flex gap-2">
