@@ -3516,7 +3516,6 @@ export default function AdminDashboard() {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Province</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emotional State</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Financial Context</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Motivation</th>
@@ -3536,9 +3535,6 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4 text-sm text-gray-600 font-mono">{user.user_id || user.id || '-'}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {user.first_name || <span className="text-gray-400 italic">null</span>}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {user.province_region || <span className="text-gray-400 italic">null</span>}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
                           {user.emotional_state && user.emotional_state.length > 0
