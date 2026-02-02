@@ -4,15 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import { ADMIN_EMAIL, JWT_SECRET } from '@/lib/admin-constants';
+import { getPool } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
-
-const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL,
-});
 
 interface VanityFilters {
   totalAccounts?: boolean;
@@ -39,6 +35,11 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    const pool = getPool();
+    if (!pool) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
     // Parse query parameters
@@ -501,29 +502,101 @@ export async function GET(request: NextRequest) {
       const newUsersPerMonthResult = await pool.query(newUsersPerMonthQuery, [...filterParams, monthStart.toISOString().split('T')[0], monthEnd.toISOString().split('T')[0]]);
       const newUsersPerMonth = parseInt(newUsersPerMonthResult.rows[0]?.count) || 0;
 
-      // Total transactions recategorised (from categorization_learning table)
+      // Total transactions recategorised (unique transactions with at least one edit)
+      // Count distinct transaction IDs from transaction_edit and bulk_edit events
       let totalTransactionsRecategorised = 0;
       try {
-        const recatCheck = await pool.query(`
+        const eventsCheck = await pool.query(`
           SELECT 1 FROM information_schema.tables 
-          WHERE table_name = 'categorization_learning'
+          WHERE table_name = 'l1_events'
           LIMIT 1
         `);
-        if (recatCheck.rows.length > 0) {
-          const recatQuery = `
-            SELECT COUNT(*) as count
-            FROM categorization_learning cl
-            JOIN users u ON u.id = cl.user_id
-            WHERE u.email != $${adminEmailParamIndex}
-              AND cl.created_at >= $${paramIndex}::timestamp
-              AND cl.created_at <= $${paramIndex + 1}::timestamp
+        if (eventsCheck.rows.length > 0) {
+          // Get all transaction_edit events (single transaction per event)
+          const recatParamIndex = filterParams.length + 1;
+          const singleEditQuery = `
+            SELECT DISTINCT (e.metadata->>'transactionId')::int as transaction_id
+            FROM l1_events e
+            JOIN users u ON u.id = e.user_id
+            WHERE e.event_type = 'transaction_edit'
+              AND e.event_timestamp >= $${recatParamIndex}::timestamp
+              AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
+              AND u.email != $${adminEmailParamIndex}
+              AND e.metadata->>'transactionId' IS NOT NULL
               ${filterConditions}
           `;
-          const recatResult = await pool.query(recatQuery, [...filterParams, weekStart, weekEnd]);
-          totalTransactionsRecategorised = parseInt(recatResult.rows[0]?.count) || 0;
+          const singleEditResult = await pool.query(singleEditQuery, [...filterParams, weekStart, weekEnd]);
+          const singleEditIds = new Set(singleEditResult.rows.map((r: any) => r.transaction_id).filter((id: any) => id !== null));
+          
+          // Get all bulk_edit events (multiple transactions per event)
+          const bulkEditQuery = `
+            SELECT e.metadata->'transactionIds' as transaction_ids
+            FROM l1_events e
+            JOIN users u ON u.id = e.user_id
+            WHERE e.event_type = 'bulk_edit'
+              AND e.event_timestamp >= $${recatParamIndex}::timestamp
+              AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
+              AND u.email != $${adminEmailParamIndex}
+              AND e.metadata->'transactionIds' IS NOT NULL
+              ${filterConditions}
+          `;
+          const bulkEditResult = await pool.query(bulkEditQuery, [...filterParams, weekStart, weekEnd]);
+          bulkEditResult.rows.forEach((row: any) => {
+            const ids = row.transaction_ids;
+            if (Array.isArray(ids)) {
+              ids.forEach((id: any) => {
+                if (id !== null && id !== undefined) {
+                  singleEditIds.add(parseInt(id));
+                }
+              });
+            }
+          });
+          
+          totalTransactionsRecategorised = singleEditIds.size;
         }
       } catch (e) {
-        // categorization_learning table doesn't exist, recategorised = 0
+        // l1_events table doesn't exist or error, recategorised = 0
+        console.error('[Vanity Metrics] Error counting recategorised transactions:', e);
+      }
+
+      // Total statements uploaded (in the week)
+      let totalStatementsUploaded = 0;
+      try {
+        const statementsParamIndex = filterParams.length + 1;
+        const statementsQuery = `
+          SELECT COUNT(*) as count
+          FROM l1_events e
+          JOIN users u ON u.id = e.user_id
+          WHERE e.event_type = 'statement_upload'
+            AND e.event_timestamp >= $${statementsParamIndex}::timestamp
+            AND e.event_timestamp <= $${statementsParamIndex + 1}::timestamp
+            AND u.email != $${adminEmailParamIndex}
+            ${filterConditions}
+        `;
+        const statementsResult = await pool.query(statementsQuery, [...filterParams, weekStart, weekEnd]);
+        totalStatementsUploaded = parseInt(statementsResult.rows[0]?.count) || 0;
+      } catch (e) {
+        // l1_events table doesn't exist, statements = 0
+      }
+
+      // Total statements uploaded by unique person (in the week)
+      let totalStatementsByUniquePerson = 0;
+      try {
+        const uniqueStatementsParamIndex = filterParams.length + 1;
+        const uniqueStatementsQuery = `
+          SELECT COUNT(DISTINCT e.user_id) as count
+          FROM l1_events e
+          JOIN users u ON u.id = e.user_id
+          WHERE e.event_type = 'statement_upload'
+            AND e.event_timestamp >= $${uniqueStatementsParamIndex}::timestamp
+            AND e.event_timestamp <= $${uniqueStatementsParamIndex + 1}::timestamp
+            AND u.email != $${adminEmailParamIndex}
+            ${filterConditions}
+        `;
+        const uniqueStatementsResult = await pool.query(uniqueStatementsQuery, [...filterParams, weekStart, weekEnd]);
+        totalStatementsByUniquePerson = parseInt(uniqueStatementsResult.rows[0]?.count) || 0;
+      } catch (e) {
+        // l1_events table doesn't exist, unique statements = 0
       }
 
       metrics[weekKey] = {
@@ -533,7 +606,10 @@ export async function GET(request: NextRequest) {
         monthlyActiveUsers: mau,
         newUsersPerMonth,
         totalTransactionsUploaded: totalTransactions,
+        newTransactionsUploaded: newTransactions,
         totalTransactionsRecategorised,
+        totalStatementsUploaded,
+        totalStatementsByUniquePerson,
         totalUniqueBanksUploaded: uniqueBanks,
       };
     }

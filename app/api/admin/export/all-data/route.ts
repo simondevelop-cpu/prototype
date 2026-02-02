@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
 import * as XLSX from 'xlsx';
 import jwt from 'jsonwebtoken';
 import { ADMIN_EMAIL, JWT_SECRET } from '@/lib/admin-constants';
+import { getPool } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
-
-const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
-});
 
 /**
  * API endpoint documentation structure
@@ -87,7 +83,7 @@ function getAPIEndpoints(): APIEndpoint[] {
     { endpoint: '/api/admin/editing-events', method: 'GET', area: 'Admin', access: 'read', description: 'Get transaction editing events', authentication: 'admin', formula: 'SELECT from l1_events WHERE event_type = transaction_edit' },
     { endpoint: '/api/admin/recategorizations', method: 'GET', area: 'Admin', access: 'read', description: 'Get recategorization log', authentication: 'admin', formula: 'SELECT from categorization_learning' },
     { endpoint: '/api/admin/cohort-analysis', method: 'GET', area: 'Admin', access: 'read', description: 'Get cohort analysis data', authentication: 'admin', variables: 'totalAccounts, validatedEmails, cohorts, intentCategories, dataCoverage', formula: 'Complex aggregations from users (non-PII only), l1_transaction_facts (tokenized_user_id), l1_events (tokenized_user_id). NO PII access.' },
-    { endpoint: '/api/admin/vanity-metrics', method: 'GET', area: 'Admin', access: 'read', description: 'Get vanity metrics', authentication: 'admin', variables: 'totalAccounts, validatedEmails, intentCategories, cohorts, dataCoverage', formula: 'Aggregations from users (non-PII only), l1_transaction_facts (tokenized_user_id). NO PII access.' },
+    { endpoint: '/api/admin/vanity-metrics', method: 'GET', area: 'Admin', access: 'read', description: 'Get vanity metrics (Total users, WAU, MAU, New users, Transactions, Recategorizations, Statements, Unique banks)', authentication: 'admin', variables: 'totalAccounts, validatedEmails, intentCategories, cohorts, dataCoverage', formula: 'Aggregations from users (non-PII only), l1_transaction_facts (tokenized_user_id), l1_events (login, transaction_edit, bulk_edit, statement_upload events). NO PII access.' },
     { endpoint: '/api/admin/engagement-chart', method: 'GET', area: 'Admin', access: 'read', description: 'Get engagement chart data', authentication: 'admin', variables: 'totalAccounts, validatedEmails, cohorts, intentCategories, dataCoverage, userIds', formula: 'Time-series aggregations from l1_events (tokenized_user_id for analytics, user_id for operational), users (non-PII only). NO PII access.' },
     { endpoint: '/api/admin/health', method: 'GET', area: 'Admin', access: 'read', description: 'App health checks', authentication: 'admin', formula: 'Various database and compliance checks' },
     { endpoint: '/api/admin/privacy-policy-check', method: 'GET', area: 'Admin', access: 'read', description: 'Privacy policy compliance checks', authentication: 'admin', formula: 'Dynamic tests against privacy commitments' },

@@ -101,10 +101,15 @@ export async function GET(request: NextRequest) {
     // 3. Add Vanity Metrics Data Details sheet
     const vanityDataDetails = [
       { 'KPI / Metric': 'Total users (cumulative)', 'Formula / Calculation': 'COUNT(*) WHERE created_at <= weekEnd', 'Data Source': 'users table (created_at column, cumulative count up to end of week)' },
-      { 'KPI / Metric': 'Weekly active users', 'Formula / Calculation': "COUNT(DISTINCT user_id) WHERE event_type = 'login' AND event_timestamp BETWEEN weekStart AND weekEnd", 'Data Source': 'l1_events table (event_type, event_timestamp columns) JOIN l0_user_tokenization' },
+      { 'KPI / Metric': 'Weekly active users', 'Formula / Calculation': "COUNT(DISTINCT user_id) WHERE event_type = 'login' AND event_timestamp BETWEEN weekStart AND weekEnd", 'Data Source': 'l1_events table (event_type, event_timestamp columns) JOIN users table' },
       { 'KPI / Metric': 'New users', 'Formula / Calculation': 'COUNT(*) WHERE created_at BETWEEN weekStart AND weekEnd', 'Data Source': 'users table (created_at column, filtered by week)' },
-      { 'KPI / Metric': 'Transactions', 'Formula / Calculation': 'COUNT(*) WHERE transaction_date BETWEEN weekStart AND weekEnd', 'Data Source': 'l1_transaction_facts table (transaction_date column, filtered by week)' },
-      { 'KPI / Metric': 'Unique banks', 'Formula / Calculation': "COUNT(DISTINCT metadata->'bank') WHERE event_type IN ('statement_upload', 'statement_linked') AND event_timestamp BETWEEN weekStart AND weekEnd", 'Data Source': 'l1_events table (metadata JSONB column, event_type, event_timestamp columns)' },
+      { 'KPI / Metric': 'Monthly active users', 'Formula / Calculation': "COUNT(DISTINCT user_id) WHERE event_type = 'login' AND event_timestamp BETWEEN monthStart AND monthEnd", 'Data Source': 'l1_events table (event_type, event_timestamp columns) JOIN users table' },
+      { 'KPI / Metric': 'Total transactions uploaded (cumulative)', 'Formula / Calculation': 'COUNT(*) WHERE created_at <= weekEnd', 'Data Source': 'l1_transaction_facts table (created_at column, cumulative count up to end of week)' },
+      { 'KPI / Metric': 'New transactions uploaded', 'Formula / Calculation': 'COUNT(*) WHERE created_at BETWEEN weekStart AND weekEnd', 'Data Source': 'l1_transaction_facts table (created_at column, filtered by week)' },
+      { 'KPI / Metric': 'Total transactions recategorised', 'Formula / Calculation': "COUNT(DISTINCT transaction_id) FROM l1_events WHERE event_type IN ('transaction_edit', 'bulk_edit') AND event_timestamp BETWEEN weekStart AND weekEnd. For transaction_edit: metadata->>'transactionId'. For bulk_edit: extract all IDs from metadata->'transactionIds' array", 'Data Source': 'l1_events table (event_type, event_timestamp, metadata columns). Unique transaction IDs extracted from transaction_edit and bulk_edit events' },
+      { 'KPI / Metric': 'Total statements uploaded', 'Formula / Calculation': "COUNT(*) WHERE event_type = 'statement_upload' AND event_timestamp BETWEEN weekStart AND weekEnd", 'Data Source': 'l1_events table (event_type, event_timestamp columns)' },
+      { 'KPI / Metric': 'Total statements uploaded by unique person', 'Formula / Calculation': "COUNT(DISTINCT user_id) WHERE event_type = 'statement_upload' AND event_timestamp BETWEEN weekStart AND weekEnd", 'Data Source': 'l1_events table (event_type, event_timestamp, user_id columns)' },
+      { 'KPI / Metric': 'Total unique banks uploaded', 'Formula / Calculation': "COUNT(DISTINCT account) WHERE created_at BETWEEN weekStart AND weekEnd AND account IS NOT NULL", 'Data Source': 'l1_transaction_facts table (account, created_at columns)' },
     ];
     const vanityWorksheet = XLSX.utils.json_to_sheet(vanityDataDetails);
     vanityWorksheet['!cols'] = [
