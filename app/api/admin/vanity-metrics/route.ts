@@ -108,49 +108,64 @@ export async function GET(request: NextRequest) {
     const adminEmailParamIndex = paramIndex;
     paramIndex++;
 
-    // Find the earliest user creation date to start from
-    const earliestUserCheck = await pool.query(`
-      SELECT MIN(created_at) as earliest_date
-      FROM users
-      WHERE email != $1
-    `, [ADMIN_EMAIL]);
+    // Use the same week calculation as cohort analysis
+    // Helper function to format week consistently (adjust PostgreSQL Monday-start to Sunday-start for display)
+    const formatWeekLabel = (weekDate: any): string => {
+      if (!weekDate) return '';
+      const weekStart = new Date(weekDate);
+      const dayOfWeek = weekStart.getDay();
+      const adjustedWeekStart = new Date(weekStart);
+      if (dayOfWeek !== 0) {
+        adjustedWeekStart.setDate(weekStart.getDate() - dayOfWeek);
+      }
+      adjustedWeekStart.setHours(0, 0, 0, 0);
+      return `w/c ${adjustedWeekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    };
+
+    // Extract actual weeks from user data (same as cohort analysis)
+    // This ensures vanity metrics uses the same week boundaries as cohort analysis
+    const weeksQuery = `
+      SELECT DISTINCT DATE_TRUNC('week', u.created_at) as signup_week
+      FROM users u
+      WHERE u.email != $1
+        ${filterConditions}
+      ORDER BY signup_week DESC
+      LIMIT 12
+    `;
+    const weeksResult = await pool.query(weeksQuery, [...filterParams]);
     
-    const earliestDateStr = earliestUserCheck.rows[0]?.earliest_date;
-    let weekStartDate: Date;
+    // Extract and format weeks from query results
+    const weeksSet = new Set<string>();
+    weeksResult.rows.forEach((row: any) => {
+      if (row.signup_week) {
+        weeksSet.add(formatWeekLabel(row.signup_week));
+      }
+    });
     
-    if (earliestDateStr) {
-      // Start from the earliest user's creation date (rounded to start of week)
-      weekStartDate = new Date(earliestDateStr);
-      // Round to start of week (Sunday)
-      const dayOfWeek = weekStartDate.getDay();
-      weekStartDate.setDate(weekStartDate.getDate() - dayOfWeek);
-      weekStartDate.setHours(0, 0, 0, 0);
-    } else {
-      // Fallback: if no users, start from 12 weeks ago
-      weekStartDate = new Date();
-      weekStartDate.setDate(weekStartDate.getDate() - (12 * 7));
-      weekStartDate.setDate(weekStartDate.getDate() - weekStartDate.getDay()); // Round to Sunday
-      weekStartDate.setHours(0, 0, 0, 0);
-    }
-
-    // Calculate weeks from earliest user to current week
-    const now = new Date();
-    const currentWeekStart = new Date(now);
-    currentWeekStart.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
-    currentWeekStart.setHours(0, 0, 0, 0);
-
-    // Calculate number of weeks
-    const weeksDiff = Math.ceil((currentWeekStart.getTime() - weekStartDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
-    const numWeeks = Math.max(1, weeksDiff + 1); // At least 1 week
-
-    // Generate all possible weeks
-    const allWeeks: string[] = [];
-    for (let i = 0; i < numWeeks; i++) {
-      const weekStart = new Date(weekStartDate);
-      weekStart.setDate(weekStartDate.getDate() + (i * 7));
-      const weekLabel = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-      allWeeks.push(weekLabel);
-    }
+    // Sort weeks (most recent first) and ensure unique
+    const allWeeks = Array.from(weeksSet).sort((a, b) => {
+      // Parse dates more carefully - handle format "DD MMM YYYY" (e.g., "20 Oct 2025")
+      const parseWeekDate = (weekStr: string): Date | null => {
+        const match = weekStr.match(/w\/c (\d+) (\w+) (\d+)/);
+        if (match) {
+          const day = parseInt(match[1]);
+          const monthName = match[2];
+          const year = parseInt(match[3]);
+          const monthMap: { [key: string]: number } = {
+            'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+            'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+          };
+          const month = monthMap[monthName] ?? 0;
+          return new Date(year, month, day);
+        }
+        return null;
+      };
+      
+      const dateA = parseWeekDate(a);
+      const dateB = parseWeekDate(b);
+      if (!dateA || !dateB) return 0;
+      return dateB.getTime() - dateA.getTime(); // Most recent first
+    });
     
     // Filter weeks based on cohort filter (if specified)
     // If cohorts filter is empty, show all weeks
@@ -158,17 +173,36 @@ export async function GET(request: NextRequest) {
       ? allWeeks.filter(week => filters.cohorts!.includes(week))
       : allWeeks;
 
+    // Helper function to parse week label back to dates
+    const parseWeekLabel = (weekStr: string): { weekStart: Date; weekEnd: Date } | null => {
+      const match = weekStr.match(/w\/c (\d+) (\w+) (\d+)/);
+      if (match) {
+        const day = parseInt(match[1]);
+        const monthName = match[2];
+        const year = parseInt(match[3]);
+        const monthMap: { [key: string]: number } = {
+          'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+          'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+        };
+        const month = monthMap[monthName] ?? 0;
+        const weekStart = new Date(year, month, day);
+        weekStart.setHours(0, 0, 0, 0);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+        return { weekStart, weekEnd };
+      }
+      return null;
+    };
+
     // Get metrics for each week (only for weeks that should be displayed)
     const metrics: { [week: string]: any } = {};
 
-    for (let i = 0; i < numWeeks; i++) {
-      const weekStart = new Date(weekStartDate);
-      weekStart.setDate(weekStartDate.getDate() + (i * 7));
-      weekStart.setHours(0, 0, 0, 0);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
-      const weekKey = `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    for (const weekKey of weeks) {
+      const weekDates = parseWeekLabel(weekKey);
+      if (!weekDates) continue;
+      
+      const { weekStart, weekEnd } = weekDates;
 
       // Total users (cumulative up to end of week)
       // Use DATE_TRUNC to ensure we're comparing dates correctly

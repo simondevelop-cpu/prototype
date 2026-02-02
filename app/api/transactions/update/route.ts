@@ -21,7 +21,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const userId = payload.sub;
+    const userId = typeof payload.sub === 'number' ? payload.sub : parseInt(payload.sub, 10);
+    if (isNaN(userId)) {
+      return NextResponse.json({ error: 'Invalid user ID' }, { status: 401 });
+    }
+    
     const pool = getPool();
     if (!pool) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });

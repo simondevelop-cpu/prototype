@@ -27,9 +27,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const userId = decoded.userId || decoded.id || decoded.sub;
-    if (!userId) {
+    const userIdRaw = decoded.userId || decoded.id || decoded.sub;
+    if (!userIdRaw) {
       return NextResponse.json({ error: 'Invalid token: no user ID' }, { status: 401 });
+    }
+    const userId = typeof userIdRaw === 'number' ? userIdRaw : parseInt(userIdRaw, 10);
+    if (isNaN(userId)) {
+      return NextResponse.json({ error: 'Invalid user ID' }, { status: 401 });
     }
 
     const pool = getPool();

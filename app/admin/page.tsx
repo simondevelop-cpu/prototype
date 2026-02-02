@@ -3663,6 +3663,9 @@ export default function AdminDashboard() {
           </div>
         )}
         
+        {/* Editing Events Data Tab - Shows transaction editing events from l1_events table
+            Events are logged when users edit transactions (category, label, amount, etc.)
+            This tab displays all transaction_edit events with change details */}
         {analyticsSubTab === 'editing-events-data' && (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="p-6 border-b border-gray-200 flex justify-between items-center">
