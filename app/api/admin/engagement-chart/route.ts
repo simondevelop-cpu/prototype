@@ -230,14 +230,15 @@ export async function GET(request: NextRequest) {
           weekEnd.setHours(23, 59, 59, 999);
           
           // Get unique login days in this week
+          // Note: We use user_id (internal ID) since login events are logged with internal user_id
           const loginDaysResult = await pool.query(`
             SELECT COUNT(DISTINCT DATE(event_timestamp)) as login_days
             FROM l1_events
             WHERE user_id = $1
               AND event_type = 'login'
-              AND event_timestamp >= $2
-              AND event_timestamp <= $3
-          `, [user.id, weekStart, weekEnd]);
+              AND event_timestamp >= $2::timestamp
+              AND event_timestamp <= $3::timestamp
+          `, [user.id, weekStart.toISOString(), weekEnd.toISOString()]);
           
           const loginDays = parseInt(loginDaysResult.rows[0]?.login_days) || 0;
           weeks.push({ week: weekNum, loginDays });
@@ -271,11 +272,28 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Debug: Log summary of what we found
+    const totalLoginEvents = hasUserEvents ? await pool.query(
+      'SELECT COUNT(*) as count FROM l1_events WHERE event_type = $1',
+      ['login']
+    ).then((r: any) => parseInt(r.rows[0]?.count || '0')) : 0;
+    
+    const usersWithLogins = userLines.filter((ul: any) => 
+      ul.weeks.some((w: any) => w.loginDays > 0)
+    ).length;
+
+    console.log(`[Engagement Chart] Found ${userLines.length} users, ${usersWithLogins} with login data, ${totalLoginEvents} total login events in l1_events`);
+
     return NextResponse.json({
       success: true,
       userLines,
       filters,
       hasUserEvents,
+      debug: {
+        totalUsers: userLines.length,
+        usersWithLogins,
+        totalLoginEvents,
+      },
     }, { status: 200 });
 
   } catch (error: any) {
