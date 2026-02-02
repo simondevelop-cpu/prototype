@@ -124,7 +124,7 @@ function getTableDescription(tableName: string): string {
     'l1_transaction_facts': 'Transaction facts table. Contains all financial transactions with normalized data. Uses tokenized_user_id for PII isolation. See Foreign Keys sheet for relationships.',
     'l2_aggregated_insights': 'Aggregated insights table. Pre-computed financial summaries and analytics.',
     'onboarding_responses': 'User onboarding responses. Stores answers from the onboarding flow (non-PII only - PII migrated to l0_pii_users).',
-    'l1_events': 'Event facts table. Tracks all user and admin actions, consent events, and system events. Replaces user_events. Uses user_id for operational events. See Foreign Keys sheet for relationships.',
+    'l1_events': 'Event facts table. Tracks all user and admin actions, consent events, and system events. Uses user_id for operational queries, tokenized_user_id for analytics. See Foreign Keys sheet for relationships.',
     'l1_customer_facts': 'Customer facts table. Contains anonymized customer attributes and analytics classifications (user_segment). Uses tokenized_user_id. See Foreign Keys sheet for relationships.',
     'l0_user_tokenization': 'User tokenization mapping. Maps internal_user_id to tokenized_user_id for analytics (PII isolation). See Foreign Keys sheet for relationships.',
     'l2_customer_summary_view': 'Customer summary view. Aggregated metrics per user using l1_transaction_facts.',
