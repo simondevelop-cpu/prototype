@@ -57,22 +57,26 @@ DECLARE
 BEGIN
   -- Find all foreign key constraints on l1_events.user_id
   FOR constraint_rec IN
-    SELECT constraint_name
+    SELECT tc.constraint_name
     FROM information_schema.table_constraints tc
     JOIN information_schema.key_column_usage kcu 
       ON tc.constraint_name = kcu.constraint_name
+      AND tc.table_schema = kcu.table_schema
     WHERE tc.table_name = 'l1_events'
       AND tc.constraint_type = 'FOREIGN KEY'
       AND kcu.column_name = 'user_id'
-    ORDER BY constraint_name
+      AND tc.table_schema = 'public'
+    ORDER BY tc.constraint_name
   LOOP
     SELECT COUNT(*) INTO constraint_count
-    FROM information_schema.table_constraints tc
-    JOIN information_schema.key_column_usage kcu 
-      ON tc.constraint_name = kcu.constraint_name
-    WHERE tc.table_name = 'l1_events'
-      AND tc.constraint_type = 'FOREIGN KEY'
-      AND kcu.column_name = 'user_id';
+    FROM information_schema.table_constraints tc2
+    JOIN information_schema.key_column_usage kcu2 
+      ON tc2.constraint_name = kcu2.constraint_name
+      AND tc2.table_schema = kcu2.table_schema
+    WHERE tc2.table_name = 'l1_events'
+      AND tc2.constraint_type = 'FOREIGN KEY'
+      AND kcu2.column_name = 'user_id'
+      AND tc2.table_schema = 'public';
     
     -- If more than one constraint, drop the ones with longer names (usually duplicates)
     IF constraint_count > 1 THEN
