@@ -95,9 +95,30 @@ async function initializeTables() {
         event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         metadata JSONB,
         is_admin BOOLEAN DEFAULT FALSE,
+        session_id TEXT,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (tokenized_user_id) REFERENCES l0_user_tokenization(tokenized_user_id)
       )
+    `);
+    
+    // Add session_id column if it doesn't exist (for existing tables)
+    await client.query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'l1_events' AND column_name = 'session_id'
+        ) THEN
+          ALTER TABLE l1_events ADD COLUMN session_id TEXT;
+        END IF;
+      END $$;
+    `);
+    
+    // Create index for session queries
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_l1_events_session_id 
+      ON l1_events(session_id) 
+      WHERE session_id IS NOT NULL;
     `);
     console.log('[DB Init] ✅ l1_events table created');
     

@@ -231,8 +231,9 @@ export async function GET(request: NextRequest) {
           
           // Get unique login days in this week
           // Note: We use user_id (internal ID) since login events are logged with internal user_id
+          // Use DATE_TRUNC('day', ...) instead of DATE() for better PostgreSQL compatibility
           const loginDaysResult = await pool.query(`
-            SELECT COUNT(DISTINCT DATE(event_timestamp)) as login_days
+            SELECT COUNT(DISTINCT DATE_TRUNC('day', event_timestamp)) as login_days
             FROM l1_events
             WHERE user_id = $1
               AND event_type = 'login'

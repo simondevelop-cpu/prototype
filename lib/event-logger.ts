@@ -6,6 +6,50 @@ import { getPool } from './db';
 import { hashPassword } from './auth';
 import crypto from 'crypto';
 
+/**
+ * Get or create session ID for a user
+ * Sessions are tracked per user and expire after 30 minutes of inactivity
+ * Session ID format: {userId}_{timestamp}_{random}
+ */
+async function getOrCreateSessionId(pool: any, userId: number): Promise<string> {
+  try {
+    // Check for recent session (within 30 minutes)
+    const recentSessionResult = await pool.query(
+      `SELECT session_id FROM l1_events 
+       WHERE user_id = $1 
+         AND session_id IS NOT NULL
+         AND event_timestamp > NOW() - INTERVAL '30 minutes'
+       ORDER BY event_timestamp DESC 
+       LIMIT 1`,
+      [userId]
+    );
+    
+    if (recentSessionResult.rows.length > 0) {
+      const existingSessionId = recentSessionResult.rows[0].session_id;
+      // Parse timestamp from session ID (format: userId_timestamp_random)
+      const parts = existingSessionId.split('_');
+      if (parts.length >= 2) {
+        const sessionTimestamp = parseInt(parts[1], 10);
+        const now = Date.now();
+        const thirtyMinutes = 30 * 60 * 1000;
+        
+        // If session is less than 30 minutes old, reuse it
+        if (!isNaN(sessionTimestamp) && (now - sessionTimestamp) < thirtyMinutes) {
+          return existingSessionId;
+        }
+      }
+    }
+  } catch (error) {
+    // If query fails (e.g., session_id column doesn't exist yet), continue to create new session
+    console.warn('[Event Logger] Could not check for existing session, creating new one:', error);
+  }
+  
+  // Create new session ID
+  const timestamp = Date.now();
+  const random = crypto.randomBytes(4).toString('hex');
+  return `${userId}_${timestamp}_${random}`;
+}
+
 export interface BankStatementEventMetadata {
   bank: string;
   accountType: string;
@@ -31,16 +75,20 @@ export async function logBankStatementEvent(
     const eventType = metadata.source === 'uploaded' ? 'statement_upload' : 'statement_linked';
     
     // Get tokenized_user_id for analytics
+    const numericUserId = typeof userId === 'number' ? userId : parseInt(String(userId), 10);
     const tokenizedResult = await pool.query(
       'SELECT tokenized_user_id FROM l0_user_tokenization WHERE internal_user_id = $1',
-      [userId]
+      [numericUserId]
     );
     const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id || null;
     
+    // Get or create session ID
+    const sessionId = await getOrCreateSessionId(pool, numericUserId);
+    
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin)
-       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE)`,
-      [userId, tokenizedUserId, eventType, JSON.stringify(metadata)]
+      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
+      [numericUserId, tokenizedUserId, eventType, JSON.stringify(metadata), sessionId]
     );
     
     console.log(`[Event Logger] Logged ${eventType} event for user ${userId}`);
@@ -70,16 +118,20 @@ export async function logFeedbackEvent(
 
   try {
     // Get tokenized_user_id for analytics
+    const numericUserId = typeof userId === 'number' ? userId : parseInt(String(userId), 10);
     const tokenizedResult = await pool.query(
       'SELECT tokenized_user_id FROM l0_user_tokenization WHERE internal_user_id = $1',
-      [userId]
+      [numericUserId]
     );
     const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id || null;
     
+    // Get or create session ID
+    const sessionId = await getOrCreateSessionId(pool, numericUserId);
+    
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin)
-       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE)`,
-      [userId, tokenizedUserId, 'feedback', JSON.stringify(feedbackData)]
+      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
+      [numericUserId, tokenizedUserId, 'feedback', JSON.stringify(feedbackData), sessionId]
     );
     
     console.log(`[Event Logger] Logged feedback event for user ${userId}`);
@@ -118,16 +170,20 @@ export async function logConsentEvent(
     };
 
     // Get tokenized_user_id for analytics
+    const numericUserId = typeof userId === 'number' ? userId : parseInt(String(userId), 10);
     const tokenizedResult = await pool.query(
       'SELECT tokenized_user_id FROM l0_user_tokenization WHERE internal_user_id = $1',
-      [userId]
+      [numericUserId]
     );
     const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id || null;
     
+    // Get or create session ID (for account creation, use new session; for others, try to get existing)
+    const sessionId = await getOrCreateSessionId(pool, numericUserId);
+    
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin)
-       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE)`,
-      [userId, tokenizedUserId, 'consent', JSON.stringify(eventMetadata)]
+      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
+      [numericUserId, tokenizedUserId, 'consent', JSON.stringify(eventMetadata), sessionId]
     );
     
     console.log(`[Event Logger] Logged consent event (${consentType}) for user ${userId}`);
@@ -170,14 +226,17 @@ export async function logTransactionEditEvent(
     );
     const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id || null;
     
+    // Get or create session ID
+    const sessionId = await getOrCreateSessionId(pool, userIdNum);
+    
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin)
-       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE)`,
+      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
       [userIdNum, tokenizedUserId, 'transaction_edit', JSON.stringify({
         transactionId,
         changes,
         timestamp: new Date().toISOString(),
-      })]
+      }), sessionId]
     );
     
     console.log(`[Event Logger] Logged transaction edit event for user ${userIdNum}, transaction ${transactionId} with ${changes.length} changes`);
@@ -223,15 +282,18 @@ export async function logBulkEditEvent(
     );
     const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id || null;
     
+    // Get or create session ID
+    const sessionId = await getOrCreateSessionId(pool, userIdNum);
+    
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin)
-       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE)`,
+      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
       [userIdNum, tokenizedUserId, 'bulk_edit', JSON.stringify({
         transactionIds,
         fieldsUpdated,
         transactionCount,
         timestamp: new Date().toISOString(),
-      })]
+      }), sessionId]
     );
     
     console.log(`[Event Logger] Logged bulk edit event for user ${userIdNum}, ${transactionCount} transactions`);
@@ -271,12 +333,15 @@ export async function logUserLoginEvent(userId: string | number): Promise<void> 
     );
     const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id || null;
     
+    // Get or create session ID
+    const sessionId = await getOrCreateSessionId(pool, numericUserId);
+    
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin)
-       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE)`,
+      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
       [numericUserId, tokenizedUserId, 'login', JSON.stringify({
         timestamp: new Date().toISOString(),
-      })]
+      }), sessionId]
     );
     
     console.log(`[Event Logger] Logged login event for user ${numericUserId}`);
