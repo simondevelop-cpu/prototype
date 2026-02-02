@@ -241,11 +241,10 @@ export async function GET(request: NextRequest) {
       // Apply data coverage filter to total users if specified
       if (filters.dataCoverage && filters.dataCoverage.length > 0 && totalUsers > 0) {
         const usersWithCoverageQuery = `
-          SELECT u.id, COUNT(DISTINCT COALESCE(tf.id, t.id)) as tx_count
+          SELECT u.id, COUNT(DISTINCT tf.id) as tx_count
           FROM users u
           LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
           LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-          LEFT JOIN transactions t ON u.id = t.user_id AND tf.id IS NULL
           WHERE u.email != $${adminEmailParamIndex}
             AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex}::date)
             ${filterConditions}
@@ -303,9 +302,10 @@ export async function GET(request: NextRequest) {
       // Apply data coverage filter to new users if specified
       if (filters.dataCoverage && filters.dataCoverage.length > 0 && newUsers > 0) {
         const newUsersWithCoverageQuery = `
-          SELECT u.id, COUNT(DISTINCT t.id) as tx_count
+          SELECT u.id, COUNT(DISTINCT tf.id) as tx_count
           FROM users u
-          LEFT JOIN transactions t ON t.user_id = u.id
+          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
           WHERE u.email != $${adminEmailParamIndex}
             AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
             AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
@@ -328,11 +328,12 @@ export async function GET(request: NextRequest) {
       const newTransactionsParamIndex = filterParams.length;
       let newTransactionsQuery = `
         SELECT COUNT(*) as count
-        FROM transactions t
-        JOIN users u ON u.id = t.user_id
+        FROM l1_transaction_facts tf
+        JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
+        JOIN users u ON ut.internal_user_id = u.id
         WHERE u.email != $${adminEmailParamIndex}
-          AND t.created_at >= $${newTransactionsParamIndex + 1}::timestamp
-          AND t.created_at <= $${newTransactionsParamIndex + 2}::timestamp
+          AND tf.created_at >= $${newTransactionsParamIndex + 1}::timestamp
+          AND tf.created_at <= $${newTransactionsParamIndex + 2}::timestamp
           ${filterConditions}
       `;
       let newTransactions = 0;
@@ -342,10 +343,11 @@ export async function GET(request: NextRequest) {
       const totalTransactionsParamIndex = filterParams.length;
       let totalTransactionsQuery = `
         SELECT COUNT(*) as count
-        FROM transactions t
-        JOIN users u ON u.id = t.user_id
+        FROM l1_transaction_facts tf
+        JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
+        JOIN users u ON ut.internal_user_id = u.id
         WHERE u.email != $${adminEmailParamIndex}
-          AND t.created_at <= $${totalTransactionsParamIndex + 1}::timestamp
+          AND tf.created_at <= $${totalTransactionsParamIndex + 1}::timestamp
           ${filterConditions}
       `;
       let totalTransactions = 0;
@@ -356,24 +358,26 @@ export async function GET(request: NextRequest) {
         const usersWithCoverageQuery = `
           SELECT DISTINCT u.id
           FROM users u
-          LEFT JOIN transactions t2 ON t2.user_id = u.id
+          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
           WHERE u.email != $${adminEmailParamIndex}
             ${filterConditions}
           GROUP BY u.id
           HAVING 
-            ${filters.dataCoverage.includes('1 upload') ? 'COUNT(DISTINCT t2.id) >= 1' : 'false'}
-            ${filters.dataCoverage.includes('2 uploads') ? 'OR COUNT(DISTINCT t2.id) >= 2' : ''}
-            ${filters.dataCoverage.includes('3+ uploads') ? 'OR COUNT(DISTINCT t2.id) >= 3' : ''}
+            ${filters.dataCoverage.includes('1 upload') ? 'COUNT(DISTINCT tf.id) >= 1' : 'false'}
+            ${filters.dataCoverage.includes('2 uploads') ? 'OR COUNT(DISTINCT tf.id) >= 2' : ''}
+            ${filters.dataCoverage.includes('3+ uploads') ? 'OR COUNT(DISTINCT tf.id) >= 3' : ''}
         `;
         const usersWithCoverage = await pool.query(usersWithCoverageQuery, filterParams);
         const userIds = usersWithCoverage.rows.map((r: any) => r.id);
         if (userIds.length > 0) {
           const filteredNewTransactionsQuery = `
             SELECT COUNT(*) as count
-            FROM transactions t
-            WHERE t.user_id = ANY($1::int[])
-              AND t.created_at >= $2::timestamp
-              AND t.created_at <= $3::timestamp
+            FROM l1_transaction_facts tf
+            JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
+            WHERE ut.internal_user_id = ANY($1::int[])
+              AND tf.created_at >= $2::timestamp
+              AND tf.created_at <= $3::timestamp
           `;
           const filteredResult = await pool.query(filteredNewTransactionsQuery, [userIds, weekStart.toISOString(), weekEnd.toISOString()]);
           newTransactions = parseInt(filteredResult.rows[0]?.count) || 0;
@@ -392,23 +396,25 @@ export async function GET(request: NextRequest) {
         const usersWithCoverageQuery = `
           SELECT DISTINCT u.id
           FROM users u
-          LEFT JOIN transactions t2 ON t2.user_id = u.id
+          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
           WHERE u.email != $${adminEmailParamIndex}
             ${filterConditions}
           GROUP BY u.id
           HAVING 
-            ${filters.dataCoverage.includes('1 upload') ? 'COUNT(DISTINCT t2.id) >= 1' : 'false'}
-            ${filters.dataCoverage.includes('2 uploads') ? 'OR COUNT(DISTINCT t2.id) >= 2' : ''}
-            ${filters.dataCoverage.includes('3+ uploads') ? 'OR COUNT(DISTINCT t2.id) >= 3' : ''}
+            ${filters.dataCoverage.includes('1 upload') ? 'COUNT(DISTINCT tf.id) >= 1' : 'false'}
+            ${filters.dataCoverage.includes('2 uploads') ? 'OR COUNT(DISTINCT tf.id) >= 2' : ''}
+            ${filters.dataCoverage.includes('3+ uploads') ? 'OR COUNT(DISTINCT tf.id) >= 3' : ''}
         `;
         const usersWithCoverage = await pool.query(usersWithCoverageQuery, filterParams);
         const userIds = usersWithCoverage.rows.map((r: any) => r.id);
         if (userIds.length > 0) {
           const filteredTotalTransactionsQuery = `
             SELECT COUNT(*) as count
-            FROM transactions t
-            WHERE t.user_id = ANY($1::int[])
-              AND t.created_at <= $2::timestamp
+            FROM l1_transaction_facts tf
+            JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
+            WHERE ut.internal_user_id = ANY($1::int[])
+              AND tf.created_at <= $2::timestamp
           `;
           const filteredResult = await pool.query(filteredTotalTransactionsQuery, [userIds, weekEnd.toISOString()]);
           totalTransactions = parseInt(filteredResult.rows[0]?.count) || 0;
@@ -421,13 +427,14 @@ export async function GET(request: NextRequest) {
 
       // Total unique banks uploaded (in the week)
       const banksQuery = `
-        SELECT COUNT(DISTINCT t.account) as count
-        FROM transactions t
-        JOIN users u ON u.id = t.user_id
+        SELECT COUNT(DISTINCT tf.account) as count
+        FROM l1_transaction_facts tf
+        JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
+        JOIN users u ON ut.internal_user_id = u.id
         WHERE u.email != $${adminEmailParamIndex}
-          AND t.created_at >= $${paramIndex}::timestamp
-          AND t.created_at <= $${paramIndex + 1}::timestamp
-          AND t.account IS NOT NULL
+          AND tf.created_at >= $${paramIndex}::timestamp
+          AND tf.created_at <= $${paramIndex + 1}::timestamp
+          AND tf.account IS NOT NULL
           ${filterConditions}
       `;
       const banksResult = await pool.query(banksQuery, [...filterParams, weekStart, weekEnd]);
