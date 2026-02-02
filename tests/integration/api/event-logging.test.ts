@@ -231,6 +231,10 @@ describe('Event Logging', () => {
 
       const response = await bulkUpdateHandler(request);
       expect(response.status).toBe(200);
+      
+      // Verify the response indicates updates were made
+      const responseData = await response.json();
+      expect(responseData.updatedCount).toBeGreaterThan(0);
 
       const events = await testClient.query(
         `SELECT event_type, user_id, metadata FROM l1_events WHERE event_type = 'bulk_edit'`
