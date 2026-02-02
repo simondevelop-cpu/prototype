@@ -12,17 +12,16 @@ export function getPool(): Pool | null {
     let connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
     
     // Fix SSL mode warning by explicitly setting sslmode in connection string
-    // For managed databases (Vercel Postgres, Neon, etc.), use 'require' with libpq compatibility
-    // This prevents the deprecation warning while maintaining compatibility
+    // The warning recommends using 'verify-full' to maintain current behavior
+    // This prevents the deprecation warning
     if (useSSL && connectionString) {
       // Remove any existing sslmode/uselibpqcompat parameters to avoid conflicts
       connectionString = connectionString.replace(/[?&]sslmode=[^&]*/g, '');
       connectionString = connectionString.replace(/[?&]uselibpqcompat=[^&]*/g, '');
       
-      // Add sslmode parameter with libpq compatibility to avoid deprecation warning
-      // Using 'require' with uselibpqcompat=true as recommended by the warning
+      // Add sslmode parameter as recommended by the warning to maintain current behavior
       const separator = connectionString.includes('?') ? '&' : '?';
-      connectionString = `${connectionString}${separator}uselibpqcompat=true&sslmode=require`;
+      connectionString = `${connectionString}${separator}sslmode=verify-full`;
     }
     
     pool = new Pool({

@@ -248,6 +248,45 @@ export async function logBulkEditEvent(
 }
 
 /**
+ * Log a user login event (for WAU/MAU tracking)
+ */
+export async function logUserLoginEvent(userId: string | number): Promise<void> {
+  const pool = getPool();
+  if (!pool) {
+    console.warn('[Event Logger] Database not available, skipping login event log');
+    return;
+  }
+
+  try {
+    const numericUserId = typeof userId === 'string' ? parseInt(userId, 10) : userId;
+    if (isNaN(numericUserId)) {
+      console.error('[Event Logger] Invalid userId provided for login event:', userId);
+      return;
+    }
+
+    // Get tokenized_user_id for analytics
+    const tokenizedResult = await pool.query(
+      'SELECT tokenized_user_id FROM l0_user_tokenization WHERE internal_user_id = $1',
+      [numericUserId]
+    );
+    const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id || null;
+    
+    await pool.query(
+      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin)
+       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE)`,
+      [numericUserId, tokenizedUserId, 'login', JSON.stringify({
+        timestamp: new Date().toISOString(),
+      })]
+    );
+    
+    console.log(`[Event Logger] Logged login event for user ${numericUserId}`);
+  } catch (error: any) {
+    // Don't throw - event logging should not break the main flow
+    console.error('[Event Logger] Failed to log login event:', error);
+  }
+}
+
+/**
  * Log an admin event (login, tab access, etc.)
  */
 export async function logAdminEvent(

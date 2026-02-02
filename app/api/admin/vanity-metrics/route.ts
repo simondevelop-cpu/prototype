@@ -270,17 +270,20 @@ export async function GET(request: NextRequest) {
           LIMIT 1
         `);
         if (eventsCheck.rows.length > 0) {
+          // Build WAU query with correct parameter order
+          // filterParams come first, then weekStart and weekEnd
+          const wauParamIndex = filterParams.length + 1;
           const wauQuery = `
             SELECT COUNT(DISTINCT e.user_id) as count
             FROM l1_events e
             JOIN users u ON u.id = e.user_id
             WHERE e.event_type = 'login'
-              AND e.event_timestamp >= $${paramIndex}::timestamp
-              AND e.event_timestamp <= $${paramIndex + 1}::timestamp
+              AND e.event_timestamp >= $${wauParamIndex}::timestamp
+              AND e.event_timestamp <= $${wauParamIndex + 1}::timestamp
               AND u.email != $${adminEmailParamIndex}
               ${filterConditions}
           `;
-          const wauResult = await pool.query(wauQuery, [weekStart, weekEnd, ...filterParams]);
+          const wauResult = await pool.query(wauQuery, [...filterParams, weekStart, weekEnd]);
           wau = parseInt(wauResult.rows[0]?.count) || 0;
         }
       } catch (e) {
@@ -323,31 +326,31 @@ export async function GET(request: NextRequest) {
       }
 
       // New transactions uploaded (in the week) - apply data coverage filter if specified
-      // filterParams length tells us how many params are already in the array
-      // weekStart and weekEnd will be at positions filterParams.length and filterParams.length+1
-      const newTransactionsParamIndex = filterParams.length;
+      // filterParams already includes ADMIN_EMAIL and any filter params
+      // weekStart and weekEnd will be appended, so they're at positions filterParams.length + 1 and filterParams.length + 2
+      const newTransactionsDateParamIndex = filterParams.length + 1;
       let newTransactionsQuery = `
         SELECT COUNT(*) as count
         FROM l1_transaction_facts tf
         JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
         JOIN users u ON ut.internal_user_id = u.id
         WHERE u.email != $${adminEmailParamIndex}
-          AND tf.created_at >= $${newTransactionsParamIndex + 1}::timestamp
-          AND tf.created_at <= $${newTransactionsParamIndex + 2}::timestamp
+          AND tf.created_at >= $${newTransactionsDateParamIndex}::timestamp
+          AND tf.created_at <= $${newTransactionsDateParamIndex + 1}::timestamp
           ${filterConditions}
       `;
       let newTransactions = 0;
       
       // Total transactions uploaded (cumulative up to end of week) - apply data coverage filter if specified
-      // weekEnd will be at position filterParams.length
-      const totalTransactionsParamIndex = filterParams.length;
+      // weekEnd will be appended to filterParams, so it's at position filterParams.length + 1
+      const totalTransactionsDateParamIndex = filterParams.length + 1;
       let totalTransactionsQuery = `
         SELECT COUNT(*) as count
         FROM l1_transaction_facts tf
         JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
         JOIN users u ON ut.internal_user_id = u.id
         WHERE u.email != $${adminEmailParamIndex}
-          AND tf.created_at <= $${totalTransactionsParamIndex + 1}::timestamp
+          AND tf.created_at <= $${totalTransactionsDateParamIndex}::timestamp
           ${filterConditions}
       `;
       let totalTransactions = 0;
@@ -458,17 +461,20 @@ export async function GET(request: NextRequest) {
           monthEnd.setDate(0); // Last day of month
           monthEnd.setHours(23, 59, 59, 999);
           
+          // Build MAU query with correct parameter order
+          // filterParams come first, then monthStart and monthEnd
+          const mauParamIndex = filterParams.length + 1;
           const mauQuery = `
             SELECT COUNT(DISTINCT e.user_id) as count
             FROM l1_events e
             JOIN users u ON u.id = e.user_id
             WHERE e.event_type = 'login'
-              AND e.event_timestamp >= $${paramIndex}::timestamp
-              AND e.event_timestamp <= $${paramIndex + 1}::timestamp
+              AND e.event_timestamp >= $${mauParamIndex}::timestamp
+              AND e.event_timestamp <= $${mauParamIndex + 1}::timestamp
               AND u.email != $${adminEmailParamIndex}
               ${filterConditions}
           `;
-          const mauResult = await pool.query(mauQuery, [monthStart, monthEnd, ...filterParams]);
+          const mauResult = await pool.query(mauQuery, [...filterParams, monthStart, monthEnd]);
           mau = parseInt(mauResult.rows[0]?.count) || 0;
         }
       } catch (e) {

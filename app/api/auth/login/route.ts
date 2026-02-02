@@ -4,6 +4,7 @@ import { verifyPassword, hashPassword, createToken } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { verifyRequestOrigin } from '@/lib/csrf';
 import { getClientIpAddress, updateUserIpAddress } from '@/lib/ip-address';
+import { logUserLoginEvent } from '@/lib/event-logger';
 
 // Force dynamic rendering (POST endpoint requires runtime request body)
 export const dynamic = 'force-dynamic';
@@ -155,6 +156,14 @@ export async function POST(request: NextRequest) {
 
     // Create token
     const token = createToken(user.id);
+
+    // Log login event for analytics (WAU/MAU tracking)
+    try {
+      await logUserLoginEvent(user.id);
+    } catch (loginEventError) {
+      // Don't fail login if event logging fails
+      console.error('[Login] Failed to log login event:', loginEventError);
+    }
 
     return NextResponse.json({
       token,

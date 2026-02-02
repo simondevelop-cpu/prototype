@@ -6,6 +6,29 @@ const SESSION_TTL_SECONDS = Number(process.env.JWT_TTL_SECONDS || 60 * 60 * 24);
 const BCRYPT_ROUNDS = 12;
 
 /**
+ * Helper function to convert base64 to base64url format
+ * Base64url uses - and _ instead of + and /, and omits padding
+ */
+function base64ToBase64URL(base64: string): string {
+  return base64
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+/**
+ * Helper function to convert base64url to base64 format
+ */
+function base64URLToBase64(base64url: string): string {
+  let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+  // Add padding if needed
+  while (base64.length % 4) {
+    base64 += '=';
+  }
+  return base64;
+}
+
+/**
  * Hash password using bcrypt (secure, slow hash with salt)
  * Replaces old SHA-256 implementation for security
  */
@@ -39,17 +62,18 @@ export function hashPasswordLegacy(password: string): string {
 }
 
 export function createToken(userId: number): string {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  const payload = Buffer.from(
+  // Use base64 and convert to base64url for compatibility
+  const header = base64ToBase64URL(Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64'));
+  const payload = base64ToBase64URL(Buffer.from(
     JSON.stringify({ 
       sub: userId,
       exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS 
     })
-  ).toString('base64url');
-  const signature = crypto
+  ).toString('base64'));
+  const signature = base64ToBase64URL(crypto
     .createHmac('sha256', JWT_SECRET)
     .update(`${header}.${payload}`)
-    .digest('base64url');
+    .digest('base64'));
   return `${header}.${payload}.${signature}`;
 }
 
@@ -60,18 +84,19 @@ export function verifyToken(token: string): any {
     
     const [headerPart, payloadPart, signaturePart] = parts;
     
-    // Verify signature
-    const expectedSignature = crypto
+    // Verify signature - convert base64url to base64 for digest, then back to base64url
+    const expectedSignature = base64ToBase64URL(crypto
       .createHmac('sha256', JWT_SECRET)
       .update(`${headerPart}.${payloadPart}`)
-      .digest('base64url');
+      .digest('base64'));
     
     if (signaturePart !== expectedSignature) {
       return null;
     }
     
-    // Decode payload
-    const payloadJson = Buffer.from(payloadPart, 'base64url').toString('utf8');
+    // Decode payload - convert base64url to base64 first
+    const payloadBase64 = base64URLToBase64(payloadPart);
+    const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf8');
     const payload = JSON.parse(payloadJson);
     
     // Check expiration
