@@ -41,20 +41,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Check if user_events table exists
-    let hasUserEventsTable = false;
+    // Check if l1_events table exists
+    let hasEventsTable = false;
     try {
       const tableCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'user_events'
+        WHERE table_name = 'l1_events'
         LIMIT 1
       `);
-      hasUserEventsTable = tableCheck.rows.length > 0;
+      hasEventsTable = tableCheck.rows.length > 0;
     } catch (e) {
-      console.log('[Edit Counts API] Could not check for user_events table');
+      console.log('[Edit Counts API] Could not check for l1_events table');
     }
 
-    if (!hasUserEventsTable) {
+    if (!hasEventsTable) {
       return NextResponse.json({ 
         description: 0,
         category: 0,

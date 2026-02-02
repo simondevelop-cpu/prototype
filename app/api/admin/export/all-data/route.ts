@@ -299,6 +299,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const pool = getPool();
     if (!pool) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }

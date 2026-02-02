@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import { ADMIN_EMAIL, JWT_SECRET } from '@/lib/admin-constants';
+import { getPool } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
-
-const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL,
-});
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,28 +24,33 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Check if user_events table exists
-    let hasUserEventsTable = false;
+    const pool = getPool();
+    if (!pool) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 500 });
+    }
+
+    // Check if l1_events table exists
+    let hasEventsTable = false;
     try {
       const tableCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'user_events'
+        WHERE table_name = 'l1_events'
         LIMIT 1
       `);
-      hasUserEventsTable = tableCheck.rows.length > 0;
+      hasEventsTable = tableCheck.rows.length > 0;
     } catch (e) {
-      console.log('[Editing Events API] Could not check for user_events table');
+      console.log('[Editing Events API] Could not check for l1_events table');
     }
 
-    if (!hasUserEventsTable) {
+    if (!hasEventsTable) {
       return NextResponse.json({ 
         success: true,
         editingEvents: [],
-        message: 'user_events table does not exist.'
+        message: 'l1_events table does not exist.'
       }, { status: 200 });
     }
 
-    // Fetch transaction editing events
+    // Fetch transaction editing events (both transaction_edit and bulk_edit)
     const result = await pool.query(`
       SELECT 
         e.id,
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
       FROM l1_events e
       LEFT JOIN users u ON e.user_id = u.id
       LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
-      WHERE e.event_type = 'transaction_edit'
+      WHERE e.event_type IN ('transaction_edit', 'bulk_edit')
         AND (u.email != $1 OR u.email IS NULL)
       ORDER BY e.event_timestamp DESC
       LIMIT 1000
