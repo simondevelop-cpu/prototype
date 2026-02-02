@@ -2199,6 +2199,60 @@ export default function AdminDashboard() {
             )}
           </div>
 
+          {/* Fix Events Table and Remove PII */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Fix Events Table and Remove PII</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Add tokenized_user_id to l1_events for analytics consistency, drop unused l1_event_facts table, and remove any remaining PII from onboarding_responses.
+                </p>
+              </div>
+              <button
+                onClick={fixEventsAndPII}
+                disabled={fixingEventsAndPII}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 font-semibold"
+              >
+                {fixingEventsAndPII ? 'Running...' : 'Fix Events & Remove PII'}
+              </button>
+            </div>
+
+            {fixEventsAndPIIResult && (
+              <div className={`border rounded-lg p-4 ${fixEventsAndPIIResult.success ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-semibold text-gray-900">
+                    Migration Results
+                  </h4>
+                  <span className={`text-sm font-medium ${fixEventsAndPIIResult.success ? 'text-green-800' : 'text-yellow-800'}`}>
+                    {fixEventsAndPIIResult.success ? '✓ Success' : '✗ Failed'}
+                  </span>
+                </div>
+                {fixEventsAndPIIResult.message && (
+                  <p className="text-sm text-gray-700 mt-2">{fixEventsAndPIIResult.message}</p>
+                )}
+                {fixEventsAndPIIResult.changes && fixEventsAndPIIResult.changes.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-sm font-medium text-gray-700 mb-1">Changes made:</p>
+                    <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                      {fixEventsAndPIIResult.changes.map((change: string, index: number) => (
+                        <li key={index}>{change}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {fixEventsAndPIIResult.error && (
+                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                    <p className="text-sm text-red-800 font-medium">Error:</p>
+                    <p className="text-sm text-red-700">{fixEventsAndPIIResult.error}</p>
+                    {fixEventsAndPIIResult.details && (
+                      <p className="text-xs text-red-600 mt-1">{fixEventsAndPIIResult.details}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Complete PII Isolation */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
