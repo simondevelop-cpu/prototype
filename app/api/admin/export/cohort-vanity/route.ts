@@ -4,11 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import * as XLSX from 'xlsx';
 import { ADMIN_EMAIL, JWT_SECRET } from '@/lib/admin-constants';
 import { getPool } from '@/lib/db';
+import { logAdminEvent } from '@/lib/event-logger';
 
 export const dynamic = 'force-dynamic';
 
