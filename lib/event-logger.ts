@@ -30,10 +30,17 @@ export async function logBankStatementEvent(
   try {
     const eventType = metadata.source === 'uploaded' ? 'statement_upload' : 'statement_linked';
     
+    // Get tokenized_user_id for analytics
+    const tokenizedResult = await pool.query(
+      'SELECT tokenized_user_id FROM l0_user_tokenization WHERE internal_user_id = $1',
+      [userId]
+    );
+    const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id || null;
+    
     await pool.query(
-      `INSERT INTO l1_events (user_id, event_type, event_timestamp, metadata, is_admin)
-       VALUES ($1, $2, NOW(), $3::jsonb, FALSE)`,
-      [userId, eventType, JSON.stringify(metadata)]
+      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin)
+       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE)`,
+      [userId, tokenizedUserId, eventType, JSON.stringify(metadata)]
     );
     
     console.log(`[Event Logger] Logged ${eventType} event for user ${userId}`);
@@ -62,10 +69,17 @@ export async function logFeedbackEvent(
   }
 
   try {
+    // Get tokenized_user_id for analytics
+    const tokenizedResult = await pool.query(
+      'SELECT tokenized_user_id FROM l0_user_tokenization WHERE internal_user_id = $1',
+      [userId]
+    );
+    const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id || null;
+    
     await pool.query(
-      `INSERT INTO l1_events (user_id, event_type, event_timestamp, metadata, is_admin)
-       VALUES ($1, $2, NOW(), $3::jsonb, FALSE)`,
-      [userId, 'feedback', JSON.stringify(feedbackData)]
+      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin)
+       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE)`,
+      [userId, tokenizedUserId, 'feedback', JSON.stringify(feedbackData)]
     );
     
     console.log(`[Event Logger] Logged feedback event for user ${userId}`);
@@ -103,10 +117,17 @@ export async function logConsentEvent(
       timestamp: new Date().toISOString(),
     };
 
+    // Get tokenized_user_id for analytics
+    const tokenizedResult = await pool.query(
+      'SELECT tokenized_user_id FROM l0_user_tokenization WHERE internal_user_id = $1',
+      [userId]
+    );
+    const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id || null;
+    
     await pool.query(
-      `INSERT INTO l1_events (user_id, event_type, event_timestamp, metadata, is_admin)
-       VALUES ($1, $2, NOW(), $3::jsonb, FALSE)`,
-      [userId, 'consent', JSON.stringify(eventMetadata)]
+      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin)
+       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE)`,
+      [userId, tokenizedUserId, 'consent', JSON.stringify(eventMetadata)]
     );
     
     console.log(`[Event Logger] Logged consent event (${consentType}) for user ${userId}`);
@@ -135,10 +156,17 @@ export async function logTransactionEditEvent(
   }
 
   try {
+    // Get tokenized_user_id for analytics
+    const tokenizedResult = await pool.query(
+      'SELECT tokenized_user_id FROM l0_user_tokenization WHERE internal_user_id = $1',
+      [userId]
+    );
+    const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id || null;
+    
     await pool.query(
-      `INSERT INTO l1_events (user_id, event_type, event_timestamp, metadata, is_admin)
-       VALUES ($1, $2, NOW(), $3::jsonb, FALSE)`,
-      [userId, 'transaction_edit', JSON.stringify({
+      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin)
+       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE)`,
+      [userId, tokenizedUserId, 'transaction_edit', JSON.stringify({
         transactionId,
         changes,
         timestamp: new Date().toISOString(),
@@ -168,10 +196,17 @@ export async function logBulkEditEvent(
   }
 
   try {
+    // Get tokenized_user_id for analytics
+    const tokenizedResult = await pool.query(
+      'SELECT tokenized_user_id FROM l0_user_tokenization WHERE internal_user_id = $1',
+      [userId]
+    );
+    const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id || null;
+    
     await pool.query(
-      `INSERT INTO l1_events (user_id, event_type, event_timestamp, metadata, is_admin)
-       VALUES ($1, $2, NOW(), $3::jsonb, FALSE)`,
-      [userId, 'bulk_edit', JSON.stringify({
+      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin)
+       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE)`,
+      [userId, tokenizedUserId, 'bulk_edit', JSON.stringify({
         transactionIds,
         fieldsUpdated,
         transactionCount,

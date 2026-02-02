@@ -474,7 +474,8 @@ export async function GET(request: NextRequest) {
               THEN DATE(ue.created_at) 
             END) as unique_login_days_week_1
           FROM users u
-          LEFT JOIN l1_events ue ON ue.user_id = u.id
+          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          LEFT JOIN l1_events ue ON ue.tokenized_user_id = ut.tokenized_user_id
           WHERE u.email != $${paramIndex}
             ${filterConditions}
           GROUP BY DATE_TRUNC('week', u.created_at)

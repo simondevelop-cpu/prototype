@@ -90,14 +90,32 @@ async function initializeTables() {
       CREATE TABLE IF NOT EXISTS l1_events (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        tokenized_user_id TEXT,
         event_type TEXT NOT NULL,
         event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         metadata JSONB,
         is_admin BOOLEAN DEFAULT FALSE,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (tokenized_user_id) REFERENCES l0_user_tokenization(tokenized_user_id)
       )
     `);
     console.log('[DB Init] ✅ l1_events table created');
+    
+    // Populate tokenized_user_id for existing events
+    await client.query(`
+      UPDATE l1_events e
+      SET tokenized_user_id = ut.tokenized_user_id
+      FROM l0_user_tokenization ut
+      WHERE ut.internal_user_id = e.user_id
+        AND e.tokenized_user_id IS NULL
+    `);
+    
+    // Create index for analytics queries
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_l1_events_tokenized_user_id 
+      ON l1_events(tokenized_user_id) 
+      WHERE tokenized_user_id IS NOT NULL
+    `);
     
     // Create indexes for l1_events table
     await client.query(`
@@ -141,12 +159,8 @@ async function initializeTables() {
         insight_preferences TEXT[],
         insight_other TEXT,
         
-        -- Q9: Account profile
-        first_name TEXT,
-        last_name TEXT,
-        date_of_birth DATE,
-        recovery_phone TEXT,
-        province_region TEXT,
+        -- Note: PII fields (first_name, last_name, date_of_birth, recovery_phone, province_region)
+        -- have been moved to l0_pii_users table for PII isolation
         
         -- Metadata
         last_step INTEGER DEFAULT 0,
