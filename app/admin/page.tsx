@@ -84,6 +84,10 @@ export default function AdminDashboard() {
   const [editingEventsData, setEditingEventsData] = useState<any[]>([]);
   const [editingEventsDataLoading, setEditingEventsDataLoading] = useState(false);
   
+  // State for Sessions tab
+  const [sessionsData, setSessionsData] = useState<any[]>([]);
+  const [sessionsDataLoading, setSessionsDataLoading] = useState(false);
+  
   // State for User Feedback tab
   const [userFeedback, setUserFeedback] = useState<any[]>([]);
   const [userFeedbackLoading, setUserFeedbackLoading] = useState(false);
