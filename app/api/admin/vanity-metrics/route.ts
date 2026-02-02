@@ -122,25 +122,46 @@ export async function GET(request: NextRequest) {
       return `w/c ${adjustedWeekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
     };
 
-    // Extract actual weeks from user data (same as cohort analysis)
-    // This ensures vanity metrics uses the same week boundaries as cohort analysis
-    const weeksQuery = `
-      SELECT DISTINCT DATE_TRUNC('week', u.created_at) as signup_week
-      FROM users u
-      WHERE u.email != $1
-        ${filterConditions}
-      ORDER BY signup_week DESC
-      LIMIT 12
-    `;
-    const weeksResult = await pool.query(weeksQuery, [...filterParams]);
+    // Generate all weeks from earliest user to current week (same week calculation as cohort analysis)
+    // Find the earliest user creation date
+    const earliestUserCheck = await pool.query(`
+      SELECT MIN(created_at) as earliest_date
+      FROM users
+      WHERE email != $1
+    `, [ADMIN_EMAIL]);
     
-    // Extract and format weeks from query results
+    const earliestDateStr = earliestUserCheck.rows[0]?.earliest_date;
+    let earliestWeekStart: Date;
+    
+    if (earliestDateStr) {
+      // Use DATE_TRUNC to get the week start (Monday in PostgreSQL)
+      const earliestWeekResult = await pool.query(`
+        SELECT DATE_TRUNC('week', $1::timestamp) as week_start
+      `, [earliestDateStr]);
+      earliestWeekStart = new Date(earliestWeekResult.rows[0].week_start);
+    } else {
+      // Fallback: if no users, start from 12 weeks ago
+      earliestWeekStart = new Date();
+      earliestWeekStart.setDate(earliestWeekStart.getDate() - (12 * 7));
+      const dayOfWeek = earliestWeekStart.getDay();
+      earliestWeekStart.setDate(earliestWeekStart.getDate() - dayOfWeek);
+      earliestWeekStart.setHours(0, 0, 0, 0);
+    }
+
+    // Get current week start using DATE_TRUNC
+    const now = new Date();
+    const currentWeekResult = await pool.query(`
+      SELECT DATE_TRUNC('week', $1::timestamp) as week_start
+    `, [now]);
+    const currentWeekStart = new Date(currentWeekResult.rows[0].week_start);
+
+    // Generate all weeks from earliest to current
     const weeksSet = new Set<string>();
-    weeksResult.rows.forEach((row: any) => {
-      if (row.signup_week) {
-        weeksSet.add(formatWeekLabel(row.signup_week));
-      }
-    });
+    const weekDate = new Date(earliestWeekStart);
+    while (weekDate <= currentWeekStart) {
+      weeksSet.add(formatWeekLabel(weekDate));
+      weekDate.setDate(weekDate.getDate() + 7);
+    }
     
     // Sort weeks (most recent first) and ensure unique
     const allWeeks = Array.from(weeksSet).sort((a, b) => {

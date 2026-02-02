@@ -156,27 +156,40 @@ export async function logTransactionEditEvent(
   }
 
   try {
+    // Ensure userId is a number for database consistency
+    const userIdNum = typeof userId === 'number' ? userId : parseInt(String(userId), 10);
+    if (isNaN(userIdNum)) {
+      console.error('[Event Logger] Invalid userId:', userId);
+      return;
+    }
+
     // Get tokenized_user_id for analytics
     const tokenizedResult = await pool.query(
       'SELECT tokenized_user_id FROM l0_user_tokenization WHERE internal_user_id = $1',
-      [userId]
+      [userIdNum]
     );
     const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id || null;
     
     await pool.query(
       `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE)`,
-      [userId, tokenizedUserId, 'transaction_edit', JSON.stringify({
+      [userIdNum, tokenizedUserId, 'transaction_edit', JSON.stringify({
         transactionId,
         changes,
         timestamp: new Date().toISOString(),
       })]
     );
     
-    console.log(`[Event Logger] Logged transaction edit event for user ${userId}, transaction ${transactionId}`);
+    console.log(`[Event Logger] Logged transaction edit event for user ${userIdNum}, transaction ${transactionId} with ${changes.length} changes`);
   } catch (error: any) {
     // Don't throw - event logging should not break the main flow
     console.error('[Event Logger] Failed to log transaction edit event:', error);
+    console.error('[Event Logger] Error details:', {
+      userId,
+      transactionId,
+      errorMessage: error.message,
+      errorCode: error.code,
+    });
   }
 }
 
@@ -196,17 +209,24 @@ export async function logBulkEditEvent(
   }
 
   try {
+    // Ensure userId is a number for database consistency
+    const userIdNum = typeof userId === 'number' ? userId : parseInt(String(userId), 10);
+    if (isNaN(userIdNum)) {
+      console.error('[Event Logger] Invalid userId:', userId);
+      return;
+    }
+
     // Get tokenized_user_id for analytics
     const tokenizedResult = await pool.query(
       'SELECT tokenized_user_id FROM l0_user_tokenization WHERE internal_user_id = $1',
-      [userId]
+      [userIdNum]
     );
     const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id || null;
     
     await pool.query(
       `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE)`,
-      [userId, tokenizedUserId, 'bulk_edit', JSON.stringify({
+      [userIdNum, tokenizedUserId, 'bulk_edit', JSON.stringify({
         transactionIds,
         fieldsUpdated,
         transactionCount,
@@ -214,10 +234,16 @@ export async function logBulkEditEvent(
       })]
     );
     
-    console.log(`[Event Logger] Logged bulk edit event for user ${userId}, ${transactionCount} transactions`);
+    console.log(`[Event Logger] Logged bulk edit event for user ${userIdNum}, ${transactionCount} transactions`);
   } catch (error: any) {
     // Don't throw - event logging should not break the main flow
     console.error('[Event Logger] Failed to log bulk edit event:', error);
+    console.error('[Event Logger] Error details:', {
+      userId,
+      transactionCount,
+      errorMessage: error.message,
+      errorCode: error.code,
+    });
   }
 }
 
