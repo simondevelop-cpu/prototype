@@ -7,7 +7,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Pool } from 'pg';
 import { getPool } from '@/lib/db';
 
-describe('Migration Functionality Verification', () => {
+// Skip migration tests in CI - they require a real database connection
+// These tests should be run manually against a production/staging database
+const shouldSkipMigrationTests = process.env.CI === 'true' || !process.env.DATABASE_URL;
+
+describe.skipIf(shouldSkipMigrationTests)('Migration Functionality Verification', () => {
   let pool: Pool;
 
   beforeAll(async () => {
@@ -16,10 +20,6 @@ describe('Migration Functionality Verification', () => {
       throw new Error('Database pool not available');
     }
   });
-
-  // Skip all migration tests in CI (they require a real database connection)
-  // These tests should be run manually against a real database
-  const shouldSkip = !process.env.DATABASE_URL || process.env.CI === 'true';
 
   afterAll(async () => {
     await pool.end();
