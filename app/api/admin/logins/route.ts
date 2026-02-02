@@ -50,7 +50,9 @@ export async function GET(request: NextRequest) {
       }, { status: 200 });
     }
 
-    // Fetch admin login and tab access events
+    // Fetch admin login, tab access, and data download events
+    // All these events have event_type = 'admin_login' or 'admin_tab_access'
+    // Data downloads are logged as 'admin_tab_access' with metadata.action = 'data_download'
     const result = await pool.query(`
       SELECT 
         id,
@@ -59,6 +61,7 @@ export async function GET(request: NextRequest) {
         metadata
       FROM l1_events
       WHERE event_type IN ('admin_login', 'admin_tab_access')
+        AND is_admin = TRUE
       ORDER BY event_timestamp DESC
       LIMIT 1000
     `);

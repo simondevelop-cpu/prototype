@@ -4,15 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import { ADMIN_EMAIL, JWT_SECRET } from '@/lib/admin-constants';
+import { getPool } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
-
-const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL,
-});
 
 interface ChartFilters {
   totalAccounts?: boolean;
@@ -40,6 +36,11 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    const pool = getPool();
+    if (!pool) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
     // Parse query parameters

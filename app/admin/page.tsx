@@ -4851,7 +4851,13 @@ export default function AdminDashboard() {
                                   {metadata?.adminEmail || 'Unknown'}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                  {login.event_type === 'admin_login' ? 'Login' : login.event_type === 'admin_tab_access' ? 'Tab Access' : login.event_type}
+                                  {login.event_type === 'admin_login' 
+                                    ? 'Login' 
+                                    : metadata?.action === 'data_download'
+                                    ? `Data Download (${metadata?.downloadType || 'unknown'})`
+                                    : login.event_type === 'admin_tab_access' 
+                                    ? 'Tab Access' 
+                                    : login.event_type}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                   {metadata?.tab || '-'}

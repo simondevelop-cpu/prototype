@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import jwt from 'jsonwebtoken';
 import { ADMIN_EMAIL, JWT_SECRET } from '@/lib/admin-constants';
 import { getPool } from '@/lib/db';
+import { logAdminEvent } from '@/lib/event-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -290,13 +291,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
+    let adminEmail: string;
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
-      if (decoded.role !== 'admin' && decoded.email !== ADMIN_EMAIL) {
+      if (decoded.role !== 'admin' || decoded.email === ADMIN_EMAIL) {
+        adminEmail = decoded.email || ADMIN_EMAIL;
+      } else {
         return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
       }
     } catch (error) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    // Log admin data download event
+    try {
+      await logAdminEvent(adminEmail, 'admin_tab_access', {
+        action: 'data_download',
+        downloadType: 'all-database-data',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (logError) {
+      // Don't fail the download if logging fails
+      console.error('[Export] Failed to log admin download event:', logError);
     }
 
     const pool = getPool();
