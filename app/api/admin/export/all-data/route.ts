@@ -177,17 +177,16 @@ async function checkTableForPII(pool: any, tableName: string): Promise<boolean> 
       WHERE table_name = $1 AND table_schema = 'public'
     `, [tableName]);
     
-    // Only check for structured PII columns (not unstructured free text)
-    const piiKeywords = ['first_name', 'last_name', 'date_of_birth', 'recovery_phone', 'province_region', 'phone', 'address'];
+    // Check for structured PII columns (including email - it shouldn't exist outside PII table)
+    const piiKeywords = ['email', 'first_name', 'last_name', 'date_of_birth', 'recovery_phone', 'province_region', 'phone', 'address'];
     
     for (const col of columnsResult.rows) {
       const colName = col.column_name.toLowerCase();
       
-      // Check for explicit PII fields (excluding user_id, internal_user_id, tokenized_user_id, email)
-      // Note: email is kept in users table for auth but is not considered PII for detection purposes
-      // since all PII operations use l0_pii_users.email
-      if (colName === 'user_id' || colName === 'internal_user_id' || colName === 'tokenized_user_id' || colName === 'email') {
-        continue; // Skip user ID fields and email (handled separately)
+      // Check for explicit PII fields (excluding user_id, internal_user_id, tokenized_user_id)
+      // Note: email is PII and should only exist in l0_pii_users, but kept in users table for backward compatibility with auth
+      if (colName === 'user_id' || colName === 'internal_user_id' || colName === 'tokenized_user_id') {
+        continue; // Skip user ID fields
       }
       
       if (piiKeywords.some(keyword => colName.includes(keyword))) {

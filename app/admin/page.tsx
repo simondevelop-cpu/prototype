@@ -47,7 +47,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabName>('inbox');
   const [monitoringSubTab, setMonitoringSubTab] = useState<MonitoringSubTab>('health');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
-  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'editing-events-data' | 'vanity-metrics' | 'data-details' | 'download'>('cohort-analysis');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'editing-events-data' | 'vanity-metrics' | 'download'>('cohort-analysis');
   const [inboxSubTab, setInboxSubTab] = useState<InboxSubTab>('feedback');
   const [keywords, setKeywords] = useState<GroupedData>({});
   const [merchants, setMerchants] = useState<GroupedData>({});
@@ -2381,16 +2381,6 @@ export default function AdminDashboard() {
             📈 Vanity metrics
           </button>
           <button
-            onClick={() => setAnalyticsSubTab('data-details')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              analyticsSubTab === 'data-details'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            📋 Data details
-          </button>
-          <button
             onClick={() => setAnalyticsSubTab('download')}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
               analyticsSubTab === 'download'
@@ -3249,7 +3239,7 @@ export default function AdminDashboard() {
           </div>
         )}
         
-        {analyticsSubTab === 'data-details' && (
+        {false && analyticsSubTab === 'data-details' && (
           <div className="space-y-6">
             {/* Cohort Analysis Tab - Data Details */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
