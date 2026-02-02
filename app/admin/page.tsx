@@ -498,7 +498,7 @@ export default function AdminDashboard() {
   }, [activeTab, analyticsSubTab, authenticated]);
   
   const fetchSessionsData = async () => {
-    setSessionsLoading(true);
+    setSessionsDataLoading(true);
     try {
       const token = localStorage.getItem('admin_token');
       const response = await fetch('/api/admin/sessions', {
@@ -517,7 +517,7 @@ export default function AdminDashboard() {
       console.error('Error fetching sessions:', error);
       setError(error.message);
     } finally {
-      setSessionsLoading(false);
+      setSessionsDataLoading(false);
     }
   };
 
@@ -3652,7 +3652,7 @@ export default function AdminDashboard() {
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="p-6 border-b border-gray-200 flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Events Data</h2>
+                <h2 className="text-xl font-bold text-gray-900">All user events</h2>
                 <p className="text-gray-600 mt-1">User events and activity tracking from l1_events table</p>
               </div>
               <div className="flex gap-2">
