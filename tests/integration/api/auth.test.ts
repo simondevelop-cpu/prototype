@@ -71,6 +71,14 @@ describe('Authentication API', () => {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS l0_pii_users (
+        internal_user_id INTEGER PRIMARY KEY REFERENCES users(id),
+        email TEXT NOT NULL,
+        ip_address TEXT,
+        ip_address_updated_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS l1_events (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id),
@@ -79,6 +87,20 @@ describe('Authentication API', () => {
         event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         metadata JSONB,
         is_admin BOOLEAN DEFAULT FALSE
+      );
+
+      CREATE TABLE IF NOT EXISTS l1_transaction_facts (
+        id SERIAL PRIMARY KEY,
+        tokenized_user_id TEXT NOT NULL REFERENCES l0_user_tokenization(tokenized_user_id),
+        transaction_date DATE NOT NULL,
+        description TEXT NOT NULL,
+        merchant TEXT,
+        amount NUMERIC(12, 2) NOT NULL,
+        cashflow TEXT NOT NULL,
+        account TEXT,
+        category TEXT NOT NULL,
+        label TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 

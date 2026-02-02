@@ -221,7 +221,7 @@ describe('Event Logging', () => {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          ids: txIds,
+          transactionIds: txIds,
           updates: {
             category: 'Groceries',
           },
