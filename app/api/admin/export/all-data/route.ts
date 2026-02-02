@@ -467,7 +467,11 @@ export async function GET(request: NextRequest) {
     worksheets.set('Table of Contents', tocWorksheet);
 
     // 8. Export each table and view as a sheet (store in map, then add in order)
-    const allDataObjects = [...allTables, ...allViews];
+    // Filter out dropped/legacy tables that should not exist
+    const excludedTables = ['l1_event_facts', 'user_events', 'transactions', 'accounts', 'insight_feedback'];
+    const filteredTables = allTables.filter(table => !excludedTables.includes(table));
+    const allDataObjects = [...filteredTables, ...allViews];
+    
     for (const objectName of allDataObjects) {
       try {
         // Get all data from the table/view
@@ -498,7 +502,12 @@ export async function GET(request: NextRequest) {
           }
         }
       } catch (tableError: any) {
-        console.error(`[Export] Error exporting table/view ${objectName}:`, tableError);
+        // If table doesn't exist (e.g., was dropped), skip it silently
+        if (tableError.code === '42P01') { // relation does not exist
+          console.log(`[Export] Table/view ${objectName} does not exist, skipping`);
+        } else {
+          console.error(`[Export] Error exporting table/view ${objectName}:`, tableError);
+        }
         // Continue with other tables even if one fails
       }
     }
