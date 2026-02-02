@@ -1,6 +1,6 @@
 /**
  * Integration Tests: Consent API
- * Verifies /api/consent logs consent events into user_events
+ * Verifies /api/consent logs consent events into l1_events
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
@@ -41,12 +41,20 @@ describe('Consent API', () => {
         email TEXT NOT NULL UNIQUE
       );
 
-      CREATE TABLE IF NOT EXISTS user_events (
+      CREATE TABLE IF NOT EXISTS l0_user_tokenization (
+        internal_user_id INTEGER PRIMARY KEY REFERENCES users(id),
+        tokenized_user_id TEXT NOT NULL UNIQUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS l1_events (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        tokenized_user_id TEXT REFERENCES l0_user_tokenization(tokenized_user_id),
         event_type TEXT NOT NULL,
         event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        metadata JSONB
+        metadata JSONB,
+        is_admin BOOLEAN DEFAULT FALSE
       );
     `);
 
@@ -54,15 +62,22 @@ describe('Consent API', () => {
     vi.spyOn(dbModule, 'getPool').mockReturnValue(mockPool);
 
     // Create a test user
-    await testClient.query(
+    const userResult = await testClient.query(
       `INSERT INTO users (email) VALUES ('consent@test.com') RETURNING id`
+    );
+    const userId = userResult.rows[0].id;
+
+    // Create tokenized user ID for event logging
+    await testClient.query(
+      `INSERT INTO l0_user_tokenization (internal_user_id, tokenized_user_id) 
+       VALUES ($1, $2)`,
+      [userId, `token_user_${userId}`]
     );
 
     // Mock verifyToken to return our test user id
     vi.spyOn(authModule, 'verifyToken').mockImplementation((_token: string) => ({
-      userId: 1,
+      sub: userId,
       email: 'consent@test.com',
-      role: 'user',
     }) as any);
   });
 
@@ -74,7 +89,7 @@ describe('Consent API', () => {
   });
 
   beforeEach(async () => {
-    await testClient.query('DELETE FROM user_events');
+    await testClient.query('DELETE FROM l1_events');
   });
 
   it('should record a cookie banner consent event', async () => {
@@ -99,7 +114,7 @@ describe('Consent API', () => {
 
     const events = await testClient.query(
       `SELECT event_type, metadata->>'consentType' as consent_type, metadata->>'choice' as choice
-       FROM user_events`
+       FROM l1_events`
     );
 
     expect(events.rows.length).toBe(1);

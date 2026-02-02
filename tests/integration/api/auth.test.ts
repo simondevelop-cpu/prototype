@@ -65,12 +65,20 @@ describe('Authentication API', () => {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
-      CREATE TABLE IF NOT EXISTS user_events (
+      CREATE TABLE IF NOT EXISTS l0_user_tokenization (
+        internal_user_id INTEGER PRIMARY KEY REFERENCES users(id),
+        tokenized_user_id TEXT NOT NULL UNIQUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS l1_events (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        tokenized_user_id TEXT REFERENCES l0_user_tokenization(tokenized_user_id),
         event_type TEXT NOT NULL,
         event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        metadata JSONB
+        metadata JSONB,
+        is_admin BOOLEAN DEFAULT FALSE
       );
     `);
 
@@ -88,7 +96,8 @@ describe('Authentication API', () => {
   beforeEach(async () => {
     // Clear all tables before each test
     // Delete in order to respect foreign key constraints (child tables first)
-    await testClient.query('DELETE FROM user_events');
+    await testClient.query('DELETE FROM l1_events');
+    await testClient.query('DELETE FROM l0_user_tokenization');
     await testClient.query('DELETE FROM onboarding_responses');
     await testClient.query('DELETE FROM transactions');
     await testClient.query('DELETE FROM users');
