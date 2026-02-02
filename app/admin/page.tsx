@@ -3239,215 +3239,195 @@ export default function AdminDashboard() {
           </div>
         )}
         
-        {false && analyticsSubTab === 'data-details' && (
-          <div className="space-y-6">
-            {/* Cohort Analysis Tab - Data Details */}
-            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-bold text-gray-900">Cohort Analysis - Data Details</h2>
-                <p className="text-gray-600 mt-1">Documentation of all KPIs, formulas, and data sources used in the Cohort Analysis tab</p>
+        {analyticsSubTab === 'download' && (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Download</h2>
+              <p className="text-gray-600 mt-1">Export raw database data or API documentation</p>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Export All Raw Data */}
+              <div className="border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export all raw data</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Download all data from every table in the database. Includes API documentation and table of contents as the first sheets. Each table will be a separate sheet in the Excel file.
+                </p>
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('admin_token');
+                      const response = await fetch('/api/admin/export/all-data', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      });
+                      
+                      if (!response.ok) {
+                        const error = await response.json();
+                        alert(`Error: ${error.error || 'Failed to export data'}`);
+                        return;
+                      }
+                      
+                      const blob = await response.blob();
+                      const link = document.createElement('a');
+                      link.href = URL.createObjectURL(blob);
+                      link.download = `all-database-data-${new Date().toISOString().split('T')[0]}.xlsx`;
+                      link.click();
+                    } catch (error) {
+                      console.error('Export error:', error);
+                      alert('Failed to export data. Please try again.');
+                    }
+                  }}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download all raw data
+                </button>
               </div>
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">KPI / Metric</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Formula / Calculation</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Source</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {/* Activation Metrics */}
-                  <tr className="bg-gray-100">
-                    <td colSpan={3} className="px-6 py-3 text-sm font-bold text-gray-900">
-                      ACTIVATION METRICS
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Started onboarding</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) WHERE created_at IS NOT NULL</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (created_at column)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Drop-off at Step 1</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE last_step = 1 AND completed_at IS NULL</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (last_step, completed_at columns)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Drop-off at Step 2</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE last_step = 2 AND completed_at IS NULL</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (last_step, completed_at columns)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Drop-off at Step 3</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE last_step = 3 AND completed_at IS NULL</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (last_step, completed_at columns)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Drop-off at Step 4</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE last_step = 4 AND completed_at IS NULL</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (last_step, completed_at columns)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Drop-off at Step 5</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE last_step = 5 AND completed_at IS NULL</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (last_step, completed_at columns)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Drop-off at Step 6</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE last_step = 6 AND completed_at IS NULL</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (last_step, completed_at columns)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Drop-off at Step 7</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE last_step = 7 AND completed_at IS NULL</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (last_step, completed_at columns)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users by onboarding step completed - Completed onboarding</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(*) FILTER WHERE completed_at IS NOT NULL</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (completed_at column)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Started but not completed (no drop-off recorded)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">MAX(0, starting - completed - sum of all drop-offs)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (calculated from created_at, completed_at, last_step)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Average time to onboard (minutes)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">AVG(EXTRACT(EPOCH FROM (completed_at - created_at)) / 60) FILTER WHERE completed_at IS NOT NULL</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (created_at, completed_at columns)</td>
-                  </tr>
-                  
-                  {/* Engagement Metrics - Onboarding and Data Coverage */}
-                  <tr className="bg-gray-100">
-                    <td colSpan={3} className="px-6 py-3 text-sm font-bold text-gray-900">
-                      ENGAGEMENT METRICS - ONBOARDING AND DATA COVERAGE
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Onboarding completed</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE completed_at IS NOT NULL</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (completed_at column)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Uploaded first statement</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE transaction EXISTS</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (JOIN with l0_user_tokenization)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Uploaded two statements</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT user_id) FILTER WHERE COUNT(DISTINCT upload_session_id) {'>='} 2</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (upload_session_id column)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Uploaded three or more statements</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT tokenized_user_id) FILTER WHERE COUNT(DISTINCT upload_session_id) {'>='} 3</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (upload_session_id column)</td>
-                  </tr>
-                  
-                  {/* Engagement Metrics - Time to Achieve */}
-                  <tr className="bg-gray-100">
-                    <td colSpan={3} className="px-6 py-3 text-sm font-bold text-gray-900">
-                      ENGAGEMENT METRICS - TIME TO ACHIEVE
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users who uploaded on the first day</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT tokenized_user_id) FILTER WHERE DATE(first_transaction_date) = DATE(created_at)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (MIN(transaction_date) per tokenized_user_id) JOIN l0_user_tokenization JOIN users table (created_at)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Average time to first upload, who uploaded on their first day (minutes)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">AVG(EXTRACT(EPOCH FROM (first_transaction_date - created_at)) / 60) FILTER WHERE DATE(first_transaction_date) = DATE(created_at)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (MIN(transaction_date) per tokenized_user_id) JOIN l0_user_tokenization JOIN users table (created_at)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Number of users who uploaded after the first day</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT tokenized_user_id) FILTER WHERE DATE(first_transaction_date) {'>'} DATE(created_at)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (MIN(transaction_date) per tokenized_user_id) JOIN l0_user_tokenization JOIN users table (created_at)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Average time to first upload, who uploaded after the first day (days)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">AVG(EXTRACT(EPOCH FROM (first_transaction_date - created_at)) / 86400) FILTER WHERE DATE(first_transaction_date) {'>'} DATE(created_at)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (MIN(transaction_date) per tokenized_user_id) JOIN l0_user_tokenization JOIN users table (created_at)</td>
-                  </tr>
-                  
-                  {/* Engagement Metrics - Engagement Signals */}
-                  <tr className="bg-gray-100">
-                    <td colSpan={3} className="px-6 py-3 text-sm font-bold text-gray-900">
-                      ENGAGEMENT METRICS - ENGAGEMENT SIGNALS
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Average transactions per user</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">AVG(COUNT(*) per user) FILTER WHERE transaction_count {'>'} 0</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (COUNT(*) grouped by tokenized_user_id)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Users with transactions</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">COUNT(DISTINCT tokenized_user_id) FILTER WHERE transaction_count {'>'} 0</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (COUNT(*) grouped by tokenized_user_id)</td>
-                  </tr>
-                  
-                  {/* Bank Statement Source Tracking */}
-                  <tr className="bg-gray-100">
-                    <td colSpan={3} className="px-6 py-3 text-sm font-bold text-gray-900">
-                      BANK STATEMENT SOURCE TRACKING
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Bank</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'bank' FROM l1_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">l1_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'})</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Account Type</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'accountType' FROM l1_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">l1_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'})</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Bank Statement Source - Uploaded or Linked</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{`metadata->'source' FROM l1_events WHERE event_type IN ('statement_upload', 'statement_linked')`}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">l1_events table (metadata JSONB column, event_type = {'statement_upload'} or {'statement_linked'}, source = {'uploaded'} or {'linked'})</td>
-                  </tr>
-                  
-                  {/* Filters */}
-                  <tr className="bg-gray-100">
-                    <td colSpan={3} className="px-6 py-3 text-sm font-bold text-gray-900">
-                      FILTERS
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Account Type - Total Accounts</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">No filter applied (includes all accounts)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (all records)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Account Type - Validated Emails</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">FILTER WHERE email_validated = true</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (email_validated column)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Intent Categories</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">FILTER WHERE motivation = ANY(selected_categories)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (motivation column)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Cohorts (Signup Weeks)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">FILTER WHERE DATE_TRUNC('week', created_at) = selected_week</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">users table (created_at column, grouped by week)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">Data Coverage</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">FILTER users based on transaction upload counts (1 upload, 2 uploads, 3+ uploads)</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">l1_transaction_facts table (upload_session_id column, COUNT DISTINCT per tokenized_user_id)</td>
-                  </tr>
-                </tbody>
-                </table>
+              
+              {/* Cohort & Vanity Metrics Export */}
+              <div className="border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export cohort & vanity metrics</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Download cohort analysis and vanity metrics data with data details sheets documenting all KPIs, formulas, and data sources.
+                </p>
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('admin_token');
+                      const response = await fetch('/api/admin/export/cohort-vanity', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      });
+                      
+                      if (!response.ok) {
+                        const error = await response.json();
+                        alert(`Error: ${error.error || 'Failed to export data'}`);
+                        return;
+                      }
+                      
+                      const blob = await response.blob();
+                      const link = document.createElement('a');
+                      link.href = URL.createObjectURL(blob);
+                      link.download = `cohort-vanity-metrics-${new Date().toISOString().split('T')[0]}.xlsx`;
+                      link.click();
+                    } catch (error) {
+                      console.error('Export error:', error);
+                      alert('Failed to export data. Please try again.');
+                    }
+                  }}
+                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download cohort & vanity metrics
+                </button>
               </div>
             </div>
+          </div>
+        )}
+        
+        {false && analyticsSubTab === 'download' && (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Download</h2>
+              <p className="text-gray-600 mt-1">Export raw database data or API documentation</p>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Export All Raw Data */}
+              <div className="border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export all raw data</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Download all data from every table in the database. Includes API documentation and table of contents as the first sheets. Each table will be a separate sheet in the Excel file.
+                </p>
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('admin_token');
+                      const response = await fetch('/api/admin/export/all-data', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      });
+                      
+                      if (!response.ok) {
+                        const error = await response.json();
+                        alert(`Error: ${error.error || 'Failed to export data'}`);
+                        return;
+                      }
+                      
+                      const blob = await response.blob();
+                      const link = document.createElement('a');
+                      link.href = URL.createObjectURL(blob);
+                      link.download = `all-database-data-${new Date().toISOString().split('T')[0]}.xlsx`;
+                      link.click();
+                    } catch (error) {
+                      console.error('Export error:', error);
+                      alert('Failed to export data. Please try again.');
+                    }
+                  }}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download all raw data
+                </button>
+              </div>
+              
+              {/* Cohort & Vanity Metrics Export */}
+              <div className="border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export cohort & vanity metrics</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Download cohort analysis and vanity metrics data with data details sheets documenting all KPIs, formulas, and data sources.
+                </p>
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('admin_token');
+                      const response = await fetch('/api/admin/export/cohort-vanity', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      });
+                      
+                      if (!response.ok) {
+                        const error = await response.json();
+                        alert(`Error: ${error.error || 'Failed to export data'}`);
+                        return;
+                      }
+                      
+                      const blob = await response.blob();
+                      const link = document.createElement('a');
+                      link.href = URL.createObjectURL(blob);
+                      link.download = `cohort-vanity-metrics-${new Date().toISOString().split('T')[0]}.xlsx`;
+                      link.click();
+                    } catch (error) {
+                      console.error('Export error:', error);
+                      alert('Failed to export data. Please try again.');
+                    }
+                  }}
+                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download cohort & vanity metrics
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {false && (
+          <div>
+            {/* REMOVED DATA DETAILS CONTENT */}
+          </div>
+        )}
+        
+        {false && analyticsSubTab === 'download' && (
+          <div>
+            {/* REMOVED DUPLICATE DOWNLOAD CONTENT */}
+          </div>
+        )}
+        
+        {/* REMOVED: All the old data-details content from line 3251 to 3949 */}
             
             {/* Customer Data Tab - Data Details */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -3961,7 +3941,7 @@ export default function AdminDashboard() {
           </div>
         )}
         
-        {analyticsSubTab === 'download' && (
+        {false && analyticsSubTab === 'download' && (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Download</h2>
