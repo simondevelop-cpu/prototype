@@ -147,13 +147,13 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Enrich users with consent information from user_events (schema-adaptive)
+    // Enrich users with consent information from l1_events (schema-adaptive)
     try {
-      // Check if user_events table exists
+      // Check if l1_events table exists (or legacy user_events for backward compatibility)
       const tableCheck = await pool.query(`
         SELECT 1 
         FROM information_schema.tables 
-        WHERE table_name = 'user_events'
+        WHERE table_name IN ('l1_events', 'user_events')
         LIMIT 1
       `);
 

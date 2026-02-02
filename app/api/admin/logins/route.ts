@@ -29,24 +29,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Check if user_events table exists
-    let hasUserEventsTable = false;
+    // Check if l1_events table exists (or legacy user_events for backward compatibility)
+    let hasEventsTable = false;
     try {
       const tableCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'user_events'
+        WHERE table_name IN ('l1_events', 'user_events')
         LIMIT 1
       `);
-      hasUserEventsTable = tableCheck.rows.length > 0;
+      hasEventsTable = tableCheck.rows.length > 0;
     } catch (e) {
-      console.log('[Admin Logins API] Could not check for user_events table');
+      console.log('[Admin Logins API] Could not check for events table');
     }
 
-    if (!hasUserEventsTable) {
+    if (!hasEventsTable) {
       return NextResponse.json({ 
         success: true,
         logins: [],
-        message: 'user_events table does not exist.'
+        message: 'l1_events table does not exist.'
       }, { status: 200 });
     }
 
