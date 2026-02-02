@@ -89,14 +89,16 @@ These files reference old structures and are now outdated:
 ## ✅ Verification Checklist
 
 - [x] Excel export dynamically queries tables (excludes dropped tables)
+- [x] Excel export explicitly filters out dropped tables
 - [x] Excel export handles missing tables gracefully
 - [x] Table descriptions are accurate
 - [x] API documentation formulas are current
 - [x] Health check API verifies dual-column approach
-- [x] No references to dropped tables in active code
-- [ ] Old documentation files archived/deleted
-- [ ] Tests added for dual-column approach
-- [ ] Tests added for Excel export accuracy
+- [x] API references updated to check for l1_events (with backward compatibility)
+- [x] No references to dropped tables in active code (except for backward compatibility checks)
+- [ ] Old documentation files archived/deleted (optional cleanup)
+- [ ] Tests added for dual-column approach (recommended)
+- [ ] Tests added for Excel export accuracy (recommended)
 
 ---
 
