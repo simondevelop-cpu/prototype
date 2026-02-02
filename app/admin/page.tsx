@@ -123,6 +123,8 @@ export default function AdminDashboard() {
   const [piiMigrationResult, setPiiMigrationResult] = useState<any>(null);
   const [completingPIIIsolation, setCompletingPIIIsolation] = useState(false);
   const [completePIIIsolationResult, setCompletePIIIsolationResult] = useState<any>(null);
+  const [fixEventsAndPIIResult, setFixEventsAndPIIResult] = useState<any>(null);
+  const [fixingEventsAndPII, setFixingEventsAndPII] = useState(false);
   
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
@@ -4665,6 +4667,46 @@ export default function AdminDashboard() {
       alert(`Error fixing tokenization: ${error.message || 'Unknown error'}`);
     } finally {
       setFixingTokenization(false);
+    }
+  };
+
+  const fixEventsAndPII = async () => {
+    setFixingEventsAndPII(true);
+    setFixEventsAndPIIResult(null);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        throw new Error('No admin token found');
+      }
+
+      const response = await fetch('/api/admin/migration/fix-events-and-pii', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setFixEventsAndPIIResult({
+          success: true,
+          message: data.message || 'Migration completed successfully',
+          changes: data.changes || [],
+        });
+      } else {
+        setFixEventsAndPIIResult({
+          success: false,
+          error: data.error || 'Migration failed',
+          details: data.details || '',
+        });
+      }
+    } catch (error: any) {
+      setFixEventsAndPIIResult({
+        success: false,
+        error: error.message || 'Failed to run migration',
+      });
+    } finally {
+      setFixingEventsAndPII(false);
     }
   };
 
