@@ -252,21 +252,6 @@ describe('Event Logging', () => {
       
       // Verify the response indicates updates were made
       const responseData = await response.json();
-      
-      // If update failed, check what tokenized_user_id was used
-      if (responseData.updatedCount === 0) {
-        // Check what ensureTokenizedForAnalytics would return
-        const { ensureTokenizedForAnalytics } = await import('@/lib/tokenization');
-        const returnedTokenizedId = await ensureTokenizedForAnalytics(testUserId);
-        console.log('[Test Debug] Expected tokenized_user_id:', testTokenizedUserId);
-        console.log('[Test Debug] Returned tokenized_user_id:', returnedTokenizedId);
-        console.log('[Test Debug] Transaction IDs:', txIds);
-        console.log('[Test Debug] Transactions in DB:', await testClient.query(
-          `SELECT id, tokenized_user_id FROM l1_transaction_facts WHERE tokenized_user_id = $1`,
-          [testTokenizedUserId]
-        ));
-      }
-      
       expect(responseData.updatedCount).toBeGreaterThan(0);
 
       const events = await testClient.query(
