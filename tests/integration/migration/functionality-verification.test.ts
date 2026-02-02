@@ -17,6 +17,10 @@ describe('Migration Functionality Verification', () => {
     }
   });
 
+  // Skip all migration tests in CI (they require a real database connection)
+  // These tests should be run manually against a real database
+  const shouldSkip = !process.env.DATABASE_URL || process.env.CI === 'true';
+
   afterAll(async () => {
     await pool.end();
   });
