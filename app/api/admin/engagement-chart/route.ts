@@ -232,10 +232,11 @@ export async function GET(request: NextRequest) {
           // Get unique login days in this week
           // Note: We use user_id (internal ID) since login events are logged with internal user_id
           // Use DATE_TRUNC('day', ...) instead of DATE() for better PostgreSQL compatibility
+          // Cast user.id to integer to ensure type consistency
           const loginDaysResult = await pool.query(`
             SELECT COUNT(DISTINCT DATE_TRUNC('day', event_timestamp)) as login_days
             FROM l1_events
-            WHERE user_id = $1
+            WHERE user_id = $1::integer
               AND event_type = 'login'
               AND event_timestamp >= $2::timestamp
               AND event_timestamp <= $3::timestamp
@@ -279,11 +280,23 @@ export async function GET(request: NextRequest) {
       ['login']
     ).then((r: any) => parseInt(r.rows[0]?.count || '0')) : 0;
     
+    // Check if login events exist for the filtered users
+    let loginEventsForFilteredUsers = 0;
+    if (hasUserEvents && filteredUsers.length > 0) {
+      const userIds = filteredUsers.map((u: any) => u.id);
+      const loginCheck = await pool.query(
+        'SELECT COUNT(*) as count FROM l1_events WHERE event_type = $1 AND user_id = ANY($2::int[])',
+        ['login', userIds]
+      );
+      loginEventsForFilteredUsers = parseInt(loginCheck.rows[0]?.count || '0');
+    }
+    
     const usersWithLogins = userLines.filter((ul: any) => 
       ul.weeks.some((w: any) => w.loginDays > 0)
     ).length;
 
-    console.log(`[Engagement Chart] Found ${userLines.length} users, ${usersWithLogins} with login data, ${totalLoginEvents} total login events in l1_events`);
+    console.log(`[Engagement Chart] Found ${userLines.length} users, ${usersWithLogins} with login data, ${totalLoginEvents} total login events in l1_events, ${loginEventsForFilteredUsers} login events for filtered users`);
+    console.log(`[Engagement Chart] Filters: cohorts=${filters.cohorts?.length || 0}, dataCoverage=${filters.dataCoverage?.length || 0}, validatedEmails=${filters.validatedEmails}, intentCategories=${filters.intentCategories?.length || 0}`);
 
     return NextResponse.json({
       success: true,
