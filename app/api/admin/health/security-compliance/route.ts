@@ -223,10 +223,9 @@ export async function GET(request: NextRequest) {
         name: 'Event Logging Integrity',
         description: 'All user actions and system events are logged in a single, consistent location',
         category: 'data-integrity',
-        status: 'error',
+        status: 'fail',
         message: 'Error checking event tables',
         details: error.message,
-        category: 'data-integrity',
       });
     }
 
