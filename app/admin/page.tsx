@@ -3354,24 +3354,54 @@ export default function AdminDashboard() {
                   onClick={async () => {
                     try {
                       const token = localStorage.getItem('admin_token');
+                      if (!token) {
+                        alert('Please log in to download data.');
+                        return;
+                      }
+                      
                       const response = await fetch('/api/admin/export/all-data', {
                         headers: { 'Authorization': `Bearer ${token}` }
                       });
                       
                       if (!response.ok) {
-                        const error = await response.json();
-                        alert(`Error: ${error.error || 'Failed to export data'}`);
+                        let errorMessage = 'Failed to export data';
+                        try {
+                          const error = await response.json();
+                          errorMessage = error.error || error.details || errorMessage;
+                        } catch (e) {
+                          errorMessage = `Server error: ${response.status} ${response.statusText}`;
+                        }
+                        alert(`Error: ${errorMessage}`);
+                        return;
+                      }
+                      
+                      // Check if response is actually a blob
+                      const contentType = response.headers.get('content-type');
+                      if (!contentType || !contentType.includes('spreadsheetml')) {
+                        const text = await response.text();
+                        console.error('Unexpected response:', text);
+                        alert('Server returned unexpected format. Please check console for details.');
                         return;
                       }
                       
                       const blob = await response.blob();
+                      if (blob.size === 0) {
+                        alert('Downloaded file is empty. Please try again.');
+                        return;
+                      }
+                      
                       const link = document.createElement('a');
-                      link.href = URL.createObjectURL(blob);
+                      const blobUrl = URL.createObjectURL(blob);
+                      link.href = blobUrl;
                       link.download = `all-database-data-${new Date().toISOString().split('T')[0]}.xlsx`;
+                      document.body.appendChild(link);
                       link.click();
-                    } catch (error) {
+                      document.body.removeChild(link);
+                      // Clean up blob URL after a delay
+                      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+                    } catch (error: any) {
                       console.error('Export error:', error);
-                      alert('Failed to export data. Please try again.');
+                      alert(`Failed to export data: ${error.message || 'Please try again.'}`);
                     }
                   }}
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
@@ -3442,24 +3472,54 @@ export default function AdminDashboard() {
                   onClick={async () => {
                     try {
                       const token = localStorage.getItem('admin_token');
+                      if (!token) {
+                        alert('Please log in to download data.');
+                        return;
+                      }
+                      
                       const response = await fetch('/api/admin/export/all-data', {
                         headers: { 'Authorization': `Bearer ${token}` }
                       });
                       
                       if (!response.ok) {
-                        const error = await response.json();
-                        alert(`Error: ${error.error || 'Failed to export data'}`);
+                        let errorMessage = 'Failed to export data';
+                        try {
+                          const error = await response.json();
+                          errorMessage = error.error || error.details || errorMessage;
+                        } catch (e) {
+                          errorMessage = `Server error: ${response.status} ${response.statusText}`;
+                        }
+                        alert(`Error: ${errorMessage}`);
+                        return;
+                      }
+                      
+                      // Check if response is actually a blob
+                      const contentType = response.headers.get('content-type');
+                      if (!contentType || !contentType.includes('spreadsheetml')) {
+                        const text = await response.text();
+                        console.error('Unexpected response:', text);
+                        alert('Server returned unexpected format. Please check console for details.');
                         return;
                       }
                       
                       const blob = await response.blob();
+                      if (blob.size === 0) {
+                        alert('Downloaded file is empty. Please try again.');
+                        return;
+                      }
+                      
                       const link = document.createElement('a');
-                      link.href = URL.createObjectURL(blob);
+                      const blobUrl = URL.createObjectURL(blob);
+                      link.href = blobUrl;
                       link.download = `all-database-data-${new Date().toISOString().split('T')[0]}.xlsx`;
+                      document.body.appendChild(link);
                       link.click();
-                    } catch (error) {
+                      document.body.removeChild(link);
+                      // Clean up blob URL after a delay
+                      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+                    } catch (error: any) {
                       console.error('Export error:', error);
-                      alert('Failed to export data. Please try again.');
+                      alert(`Failed to export data: ${error.message || 'Please try again.'}`);
                     }
                   }}
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
