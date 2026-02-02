@@ -94,11 +94,12 @@ export async function POST(request: NextRequest) {
     const idsParam = paramCount;
 
     // Bulk update transactions in L1 fact table (only if they belong to the user)
+    // Explicitly cast the array to integer[] to ensure proper type handling
     const result = await pool.query(
       `UPDATE l1_transaction_facts 
        SET ${updateFields.join(', ')}
        WHERE tokenized_user_id = $${userIdParam} 
-         AND id = ANY($${idsParam})
+         AND id = ANY($${idsParam}::int[])
        RETURNING id`,
       values
     );
