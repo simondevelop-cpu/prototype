@@ -462,16 +462,16 @@ export async function GET(request: NextRequest) {
           SELECT 
             DATE_TRUNC('week', u.created_at) as signup_week,
             COUNT(DISTINCT CASE 
-              WHEN ue.created_at >= u.created_at 
-              AND ue.created_at < u.created_at + INTERVAL '7 days'
+              WHEN ue.event_timestamp >= u.created_at 
+              AND ue.event_timestamp < u.created_at + INTERVAL '7 days'
               AND ue.event_type = 'login' 
-              THEN DATE(ue.created_at) 
+              THEN DATE(ue.event_timestamp) 
             END) as unique_login_days_week_0,
             COUNT(DISTINCT CASE 
-              WHEN ue.created_at >= u.created_at + INTERVAL '7 days'
-              AND ue.created_at < u.created_at + INTERVAL '14 days'
+              WHEN ue.event_timestamp >= u.created_at + INTERVAL '7 days'
+              AND ue.event_timestamp < u.created_at + INTERVAL '14 days'
               AND ue.event_type = 'login' 
-              THEN DATE(ue.created_at) 
+              THEN DATE(ue.event_timestamp) 
             END) as unique_login_days_week_1
           FROM users u
           LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
