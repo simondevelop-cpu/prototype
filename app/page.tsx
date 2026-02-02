@@ -17,9 +17,33 @@ export default function Home() {
       // Check for existing session
       const storedToken = localStorage.getItem('ci.session.token');
       const storedUser = localStorage.getItem('ci.session.user');
+      const lastActivityKey = 'ci.session.lastActivity';
+      const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+      
+      // Check for inactivity timeout
+      const lastActivity = localStorage.getItem(lastActivityKey);
+      if (lastActivity) {
+        const lastActivityTime = parseInt(lastActivity, 10);
+        const timeSinceActivity = Date.now() - lastActivityTime;
+        
+        if (timeSinceActivity > INACTIVITY_TIMEOUT_MS) {
+          // Session expired due to inactivity
+          console.log('[Home] Session expired due to inactivity');
+          localStorage.removeItem('ci.session.token');
+          localStorage.removeItem('ci.session.user');
+          localStorage.removeItem(lastActivityKey);
+          setToken(null);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+      }
       
       if (storedToken && storedUser) {
         const parsedUser = JSON.parse(storedUser);
+        
+        // Update last activity time
+        localStorage.setItem(lastActivityKey, Date.now().toString());
         
         // Check if user needs to complete onboarding
         try {
@@ -29,6 +53,7 @@ export default function Home() {
             // On unauthorized, clear session and show login
             localStorage.removeItem('ci.session.token');
             localStorage.removeItem('ci.session.user');
+            localStorage.removeItem(lastActivityKey);
             setToken(null);
             setUser(null);
           });
@@ -51,13 +76,36 @@ export default function Home() {
     };
     
     checkSession();
-  }, [router]);
+    
+    // Set up inactivity monitoring - check every minute
+    const inactivityCheckInterval = setInterval(() => {
+      const lastActivityKey = 'ci.session.lastActivity';
+      const lastActivity = localStorage.getItem(lastActivityKey);
+      const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
+      
+      if (lastActivity && token) {
+        const lastActivityTime = parseInt(lastActivity, 10);
+        const timeSinceActivity = Date.now() - lastActivityTime;
+        
+        if (timeSinceActivity > INACTIVITY_TIMEOUT_MS) {
+          // Force logout after 30 minutes of inactivity
+          console.log('[Home] Auto-logout due to inactivity');
+          handleLogout();
+          clearInterval(inactivityCheckInterval);
+        }
+      }
+    }, 60 * 1000); // Check every minute
+    
+    return () => clearInterval(inactivityCheckInterval);
+  }, [router, token]);
 
   const handleLogin = (token: string, user: any) => {
     setToken(token);
     setUser(user);
     localStorage.setItem('ci.session.token', token);
     localStorage.setItem('ci.session.user', JSON.stringify(user));
+    // Set last activity time on login
+    localStorage.setItem('ci.session.lastActivity', Date.now().toString());
   };
 
   const handleLogout = () => {
@@ -66,6 +114,7 @@ export default function Home() {
     // Clear all possible token keys (current and legacy)
     localStorage.removeItem('ci.session.token');
     localStorage.removeItem('ci.session.user');
+    localStorage.removeItem('ci.session.lastActivity');
     localStorage.removeItem('token'); // Legacy cleanup
     localStorage.removeItem('user');  // Legacy cleanup
   };

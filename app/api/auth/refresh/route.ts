@@ -46,12 +46,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create new token with extended expiration
+    // Check token age - if it's older than 30 minutes, don't refresh (force re-login)
+    const tokenAge = Date.now() / 1000 - (payload.iat || payload.exp - 30 * 60);
+    const MAX_TOKEN_AGE_SECONDS = 30 * 60; // 30 minutes
+    
+    if (tokenAge > MAX_TOKEN_AGE_SECONDS) {
+      return NextResponse.json(
+        { error: 'Token too old - please log in again' },
+        { status: 401 }
+      );
+    }
+
+    // Create new token with 30-minute expiration
     const newToken = createToken(userId);
 
     return NextResponse.json({
       token: newToken,
-      expiresIn: 24 * 60 * 60, // 24 hours in seconds
+      expiresIn: 30 * 60, // 30 minutes in seconds
     });
   } catch (error: any) {
     console.error('[API] Token refresh error:', error);

@@ -114,15 +114,46 @@ export async function apiFetch<T = any>(
     return { error: 'No authentication token', status: 401 };
   }
 
+  // Check for inactivity timeout (30 minutes)
+  const lastActivityKey = 'ci.session.lastActivity';
+  const lastActivity = localStorage.getItem(lastActivityKey);
+  const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes in milliseconds
+  
+  if (lastActivity) {
+    const lastActivityTime = parseInt(lastActivity, 10);
+    const timeSinceActivity = Date.now() - lastActivityTime;
+    
+    if (timeSinceActivity > INACTIVITY_TIMEOUT_MS) {
+      // User has been inactive for more than 30 minutes - force logout
+      console.log('[API Client] Session expired due to inactivity (30 minutes)');
+      localStorage.removeItem('ci.session.token');
+      localStorage.removeItem('ci.session.user');
+      localStorage.removeItem(lastActivityKey);
+      if (onUnauthorized) {
+        onUnauthorized();
+      } else {
+        window.location.href = '/';
+      }
+      return { error: 'Session expired due to inactivity', status: 401 };
+    }
+  }
+  
+  // Update last activity time
+  localStorage.setItem(lastActivityKey, Date.now().toString());
+
   // Check if token needs refresh before making request
+  // Only refresh if there's been recent activity (within 30 minutes)
   if (isTokenExpiring(token)) {
     const newToken = await refreshToken(token);
     if (newToken) {
       token = newToken;
+      // Update last activity after successful refresh
+      localStorage.setItem(lastActivityKey, Date.now().toString());
     } else {
       // Refresh failed, token is invalid
       localStorage.removeItem('ci.session.token');
       localStorage.removeItem('ci.session.user');
+      localStorage.removeItem(lastActivityKey);
       if (onUnauthorized) {
         onUnauthorized();
       } else {
