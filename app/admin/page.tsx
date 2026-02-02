@@ -4007,22 +4007,42 @@ export default function AdminDashboard() {
                 </button>
               </div>
               
-              {/* Cohort Analysis Export */}
+              {/* Cohort & Vanity Metrics Export */}
               <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export cohort analysis</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export cohort & vanity metrics</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Download cohort analysis data and metrics.
+                  Download cohort analysis and vanity metrics data with data details sheets documenting all KPIs, formulas, and data sources.
                 </p>
                 <button
-                  onClick={() => {
-                    alert('Cohort analysis export is not yet programmed. Coming soon!');
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('admin_token');
+                      const response = await fetch('/api/admin/export/cohort-vanity', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      });
+                      
+                      if (!response.ok) {
+                        const error = await response.json();
+                        alert(`Error: ${error.error || 'Failed to export data'}`);
+                        return;
+                      }
+                      
+                      const blob = await response.blob();
+                      const link = document.createElement('a');
+                      link.href = URL.createObjectURL(blob);
+                      link.download = `cohort-vanity-metrics-${new Date().toISOString().split('T')[0]}.xlsx`;
+                      link.click();
+                    } catch (error) {
+                      console.error('Export error:', error);
+                      alert('Failed to export data. Please try again.');
+                    }
                   }}
-                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  Download cohort analysis
+                  Download cohort & vanity metrics
                 </button>
               </div>
               
