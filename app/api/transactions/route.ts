@@ -33,6 +33,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to get user identifier' }, { status: 500 });
     }
 
+    // Debug: Log tokenized user ID and check transaction counts
+    console.log(`[Transactions API] User ID: ${userId}, Tokenized ID: ${tokenizedUserId}`);
+    const countResult = await pool.query(
+      'SELECT COUNT(*) as count FROM l1_transaction_facts WHERE tokenized_user_id = $1',
+      [tokenizedUserId]
+    );
+    console.log(`[Transactions API] Transaction count in l1_transaction_facts: ${countResult.rows[0]?.count || 0}`);
+
     // Get date range parameters
     const url = new URL(request.url);
     const startParam = url.searchParams.get('start');
@@ -115,6 +123,15 @@ export async function GET(request: NextRequest) {
 
     // Query transactions (no LIMIT - show all)
     const result = await pool.query(query, params);
+
+    console.log(`[Transactions API] Query returned ${result.rows.length} transactions`);
+    if (monthsParam) {
+      console.log(`[Transactions API] Date range filter: ${params[1]} to ${params[2]}`);
+    } else if (startParam && endParam) {
+      console.log(`[Transactions API] Custom date range: ${params[1]} to ${params[2]}`);
+    } else {
+      console.log(`[Transactions API] No date filter - returning all transactions`);
+    }
 
     const transactions = result.rows.map(row => ({
       id: row.id,
