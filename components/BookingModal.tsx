@@ -17,6 +17,7 @@ export default function BookingModal({ isOpen, onClose, date, time, token }: Boo
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   if (!isOpen) return null;
 
@@ -65,11 +66,8 @@ export default function BookingModal({ isOpen, onClose, date, time, token }: Boo
       setRecordConversation(null);
       setNotes('');
       
-      // Show success message with email follow-up
-      alert('Thank you for requesting a chat! We\'ll follow up with you via email to confirm the details.');
-      
-      // Close modal
-      onClose();
+      // Show success message
+      setShowSuccess(true);
     } catch (err: any) {
       setError(err.message || 'Failed to book appointment. Please try again.');
     } finally {
@@ -81,6 +79,34 @@ export default function BookingModal({ isOpen, onClose, date, time, token }: Boo
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   };
+
+  // Success modal
+  if (showSuccess) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
+          <div className="mb-4">
+            <svg className="w-16 h-16 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Thank you!</h3>
+          <p className="text-gray-600 mb-6">
+            Thank you for requesting a chat! We'll follow up with you via email to confirm the details.
+          </p>
+          <button
+            onClick={() => {
+              setShowSuccess(false);
+              onClose();
+            }}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
