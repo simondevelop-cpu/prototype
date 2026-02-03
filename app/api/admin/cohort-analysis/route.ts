@@ -426,9 +426,9 @@ export async function GET(request: NextRequest) {
 
     // Check if l1_events table exists for engagement metrics
     let hasUserEventsTable = false;
+    let eventsTable = 'l1_event_facts'; // Default to new table name
     try {
       // Check for l1_event_facts first (new), then l1_events (old)
-      let eventsTable = 'l1_event_facts';
       const newTableCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
         WHERE table_name = 'l1_event_facts'
