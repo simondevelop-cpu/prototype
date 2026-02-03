@@ -182,10 +182,11 @@ export async function logConsentEvent(
     
     // Use INSERT ... ON CONFLICT DO NOTHING to prevent race conditions
     // The unique index on (user_id, event_type, metadata->>'consentType') will prevent duplicates
+    // For partial unique indexes, we must reference the columns, not the constraint name
     const result = await pool.query(
       `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)
-       ON CONFLICT (user_id, event_type, ((metadata->>'consentType'))) 
+       ON CONFLICT (user_id, event_type, ((metadata->>'consentType')))
        WHERE event_type = 'consent'
        DO NOTHING
        RETURNING id`,
