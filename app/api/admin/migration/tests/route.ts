@@ -478,7 +478,7 @@ async function runForeignKeyTests(pool: any, testType: string): Promise<Migratio
         const sessionCount = parseInt(result.rows[0]?.session_count || '0', 10);
         tests.push({
           id: 'fk-events-sessions',
-          name: `Relationship: ${eventsTable || 'l1_events'} -> sessions`,
+          name: `Relationship: ${eventsTableName || 'l1_events'} -> sessions`,
           description: 'Verify session tracking is working',
           category: 'foreign-keys',
           status: 'pass',
@@ -489,7 +489,7 @@ async function runForeignKeyTests(pool: any, testType: string): Promise<Migratio
     } catch (error: any) {
       tests.push({
         id: 'fk-events-sessions',
-        name: `Relationship: ${eventsTable || 'l1_events'} -> sessions`,
+        name: `Relationship: ${eventsTableName || 'l1_events'} -> sessions`,
         description: 'Verify session tracking is working',
         category: 'foreign-keys',
         status: 'warning',
