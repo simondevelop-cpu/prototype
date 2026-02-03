@@ -84,11 +84,22 @@ export async function POST(request: NextRequest) {
       `);
       
       if (tableCheck.rows.length > 0) {
-        const betaCheck = await pool.query(
-          'SELECT email FROM beta_emails WHERE email = $1',
-          [email.toLowerCase()]
-        );
-        isBetaEmail = betaCheck.rows.length > 0;
+        // Check if table has any entries at all
+        const countCheck = await pool.query('SELECT COUNT(*) as count FROM beta_emails');
+        const emailCount = parseInt(countCheck.rows[0]?.count || '0', 10);
+        
+        // If table is empty, allow registration (backward compatibility - treat empty as "all emails allowed")
+        if (emailCount === 0) {
+          console.log('[Register] beta_emails table exists but is empty, allowing registration');
+          isBetaEmail = true;
+        } else {
+          // Table has entries, check if this email is in the list
+          const betaCheck = await pool.query(
+            'SELECT email FROM beta_emails WHERE email = $1',
+            [email.toLowerCase()]
+          );
+          isBetaEmail = betaCheck.rows.length > 0;
+        }
       } else {
         // If table doesn't exist yet, allow registration (backward compatibility)
         console.log('[Register] beta_emails table does not exist, allowing registration');
