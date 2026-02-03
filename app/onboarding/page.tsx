@@ -42,6 +42,8 @@ export default function OnboardingPage() {
   });
 
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [isBetaEmail, setIsBetaEmail] = useState<boolean | null>(null);
+  const [checkingBetaEmail, setCheckingBetaEmail] = useState(false);
 
   const totalSteps = 7; // 0=verification, 1-6=questions (step 6 is profile, the final step)
 
@@ -206,6 +208,34 @@ export default function OnboardingPage() {
   };
 
   const handleNext = async () => {
+    // On email verification step (step 0), check if user has beta email before allowing skip
+    if (currentStep === 0) {
+      if (!userEmail) {
+        alert('Please enter your email address first.');
+        return;
+      }
+
+      // Check if email is a beta email
+      if (isBetaEmail === null) {
+        // Still checking, wait a bit
+        if (checkingBetaEmail) {
+          alert('Please wait while we verify your email...');
+          return;
+        }
+        // Not checked yet, check now
+        await checkBetaEmail(userEmail);
+        // Wait a moment for the check to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      if (isBetaEmail === false) {
+        alert('This email is not on the pre-approved beta list. Please verify your email with the code sent to you, or contact support to be added to the beta list.');
+        return;
+      }
+
+      // If isBetaEmail is true or null (table doesn't exist), allow proceeding
+    }
+
     if (validateStep()) {
       // Update progress after each step (to track drop-offs)
       if (currentStep > 0) { // Don't save on email verification step
@@ -372,9 +402,14 @@ export default function OnboardingPage() {
         </button>
         <button
           onClick={handleNext}
-          className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium"
+          disabled={checkingBetaEmail}
+          className={`px-4 py-2 font-medium ${
+            checkingBetaEmail
+              ? 'text-gray-400 cursor-not-allowed'
+              : 'text-blue-600 hover:text-blue-700'
+          }`}
         >
-          Skip
+          {checkingBetaEmail ? 'Checking...' : 'Skip - I have a preapproved email address'}
         </button>
       </div>
     </div>
