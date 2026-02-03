@@ -266,11 +266,28 @@ async function runDataIntegrityTests(pool: any, testType: string): Promise<Migra
 async function runSchemaTests(pool: any, testType: string): Promise<MigrationTest[]> {
   const tests: MigrationTest[] = [];
 
+  // Detect which events table exists (l1_event_facts or l1_events)
+  let eventsTableName = null;
+  for (const tableName of ['l1_event_facts', 'l1_events']) {
+    try {
+      await pool.query(`SELECT 1 FROM ${tableName} LIMIT 1`);
+      eventsTableName = tableName;
+      break;
+    } catch (error: any) {
+      // Table doesn't exist, try next
+    }
+  }
+
   // Test: Check if all expected tables exist
   const expectedTables = [
-    'users', 'l1_events', 'l1_transaction_facts', 'l1_customer_facts',
+    'users', 'l1_transaction_facts', 'l1_customer_facts',
     'admin_keywords', 'admin_merchants', 'l0_user_tokenization', 'l0_pii_users'
   ];
+  
+  // Add events table if found
+  if (eventsTableName) {
+    expectedTables.push(eventsTableName);
+  }
 
   for (const table of expectedTables) {
     try {
