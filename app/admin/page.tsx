@@ -483,6 +483,7 @@ export default function AdminDashboard() {
       const data = await response.json();
       if (response.ok) {
         setBetaEmails(data.emails || []);
+        setError(null); // Clear any previous errors
       } else {
         setError(data.error || 'Failed to fetch beta emails');
         setBetaEmails([]);
@@ -1742,8 +1743,11 @@ export default function AdminDashboard() {
                     });
                     const data = await response.json();
                     if (response.ok) {
-                      alert(`Success: ${data.message}`);
+                      setError(null); // Clear any previous errors
+                      // Force refresh by clearing and re-fetching
+                      setBetaEmails([]);
                       await fetchBetaEmails();
+                      alert(`Success: ${data.message}`);
                     } else {
                       setError(data.error || 'Failed to backfill emails');
                     }
