@@ -95,10 +95,10 @@ async function runDataIntegrityTests(pool: any, testType: string): Promise<Migra
   const tests: MigrationTest[] = [];
 
   // Test 1: Count records in each table
-  // Note: l1_events may have been renamed to l1_event_facts, check both
+  // Note: Check for renamed tables (l1_admin_keywords instead of admin_keywords, etc.)
   const tables = [
     'users', 'l1_transaction_facts', 'l1_customer_facts',
-    'admin_keywords', 'admin_merchants', 'onboarding_responses', 'survey_responses',
+    'l1_admin_keywords', 'l1_admin_merchants', 'l1_onboarding_responses', 'l1_survey_responses',
     'categorization_learning', 'l0_user_tokenization', 'l0_pii_users'
   ];
   
@@ -278,10 +278,10 @@ async function runSchemaTests(pool: any, testType: string): Promise<MigrationTes
     }
   }
 
-  // Test: Check if all expected tables exist
+  // Test: Check if all expected tables exist (check for renamed tables)
   const expectedTables = [
     'users', 'l1_transaction_facts', 'l1_customer_facts',
-    'admin_keywords', 'admin_merchants', 'l0_user_tokenization', 'l0_pii_users'
+    'l1_admin_keywords', 'l1_admin_merchants', 'l0_user_tokenization', 'l0_pii_users'
   ];
   
   // Add events table if found
