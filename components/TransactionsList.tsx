@@ -68,6 +68,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [editCountsLoading, setEditCountsLoading] = useState(false);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [addCategoryContext, setAddCategoryContext] = useState<{ field: 'category'; onAdd: (cat: string) => void } | null>(null);
+  const [isOpeningAddCategoryModal, setIsOpeningAddCategoryModal] = useState(false);
   
   const cashflowDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
   const accountDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
@@ -314,8 +315,6 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       setEditingTransaction(null);
       onRefresh(); // Refresh the list
       fetchEditCounts(); // Refresh edit counts
-      // Refresh edit counts after successful update
-      fetchEditCounts();
     } catch (error: any) {
       console.error('Update transaction error:', error);
       throw error;
@@ -1183,6 +1182,8 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                             onChange={(e) => {
                               const newVal = e.target.value;
                               if (newVal === '__ADD_NEW__') {
+                                // Prevent blur from saving empty value
+                                setIsOpeningAddCategoryModal(true);
                                 setAddCategoryContext({
                                   field: 'category',
                                   onAdd: (cat: string) => {
@@ -1190,16 +1191,23 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                                       setEditValue(cat);
                                       saveInlineEdit(tx, 'category', cat);
                                     }
+                                    setIsOpeningAddCategoryModal(false);
                                   }
                                 });
                                 setShowAddCategoryModal(true);
-                                setEditValue('');
+                                // Don't clear editValue - keep the original category value
+                                // The modal will handle setting the new value
                               } else {
                                 setEditValue(newVal);
                                 saveInlineEdit(tx, 'category', newVal);
                               }
                             }}
-                            onBlur={() => saveInlineEdit(tx, 'category')}
+                            onBlur={() => {
+                              // Don't save if we're opening the add category modal
+                              if (!isOpeningAddCategoryModal) {
+                                saveInlineEdit(tx, 'category');
+                              }
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === 'Escape') cancelInlineEdit(tx, 'category');
                             }}
