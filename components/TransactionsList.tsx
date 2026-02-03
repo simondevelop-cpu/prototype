@@ -53,7 +53,18 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [showAddCategoryInput, setShowAddCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [deleteConfirmTxId, setDeleteConfirmTxId] = useState<number | null>(null);
-  const [editCounts, setEditCounts] = useState({ description: 0, category: 0, label: 0, date: 0, amount: 0, statementsUploaded: 0, bulkEdit: 0 });
+  const [editCounts, setEditCounts] = useState({ 
+    totalUploads: 0,
+    monthsWithData: 0,
+    autoCategorisedNumerator: 0,
+    autoCategorisedDenominator: 0,
+    notCategorisedNumerator: 0,
+    notCategorisedDenominator: 0,
+    description: 0,
+    date: 0,
+    amount: 0,
+    bulkEdit: 0,
+  });
   const [editCountsLoading, setEditCountsLoading] = useState(false);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [addCategoryContext, setAddCategoryContext] = useState<{ field: 'category'; onAdd: (cat: string) => void } | null>(null);
@@ -580,33 +591,52 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                 <div className="animate-spin w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-8 gap-4">
+                {/* (i) Total uploads - green */}
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{editCounts.description}</div>
+                  <div className="text-3xl font-bold text-green-600">{editCounts.totalUploads}</div>
+                  <div className="text-sm text-gray-600 mt-1">Total uploads</div>
+                </div>
+                
+                {/* (ii) Months with data - green */}
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-green-600">{editCounts.monthsWithData}</div>
+                  <div className="text-sm text-gray-600 mt-1">Months with data</div>
+                </div>
+                
+                {/* (iii) Auto-categorised - fraction (numerator red, denominator black) */}
+                <div className="text-center">
+                  <div className="text-3xl font-bold">
+                    <span className="text-red-600">{editCounts.autoCategorisedNumerator}</span>
+                    <span className="text-gray-900">/{editCounts.autoCategorisedDenominator}</span>
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">Auto-categorised</div>
+                </div>
+                
+                {/* (iv) Not categorised - fraction (numerator red, denominator black) */}
+                <div className="text-center">
+                  <div className="text-3xl font-bold">
+                    <span className="text-red-600">{editCounts.notCategorisedNumerator}</span>
+                    <span className="text-gray-900">/{editCounts.notCategorisedDenominator}</span>
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">Not categorised</div>
+                </div>
+                
+                {/* Edit counts - all in black */}
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-gray-900">{editCounts.description}</div>
                   <div className="text-sm text-gray-600 mt-1">Description</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{editCounts.category}</div>
-                  <div className="text-sm text-gray-600 mt-1">Category</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{editCounts.label}</div>
-                  <div className="text-sm text-gray-600 mt-1">Label</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{editCounts.date}</div>
+                  <div className="text-3xl font-bold text-gray-900">{editCounts.date}</div>
                   <div className="text-sm text-gray-600 mt-1">Date</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{editCounts.amount}</div>
+                  <div className="text-3xl font-bold text-gray-900">{editCounts.amount}</div>
                   <div className="text-sm text-gray-600 mt-1">Amount</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-green-600">{editCounts.statementsUploaded}</div>
-                  <div className="text-sm text-gray-600 mt-1">Statements uploaded</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{editCounts.bulkEdit}</div>
+                  <div className="text-3xl font-bold text-gray-900">{editCounts.bulkEdit}</div>
                   <div className="text-sm text-gray-600 mt-1">Bulk edit</div>
                 </div>
               </div>
