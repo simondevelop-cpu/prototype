@@ -23,12 +23,6 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
   const [q1Data, setQ1Data] = useState<Array<{ feature: string; expect: boolean; use: boolean; love: boolean }>>([]);
   const [q2Ranked, setQ2Ranked] = useState<RankedItem[]>([
     { text: 'Maintain user trust with obsession on data security', rank: 1 },
-    { text: 'Personalized financial tips and recommendations', rank: null },
-    { text: 'Ability to set and track custom spending limits', rank: null },
-    { text: 'Notifications about unusual spending patterns', rank: null },
-    { text: 'Comparison with peers - is my spend normal type charts', rank: null },
-    { text: 'Integration with investment tracking', rank: null },
-    { text: 'Tax preparation features', rank: null },
     { text: 'More accurate automatic categorization', rank: null },
     { text: 'Faster transaction import and processing', rank: null },
     { text: 'Better visualizations and charts', rank: null },
@@ -56,12 +50,6 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
       setQ1Data([]);
       setQ2Ranked([
         { text: 'Maintain user trust with obsession on data security', rank: 1 },
-        { text: 'Personalized financial tips and recommendations', rank: null },
-        { text: 'Ability to set and track custom spending limits', rank: null },
-        { text: 'Notifications about unusual spending patterns', rank: null },
-        { text: 'Comparison with peers - is my spend normal type charts', rank: null },
-        { text: 'Integration with investment tracking', rank: null },
-        { text: 'Tax preparation features', rank: null },
         { text: 'More accurate automatic categorization', rank: null },
         { text: 'Faster transaction import and processing', rank: null },
         { text: 'Better visualizations and charts', rank: null },
@@ -255,10 +243,16 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
               'Multi-currency support for travel expenses',
               'Integration with more banks and credit cards',
               'Predictive insights (e.g., "You usually spend $X on groceries this week")',
-              'Export data to Excel or CSV for my own analysis',
+              'Do my own analysis based on excels pulled from the App',
               'Recommendations and comparisons',
               'Mobile app for on-the-go expense tracking',
               'Family/household budget sharing',
+              'Personalized financial tips and recommendations',
+              'Ability to set and track custom spending limits',
+              'Notifications about unusual spending patterns',
+              'Comparison with peers - is my spend normal type charts',
+              'Integration with investment tracking',
+              'Tax preparation features',
             ].map((feature, idx) => {
               const existing = q1Data.find(item => item.feature === feature);
               return (
@@ -433,7 +427,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
         <div className="space-y-3">
           {[
             { emoji: '🧾', text: 'Accountant / CPA (taxes, filings, cleanup, year-end)' },
-            { emoji: '🏦', text: 'Fee-only financial planner (budgeting, saving, big decisions, retirement)' },
+            { emoji: '🏦', text: 'Fee-only financial planner (budgeting, saving, big decisions, retirement planning)' },
             { emoji: '💳', text: 'Credit card / rewards specialist (optimize cards based on spend)' },
             { emoji: '🏠', text: 'Mortgage or home-buying advisor' },
             { emoji: '📈', text: 'Investment advisor (non-sales / fee-only)' },

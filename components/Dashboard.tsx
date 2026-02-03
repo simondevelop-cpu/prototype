@@ -866,6 +866,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         isOpen={showFeedback}
         onClose={() => setShowFeedback(false)}
         token={currentToken}
+        onOpenSurvey={() => setShowSurveyModal(true)}
       />
 
       {/* Booking Modal */}
