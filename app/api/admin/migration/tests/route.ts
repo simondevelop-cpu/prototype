@@ -302,11 +302,12 @@ async function runSchemaTests(pool: any, testType: string): Promise<MigrationTes
 
   // Test: Check for required columns in events table (l1_event_facts or l1_events)
   const eventsTableForColumns = eventsTableName || 'l1_event_facts'; // Use detected table or default to renamed version
+  const eventsTableDisplay = eventsTableName || 'l1_events'; // For display purposes
   const requiredColumns = [
-    { table: eventsTableForColumns, column: 'user_id', critical: true, tableDisplay: eventsTable || 'l1_events' },
-    { table: eventsTableForColumns, column: 'event_type', critical: true, tableDisplay: eventsTable || 'l1_events' },
-    { table: eventsTableForColumns, column: 'event_timestamp', critical: true, tableDisplay: eventsTable || 'l1_events' },
-    { table: eventsTableForColumns, column: 'session_id', critical: false, tableDisplay: eventsTable || 'l1_events' },
+    { table: eventsTableForColumns, column: 'user_id', critical: true, tableDisplay: eventsTableDisplay },
+    { table: eventsTableForColumns, column: 'event_type', critical: true, tableDisplay: eventsTableDisplay },
+    { table: eventsTableForColumns, column: 'event_timestamp', critical: true, tableDisplay: eventsTableDisplay },
+    { table: eventsTableForColumns, column: 'session_id', critical: false, tableDisplay: eventsTableDisplay },
   ];
 
   for (const col of requiredColumns) {
