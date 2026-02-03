@@ -63,6 +63,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
     description: 0,
     date: 0,
     amount: 0,
+    label: 0,
     bulkEdit: 0,
   });
   const [editCountsLoading, setEditCountsLoading] = useState(false);
