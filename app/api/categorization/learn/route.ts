@@ -71,19 +71,32 @@ export async function POST(req: NextRequest) {
     // Extract pattern from description
     const pattern = extractPattern(description);
 
+    // Use new table name (l2_user_categorization_learning) with fallback to old name
+    let tableName = 'l2_user_categorization_learning';
+    try {
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'categorization_learning'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'categorization_learning'; // Fallback on error
+    }
+
     // Check if this pattern already exists for this user
     const existing = await pool.query(
-      `SELECT id, frequency FROM categorization_learning 
+      `SELECT id, frequency FROM ${tableName} 
        WHERE user_id = $1 AND description_pattern = $2`,
       [userId, pattern]
     );
 
     if (existing.rows.length > 0) {
       // Update existing pattern (increment frequency, update last_used)
-      // Use dynamic query to handle both old and new schemas
       try {
         await pool.query(
-          `UPDATE categorization_learning 
+          `UPDATE ${tableName} 
            SET frequency = frequency + 1,
                last_used = CURRENT_TIMESTAMP,
                corrected_category = $1,
@@ -94,7 +107,7 @@ export async function POST(req: NextRequest) {
       } catch {
         // Fallback for old schema without corrected_category/corrected_label
         await pool.query(
-          `UPDATE categorization_learning 
+          `UPDATE ${tableName} 
            SET frequency = frequency + 1,
                last_used = CURRENT_TIMESTAMP
            WHERE id = $1`,

@@ -347,7 +347,7 @@ export async function GET(request: NextRequest) {
 
       const fromClause = `FROM users u
            LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
-           INNER JOIN onboarding_responses o ON o.user_id = u.id`;
+           INNER JOIN ${onboardingTable} o ON o.user_id = u.id`;
 
       // Build transaction stats subquery - Single source of truth (l1_transaction_facts only)
       const transactionStatsQuery = `
