@@ -551,7 +551,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
     );
   }
 
-  // Main component return
+  // Main component content
   const mainContent = (
     <div className="fixed inset-0 z-50 bg-gradient-to-br from-blue-50 to-indigo-100 overflow-y-auto">
       <div className="min-h-screen py-12 px-4">
@@ -604,6 +604,14 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
         </div>
       </div>
     </div>
+  );
+
+  // Return both success modal and main content
+  return (
+    <>
+      {successModalContent}
+      {mainContent}
+    </>
   );
 }
 
