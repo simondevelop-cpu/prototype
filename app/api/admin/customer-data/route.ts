@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     let hasEmailValidated = false;
     let useUsersTable = false;
     let onboardingResponsesExists = false;
+    let onboardingTableForQuery = 'l1_onboarding_responses'; // Default to new table name
     
     try {
       // Check users table schema
@@ -55,8 +56,6 @@ export async function GET(request: NextRequest) {
       hasEmailValidated = schemaCheck.rows.some(row => row.column_name === 'email_validated');
       
       // Check if l1_onboarding_responses or onboarding_responses table exists (migration-safe)
-      let onboardingTableForQuery = 'l1_onboarding_responses';
-      let onboardingResponsesExists = false;
       try {
         const newTableCheck = await pool.query(`
           SELECT 1 FROM information_schema.tables 
