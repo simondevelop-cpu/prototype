@@ -1198,6 +1198,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                                 // Don't clear editValue - keep the original category value
                                 // The modal will handle setting the new value
                               } else {
+                                setIsOpeningAddCategoryModal(false); // Reset flag when selecting existing category
                                 setEditValue(newVal);
                                 saveInlineEdit(tx, 'category', newVal);
                               }
