@@ -112,22 +112,30 @@ async function executeSimpleRenames(pool: any, dryRun: boolean): Promise<Migrati
         WHERE table_name = $1
       `, [rename.old]);
 
-      if (tableCheck.rows.length === 0) {
-        step.status = 'skipped';
-        step.details = { reason: 'Source table does not exist' };
-        steps.push(step);
-        continue;
-      }
-
       // Check if new table already exists
       const newTableCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
         WHERE table_name = $1
       `, [rename.new]);
 
+      // If target table already exists, migration is already done
       if (newTableCheck.rows.length > 0) {
+        step.status = 'completed';
+        step.details = { 
+          reason: 'Target table already exists - migration already completed',
+          note: 'This table was likely renamed in a previous migration'
+        };
+        steps.push(step);
+        continue;
+      }
+
+      // If source table doesn't exist and target doesn't exist, table never existed
+      if (tableCheck.rows.length === 0) {
         step.status = 'skipped';
-        step.details = { reason: 'Target table already exists' };
+        step.details = { 
+          reason: 'Source table does not exist',
+          note: 'This table may never have been created, or was already renamed/dropped'
+        };
         steps.push(step);
         continue;
       }
