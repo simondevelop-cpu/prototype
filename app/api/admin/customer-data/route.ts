@@ -274,19 +274,21 @@ export async function GET(request: NextRequest) {
       });
     }
     } else {
-      // Use onboarding_responses table (pre-migration or data not migrated yet)
-      console.log('[Customer Data API] Using onboarding_responses table');
+      // Use l1_onboarding_responses or onboarding_responses table (pre-migration or data not migrated yet)
+      // onboardingTableForQuery is set above in the try block
+      const onboardingTable = onboardingTableForQuery;
+      console.log(`[Customer Data API] Using ${onboardingTable} table`);
       
-      // Check onboarding_responses schema
+      // Check onboarding table schema
       let onboardingHasLastStep = false;
       let onboardingHasAcquisitionOther = false;
       try {
         const onboardingSchemaCheck = await pool.query(`
           SELECT column_name 
           FROM information_schema.columns 
-          WHERE table_name = 'onboarding_responses' 
+          WHERE table_name = $1 
           AND column_name IN ('last_step', 'acquisition_other')
-        `);
+        `, [onboardingTable]);
         onboardingHasLastStep = onboardingSchemaCheck.rows.some(row => row.column_name === 'last_step');
         onboardingHasAcquisitionOther = onboardingSchemaCheck.rows.some(row => row.column_name === 'acquisition_other');
       } catch (e) {
