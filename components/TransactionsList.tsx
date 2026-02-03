@@ -627,69 +627,71 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       {emptyStateContent || (
         <>
           {/* Your Activity Section */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">Your monthly activity... let's play a game!</h3>
-            <p className="text-xs text-gray-500 mb-3">
-              You try and bring green numbers up, red numbers down and we'll try and increase the blue (accurately).
-            </p>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-4">
+            <div className="mb-4">
+              <h3 className="text-base font-bold text-gray-900 mb-1">Your monthly activity... let's play a game!</h3>
+              <p className="text-sm text-gray-600">
+                You try and bring green numbers up, red numbers down and we'll try and increase the blue (accurately).
+              </p>
+            </div>
             {editCountsLoading ? (
-              <div className="text-center py-2">
-                <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+              <div className="text-center py-8">
+                <div className="animate-spin w-6 h-6 border-3 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
               </div>
             ) : (
-              <div className="space-y-3">
-                {/* Row 1: Data and categorisation coverage */}
-                <div className="flex items-center gap-4">
-                  <div className="text-xs font-medium text-gray-700 whitespace-nowrap w-32">Data and categorisation coverage</div>
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-green-600">{editCounts.totalUploads}</div>
-                      <div className="text-xs text-gray-500">Total uploads</div>
+              <div className="space-y-6">
+                {/* Data and categorisation coverage */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-800 mb-3">Data and categorisation coverage</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                      <div className="text-2xl font-bold text-green-700 mb-1">{editCounts.totalUploads}</div>
+                      <div className="text-xs font-medium text-green-600">Total uploads</div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-green-600">{editCounts.monthsWithData}</div>
-                      <div className="text-xs text-gray-500">Months with data</div>
+                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                      <div className="text-2xl font-bold text-green-700 mb-1">{editCounts.monthsWithData}</div>
+                      <div className="text-xs font-medium text-green-600">Months with data</div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold">
-                        <span className="text-red-600">{editCounts.autoCategorisedNumerator}</span>
-                        <span className="text-blue-600">/{editCounts.autoCategorisedDenominator}</span>
+                    <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+                      <div className="text-2xl font-bold mb-1">
+                        <span className="text-red-700">{editCounts.autoCategorisedNumerator}</span>
+                        <span className="text-blue-600 text-lg">/{editCounts.autoCategorisedDenominator}</span>
                       </div>
-                      <div className="text-xs text-gray-500">Unedited auto-categorised</div>
+                      <div className="text-xs font-medium text-red-600">Unedited auto-categorised</div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold">
-                        <span className="text-green-600">{editCounts.notCategorisedNumerator}</span>
-                        <span className="text-gray-900">/{editCounts.notCategorisedDenominator}</span>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="text-2xl font-bold mb-1">
+                        <span className="text-green-700">{editCounts.notCategorisedNumerator}</span>
+                        <span className="text-gray-600 text-lg">/{editCounts.notCategorisedDenominator}</span>
                       </div>
-                      <div className="text-xs text-gray-500">Edited un-categorised</div>
+                      <div className="text-xs font-medium text-gray-600">Edited un-categorised</div>
                     </div>
                   </div>
                 </div>
 
-                {/* Row 2: Other edits */}
-                <div className="flex items-center gap-4">
-                  <div className="text-xs font-medium text-gray-700 whitespace-nowrap w-32">Other edits</div>
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-gray-900">{editCounts.description}</div>
-                      <div className="text-xs text-gray-500">Description</div>
+                {/* Other edits */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-800 mb-3">Other edits</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="text-2xl font-bold text-gray-900 mb-1">{editCounts.description}</div>
+                      <div className="text-xs font-medium text-gray-600">Description</div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-gray-900">{editCounts.date}</div>
-                      <div className="text-xs text-gray-500">Date</div>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="text-2xl font-bold text-gray-900 mb-1">{editCounts.date}</div>
+                      <div className="text-xs font-medium text-gray-600">Date</div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-gray-900">{editCounts.amount}</div>
-                      <div className="text-xs text-gray-500">Amount</div>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="text-2xl font-bold text-gray-900 mb-1">{editCounts.amount}</div>
+                      <div className="text-xs font-medium text-gray-600">Amount</div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-gray-900">{editCounts.bulkEdit}</div>
-                      <div className="text-xs text-gray-500">Bulk edit</div>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="text-2xl font-bold text-gray-900 mb-1">{editCounts.bulkEdit}</div>
+                      <div className="text-xs font-medium text-gray-600">Bulk edit</div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-gray-900">{editCounts.label || 0}</div>
-                      <div className="text-xs text-gray-500">Label</div>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="text-2xl font-bold text-gray-900 mb-1">{editCounts.label || 0}</div>
+                      <div className="text-xs font-medium text-gray-600">Label</div>
                     </div>
                   </div>
                 </div>
