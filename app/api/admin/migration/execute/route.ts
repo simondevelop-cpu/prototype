@@ -360,7 +360,7 @@ async function executeConsolidations(pool: any, dryRun: boolean): Promise<Migrat
             CURRENT_TIMESTAMP as created_at,
             CURRENT_TIMESTAMP as updated_at
           FROM l0_user_tokenization ut
-          INNER JOIN users u ON ut.user_id = u.id
+          INNER JOIN users u ON ut.internal_user_id = u.id
           LEFT JOIN l1_customer_facts cf ON ut.tokenized_user_id = cf.tokenized_user_id
           WHERE cf.tokenized_user_id IS NULL
         `);
