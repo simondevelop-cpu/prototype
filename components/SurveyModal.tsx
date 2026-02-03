@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import dayjs from 'dayjs';
 
 interface SurveyModalProps {
@@ -608,10 +608,10 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
 
   // Return both success modal and main content
   return (
-    <>
+    <Fragment>
       {successModalContent}
       {mainContent}
-    </>
+    </Fragment>
   );
 }
 
