@@ -461,7 +461,7 @@ async function runForeignKeyTests(pool: any, testType: string): Promise<Migratio
         // Column doesn't exist yet - this is expected before migration
         tests.push({
           id: 'fk-events-sessions',
-          name: `Relationship: ${eventsTable || 'l1_events'} -> sessions`,
+          name: `Relationship: ${eventsTableName || 'l1_events'} -> sessions`,
           description: 'Verify session tracking is working',
           category: 'foreign-keys',
           status: 'warning',
