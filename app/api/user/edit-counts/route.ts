@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
         description: 0,
         date: 0,
         amount: 0,
+        label: 0,
         bulkEdit: 0,
       }, { status: 200 });
     }
@@ -108,11 +109,12 @@ export async function GET(request: NextRequest) {
         AND event_type = 'bulk_edit'
     `, [userId]);
 
-    // Count edits by field (only description, date, amount - exclude category, label)
+    // Count edits by field (description, date, amount, label - exclude category)
     const counts = {
       description: 0,
       date: 0,
       amount: 0,
+      label: 0,
     };
 
     // Track unique transaction IDs that have had their category edited
@@ -251,6 +253,7 @@ export async function GET(request: NextRequest) {
       description: counts.description,
       date: counts.date,
       amount: counts.amount,
+      label: counts.label,
       bulkEdit: parseInt(bulkEditResult.rows[0]?.count || '0', 10),
     }, { status: 200 });
 

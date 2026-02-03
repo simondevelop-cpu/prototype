@@ -581,62 +581,77 @@ export default function TransactionsList({ transactions, loading, token, onRefre
         <>
           {/* Your Activity Section */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Your monthly activity... measuring just how much we got wrong (and can get better)!</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Let's play a game - you try and get these numbers as high as you can, and we'll try and bring the blue ones down over time!
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Your monthly activity... let's play a game!</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              You try and bring green numbers up, red numbers down and we'll try and increase the blue (accurately).
             </p>
             {editCountsLoading ? (
               <div className="text-center py-4">
                 <div className="animate-spin w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-8 gap-4">
-                {/* (i) Total uploads - green */}
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-green-600">{editCounts.totalUploads}</div>
-                  <div className="text-sm text-gray-600 mt-1">Total uploads</div>
-                </div>
-                
-                {/* (ii) Months with data - green */}
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-green-600">{editCounts.monthsWithData}</div>
-                  <div className="text-sm text-gray-600 mt-1">Months with data</div>
-                </div>
-                
-                {/* (iii) Auto-categorised - fraction (numerator red, denominator black) */}
-                <div className="text-center">
-                  <div className="text-3xl font-bold">
-                    <span className="text-red-600">{editCounts.autoCategorisedNumerator}</span>
-                    <span className="text-gray-900">/{editCounts.autoCategorisedDenominator}</span>
+              <div className="space-y-6">
+                {/* Data Coverage Section */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Data coverage</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-green-600">{editCounts.totalUploads}</div>
+                      <div className="text-sm text-gray-600 mt-1">Total uploads</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-green-600">{editCounts.monthsWithData}</div>
+                      <div className="text-sm text-gray-600 mt-1">Months with data</div>
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">Auto-categorised</div>
                 </div>
-                
-                {/* (iv) Not categorised - fraction (numerator red, denominator black) */}
-                <div className="text-center">
-                  <div className="text-3xl font-bold">
-                    <span className="text-red-600">{editCounts.notCategorisedNumerator}</span>
-                    <span className="text-gray-900">/{editCounts.notCategorisedDenominator}</span>
+
+                {/* Categorisation Edits Section */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Categorisation edits</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold">
+                        <span className="text-red-600">{editCounts.autoCategorisedNumerator}</span>
+                        <span className="text-blue-600">/{editCounts.autoCategorisedDenominator}</span>
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">Unedited auto-categorised transactions</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold">
+                        <span className="text-green-600">{editCounts.notCategorisedNumerator}</span>
+                        <span className="text-gray-900">/{editCounts.notCategorisedDenominator}</span>
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">Edited un-categorised transactions</div>
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">You categorised / Still uncategorised</div>
                 </div>
-                
-                {/* Edit counts - all in black */}
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-gray-900">{editCounts.description}</div>
-                  <div className="text-sm text-gray-600 mt-1">Description</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-gray-900">{editCounts.date}</div>
-                  <div className="text-sm text-gray-600 mt-1">Date</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-gray-900">{editCounts.amount}</div>
-                  <div className="text-sm text-gray-600 mt-1">Amount</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-gray-900">{editCounts.bulkEdit}</div>
-                  <div className="text-sm text-gray-600 mt-1">Bulk edit</div>
+
+                {/* Other Edits Section */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Other edits</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-gray-900">{editCounts.description}</div>
+                      <div className="text-sm text-gray-600 mt-1">Description</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-gray-900">{editCounts.date}</div>
+                      <div className="text-sm text-gray-600 mt-1">Date</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-gray-900">{editCounts.amount}</div>
+                      <div className="text-sm text-gray-600 mt-1">Amount</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-gray-900">{editCounts.bulkEdit}</div>
+                      <div className="text-sm text-gray-600 mt-1">Bulk edit</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-gray-900">{editCounts.label || 0}</div>
+                      <div className="text-sm text-gray-600 mt-1">Label</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
