@@ -101,6 +101,13 @@ async function initializeTables() {
       )
     `);
     
+    // Add unique index to prevent duplicate consent events (race condition fix)
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_l1_events_unique_consent 
+      ON l1_events (user_id, event_type, ((metadata->>'consentType')))
+      WHERE event_type = 'consent'
+    `);
+    
     // Add session_id column if it doesn't exist (for existing tables)
     await client.query(`
       DO $$ 

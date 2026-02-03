@@ -55,30 +55,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if consent already exists for this user and type
-    const pool = getPool();
-    if (pool) {
-      try {
-        const existingConsent = await pool.query(
-          `SELECT id FROM l1_events 
-           WHERE user_id = $1 
-             AND event_type = 'consent' 
-             AND metadata->>'consentType' = $2 
-           LIMIT 1`,
-          [userId, consentType]
-        );
-
-        if (existingConsent.rows.length > 0) {
-          // Consent already exists, don't log again
-          return NextResponse.json({ success: true, alreadyExists: true });
-        }
-      } catch (checkError) {
-        // If check fails, continue to log (don't block)
-        console.warn('[API] Could not check existing consent:', checkError);
-      }
-    }
-
-    // Log consent event (only if it doesn't already exist)
+    // Log consent event - database unique constraint will prevent duplicates
+    // No need to check first, as logConsentEvent uses INSERT ... ON CONFLICT DO NOTHING
     await logConsentEvent(userId, consentType as any, {
       choice,
       setting,

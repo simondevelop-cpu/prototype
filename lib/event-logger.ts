@@ -180,13 +180,23 @@ export async function logConsentEvent(
     // Get or create session ID (for account creation, use new session; for others, try to get existing)
     const sessionId = await getOrCreateSessionId(pool, numericUserId);
     
-    await pool.query(
+    // Use INSERT ... ON CONFLICT DO NOTHING to prevent race conditions
+    // The unique index on (user_id, event_type, metadata->>'consentType') will prevent duplicates
+    const result = await pool.query(
       `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
-       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
+       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)
+       ON CONFLICT (user_id, event_type, ((metadata->>'consentType'))) 
+       WHERE event_type = 'consent'
+       DO NOTHING
+       RETURNING id`,
       [numericUserId, tokenizedUserId, 'consent', JSON.stringify(eventMetadata), sessionId]
     );
     
-    console.log(`[Event Logger] Logged consent event (${consentType}) for user ${userId}`);
+    if (result.rows.length > 0) {
+      console.log(`[Event Logger] Logged consent event (${consentType}) for user ${userId}`);
+    } else {
+      console.log(`[Event Logger] Consent event (${consentType}) for user ${userId} already exists, skipped duplicate`);
+    }
   } catch (error: any) {
     // Don't throw - event logging should not break the main flow
     console.error('[Event Logger] Failed to log consent event:', error);
