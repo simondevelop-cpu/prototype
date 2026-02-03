@@ -499,6 +499,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
   const renderStep4 = () => {
     const wordCount = q5Data.trim().split(/\s+/).filter(Boolean).length;
     const maxWords = 200;
+    const borderClass = wordCount >= maxWords ? 'border-red-300' : 'border-gray-300';
     
     return (
       <div>
@@ -516,14 +517,12 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
             }
           }}
           rows={6}
-          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-            wordCount >= maxWords ? 'border-red-300' : 'border-gray-300'
-          }`}
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${borderClass}`}
           placeholder="Your comments, suggestions, or let us know if you're open to a follow-up conversation..."
         />
-        {wordCount >= maxWords && (
+        {wordCount >= maxWords ? (
           <p className="text-sm text-red-600 mt-1">200 word maximum</p>
-        )}
+        ) : null}
       </div>
     );
   };
