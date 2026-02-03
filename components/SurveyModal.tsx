@@ -552,12 +552,8 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
   }
 
   // Main component return
-  return (
-    <div>
-      {/* Success Modal - Center Screen */}
-      {successModalContent}
-
-      <div className="fixed inset-0 z-50 bg-gradient-to-br from-blue-50 to-indigo-100 overflow-y-auto">
+  const mainContent = (
+    <div className="fixed inset-0 z-50 bg-gradient-to-br from-blue-50 to-indigo-100 overflow-y-auto">
       <div className="min-h-screen py-12 px-4">
         <div className="max-w-3xl mx-auto">
           <div className="bg-white rounded-2xl shadow-xl p-8">
