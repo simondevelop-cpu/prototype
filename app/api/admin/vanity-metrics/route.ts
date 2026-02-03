@@ -583,8 +583,9 @@ export async function GET(request: NextRequest) {
           `;
           const statementsResult = await pool.query(statementsQuery, [...filterParams, weekStart, weekEnd]);
           totalStatementsUploaded = parseInt(statementsResult.rows[0]?.count) || 0;
-      } catch (e) {
-        // l1_events table doesn't exist, statements = 0
+        } catch (e) {
+          // l1_events table doesn't exist, statements = 0
+        }
       }
 
       // Total statements uploaded by unique person (in the week)
