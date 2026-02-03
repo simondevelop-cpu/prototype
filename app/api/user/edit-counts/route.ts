@@ -77,12 +77,12 @@ export async function GET(request: NextRequest) {
       }, { status: 200 });
     }
 
-    // Fetch statement upload events for this user
+    // Fetch statement upload events for this user (include both statement_upload and statement_linked)
     const statementResult = await pool.query(`
       SELECT COUNT(*) as count
       FROM l1_events
       WHERE user_id = $1
-        AND event_type = 'statement_upload'
+        AND (event_type = 'statement_upload' OR event_type = 'statement_linked')
     `, [userId]);
 
     // Fetch bulk edit events for this user
