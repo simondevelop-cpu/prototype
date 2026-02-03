@@ -82,12 +82,25 @@ export async function GET(request: NextRequest) {
         lastStep = parseInt(result.rows[0]?.last_step || '0') || 0;
       }
     } else {
-      // Fallback to onboarding_responses table (pre-migration)
+      // Fallback to l1_onboarding_responses or onboarding_responses table
+      let onboardingTable = 'l1_onboarding_responses';
+      try {
+        const tableCheck = await pool.query(
+          `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+          [onboardingTable]
+        );
+        if (tableCheck.rows.length === 0) {
+          onboardingTable = 'onboarding_responses'; // Fallback to old name
+        }
+      } catch (e) {
+        onboardingTable = 'onboarding_responses'; // Fallback on error
+      }
+      
       const result = await pool.query(
         `SELECT 
           COUNT(DISTINCT CASE WHEN completed_at IS NOT NULL THEN id END) as completed_count,
           MAX(last_step) as last_step
-         FROM onboarding_responses 
+         FROM ${onboardingTable} 
          WHERE user_id = $1`,
         [userId]
       );

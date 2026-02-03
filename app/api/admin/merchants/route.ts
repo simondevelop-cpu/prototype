@@ -27,8 +27,22 @@ export async function POST(request: NextRequest) {
     
     const { merchant_pattern, alternate_patterns, category, label } = await request.json();
     
+    // Use new table name (l1_admin_merchants) with fallback to old name
+    let tableName = 'l1_admin_merchants';
+    try {
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'admin_merchants'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'admin_merchants'; // Fallback on error
+    }
+    
     const result = await pool.query(
-      `INSERT INTO admin_merchants (merchant_pattern, alternate_patterns, category, label, is_active)
+      `INSERT INTO ${tableName} (merchant_pattern, alternate_patterns, category, label, is_active)
        VALUES ($1, $2, $3, $4, true)
        RETURNING *`,
       [merchant_pattern, alternate_patterns || [], category, label]

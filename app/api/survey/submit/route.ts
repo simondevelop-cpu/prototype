@@ -83,25 +83,37 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Ensure survey_responses table exists
+    // Determine table name (new architecture with fallback)
+    let tableName = 'l1_survey_responses';
     try {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS survey_responses (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          q1_data JSONB,
-          q2_data JSONB,
-          q3_data JSONB,
-          q4_data TEXT,
-          q5_data TEXT,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      await pool.query(`CREATE INDEX IF NOT EXISTS idx_survey_responses_user_id ON survey_responses(user_id)`);
-      await pool.query(`CREATE INDEX IF NOT EXISTS idx_survey_responses_created_at ON survey_responses(created_at)`);
-    } catch (createError: any) {
-      console.error('[API] Error ensuring survey_responses table exists:', createError);
-      // Continue anyway - might already exist
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'survey_responses'; // Fallback to old name
+        // Ensure old table exists if using fallback
+        try {
+          await pool.query(`
+            CREATE TABLE IF NOT EXISTS survey_responses (
+              id SERIAL PRIMARY KEY,
+              user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              q1_data JSONB,
+              q2_data JSONB,
+              q3_data JSONB,
+              q4_data TEXT,
+              q5_data TEXT,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+          await pool.query(`CREATE INDEX IF NOT EXISTS idx_survey_responses_user_id ON survey_responses(user_id)`);
+          await pool.query(`CREATE INDEX IF NOT EXISTS idx_survey_responses_created_at ON survey_responses(created_at)`);
+        } catch (createError: any) {
+          console.error('[API] Error ensuring survey_responses table exists:', createError);
+        }
+      }
+    } catch (e) {
+      tableName = 'survey_responses'; // Fallback on error
     }
 
     // Insert survey response
@@ -121,7 +133,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await pool.query(
-      `INSERT INTO survey_responses (user_id, q1_data, q2_data, q3_data, q4_data, q5_data)
+      `INSERT INTO ${tableName} (user_id, q1_data, q2_data, q3_data, q4_data, q5_data)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, created_at`,
       [

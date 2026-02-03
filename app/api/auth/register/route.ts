@@ -237,10 +237,25 @@ export async function POST(request: NextRequest) {
         transactionCount = { rows: [{ count: '0' }] };
       }
     }
-    const onboardingCount = await pool.query(
-      'SELECT COUNT(*) as count FROM onboarding_responses WHERE user_id = $1 AND completed_at IS NOT NULL',
-      [userId]
-    );
+    // Check onboarding - use l1_onboarding_responses if exists, otherwise fallback to onboarding_responses
+    let onboardingCount;
+    try {
+      onboardingCount = await pool.query(
+        'SELECT COUNT(*) as count FROM l1_onboarding_responses WHERE user_id = $1 AND completed_at IS NOT NULL',
+        [userId]
+      );
+    } catch (error) {
+      // Fallback to legacy table name if migration not complete
+      try {
+        onboardingCount = await pool.query(
+          'SELECT COUNT(*) as count FROM onboarding_responses WHERE user_id = $1 AND completed_at IS NOT NULL',
+          [userId]
+        );
+      } catch (fallbackError) {
+        console.error('[Register] Error checking onboarding:', fallbackError);
+        onboardingCount = { rows: [{ count: '0' }] };
+      }
+    }
 
     const user = userResult.rows[0];
     const txCount = parseInt(transactionCount.rows[0]?.count || '0');

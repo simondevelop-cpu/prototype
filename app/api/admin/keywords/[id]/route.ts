@@ -31,8 +31,22 @@ export async function PUT(
     const { keyword, category, label } = await request.json();
     const id = parseInt(params.id);
     
+    // Use new table name (l1_admin_keywords) with fallback to old name
+    let tableName = 'l1_admin_keywords';
+    try {
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'admin_keywords'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'admin_keywords'; // Fallback on error
+    }
+    
     const result = await pool.query(
-      `UPDATE admin_keywords 
+      `UPDATE ${tableName} 
        SET keyword = $1, category = $2, label = $3, updated_at = NOW()
        WHERE id = $4
        RETURNING *`,
@@ -74,8 +88,22 @@ export async function DELETE(
     
     const id = parseInt(params.id);
     
+    // Use new table name (l1_admin_keywords) with fallback to old name
+    let tableName = 'l1_admin_keywords';
+    try {
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'admin_keywords'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'admin_keywords'; // Fallback on error
+    }
+    
     const result = await pool.query(
-      'DELETE FROM admin_keywords WHERE id = $1 RETURNING id',
+      `DELETE FROM ${tableName} WHERE id = $1 RETURNING id`,
       [id]
     );
     
