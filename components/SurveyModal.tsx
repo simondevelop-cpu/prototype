@@ -528,12 +528,14 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
     );
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <div>
-      {/* Success Modal - Center Screen - Fixed syntax error */}
-      {showSuccessModal && (
+      {/* Success Modal - Center Screen */}
+      {showSuccessModal ? (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
             <div className="mb-4">
@@ -545,7 +547,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
             <p className="text-gray-600">Your responses will help shape our roadmap.</p>
           </div>
         </div>
-      )}
+      ) : null}
 
       <div className="fixed inset-0 z-50 bg-gradient-to-br from-blue-50 to-indigo-100 overflow-y-auto">
       <div className="min-h-screen py-12 px-4">
