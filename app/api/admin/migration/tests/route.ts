@@ -360,22 +360,43 @@ async function runForeignKeyTests(pool: any, testType: string): Promise<Migratio
   }
 
   // Test: Events -> Sessions relationship (via session_id)
+  // First check if session_id column exists
   try {
-    const result = await pool.query(`
-      SELECT COUNT(DISTINCT session_id) as session_count
-      FROM l1_events
-      WHERE session_id IS NOT NULL
+    const columnCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'l1_events' AND column_name = 'session_id'
     `);
-    const sessionCount = parseInt(result.rows[0]?.session_count || '0', 10);
-    tests.push({
-      id: 'fk-events-sessions',
-      name: 'Relationship: l1_events -> sessions',
-      description: 'Verify session tracking is working',
-      category: 'foreign-keys',
-      status: 'pass',
-      flag: '✅',
-      details: { sessionCount },
-    });
+    
+    if (columnCheck.rows.length === 0) {
+      // Column doesn't exist yet - this is expected before migration
+      tests.push({
+        id: 'fk-events-sessions',
+        name: 'Relationship: l1_events -> sessions',
+        description: 'Verify session tracking is working',
+        category: 'foreign-keys',
+        status: 'warning',
+        flag: '⚠️',
+        message: 'session_id column does not exist yet (will be added during migration)',
+      });
+    } else {
+      // Column exists, check session data
+      const result = await pool.query(`
+        SELECT COUNT(DISTINCT session_id) as session_count
+        FROM l1_events
+        WHERE session_id IS NOT NULL
+      `);
+      const sessionCount = parseInt(result.rows[0]?.session_count || '0', 10);
+      tests.push({
+        id: 'fk-events-sessions',
+        name: 'Relationship: l1_events -> sessions',
+        description: 'Verify session tracking is working',
+        category: 'foreign-keys',
+        status: 'pass',
+        flag: '✅',
+        details: { sessionCount },
+      });
+    }
   } catch (error: any) {
     tests.push({
       id: 'fk-events-sessions',
