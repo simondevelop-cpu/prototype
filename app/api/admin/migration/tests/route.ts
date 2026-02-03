@@ -252,24 +252,41 @@ async function runSchemaTests(pool: any, testType: string): Promise<MigrationTes
         FROM information_schema.columns 
         WHERE table_name = $1 AND column_name = $2
       `, [col.table, col.column]);
-      tests.push({
-        id: `schema-column-${col.table}-${col.column}`,
-        name: `Column exists: ${col.table}.${col.column}`,
-        description: `Verify required column exists`,
-        category: 'schema',
-        status: result.rows.length > 0 ? 'pass' : 'fail',
-        flag: result.rows.length > 0 ? '✅' : '❌',
-        critical: col.critical,
-      });
+      const exists = result.rows.length > 0;
+      // For non-critical columns (like session_id), missing is a warning, not a failure
+      if (!exists && !col.critical) {
+        tests.push({
+          id: `schema-column-${col.table}-${col.column}`,
+          name: `Column exists: ${col.table}.${col.column}`,
+          description: `Verify required column exists`,
+          category: 'schema',
+          status: 'warning',
+          flag: '⚠️',
+          message: `Column does not exist (will be added during migration)`,
+          critical: false,
+        });
+      } else {
+        tests.push({
+          id: `schema-column-${col.table}-${col.column}`,
+          name: `Column exists: ${col.table}.${col.column}`,
+          description: `Verify required column exists`,
+          category: 'schema',
+          status: exists ? 'pass' : 'fail',
+          flag: exists ? '✅' : '❌',
+          critical: col.critical,
+          message: exists ? undefined : `Column does not exist`,
+        });
+      }
     } catch (error: any) {
       tests.push({
         id: `schema-column-${col.table}-${col.column}`,
         name: `Column exists: ${col.table}.${col.column}`,
         description: `Verify required column exists`,
         category: 'schema',
-        status: 'fail',
-        flag: '❌',
+        status: col.critical ? 'fail' : 'warning',
+        flag: col.critical ? '❌' : '⚠️',
         message: error.message,
+        critical: col.critical,
       });
     }
   }
