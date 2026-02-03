@@ -34,17 +34,39 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Check if l1_events table exists and has session_id column
+    // Check if l1_event_facts or l1_events table exists and has session_id column (migration-safe)
+    let eventsTable = 'l1_event_facts';
     let hasSessions = false;
     try {
-      const tableCheck = await pool.query(`
+      const newTableCheck = await pool.query(`
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_event_facts' LIMIT 1
+      `);
+      if (newTableCheck.rows.length > 0) {
+        eventsTable = 'l1_event_facts';
+      } else {
+        const oldTableCheck = await pool.query(`
+          SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_events' LIMIT 1
+        `);
+        if (oldTableCheck.rows.length > 0) {
+          eventsTable = 'l1_events';
+        } else {
+          return NextResponse.json({
+            success: true,
+            sessions: [],
+            message: 'Events table does not exist.',
+          }, { status: 200 });
+        }
+      }
+      
+      // Check for session_id column
+      const columnCheck = await pool.query(`
         SELECT column_name 
         FROM information_schema.columns 
-        WHERE table_name = 'l1_events' 
+        WHERE table_name = $1 
           AND column_name = 'session_id'
         LIMIT 1
-      `);
-      hasSessions = tableCheck.rows.length > 0;
+      `, [eventsTable]);
+      hasSessions = columnCheck.rows.length > 0;
     } catch (e) {
       console.log('[Sessions API] Could not check for session_id column');
     }
@@ -53,7 +75,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         sessions: [],
-        message: 'Session tracking not available - session_id column does not exist in l1_events table. Run migration to add it.',
+        message: `Session tracking not available - session_id column does not exist in ${eventsTable} table. Run migration to add it.`,
       }, { status: 200 });
     }
 
@@ -74,7 +96,7 @@ export async function GET(request: NextRequest) {
         COUNT(*) FILTER (WHERE e.event_type = 'consent') as consent_count,
         COUNT(*) FILTER (WHERE e.event_type = 'feedback') as feedback_count,
         COUNT(*) as total_events
-      FROM l1_events e
+      FROM ${eventsTable} e
       WHERE e.session_id IS NOT NULL
         AND e.is_admin = FALSE
       GROUP BY e.user_id, e.session_id

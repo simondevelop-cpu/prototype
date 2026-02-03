@@ -29,15 +29,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Check if l1_events table exists (or legacy user_events for backward compatibility)
+    // Check if l1_event_facts or l1_events table exists (migration-safe)
+    let eventsTable = 'l1_event_facts';
     let hasEventsTable = false;
     try {
-      const tableCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables 
-        WHERE table_name IN ('l1_events', 'user_events')
-        LIMIT 1
+      const newTableCheck = await pool.query(`
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_event_facts' LIMIT 1
       `);
-      hasEventsTable = tableCheck.rows.length > 0;
+      if (newTableCheck.rows.length > 0) {
+        eventsTable = 'l1_event_facts';
+        hasEventsTable = true;
+      } else {
+        const oldTableCheck = await pool.query(`
+          SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_events' LIMIT 1
+        `);
+        if (oldTableCheck.rows.length > 0) {
+          eventsTable = 'l1_events';
+          hasEventsTable = true;
+        }
+      }
     } catch (e) {
       console.log('[Admin Logins API] Could not check for events table');
     }
@@ -46,7 +56,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ 
         success: true,
         logins: [],
-        message: 'l1_events table does not exist.'
+        message: 'Events table does not exist.'
       }, { status: 200 });
     }
 
@@ -59,7 +69,7 @@ export async function GET(request: NextRequest) {
         event_type,
         event_timestamp,
         metadata
-      FROM l1_events
+      FROM ${eventsTable}
       WHERE event_type IN ('admin_login', 'admin_tab_access')
         AND is_admin = TRUE
       ORDER BY event_timestamp DESC
