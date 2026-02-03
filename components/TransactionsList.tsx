@@ -82,6 +82,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [addCategoryContext, setAddCategoryContext] = useState<{ field: 'category'; onAdd: (cat: string) => void } | null>(null);
   const [isOpeningAddCategoryModal, setIsOpeningAddCategoryModal] = useState(false);
+  const [errorModal, setErrorModal] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
   
   const cashflowDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
   const accountDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
@@ -464,7 +465,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       fetchEditCounts(); // Refresh edit counts
     } catch (error: any) {
       console.error('Delete transaction error:', error);
-      alert(error.message);
+      setErrorModal({ show: true, message: error.message || 'Failed to delete transaction' });
     }
   };
 
@@ -601,6 +602,27 @@ export default function TransactionsList({ transactions, loading, token, onRefre
 
   return (
     <div className="space-y-6">
+      {/* Error Modal */}
+      {errorModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
+            <div className="mb-4">
+              <svg className="w-16 h-16 text-red-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Error</h3>
+            <p className="text-gray-600 mb-6">{errorModal.message}</p>
+            <button
+              onClick={() => setErrorModal({ show: false, message: '' })}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Show empty state or normal content */}
       {emptyStateContent || (
         <>

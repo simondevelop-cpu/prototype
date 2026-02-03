@@ -20,6 +20,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [q1Data, setQ1Data] = useState<Array<{ feature: string; expect: boolean; use: boolean; love: boolean }>>([]);
   const [q2Ranked, setQ2Ranked] = useState<RankedItem[]>([
     { text: 'Maintain user trust with obsession on data security', rank: 1 },
@@ -204,6 +205,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
       if (response.ok) {
         setIsSubmitted(true);
         setShowSuccessModal(true);
+        setError(null);
         // Auto-close after 2 seconds
         setTimeout(() => {
           setShowSuccessModal(false);
@@ -211,12 +213,12 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
         }, 2000);
       } else {
         setIsSubmitting(false);
-        alert('Failed to submit survey. Please try again.');
+        setError('Failed to submit survey. Please try again.');
       }
     } catch (error) {
       console.error('Error submitting survey:', error);
       setIsSubmitting(false);
-      alert('Failed to submit survey. Please try again.');
+      setError('Failed to submit survey. Please try again.');
     }
   };
 
@@ -605,6 +607,26 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
     <Fragment>
       {successModalContent}
       {mainContent}
+      {/* Error message - inline at top of modal */}
+      {error && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
+            <div className="mb-4">
+              <svg className="w-16 h-16 text-red-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Error</h3>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <button
+              onClick={() => setError(null)}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </Fragment>
   );
 }
