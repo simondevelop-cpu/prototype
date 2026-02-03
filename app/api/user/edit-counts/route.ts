@@ -153,9 +153,9 @@ export async function GET(request: NextRequest) {
     // Get transaction statistics if tokenized_user_id exists
     let monthsWithData = 0;
     let autoCategorisedDenominator = 0; // Total transactions with category
-    let autoCategorisedNumerator = 0; // Transactions with category that haven't been edited
-    let notCategorisedDenominator = 0; // Total transactions without category
-    let notCategorisedNumerator = 0; // Transactions that were categorised (moved from uncategorised to categorised)
+    let autoCategorisedNumerator = 0; // Transactions with category that haven't been edited (still correctly auto-categorised)
+    let notCategorisedDenominator = 0; // Total transactions currently without category (uncategorised pool)
+    let notCategorisedNumerator = 0; // Transactions you categorised (moved from uncategorised to categorised) - shows your progress in catching and fixing uncategorised transactions
 
     if (tokenizedUserId) {
       try {

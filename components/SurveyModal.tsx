@@ -528,24 +528,30 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
     );
   };
 
+  // Early return if modal is not open
   if (!isOpen) {
     return null;
   }
 
-  const successModalContent = showSuccessModal ? (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
-        <div className="mb-4">
-          <svg className="w-16 h-16 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+  // Prepare success modal content
+  let successModalContent: JSX.Element | null = null;
+  if (showSuccessModal) {
+    successModalContent = (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
+          <div className="mb-4">
+            <svg className="w-16 h-16 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Thank you!</h3>
+          <p className="text-gray-600">Your responses will help shape our roadmap.</p>
         </div>
-        <h3 className="text-xl font-bold text-gray-900 mb-2">Thank you!</h3>
-        <p className="text-gray-600">Your responses will help shape our roadmap.</p>
       </div>
-    </div>
-  ) : null;
+    );
+  }
 
+  // Main component return
   return (
     <div>
       {/* Success Modal - Center Screen */}

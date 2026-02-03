@@ -618,7 +618,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                     <span className="text-red-600">{editCounts.notCategorisedNumerator}</span>
                     <span className="text-gray-900">/{editCounts.notCategorisedDenominator}</span>
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">Not categorised</div>
+                  <div className="text-sm text-gray-600 mt-1">You categorised / Still uncategorised</div>
                 </div>
                 
                 {/* Edit counts - all in black */}
