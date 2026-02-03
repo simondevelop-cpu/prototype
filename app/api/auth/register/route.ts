@@ -222,20 +222,20 @@ export async function POST(request: NextRequest) {
 
     // User exists - check transactions and onboarding
     const userId = userResult.rows[0].id;
-    // Check l1_transaction_facts (preferred) or transactions (legacy)
+    // Check l1_transaction_facts (new architecture)
     const tokenizedUserId = await getTokenizedUserId(userId);
-    let transactionCount;
+    let transactionCount = { rows: [{ count: '0' }] };
     if (tokenizedUserId) {
-      transactionCount = await pool.query(
-        'SELECT COUNT(*) as count FROM l1_transaction_facts WHERE tokenized_user_id = $1',
-        [tokenizedUserId]
-      );
-    } else {
-      // Fallback to legacy transactions table
-      transactionCount = await pool.query(
-        'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1',
-        [userId]
-      );
+      try {
+        transactionCount = await pool.query(
+          'SELECT COUNT(*) as count FROM l1_transaction_facts WHERE tokenized_user_id = $1',
+          [tokenizedUserId]
+        );
+      } catch (error) {
+        console.error('[Register] Error checking l1_transaction_facts:', error);
+        // If table doesn't exist, assume 0 transactions
+        transactionCount = { rows: [{ count: '0' }] };
+      }
     }
     const onboardingCount = await pool.query(
       'SELECT COUNT(*) as count FROM onboarding_responses WHERE user_id = $1 AND completed_at IS NOT NULL',
