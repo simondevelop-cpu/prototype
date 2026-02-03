@@ -21,25 +21,55 @@ This document outlines the migration plan for renaming and consolidating databas
 5. `onboarding_responses` → `l1_onboarding_responses`
 6. `survey_responses` → `l1_survey_responses`
 7. `l1_events` → `l1_event_facts`
+   - **RED TEXT REQUIREMENT:** This should hold master on ALL events we are capturing
+   - **CRITICAL:** Log each event once as a separate row (no aggregation)
+   - Every event type (login, transaction_edit, bulk_edit, consent, feedback, etc.) should be a separate row
+   - This is the single source of truth for all event data
+   - Verify all event types are being logged:
+     - User events: login, transaction_edit, bulk_edit, statement_upload, statement_linked, consent, feedback
+     - Admin events: admin_login, admin_tab_access, admin_data_download
+     - Any other events we're capturing
 
 ### Renames with Schema Changes
 1. `l0_category_list` → `l1_admin_categorisation_list`
 2. `l0_insight_list` → `l1_admin_insights_list`
 3. `admin_categorization_learning` → `l2_user_categorization_learning`
-   - **Schema Changes Required:**
-     - Add `previous_category` column
-     - Ensure every category change is logged as a separate row (audit trail)
+   - **Schema Changes Required (RED TEXT REQUIREMENTS):**
+     - Add `previous_category` column to track what category was changed FROM
+     - **CRITICAL:** Log every category change ever made as a separate row (full audit trail)
+     - Each time a user changes a category, create a new row with:
+       - `previous_category` = the old category
+       - `category` = the new category
+       - `description_pattern` = the transaction description pattern
+       - `user_id` = the user who made the change
+       - Timestamp of when the change was made
+     - This ensures complete history of all categorization changes
 
-### Consolidations
+### Consolidations (RED TEXT REQUIREMENTS)
 1. **Combine `l1_users` + `l2_customer_summary_view` → `l1_customer_facts`**
+   - **RED TEXT REQUIREMENT:** "combine with l1_customer facts - fix all the functionality, APIs, etc. - let's migrate"
    - This is a complex migration requiring:
-     - Data mapping between tables
-     - API endpoint updates
-     - View/query updates
-     - Testing all user-related functionality
+     - **Data mapping:** Map all columns from both source tables to target
+     - **API endpoint updates:** Update all endpoints that reference `l1_users` or `l2_customer_summary_view`
+     - **Query updates:** Update all queries, views, and reports
+     - **Functionality fixes:** Ensure all user-related functionality works with consolidated table
+     - **Comprehensive testing:** Test all user management, analytics, and reporting features
+   - **Migration Steps:**
+     1. Analyze schema differences between all three tables
+     2. Create unified schema for `l1_customer_facts`
+     3. Map and migrate data from both source tables
+     4. Update all code references
+     5. Test thoroughly
+     6. Drop old tables after verification period
 
-### Tables to Review
-- `l2_transactions_view` - Question: Is this needed? Seems duplicative of `l1_transaction_facts`
+### Tables to Review/Remove (RED TEXT REQUIREMENT)
+- `l2_transactions_view` 
+  - **RED TEXT QUESTION:** "Is this needed at all? Seems duplicative to the l1_transaction_facts table"
+  - **Action Required:** 
+    - Analyze if this view provides any unique functionality
+    - Check if any code references this view
+    - If duplicative, remove it during migration cleanup phase
+    - If it provides aggregations/calculations, consider if those should be in `l1_transaction_facts` or a different view
 
 ## Questions to Address
 
@@ -86,10 +116,19 @@ This document outlines the migration plan for renaming and consolidating databas
   - Can be removed after verifying all data is migrated and old table is dropped
   - Add to migration cleanup phase
 
-### 5. Foreign Keys
-**Question:** Does Foreign Keys sheet have all of the foreign key logic? Is there anything connecting events, sessions and transactions to each other?
+### 5. Foreign Keys (RED TEXT REQUIREMENT)
+**Question:** "Does Foreign Keys sheet have all of the foreign key logic? Is there anything connecting events, sessions and transactions to each other?"
 
-**Action:** Review all foreign key relationships and ensure they're documented.
+**Action Required:**
+- **Comprehensive Review:** Audit all foreign key relationships in the database
+- **Document Missing Relationships:** Identify any relationships not currently documented
+- **Verify Interconnections:**
+  - **Events ↔ Sessions:** `l1_event_facts.session_id` should link to session tracking
+  - **Events ↔ Transactions:** `l1_event_facts` metadata may reference `l1_transaction_facts.id` for transaction_edit/bulk_edit events
+  - **Sessions ↔ Users:** Sessions are tied to `user_id` in `l1_event_facts`
+  - **Transactions ↔ Users:** `l1_transaction_facts.tokenized_user_id` links to `l0_user_tokenization` which links to users
+- **Update Foreign Keys Sheet:** Ensure all relationships are documented
+- **Add Missing Foreign Keys:** If relationships exist but aren't enforced, add proper foreign key constraints
 
 ## Pre-Migration Tests
 
