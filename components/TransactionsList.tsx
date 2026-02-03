@@ -53,7 +53,19 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [showAddCategoryInput, setShowAddCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [deleteConfirmTxId, setDeleteConfirmTxId] = useState<number | null>(null);
-  const [editCounts, setEditCounts] = useState({ 
+  const [editCounts, setEditCounts] = useState<{
+    totalUploads: number;
+    monthsWithData: number;
+    autoCategorisedNumerator: number;
+    autoCategorisedDenominator: number;
+    notCategorisedNumerator: number;
+    notCategorisedDenominator: number;
+    description: number;
+    date: number;
+    amount: number;
+    label: number;
+    bulkEdit: number;
+  }>({ 
     totalUploads: 0,
     monthsWithData: 0,
     autoCategorisedNumerator: 0,
@@ -132,7 +144,19 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       });
       if (response.ok) {
         const data = await response.json();
-        setEditCounts(data);
+        setEditCounts({
+          totalUploads: data.totalUploads || 0,
+          monthsWithData: data.monthsWithData || 0,
+          autoCategorisedNumerator: data.autoCategorisedNumerator || 0,
+          autoCategorisedDenominator: data.autoCategorisedDenominator || 0,
+          notCategorisedNumerator: data.notCategorisedNumerator || 0,
+          notCategorisedDenominator: data.notCategorisedDenominator || 0,
+          description: data.description || 0,
+          date: data.date || 0,
+          amount: data.amount || 0,
+          label: data.label || 0,
+          bulkEdit: data.bulkEdit || 0,
+        });
       }
     } catch (error) {
       console.error('Error fetching edit counts:', error);
