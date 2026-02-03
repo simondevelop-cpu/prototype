@@ -84,7 +84,46 @@ export default function OnboardingPage() {
       localStorage.removeItem('onboarding.lock');
       window.removeEventListener('popstate', handleBrowserBack);
     };
-  }, [currentStep]);
+  }, [currentStep, userEmail]);
+
+  // Check if email is a beta email
+  const checkBetaEmail = async (email: string) => {
+    if (!email) {
+      setIsBetaEmail(null);
+      return;
+    }
+
+    setCheckingBetaEmail(true);
+    try {
+      const response = await fetch('/api/auth/check-beta-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email.toLowerCase().trim() }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setIsBetaEmail(data.isBetaEmail || false);
+      } else {
+        console.error('[Onboarding] Failed to check beta email:', data.error);
+        setIsBetaEmail(null); // Default to null if check fails
+      }
+    } catch (error) {
+      console.error('[Onboarding] Error checking beta email:', error);
+      setIsBetaEmail(null); // Default to null if check fails
+    } finally {
+      setCheckingBetaEmail(false);
+    }
+  };
+
+  // Check beta email when userEmail changes
+  useEffect(() => {
+    if (userEmail && currentStep === 0) {
+      checkBetaEmail(userEmail);
+    }
+  }, [userEmail, currentStep]);
 
   const handleMultiSelect = (field: 'emotionalState' | 'financialContext' | 'insightPreferences', value: string) => {
     const currentValues = formData[field];
