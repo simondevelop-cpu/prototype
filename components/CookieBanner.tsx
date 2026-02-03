@@ -50,14 +50,19 @@ export default function CookieBanner({ token, userId }: CookieBannerProps) {
   }, [token]);
 
   const handleAcceptAll = async () => {
-    // Log consent event FIRST (before hiding banner)
+    // Hide banner immediately for better UX
+    setIsVisible(false);
+    setChoice('accept_all');
+    localStorage.setItem('cookie_consent', 'accept_all');
+    
+    // Log consent event (fire and forget - don't block UI)
     try {
       const response = await fetch('/api/consent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-          'Origin': window.location.origin, // Add Origin header for CSRF check
+          'Origin': window.location.origin,
         },
         body: JSON.stringify({
           consentType: 'cookie_banner',
@@ -68,32 +73,26 @@ export default function CookieBanner({ token, userId }: CookieBannerProps) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('Failed to log cookie consent:', response.status, errorData);
-        // Don't hide banner if logging failed
-        return;
-      } else {
-        console.log('Cookie consent logged successfully');
       }
     } catch (error) {
       console.error('Failed to log cookie consent:', error);
-      // Don't hide banner if logging failed
-      return;
     }
-    
-    // Only update UI if logging succeeded
-    localStorage.setItem('cookie_consent', 'accept_all');
-    setChoice('accept_all');
-    setIsVisible(false);
   };
 
   const handleEssentialOnly = async () => {
-    // Log consent event FIRST (before hiding banner)
+    // Hide banner immediately for better UX
+    setIsVisible(false);
+    setChoice('essential_only');
+    localStorage.setItem('cookie_consent', 'essential_only');
+    
+    // Log consent event (fire and forget - don't block UI)
     try {
       const response = await fetch('/api/consent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-          'Origin': window.location.origin, // Add Origin header for CSRF check
+          'Origin': window.location.origin,
         },
         body: JSON.stringify({
           consentType: 'cookie_banner',
@@ -104,21 +103,10 @@ export default function CookieBanner({ token, userId }: CookieBannerProps) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('Failed to log cookie consent:', response.status, errorData);
-        // Don't hide banner if logging failed
-        return;
-      } else {
-        console.log('Cookie consent logged successfully');
       }
     } catch (error) {
       console.error('Failed to log cookie consent:', error);
-      // Don't hide banner if logging failed
-      return;
     }
-    
-    // Only update UI if logging succeeded
-    localStorage.setItem('cookie_consent', 'essential_only');
-    setChoice('essential_only');
-    setIsVisible(false);
   };
 
   // Don't show banner while checking or if consent already given

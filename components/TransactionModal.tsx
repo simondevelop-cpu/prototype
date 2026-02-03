@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import AddCategoryModal from './AddCategoryModal';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export default function TransactionModal({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
 
   // Initialize form data when transaction changes or modal opens
   useEffect(() => {
@@ -247,10 +249,7 @@ export default function TransactionModal({
               onChange={(e) => {
                 const newVal = e.target.value;
                 if (newVal === '__ADD_NEW__') {
-                  const newCat = prompt('Enter new category name:');
-                  if (newCat && newCat.trim()) {
-                    setFormData({ ...formData, category: newCat.trim() });
-                  }
+                  setShowAddCategoryModal(true);
                 } else {
                   setFormData({ ...formData, category: newVal });
                 }
@@ -285,6 +284,16 @@ export default function TransactionModal({
           </div>
         </form>
       </div>
+
+      <AddCategoryModal
+        isOpen={showAddCategoryModal}
+        onClose={() => setShowAddCategoryModal(false)}
+        onAdd={(categoryName) => {
+          setFormData({ ...formData, category: categoryName });
+          setShowAddCategoryModal(false);
+        }}
+        existingCategories={categories}
+      />
     </div>
   );
 }

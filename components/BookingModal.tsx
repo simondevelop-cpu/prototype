@@ -65,6 +65,9 @@ export default function BookingModal({ isOpen, onClose, date, time, token }: Boo
       setRecordConversation(null);
       setNotes('');
       
+      // Show success message with email follow-up
+      alert('Thank you for requesting a chat! We\'ll follow up with you via email to confirm the details.');
+      
       // Close modal
       onClose();
     } catch (err: any) {

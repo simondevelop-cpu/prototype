@@ -6,6 +6,7 @@ import utc from 'dayjs/plugin/utc';
 import TransactionModal from './TransactionModal';
 import BulkRecategorizeModal from './BulkRecategorizeModal';
 import StatementUploadModal from './StatementUploadModal';
+import AddCategoryModal from './AddCategoryModal';
 import { CATEGORIES } from '@/lib/categorization-engine';
 
 dayjs.extend(utc);
@@ -54,6 +55,8 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [deleteConfirmTxId, setDeleteConfirmTxId] = useState<number | null>(null);
   const [editCounts, setEditCounts] = useState({ description: 0, category: 0, label: 0, date: 0, amount: 0, statementsUploaded: 0, bulkEdit: 0 });
   const [editCountsLoading, setEditCountsLoading] = useState(false);
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [addCategoryContext, setAddCategoryContext] = useState<{ field: 'category'; onAdd: (cat: string) => void } | null>(null);
   
   const cashflowDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
   const accountDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
@@ -239,6 +242,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       }
 
       onRefresh(); // Refresh the list
+      fetchEditCounts(); // Refresh edit counts
     } catch (error: any) {
       console.error('Create transaction error:', error);
       throw error;
@@ -298,6 +302,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
 
       setEditingTransaction(null);
       onRefresh(); // Refresh the list
+      fetchEditCounts(); // Refresh edit counts
       // Refresh edit counts after successful update
       fetchEditCounts();
     } catch (error: any) {
@@ -421,6 +426,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       }
 
       onRefresh(); // Refresh the list
+      fetchEditCounts(); // Refresh edit counts
     } catch (error: any) {
       console.error('Delete transaction error:', error);
       alert(error.message);
@@ -1147,13 +1153,17 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                             onChange={(e) => {
                               const newVal = e.target.value;
                               if (newVal === '__ADD_NEW__') {
-                                const newCat = prompt('Enter new category name:');
-                                if (newCat && newCat.trim() && !categories.includes(newCat.trim())) {
-                                  setEditValue(newCat.trim());
-                                  saveInlineEdit(tx, 'category', newCat.trim());
-                                } else {
-                                  setEditValue('');
-                                }
+                                setAddCategoryContext({
+                                  field: 'category',
+                                  onAdd: (cat: string) => {
+                                    if (!categories.includes(cat)) {
+                                      setEditValue(cat);
+                                      saveInlineEdit(tx, 'category', cat);
+                                    }
+                                  }
+                                });
+                                setShowAddCategoryModal(true);
+                                setEditValue('');
                               } else {
                                 setEditValue(newVal);
                                 saveInlineEdit(tx, 'category', newVal);
@@ -1315,7 +1325,27 @@ export default function TransactionsList({ transactions, loading, token, onRefre
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         token={token}
-        onSuccess={onRefresh}
+        onSuccess={() => {
+          onRefresh();
+          fetchEditCounts();
+        }}
+      />
+
+      <AddCategoryModal
+        isOpen={showAddCategoryModal}
+        onClose={() => {
+          setShowAddCategoryModal(false);
+          setAddCategoryContext(null);
+        }}
+        onAdd={(categoryName) => {
+          if (addCategoryContext) {
+            addCategoryContext.onAdd(categoryName);
+          }
+          setShowAddCategoryModal(false);
+          setAddCategoryContext(null);
+          onRefresh(); // Refresh to show new category in list
+        }}
+        existingCategories={categories.filter(c => c !== 'All categories')}
       />
     </div>
   );

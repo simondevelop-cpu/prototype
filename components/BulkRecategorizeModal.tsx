@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import AddCategoryModal from './AddCategoryModal';
 
 interface BulkRecategorizeModalProps {
   isOpen: boolean;
@@ -140,10 +141,7 @@ export default function BulkRecategorizeModal({
               onChange={(e) => {
                 const newVal = e.target.value;
                 if (newVal === '__ADD_NEW__') {
-                  const newCat = prompt('Enter new category name:');
-                  if (newCat && newCat.trim()) {
-                    setUpdates({ ...updates, category: newCat.trim() });
-                  }
+                  setShowAddCategoryModal(true);
                 } else {
                   setUpdates({ ...updates, category: newVal });
                 }
@@ -264,6 +262,16 @@ export default function BulkRecategorizeModal({
           </div>
         </form>
       </div>
+
+      <AddCategoryModal
+        isOpen={showAddCategoryModal}
+        onClose={() => setShowAddCategoryModal(false)}
+        onAdd={(categoryName) => {
+          setUpdates({ ...updates, category: categoryName });
+          setShowAddCategoryModal(false);
+        }}
+        existingCategories={categories}
+      />
     </div>
   );
 }
