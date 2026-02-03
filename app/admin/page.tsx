@@ -114,8 +114,12 @@ export default function AdminDashboard() {
   // State for Migration tab
   const [migrationTests, setMigrationTests] = useState<any[]>([]);
   const [migrationTestsLoading, setMigrationTestsLoading] = useState(false);
+  const [migrationTestSummary, setMigrationTestSummary] = useState<any>(null);
+  const [migrationTestType, setMigrationTestType] = useState<'pre' | 'post'>('pre');
+  const [migrationSteps, setMigrationSteps] = useState<any[]>([]);
+  const [migrationExecuting, setMigrationExecuting] = useState(false);
+  const [migrationPhase, setMigrationPhase] = useState<string>('');
   const [migrationResults, setMigrationResults] = useState<any>(null);
-  const [migrationRunning, setMigrationRunning] = useState(false);
   const [dropVerification, setDropVerification] = useState<any>(null);
   const [dropVerificationLoading, setDropVerificationLoading] = useState(false);
   const [investigationData, setInvestigationData] = useState<any>(null);
@@ -1926,52 +1930,105 @@ export default function AdminDashboard() {
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Database Migration</h2>
           <p className="text-gray-600 mb-6">
-            Run the comprehensive table consolidation migration and verify table drops.
+            Execute table renames, schema changes, and consolidations with comprehensive pre/post migration testing.
           </p>
 
-          {/* Pre-Migration Tests */}
+          {/* Test Section */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Pre-Migration Tests</h3>
-              <button
-                onClick={fetchMigrationTests}
-                disabled={migrationTestsLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
-                {migrationTestsLoading ? 'Loading...' : 'Run Tests'}
-              </button>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Migration Tests</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Run pre-migration tests before executing, and post-migration tests after to verify success.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => fetchMigrationTests('pre')}
+                  disabled={migrationTestsLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {migrationTestsLoading ? 'Loading...' : 'Run Pre-Tests'}
+                </button>
+                <button
+                  onClick={() => fetchMigrationTests('post')}
+                  disabled={migrationTestsLoading}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  {migrationTestsLoading ? 'Loading...' : 'Run Post-Tests'}
+                </button>
+              </div>
             </div>
+
+            {/* Test Summary */}
+            {migrationTestSummary && (
+              <div className={`mb-4 p-4 rounded-lg border-2 ${
+                migrationTestSummary.critical > 0 ? 'bg-red-50 border-red-300' :
+                migrationTestSummary.failed > 0 ? 'bg-yellow-50 border-yellow-300' :
+                'bg-green-50 border-green-300'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-gray-900">Test Summary ({migrationTestType === 'pre' ? 'Pre' : 'Post'}-Migration)</h4>
+                  <div className="flex gap-4 text-sm">
+                    <span className={migrationTestSummary.passed > 0 ? 'text-green-700 font-medium' : ''}>
+                      ✅ {migrationTestSummary.passed} Passed
+                    </span>
+                    {migrationTestSummary.failed > 0 && (
+                      <span className="text-red-700 font-medium">
+                        ❌ {migrationTestSummary.failed} Failed
+                      </span>
+                    )}
+                    {migrationTestSummary.warnings > 0 && (
+                      <span className="text-yellow-700 font-medium">
+                        ⚠️ {migrationTestSummary.warnings} Warnings
+                      </span>
+                    )}
+                    {migrationTestSummary.critical > 0 && (
+                      <span className="text-red-700 font-bold">
+                        🔴 {migrationTestSummary.critical} Critical Failed
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             
+            {/* Test Results Table */}
             {migrationTests.length > 0 && (
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Test</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Test</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {migrationTests.map((test, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{test.name}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{test.description}</td>
+                    {migrationTests.map((test: any, index: number) => (
+                      <tr key={test.id || index} className={test.critical && test.status !== 'pass' ? 'bg-red-50' : ''}>
                         <td className="px-6 py-4 text-sm">
-                          {test.passed ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              ✓ Pass
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              ✗ Fail
-                            </span>
+                          <span className="text-2xl">{test.flag || '⏸️'}</span>
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          {test.name}
+                          {test.critical && (
+                            <span className="ml-2 text-xs text-red-600 font-bold">🔴 CRITICAL</span>
                           )}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
-                          {test.actualValue !== null && test.actualValue !== undefined ? String(test.actualValue) : '-'}
-                          {test.error && <span className="text-red-600 ml-2">({test.error})</span>}
+                          <span className="px-2 py-1 bg-gray-100 rounded text-xs">{test.category}</span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{test.description}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {test.message && <div className="text-red-600">{test.message}</div>}
+                          {test.details && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              {JSON.stringify(test.details, null, 2)}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -1981,51 +2038,170 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {/* Run Migration */}
+          {/* Migration Execution */}
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Run Migration</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Execute the comprehensive table consolidation migration script.
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Execute Migration</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Phase 1: Simple Renames */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-2">Phase 1: Simple Renames</h4>
+                <p className="text-sm text-gray-600 mb-3">
+                  Rename tables without schema changes (admin_keywords, admin_merchants, etc.)
                 </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => executeMigrationPhase('simple-rename', true)}
+                    disabled={migrationExecuting}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
+                  >
+                    Dry Run
+                  </button>
+                  <button
+                    onClick={() => executeMigrationPhase('simple-rename', false)}
+                    disabled={migrationExecuting}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm font-semibold"
+                  >
+                    Execute
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={runMigration}
-                disabled={migrationRunning}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-semibold"
-              >
-                {migrationRunning ? 'Running...' : 'Run Migration'}
-              </button>
+
+              {/* Phase 2: Schema Changes */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-2">Phase 2: Schema Changes</h4>
+                <p className="text-sm text-gray-600 mb-3">
+                  Rename tables and add columns (previous_category, etc.)
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => executeMigrationPhase('schema-change', true)}
+                    disabled={migrationExecuting}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
+                  >
+                    Dry Run
+                  </button>
+                  <button
+                    onClick={() => executeMigrationPhase('schema-change', false)}
+                    disabled={migrationExecuting}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm font-semibold"
+                  >
+                    Execute
+                  </button>
+                </div>
+              </div>
+
+              {/* Phase 3: Consolidations */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-2">Phase 3: Consolidations</h4>
+                <p className="text-sm text-gray-600 mb-3">
+                  Combine l1_users + l2_customer_summary_view → l1_customer_facts
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => executeMigrationPhase('consolidation', true)}
+                    disabled={migrationExecuting}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
+                  >
+                    Dry Run
+                  </button>
+                  <button
+                    onClick={() => executeMigrationPhase('consolidation', false)}
+                    disabled={migrationExecuting}
+                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 text-sm font-semibold"
+                  >
+                    Execute
+                  </button>
+                </div>
+              </div>
+
+              {/* Phase 4: Cleanup */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-2">Phase 4: Cleanup</h4>
+                <p className="text-sm text-gray-600 mb-3">
+                  Review and remove unused views/tables (l2_transactions_view, etc.)
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => executeMigrationPhase('cleanup', true)}
+                    disabled={migrationExecuting}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
+                  >
+                    Dry Run
+                  </button>
+                  <button
+                    onClick={() => executeMigrationPhase('cleanup', false)}
+                    disabled={migrationExecuting}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 text-sm font-semibold"
+                  >
+                    Execute
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {migrationResults && (
-              <div className={`border rounded-lg p-4 ${migrationResults.success ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold text-gray-900">
-                    Migration Results
-                  </h4>
-                  <span className={`text-sm font-medium ${migrationResults.success ? 'text-green-800' : 'text-yellow-800'}`}>
-                    {migrationResults.successful} / {migrationResults.executed} statements successful
-                  </span>
+            {/* Migration Steps Results */}
+            {migrationSteps.length > 0 && (
+              <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden">
+                <div className="p-4 bg-gray-50 border-b border-gray-200">
+                  <h4 className="font-semibold text-gray-900">Migration Steps ({migrationPhase})</h4>
+                  {migrationResults && (
+                    <div className="mt-2 text-sm">
+                      <span className={migrationResults.success ? 'text-green-700' : 'text-red-700'}>
+                        {migrationResults.summary?.completed || 0} completed, {migrationResults.summary?.failed || 0} failed
+                      </span>
+                    </div>
+                  )}
                 </div>
-                {migrationResults.errors > 0 && (
-                  <p className="text-sm text-yellow-800 mb-2">
-                    {migrationResults.errors} error(s) occurred. Check details below.
-                  </p>
-                )}
-                {migrationResults.error && (
-                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
-                    <p className="text-sm text-red-800 font-medium">Error:</p>
-                    <p className="text-sm text-red-700">{migrationResults.error}</p>
-                    {migrationResults.details && (
-                      <p className="text-xs text-red-600 mt-1">{migrationResults.details}</p>
-                    )}
-                  </div>
-                )}
-                {migrationResults.message && (
-                  <p className="text-sm text-green-800">{migrationResults.message}</p>
-                )}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Step</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {migrationSteps.map((step: any, index: number) => (
+                        <tr key={step.id || index}>
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{step.name}</td>
+                          <td className="px-6 py-4 text-sm">
+                            {step.status === 'completed' && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                ✅ Completed
+                              </span>
+                            )}
+                            {step.status === 'failed' && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                ❌ Failed
+                              </span>
+                            )}
+                            {step.status === 'skipped' && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                ⏸️ Skipped
+                              </span>
+                            )}
+                            {step.status === 'running' && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                ⏳ Running
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{step.description}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            {step.error && <div className="text-red-600">{step.error}</div>}
+                            {step.details && (
+                              <div className="text-xs text-gray-500">
+                                {JSON.stringify(step.details, null, 2)}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -4249,16 +4425,17 @@ export default function AdminDashboard() {
     );
   };
 
-  // Fetch migration pre-tests
-  const fetchMigrationTests = async () => {
+  // Fetch migration tests (pre or post)
+  const fetchMigrationTests = async (type: 'pre' | 'post' = 'pre') => {
     setMigrationTestsLoading(true);
+    setMigrationTestType(type);
     try {
       const token = localStorage.getItem('admin_token');
       if (!token) {
-        alert('Not authenticated. Please log in again.');
+        setError('Not authenticated. Please log in again.');
         return;
       }
-      const response = await fetch('/api/admin/migration/run', {
+      const response = await fetch(`/api/admin/migration/tests?type=${type}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -4266,14 +4443,62 @@ export default function AdminDashboard() {
       const data = await response.json();
       if (response.ok) {
         setMigrationTests(data.tests || []);
+        setMigrationTestSummary(data.summary || null);
       } else {
-        alert(`Failed to fetch migration tests: ${data.error || 'Unknown error'}`);
+        setError(data.error || 'Failed to fetch migration tests');
+        setMigrationTests([]);
+        setMigrationTestSummary(null);
       }
     } catch (error: any) {
       console.error('Error fetching migration tests:', error);
-      alert(`Error fetching migration tests: ${error.message || 'Unknown error'}`);
+      setError(`Error fetching migration tests: ${error.message || 'Unknown error'}`);
+      setMigrationTests([]);
+      setMigrationTestSummary(null);
     } finally {
       setMigrationTestsLoading(false);
+    }
+  };
+
+  // Execute migration phase
+  const executeMigrationPhase = async (phase: string, dryRun: boolean = false) => {
+    if (!dryRun && !confirm(`Are you sure you want to execute the ${phase} migration? This will modify the database structure.`)) {
+      return;
+    }
+    
+    setMigrationExecuting(true);
+    setMigrationPhase(phase);
+    setMigrationSteps([]);
+    setMigrationResults(null);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        setError('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/migration/execute', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phase, dryRun }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setMigrationSteps(data.steps || []);
+        setMigrationResults(data);
+        if (!dryRun && data.success) {
+          // Refresh tests after migration
+          await fetchMigrationTests('post');
+        }
+      } else {
+        setError(data.error || 'Failed to execute migration');
+      }
+    } catch (error: any) {
+      console.error('Error executing migration:', error);
+      setError(`Error executing migration: ${error.message || 'Unknown error'}`);
+    } finally {
+      setMigrationExecuting(false);
     }
   };
 
@@ -5183,6 +5408,16 @@ export default function AdminDashboard() {
             >
               🔍 App monitoring
             </button>
+            <button
+              onClick={() => setActiveTab('migration')}
+              className={`px-6 py-4 font-medium text-sm transition-colors relative ${
+                activeTab === 'migration'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              🔄 Migration
+            </button>
           </div>
         </div>
       </div>
@@ -5528,6 +5763,7 @@ export default function AdminDashboard() {
         )}
         {activeTab === 'categories' && renderCategoriesTab()}
         {activeTab === 'analytics' && renderAnalyticsTab()}
+        {activeTab === 'migration' && renderMigrationTab()}
       </div>
       
       {/* Add Modal - only for keywords and merchants */}
