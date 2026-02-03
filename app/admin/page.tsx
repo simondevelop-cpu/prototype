@@ -4502,13 +4502,14 @@ export default function AdminDashboard() {
     }
   };
 
-  // Run migration
+  // Legacy runMigration function - kept for backward compatibility with old investigation code
+  // New migrations should use executeMigrationPhase instead
   const runMigration = async () => {
     if (!confirm('Are you sure you want to run the migration? This will modify the database structure.')) {
       return;
     }
     
-    setMigrationRunning(true);
+    setMigrationExecuting(true);
     setMigrationResults(null);
     try {
       const token = localStorage.getItem('admin_token');
@@ -4528,8 +4529,7 @@ export default function AdminDashboard() {
       if (response.ok && data.success) {
         alert('Migration completed successfully!');
         // Refresh tests
-        fetchMigrationTests();
-        fetchDropVerification();
+        fetchMigrationTests('post');
       } else {
         alert(`Migration completed with ${data.errors || 0} error(s). Check results below.`);
       }
@@ -4537,7 +4537,7 @@ export default function AdminDashboard() {
       console.error('Error running migration:', error);
       alert(`Error running migration: ${error.message || 'Unknown error'}`);
     } finally {
-      setMigrationRunning(false);
+      setMigrationExecuting(false);
     }
   };
 
