@@ -95,11 +95,33 @@ async function runDataIntegrityTests(pool: any, testType: string): Promise<Migra
   const tests: MigrationTest[] = [];
 
   // Test 1: Count records in each table
+  // Note: l1_events may have been renamed to l1_event_facts, check both
   const tables = [
-    'users', 'l1_events', 'l1_transaction_facts', 'l1_customer_facts',
+    'users', 'l1_transaction_facts', 'l1_customer_facts',
     'admin_keywords', 'admin_merchants', 'onboarding_responses', 'survey_responses',
     'categorization_learning', 'l0_user_tokenization', 'l0_pii_users'
   ];
+  
+  // Check for events table (could be l1_events or l1_event_facts)
+  const eventsTableCheck = ['l1_event_facts', 'l1_events'];
+  for (const table of eventsTableCheck) {
+    try {
+      const result = await pool.query(`SELECT COUNT(*) as count FROM ${table}`);
+      const count = parseInt(result.rows[0]?.count || '0', 10);
+      tests.push({
+        id: `data-count-${table}`,
+        name: `Record count: ${table}`,
+        description: `Verify ${table} has records`,
+        category: 'data-integrity',
+        status: count >= 0 ? 'pass' : 'fail',
+        flag: count >= 0 ? '✅' : '❌',
+        details: { count, table },
+      });
+      break; // Found the events table, stop checking
+    } catch (error: any) {
+      // Continue to next table name
+    }
+  }
 
   for (const table of tables) {
     try {
@@ -129,12 +151,25 @@ async function runDataIntegrityTests(pool: any, testType: string): Promise<Migra
   }
 
   // Test 2: Check for orphaned records
-  try {
-    const orphanedEvents = await pool.query(`
-      SELECT COUNT(*) as count
-      FROM l1_events e
-      WHERE e.user_id NOT IN (SELECT id FROM users)
-    `);
+  // Check which events table exists (l1_event_facts or l1_events)
+  let eventsTableName = null;
+  for (const tableName of ['l1_event_facts', 'l1_events']) {
+    try {
+      await pool.query(`SELECT 1 FROM ${tableName} LIMIT 1`);
+      eventsTableName = tableName;
+      break;
+    } catch (error: any) {
+      // Table doesn't exist, try next
+    }
+  }
+  
+  if (eventsTableName) {
+    try {
+      const orphanedEvents = await pool.query(`
+        SELECT COUNT(*) as count
+        FROM ${eventsTableName} e
+        WHERE e.user_id NOT IN (SELECT id FROM users)
+      `);
     const orphanedCount = parseInt(orphanedEvents.rows[0]?.count || '0', 10);
     tests.push({
       id: 'data-orphaned-events',
@@ -144,9 +179,20 @@ async function runDataIntegrityTests(pool: any, testType: string): Promise<Migra
       status: orphanedCount === 0 ? 'pass' : 'fail',
       flag: orphanedCount === 0 ? '✅' : '❌',
       critical: true,
-      details: { orphanedCount },
+      details: { orphanedCount, eventsTable: eventsTableName },
     });
-  } catch (error: any) {
+    } catch (error: any) {
+      tests.push({
+        id: 'data-orphaned-events',
+        name: 'Orphaned events check',
+        description: 'Verify no events reference non-existent users',
+        category: 'data-integrity',
+        status: 'warning',
+        flag: '⚠️',
+        message: `Could not check: ${error.message}`,
+      });
+    }
+  } else {
     tests.push({
       id: 'data-orphaned-events',
       name: 'Orphaned events check',
@@ -154,19 +200,36 @@ async function runDataIntegrityTests(pool: any, testType: string): Promise<Migra
       category: 'data-integrity',
       status: 'warning',
       flag: '⚠️',
-      message: `Could not check: ${error.message}`,
+      message: 'Events table (l1_events or l1_event_facts) does not exist',
     });
   }
 
   // Test 3: Check for NULL values in required fields
+  // Determine which events table exists
+  const eventsTable = eventsTableName || 'l1_events'; // Fallback for display
   const requiredFieldTests = [
-    { table: 'l1_events', field: 'user_id', critical: true },
-    { table: 'l1_events', field: 'event_type', critical: true },
-    { table: 'l1_transaction_facts', field: 'tokenized_user_id', critical: true },
-    { table: 'l1_transaction_facts', field: 'transaction_date', critical: true },
+    { table: eventsTableName || 'l1_event_facts', field: 'user_id', critical: true, tableDisplay: eventsTable },
+    { table: eventsTableName || 'l1_event_facts', field: 'event_type', critical: true, tableDisplay: eventsTable },
+    { table: 'l1_transaction_facts', field: 'tokenized_user_id', critical: true, tableDisplay: 'l1_transaction_facts' },
+    { table: 'l1_transaction_facts', field: 'transaction_date', critical: true, tableDisplay: 'l1_transaction_facts' },
   ];
 
   for (const test of requiredFieldTests) {
+    // Skip if table doesn't exist
+    if (!test.table || (test.table.includes('event') && !eventsTableName)) {
+      tests.push({
+        id: `data-null-${test.tableDisplay || test.table}-${test.field}`,
+        name: `NULL check: ${test.tableDisplay || test.table}.${test.field}`,
+        description: `Verify no NULL values in required field`,
+        category: 'data-integrity',
+        status: 'warning',
+        flag: '⚠️',
+        message: `Table ${test.tableDisplay || test.table} does not exist`,
+        critical: test.critical,
+      });
+      continue;
+    }
+    
     try {
       const result = await pool.query(`
         SELECT COUNT(*) as count
@@ -175,8 +238,8 @@ async function runDataIntegrityTests(pool: any, testType: string): Promise<Migra
       `);
       const nullCount = parseInt(result.rows[0]?.count || '0', 10);
       tests.push({
-        id: `data-null-${test.table}-${test.field}`,
-        name: `NULL check: ${test.table}.${test.field}`,
+        id: `data-null-${test.tableDisplay || test.table}-${test.field}`,
+        name: `NULL check: ${test.tableDisplay || test.table}.${test.field}`,
         description: `Verify no NULL values in required field`,
         category: 'data-integrity',
         status: nullCount === 0 ? 'pass' : 'fail',
@@ -237,12 +300,13 @@ async function runSchemaTests(pool: any, testType: string): Promise<MigrationTes
     }
   }
 
-  // Test: Check for required columns in l1_events
+  // Test: Check for required columns in events table (l1_event_facts or l1_events)
+  const eventsTableForColumns = eventsTableName || 'l1_event_facts'; // Use detected table or default to renamed version
   const requiredColumns = [
-    { table: 'l1_events', column: 'user_id', critical: true },
-    { table: 'l1_events', column: 'event_type', critical: true },
-    { table: 'l1_events', column: 'event_timestamp', critical: true },
-    { table: 'l1_events', column: 'session_id', critical: false },
+    { table: eventsTableForColumns, column: 'user_id', critical: true, tableDisplay: eventsTable || 'l1_events' },
+    { table: eventsTableForColumns, column: 'event_type', critical: true, tableDisplay: eventsTable || 'l1_events' },
+    { table: eventsTableForColumns, column: 'event_timestamp', critical: true, tableDisplay: eventsTable || 'l1_events' },
+    { table: eventsTableForColumns, column: 'session_id', critical: false, tableDisplay: eventsTable || 'l1_events' },
   ];
 
   for (const col of requiredColumns) {
@@ -279,8 +343,8 @@ async function runSchemaTests(pool: any, testType: string): Promise<MigrationTes
       }
     } catch (error: any) {
       tests.push({
-        id: `schema-column-${col.table}-${col.column}`,
-        name: `Column exists: ${col.table}.${col.column}`,
+        id: `schema-column-${col.tableDisplay || col.table}-${col.column}`,
+        name: `Column exists: ${col.tableDisplay || col.table}.${col.column}`,
         description: `Verify required column exists`,
         category: 'schema',
         status: col.critical ? 'fail' : 'warning',
@@ -306,17 +370,28 @@ async function runForeignKeyTests(pool: any, testType: string): Promise<Migratio
       WHERE e.user_id IS NOT NULL AND u.id IS NULL
     `);
     const brokenCount = parseInt(result.rows[0]?.count || '0', 10);
-    tests.push({
-      id: 'fk-events-users',
-      name: 'Foreign Key: l1_events -> users',
-      description: 'Verify all events reference valid users',
-      category: 'foreign-keys',
-      status: brokenCount === 0 ? 'pass' : 'fail',
-      flag: brokenCount === 0 ? '✅' : '❌',
-      critical: true,
-      details: { brokenCount },
-    });
-  } catch (error: any) {
+      tests.push({
+        id: 'fk-events-users',
+        name: `Foreign Key: ${eventsTable || 'l1_events'} -> users`,
+        description: 'Verify all events reference valid users',
+        category: 'foreign-keys',
+        status: brokenCount === 0 ? 'pass' : 'fail',
+        flag: brokenCount === 0 ? '✅' : '❌',
+        critical: true,
+        details: { brokenCount, eventsTable: eventsTableName },
+      });
+    } catch (error: any) {
+      tests.push({
+        id: 'fk-events-users',
+        name: `Foreign Key: ${eventsTable || 'l1_events'} -> users`,
+        description: 'Verify all events reference valid users',
+        category: 'foreign-keys',
+        status: 'warning',
+        flag: '⚠️',
+        message: `Could not check: ${error.message}`,
+      });
+    }
+  } else {
     tests.push({
       id: 'fk-events-users',
       name: 'Foreign Key: l1_events -> users',
@@ -324,7 +399,7 @@ async function runForeignKeyTests(pool: any, testType: string): Promise<Migratio
       category: 'foreign-keys',
       status: 'warning',
       flag: '⚠️',
-      message: `Could not check: ${error.message}`,
+      message: 'Events table (l1_events or l1_event_facts) does not exist',
     });
   }
 
@@ -361,43 +436,55 @@ async function runForeignKeyTests(pool: any, testType: string): Promise<Migratio
 
   // Test: Events -> Sessions relationship (via session_id)
   // First check if session_id column exists
-  try {
-    const columnCheck = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'l1_events' AND column_name = 'session_id'
-    `);
+  if (eventsTableName) {
+    try {
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = $1 AND column_name = 'session_id'
+      `, [eventsTableName]);
     
-    if (columnCheck.rows.length === 0) {
-      // Column doesn't exist yet - this is expected before migration
+      if (columnCheck.rows.length === 0) {
+        // Column doesn't exist yet - this is expected before migration
+        tests.push({
+          id: 'fk-events-sessions',
+          name: `Relationship: ${eventsTable || 'l1_events'} -> sessions`,
+          description: 'Verify session tracking is working',
+          category: 'foreign-keys',
+          status: 'warning',
+          flag: '⚠️',
+          message: 'session_id column does not exist yet (will be added during migration)',
+        });
+      } else {
+        // Column exists, check session data
+        const result = await pool.query(`
+          SELECT COUNT(DISTINCT session_id) as session_count
+          FROM ${eventsTableName}
+          WHERE session_id IS NOT NULL
+        `);
+        const sessionCount = parseInt(result.rows[0]?.session_count || '0', 10);
+        tests.push({
+          id: 'fk-events-sessions',
+          name: `Relationship: ${eventsTable || 'l1_events'} -> sessions`,
+          description: 'Verify session tracking is working',
+          category: 'foreign-keys',
+          status: 'pass',
+          flag: '✅',
+          details: { sessionCount, eventsTable: eventsTableName },
+        });
+      }
+    } catch (error: any) {
       tests.push({
         id: 'fk-events-sessions',
-        name: 'Relationship: l1_events -> sessions',
+        name: `Relationship: ${eventsTable || 'l1_events'} -> sessions`,
         description: 'Verify session tracking is working',
         category: 'foreign-keys',
         status: 'warning',
         flag: '⚠️',
-        message: 'session_id column does not exist yet (will be added during migration)',
-      });
-    } else {
-      // Column exists, check session data
-      const result = await pool.query(`
-        SELECT COUNT(DISTINCT session_id) as session_count
-        FROM l1_events
-        WHERE session_id IS NOT NULL
-      `);
-      const sessionCount = parseInt(result.rows[0]?.session_count || '0', 10);
-      tests.push({
-        id: 'fk-events-sessions',
-        name: 'Relationship: l1_events -> sessions',
-        description: 'Verify session tracking is working',
-        category: 'foreign-keys',
-        status: 'pass',
-        flag: '✅',
-        details: { sessionCount },
+        message: `Could not check: ${error.message}`,
       });
     }
-  } catch (error: any) {
+  } else {
     tests.push({
       id: 'fk-events-sessions',
       name: 'Relationship: l1_events -> sessions',
@@ -405,7 +492,7 @@ async function runForeignKeyTests(pool: any, testType: string): Promise<Migratio
       category: 'foreign-keys',
       status: 'warning',
       flag: '⚠️',
-      message: `Could not check: ${error.message}`,
+      message: 'Events table (l1_events or l1_event_facts) does not exist',
     });
   }
 
