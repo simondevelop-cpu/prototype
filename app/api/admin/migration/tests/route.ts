@@ -361,18 +361,31 @@ async function runSchemaTests(pool: any, testType: string): Promise<MigrationTes
 async function runForeignKeyTests(pool: any, testType: string): Promise<MigrationTest[]> {
   const tests: MigrationTest[] = [];
 
+  // Determine which events table exists
+  let eventsTableName = null;
+  for (const tableName of ['l1_event_facts', 'l1_events']) {
+    try {
+      await pool.query(`SELECT 1 FROM ${tableName} LIMIT 1`);
+      eventsTableName = tableName;
+      break;
+    } catch (error: any) {
+      // Table doesn't exist, try next
+    }
+  }
+
   // Test: Events -> Users foreign key
-  try {
-    const result = await pool.query(`
-      SELECT COUNT(*) as count
-      FROM l1_events e
-      LEFT JOIN users u ON e.user_id = u.id
-      WHERE e.user_id IS NOT NULL AND u.id IS NULL
-    `);
-    const brokenCount = parseInt(result.rows[0]?.count || '0', 10);
+  if (eventsTableName) {
+    try {
+      const result = await pool.query(`
+        SELECT COUNT(*) as count
+        FROM ${eventsTableName} e
+        LEFT JOIN users u ON e.user_id = u.id
+        WHERE e.user_id IS NOT NULL AND u.id IS NULL
+      `);
+      const brokenCount = parseInt(result.rows[0]?.count || '0', 10);
       tests.push({
         id: 'fk-events-users',
-        name: `Foreign Key: ${eventsTable || 'l1_events'} -> users`,
+        name: `Foreign Key: ${eventsTableName} -> users`,
         description: 'Verify all events reference valid users',
         category: 'foreign-keys',
         status: brokenCount === 0 ? 'pass' : 'fail',
@@ -383,7 +396,7 @@ async function runForeignKeyTests(pool: any, testType: string): Promise<Migratio
     } catch (error: any) {
       tests.push({
         id: 'fk-events-users',
-        name: `Foreign Key: ${eventsTable || 'l1_events'} -> users`,
+        name: `Foreign Key: ${eventsTableName || 'l1_events'} -> users`,
         description: 'Verify all events reference valid users',
         category: 'foreign-keys',
         status: 'warning',
