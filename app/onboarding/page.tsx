@@ -118,12 +118,21 @@ export default function OnboardingPage() {
     }
   };
 
-  // Check beta email when userEmail changes
+  // Check beta email when userEmail changes or when on verification step
   useEffect(() => {
     if (userEmail && currentStep === 0) {
       checkBetaEmail(userEmail);
     }
   }, [userEmail, currentStep]);
+
+  // Re-check beta email when step changes to 0 (email verification)
+  useEffect(() => {
+    if (currentStep === 0 && userEmail) {
+      // Reset state and re-check
+      setIsBetaEmail(null);
+      checkBetaEmail(userEmail);
+    }
+  }, [currentStep]);
 
   const handleMultiSelect = (field: 'emotionalState' | 'financialContext' | 'insightPreferences', value: string) => {
     const currentValues = formData[field];
@@ -254,25 +263,25 @@ export default function OnboardingPage() {
         return;
       }
 
-      // Check if email is a beta email
-      if (isBetaEmail === null) {
-        // Still checking, wait a bit
-        if (checkingBetaEmail) {
-          alert('Please wait while we verify your email...');
-          return;
-        }
-        // Not checked yet, check now
+      // Always check if email is a beta email (don't rely on cached state)
+      if (isBetaEmail === null || checkingBetaEmail) {
+        // Still checking or not checked yet, check now
         await checkBetaEmail(userEmail);
         // Wait a moment for the check to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 800));
       }
 
+      // Re-check after waiting (state should be updated)
       if (isBetaEmail === false) {
         alert('This email is not on the pre-approved beta list. Please verify your email with the code sent to you, or contact support to be added to the beta list.');
         return;
       }
 
-      // If isBetaEmail is true or null (table doesn't exist), allow proceeding
+      // Only allow if explicitly true (not null - null means check failed or table doesn't exist, which should block)
+      if (isBetaEmail !== true) {
+        alert('Unable to verify beta email status. Please verify your email with the code sent to you, or contact support.');
+        return;
+      }
     }
 
     if (validateStep()) {

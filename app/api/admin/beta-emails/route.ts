@@ -59,10 +59,15 @@ export async function GET(request: NextRequest) {
     `);
 
     // Get all existing user emails that aren't in beta_emails yet
+    // Use COALESCE to handle NULL emails
     const existingUsersResult = await pool.query(`
       SELECT DISTINCT u.email, u.created_at, 'system' as added_by
       FROM users u
-      WHERE u.email NOT IN (SELECT email FROM beta_emails)
+      WHERE u.email IS NOT NULL
+        AND u.email != ''
+        AND LOWER(TRIM(u.email)) NOT IN (
+          SELECT LOWER(TRIM(email)) FROM beta_emails WHERE email IS NOT NULL
+        )
       ORDER BY u.created_at DESC
     `);
 

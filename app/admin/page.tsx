@@ -106,6 +106,9 @@ export default function AdminDashboard() {
   const [addingBetaEmail, setAddingBetaEmail] = useState(false);
   const [healthLoading, setHealthLoading] = useState(false);
   
+  // State for Excel validation
+  const [excelValidation, setExcelValidation] = useState<any>(null);
+  const [excelValidationLoading, setExcelValidationLoading] = useState(false);
   
   // State for Admin Logins tab
   const [adminLogins, setAdminLogins] = useState<any[]>([]);
@@ -3978,6 +3981,34 @@ export default function AdminDashboard() {
   };
 
 
+  // Fetch Excel validation
+  const fetchExcelValidation = async () => {
+    setExcelValidationLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch('/api/admin/export/validate', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setExcelValidation(data);
+      } else {
+        alert(`Failed to validate Excel export: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error validating Excel export:', error);
+      alert(`Error validating Excel export: ${error.message || 'Unknown error'}`);
+    } finally {
+      setExcelValidationLoading(false);
+    }
+  };
+
   // Fetch health check data
   const fetchHealthData = async () => {
     setHealthLoading(true);
@@ -4043,15 +4074,111 @@ export default function AdminDashboard() {
                 Security and compliance health checks to verify data protection and user rights are properly implemented.
               </p>
             </div>
-            <button
-              onClick={fetchHealthData}
-              disabled={healthLoading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {healthLoading ? 'Checking...' : '🔄 Refresh'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={fetchExcelValidation}
+                disabled={excelValidationLoading}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {excelValidationLoading ? 'Validating...' : '📊 Validate Excel Export'}
+              </button>
+              <button
+                onClick={fetchHealthData}
+                disabled={healthLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {healthLoading ? 'Checking...' : '🔄 Refresh'}
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Excel Validation Results */}
+        {excelValidation && (
+          <div className={`rounded-lg border-2 p-6 ${
+            excelValidation.passed ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
+          }`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold">
+                Excel Export Validation: {excelValidation.passed ? '✅ Passed' : '❌ Failed'}
+              </h3>
+              <button
+                onClick={() => setExcelValidation(null)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {excelValidation.results && (
+              <div className="space-y-4">
+                {/* Accuracy */}
+                <div>
+                  <h4 className="font-semibold mb-2">Accuracy:</h4>
+                  <div className={`p-3 rounded ${excelValidation.results.accuracy.passed ? 'bg-green-100' : 'bg-red-100'}`}>
+                    {excelValidation.results.accuracy.issues.length > 0 && (
+                      <div className="mb-2">
+                        <p className="font-medium text-red-800">Issues:</p>
+                        <ul className="list-disc list-inside text-sm text-red-700">
+                          {excelValidation.results.accuracy.issues.map((issue: string, idx: number) => (
+                            <li key={idx}>{issue}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {excelValidation.results.accuracy.warnings.length > 0 && (
+                      <div>
+                        <p className="font-medium text-yellow-800">Warnings:</p>
+                        <ul className="list-disc list-inside text-sm text-yellow-700">
+                          {excelValidation.results.accuracy.warnings.map((warning: string, idx: number) => (
+                            <li key={idx}>{warning}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {excelValidation.results.accuracy.issues.length === 0 && excelValidation.results.accuracy.warnings.length === 0 && (
+                      <p className="text-green-700">✓ All table names are accurate</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Schema Alignment */}
+                {excelValidation.results.schemaAlignment && (
+                  <div>
+                    <h4 className="font-semibold mb-2">Schema Alignment:</h4>
+                    <div className={`p-3 rounded ${excelValidation.results.schemaAlignment.passed ? 'bg-green-100' : 'bg-yellow-100'}`}>
+                      {excelValidation.results.schemaAlignment.expectedMigrations.length > 0 && (
+                        <div>
+                          <p className="font-medium text-yellow-800">Migration Status:</p>
+                          <ul className="list-disc list-inside text-sm text-yellow-700">
+                            {excelValidation.results.schemaAlignment.expectedMigrations.map((migration: string, idx: number) => (
+                              <li key={idx}>{migration}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {excelValidation.results.schemaAlignment.expectedMigrations.length === 0 && (
+                        <p className="text-green-700">✓ Schema is aligned with current architecture</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recommendations */}
+                {excelValidation.recommendations && excelValidation.recommendations.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-2">Recommendations:</h4>
+                    <ul className="list-disc list-inside text-sm text-gray-700">
+                      {excelValidation.recommendations.map((rec: string, idx: number) => (
+                        <li key={idx}>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Overall Status */}
         {healthData && healthData.summary && (

@@ -31,8 +31,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (!hasTable) {
-      // If table doesn't exist, allow all emails (backward compatibility)
-      return NextResponse.json({ isBetaEmail: true });
+      // If table doesn't exist, block all emails (require table to be set up)
+      // This ensures beta access is properly controlled
+      return NextResponse.json({ isBetaEmail: false, message: 'Beta emails table not configured' });
     }
 
     // Check if email is in beta_emails table

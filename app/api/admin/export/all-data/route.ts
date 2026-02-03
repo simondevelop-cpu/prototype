@@ -149,9 +149,18 @@ function getTableDescription(tableName: string): string {
 function getSheetName(tableName: string): string {
   const sheetNameMap: { [key: string]: string } = {
     'users': 'l1_users',
-    'available_slots': 'admin_available_slots',
-    'categorization_learning': 'admin_categorization_learning',
-    'chat_bookings': 'admin_chat_bookings',
+    'l1_admin_available_slots': 'l1_admin_available_slots',
+    'l2_user_categorization_learning': 'l2_user_categorization_learning',
+    'l1_admin_chat_bookings': 'l1_admin_chat_bookings',
+    // Legacy names for backward compatibility (if migration not complete)
+    'available_slots': 'l1_admin_available_slots',
+    'categorization_learning': 'l2_user_categorization_learning',
+    'chat_bookings': 'l1_admin_chat_bookings',
+    'admin_keywords': 'l1_admin_keywords',
+    'admin_merchants': 'l1_admin_merchants',
+    'onboarding_responses': 'l1_onboarding_responses',
+    'survey_responses': 'l1_survey_responses',
+    'l1_events': 'l1_event_facts',
   };
   
   return sheetNameMap[tableName] || tableName;
@@ -348,7 +357,7 @@ export async function GET(request: NextRequest) {
     const allTables = tablesResult.rows.filter(row => row.table_type === 'BASE TABLE').map(row => row.table_name);
     const allViews = tablesResult.rows.filter(row => row.table_type === 'VIEW').map(row => row.table_name);
 
-    // Define sheet order based on categories
+    // Define sheet order based on categories - using actual table names from database
     const sheetOrder = [
       // Documentation sheets first
       'Table of Contents',
@@ -359,17 +368,17 @@ export async function GET(request: NextRequest) {
       'l0_user_tokenization',
       'l1_users',
       'l1_customer_facts',
-      'onboarding_responses',
-      'survey_responses',
+      'l1_onboarding_responses',
+      'l1_survey_responses',
       // Transaction and events
       'l1_transaction_facts',
-      'l1_events',
+      'l1_event_facts',
       // Admin tooling
-      'admin_keywords',
-      'admin_merchants',
-      'admin_available_slots',
-      'admin_categorization_learning',
-      'admin_chat_bookings',
+      'l1_admin_keywords',
+      'l1_admin_merchants',
+      'l1_admin_available_slots',
+      'l2_user_categorization_learning',
+      'l1_admin_chat_bookings',
       // TBC
       'l0_category_list',
       'l0_insight_list',
