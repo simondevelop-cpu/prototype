@@ -2226,10 +2226,44 @@ export default function AdminDashboard() {
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-600">{step.description}</td>
                           <td className="px-6 py-4 text-sm text-gray-600">
-                            {step.error && <div className="text-red-600">{step.error}</div>}
+                            {step.error && (
+                              <div className="text-red-600 text-xs font-medium mb-1">
+                                Error: {step.error}
+                              </div>
+                            )}
                             {step.details && (
-                              <div className="text-xs text-gray-500">
-                                {JSON.stringify(step.details, null, 2)}
+                              <div className="space-y-1">
+                                {typeof step.details === 'object' && step.details.reason && (
+                                  <div className="text-xs">
+                                    <span className="font-medium text-gray-700">Reason:</span> {step.details.reason}
+                                  </div>
+                                )}
+                                {typeof step.details === 'object' && step.details.note && (
+                                  <div className="text-xs text-gray-500 italic">
+                                    {step.details.note}
+                                  </div>
+                                )}
+                                {typeof step.details === 'object' && (step.details.missingCount !== undefined || step.details.migratedCount !== undefined || step.details.rowCount !== undefined) && (
+                                  <div className="text-xs">
+                                    <span className="font-medium text-gray-700">Count:</span> {step.details.missingCount ?? step.details.migratedCount ?? step.details.rowCount ?? '-'}
+                                  </div>
+                                )}
+                                {typeof step.details === 'object' && step.details.wouldExecute && (
+                                  <div className="text-xs text-blue-600 font-medium">
+                                    Would execute in real run
+                                  </div>
+                                )}
+                                {typeof step.details === 'object' && Object.keys(step.details).filter(k => !['reason', 'note', 'missingCount', 'migratedCount', 'rowCount', 'wouldExecute'].includes(k)).length > 0 && (
+                                  <details className="text-xs">
+                                    <summary className="cursor-pointer text-gray-500 hover:text-gray-700">Show full details</summary>
+                                    <pre className="mt-1 bg-gray-50 p-2 rounded overflow-auto max-h-32">
+                                      {JSON.stringify(step.details, null, 2)}
+                                    </pre>
+                                  </details>
+                                )}
+                                {typeof step.details === 'string' && (
+                                  <div className="text-xs text-gray-500">{step.details}</div>
+                                )}
                               </div>
                             )}
                           </td>
