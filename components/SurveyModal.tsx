@@ -597,7 +597,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
