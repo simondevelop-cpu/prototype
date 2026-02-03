@@ -8,7 +8,6 @@ import CookieBanner from './CookieBanner';
 import BookingModal from './BookingModal';
 import BookingItem from './BookingItem';
 import SurveyModal from './SurveyModal';
-import TokenExpirationWarning from './TokenExpirationWarning';
 import { apiFetch } from '@/lib/api-client';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -891,16 +890,6 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         isOpen={showSurveyModal}
         onClose={() => setShowSurveyModal(false)}
         token={currentToken}
-      />
-
-      {/* Token Expiration Warning */}
-      <TokenExpirationWarning 
-        token={currentToken} 
-        onRefresh={(newToken) => {
-          setCurrentToken(newToken);
-          // Update localStorage
-          localStorage.setItem('ci.session.token', newToken);
-        }}
       />
 
       {/* Cookie Banner - shown for signed-in users until choice recorded */}

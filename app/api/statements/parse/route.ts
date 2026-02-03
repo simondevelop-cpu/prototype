@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { parseBankStatement } from '@/lib/pdf-parser';
+import { getPool } from '@/lib/db';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -14,8 +15,8 @@ export const runtime = 'nodejs';
  */
 export async function POST(request: NextRequest) {
   try {
-    // Verify auth
-    const authHeader = request.headers.get('authorization');
+    // Verify auth (check both lowercase and capitalized header)
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -23,10 +24,36 @@ export async function POST(request: NextRequest) {
     const token = authHeader.substring(7);
     const payload = verifyToken(token);
     if (!payload) {
+      console.error('[API] Statement parse: Invalid token');
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const userId = payload.sub;
+    
+    // Check for first_upload consent
+    const pool = getPool();
+    if (pool) {
+      try {
+        const consentCheck = await pool.query(
+          `SELECT id FROM l1_events 
+           WHERE user_id = $1 
+             AND event_type = 'consent' 
+             AND metadata->>'consentType' = 'first_upload' 
+           LIMIT 1`,
+          [userId]
+        );
+        
+        if (consentCheck.rows.length === 0) {
+          return NextResponse.json(
+            { error: 'Consent required. Please accept the upload consent first.' },
+            { status: 403 }
+          );
+        }
+      } catch (consentError) {
+        // If check fails, allow parse (don't block on database errors)
+        console.warn('[API] Could not check upload consent:', consentError);
+      }
+    }
 
     // Parse form data
     const formData = await request.formData();
