@@ -532,7 +532,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
 
   return (
     <>
-      {/* Success Modal - Center Screen */}
+      {/* Success Modal - Center Screen - Fixed syntax error */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
