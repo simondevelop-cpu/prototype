@@ -65,6 +65,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if email is on beta/pre-approved list
+    const pool = getPool();
+    if (!pool) {
+      return NextResponse.json(
+        { error: 'Database not available' },
+        { status: 500 }
+      );
+    }
+
+    // Check if beta_emails table exists and if email is pre-approved
+    let isBetaEmail = false;
+    try {
+      const tableCheck = await pool.query(`
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'beta_emails'
+        LIMIT 1
+      `);
+      
+      if (tableCheck.rows.length > 0) {
+        const betaCheck = await pool.query(
+          'SELECT email FROM beta_emails WHERE email = $1',
+          [email.toLowerCase()]
+        );
+        isBetaEmail = betaCheck.rows.length > 0;
+      } else {
+        // If table doesn't exist yet, allow registration (backward compatibility)
+        console.log('[Register] beta_emails table does not exist, allowing registration');
+        isBetaEmail = true;
+      }
+    } catch (e) {
+      console.error('[Register] Error checking beta emails:', e);
+      // On error, allow registration (fail open for backward compatibility)
+      isBetaEmail = true;
+    }
+
+    if (!isBetaEmail) {
+      return NextResponse.json(
+        { error: 'This email is not on the beta access list. Please contact support to request access.' },
+        { status: 403 }
+      );
+    }
+
     // Validate password strength
     const passwordValidation = validatePasswordStrength(password);
     if (!passwordValidation.valid) {
@@ -82,14 +124,6 @@ export async function POST(request: NextRequest) {
           details: passwordValidation.errors,
         },
         { status: 400 }
-      );
-    }
-
-    const pool = getPool();
-    if (!pool) {
-      return NextResponse.json(
-        { error: 'Database not available' },
-        { status: 500 }
       );
     }
 

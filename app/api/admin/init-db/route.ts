@@ -101,6 +101,22 @@ async function initializeTables() {
       )
     `);
     
+    // Create beta_emails table for pre-approved email addresses
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS beta_emails (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        added_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('[DB Init] ✅ beta_emails table created');
+    
+    // Create index on email for faster lookups
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_beta_emails_email ON beta_emails(email)
+    `);
+    
     // Add unique index to prevent duplicate consent events (race condition fix)
     await client.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_l1_events_unique_consent 

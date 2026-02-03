@@ -8,7 +8,7 @@ import CheckboxDropdown from '@/components/CheckboxDropdown';
 import { formatUserId, formatTransactionId, formatEventId } from '@/lib/id-formatter';
 
 type TabName = 'monitoring' | 'inbox' | 'categories' | 'analytics' | 'migration';
-type MonitoringSubTab = 'accounts' | 'health' | 'admin-logins';
+type MonitoringSubTab = 'accounts' | 'health' | 'admin-logins' | 'beta-accounts';
 type InboxSubTab = 'chat-scheduler' | 'feedback' | 'whats-coming-survey';
 
 interface Keyword {
@@ -98,6 +98,12 @@ export default function AdminDashboard() {
   
   // State for App Health tab
   const [healthData, setHealthData] = useState<any>(null);
+  
+  // State for Beta Accounts tab
+  const [betaEmails, setBetaEmails] = useState<any[]>([]);
+  const [betaEmailsLoading, setBetaEmailsLoading] = useState(false);
+  const [newBetaEmail, setNewBetaEmail] = useState('');
+  const [addingBetaEmail, setAddingBetaEmail] = useState(false);
   const [healthLoading, setHealthLoading] = useState(false);
   
   
@@ -458,6 +464,120 @@ export default function AdminDashboard() {
       fetchUsers();
     }
   }, [activeTab, monitoringSubTab, authenticated]);
+
+  const fetchBetaEmails = async () => {
+    setBetaEmailsLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        setError('Not authenticated. Please log in again.');
+        return;
+      }
+
+      const response = await fetch('/api/admin/beta-emails', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setBetaEmails(data.emails || []);
+      } else {
+        setError(data.error || 'Failed to fetch beta emails');
+        setBetaEmails([]);
+      }
+    } catch (error) {
+      console.error('Error fetching beta emails:', error);
+      setError('Failed to fetch beta emails');
+    } finally {
+      setBetaEmailsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'monitoring' && monitoringSubTab === 'beta-accounts' && authenticated) {
+      fetchBetaEmails();
+    }
+  }, [activeTab, monitoringSubTab, authenticated]);
+
+  const handleAddBetaEmail = async () => {
+    if (!newBetaEmail.trim()) {
+      setError('Please enter an email address');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newBetaEmail.trim())) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setAddingBetaEmail(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        setError('Not authenticated. Please log in again.');
+        setAddingBetaEmail(false);
+        return;
+      }
+
+      const response = await fetch('/api/admin/beta-emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email: newBetaEmail.trim() }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setNewBetaEmail('');
+        await fetchBetaEmails(); // Refresh the list
+      } else {
+        setError(data.error || 'Failed to add beta email');
+      }
+    } catch (error) {
+      console.error('Error adding beta email:', error);
+      setError('Failed to add beta email');
+    } finally {
+      setAddingBetaEmail(false);
+    }
+  };
+
+  const handleRemoveBetaEmail = async (email: string) => {
+    if (!confirm(`Are you sure you want to remove ${email} from the beta list?`)) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        setError('Not authenticated. Please log in again.');
+        return;
+      }
+
+      const response = await fetch(`/api/admin/beta-emails?email=${encodeURIComponent(email)}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        await fetchBetaEmails(); // Refresh the list
+      } else {
+        setError(data.error || 'Failed to remove beta email');
+      }
+    } catch (error) {
+      console.error('Error removing beta email:', error);
+      setError('Failed to remove beta email');
+    }
+  };
 
   // Fetch recategorizations when Recategorization Log tab is active
   useEffect(() => {
@@ -1589,6 +1709,130 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
+      </div>
+    );
+  };
+
+  const renderBetaAccountsTab = () => {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Beta Accounts</h2>
+              <p className="text-gray-600 mt-1">Manage pre-approved email addresses for account registration</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={fetchBetaEmails}
+                disabled={betaEmailsLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                <svg className={`w-4 h-4 ${betaEmailsLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          {/* Add New Beta Email */}
+          <div className="p-6 border-b border-gray-200 bg-gray-50">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Beta Email</h3>
+            <div className="flex gap-3">
+              <input
+                type="email"
+                value={newBetaEmail}
+                onChange={(e) => setNewBetaEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !addingBetaEmail) {
+                    handleAddBetaEmail();
+                  }
+                }}
+                placeholder="Enter email address"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={addingBetaEmail}
+              />
+              <button
+                onClick={handleAddBetaEmail}
+                disabled={addingBetaEmail || !newBetaEmail.trim()}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {addingBetaEmail ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Email
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Beta Emails List */}
+          {betaEmailsLoading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+              <p className="text-gray-600 mt-4">Loading beta emails...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Added By</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Added At</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {betaEmails && betaEmails.length > 0 ? (
+                    betaEmails.map((betaEmail: any, index: number) => (
+                      <tr key={betaEmail.email || index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-900 font-mono">{betaEmail.email}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{betaEmail.added_by || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {betaEmail.created_at ? new Date(betaEmail.created_at).toLocaleString() : '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          <button
+                            onClick={() => handleRemoveBetaEmail(betaEmail.email)}
+                            className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors text-xs font-medium"
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                        <div className="flex flex-col items-center">
+                          <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          <p className="text-lg font-medium mb-2">No beta emails yet</p>
+                          <p className="text-sm text-gray-400">
+                            Add email addresses above to allow users to register accounts.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -4897,10 +5141,21 @@ export default function AdminDashboard() {
               >
                 👥 Accounts
               </button>
+              <button
+                onClick={() => setMonitoringSubTab('beta-accounts')}
+                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                  monitoringSubTab === 'beta-accounts'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🧪 Beta accounts
+              </button>
             </div>
             {/* Monitoring Content */}
             {monitoringSubTab === 'accounts' && renderAccountsTab()}
             {monitoringSubTab === 'health' && renderAppHealth()}
+            {monitoringSubTab === 'beta-accounts' && renderBetaAccountsTab()}
             {monitoringSubTab === 'admin-logins' && (
               <div className="space-y-6">
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
