@@ -4469,12 +4469,17 @@ export default function AdminDashboard() {
     setMigrationPhase(phase);
     setMigrationSteps([]);
     setMigrationResults(null);
+    setError(null); // Clear any previous errors
     try {
       const token = localStorage.getItem('admin_token');
       if (!token) {
         setError('Not authenticated. Please log in again.');
+        setMigrationExecuting(false);
         return;
       }
+      
+      console.log(`[Migration] Executing ${phase} phase, dryRun: ${dryRun}`);
+      
       const response = await fetch('/api/admin/migration/execute', {
         method: 'POST',
         headers: {
@@ -4483,20 +4488,31 @@ export default function AdminDashboard() {
         },
         body: JSON.stringify({ phase, dryRun }),
       });
+      
       const data = await response.json();
+      console.log(`[Migration] Response:`, data);
+      
       if (response.ok) {
         setMigrationSteps(data.steps || []);
         setMigrationResults(data);
+        setError(null);
         if (!dryRun && data.success) {
           // Refresh tests after migration
           await fetchMigrationTests('post');
         }
       } else {
-        setError(data.error || 'Failed to execute migration');
+        const errorMsg = data.error || data.details || 'Failed to execute migration';
+        console.error('[Migration] API error:', errorMsg);
+        setError(errorMsg);
+        setMigrationSteps([]);
+        setMigrationResults(null);
       }
     } catch (error: any) {
       console.error('Error executing migration:', error);
-      setError(`Error executing migration: ${error.message || 'Unknown error'}`);
+      const errorMsg = error.message || 'Unknown error';
+      setError(`Error executing migration: ${errorMsg}`);
+      setMigrationSteps([]);
+      setMigrationResults(null);
     } finally {
       setMigrationExecuting(false);
     }
