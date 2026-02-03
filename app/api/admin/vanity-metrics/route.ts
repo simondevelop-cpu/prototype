@@ -463,13 +463,8 @@ export async function GET(request: NextRequest) {
 
       // Monthly Active Users (MAU) - users who logged in during the month containing this week
       let mau = 0;
-      try {
-        const eventsCheck = await pool.query(`
-          SELECT 1 FROM information_schema.tables 
-          WHERE table_name = 'l1_events'
-          LIMIT 1
-        `);
-        if (eventsCheck.rows.length > 0) {
+      if (hasEventsTable) {
+        try {
           // Get the month start and end for this week
           const monthStart = new Date(weekStart);
           monthStart.setDate(1);
@@ -484,7 +479,7 @@ export async function GET(request: NextRequest) {
           const mauParamIndex = filterParams.length + 1;
           const mauQuery = `
             SELECT COUNT(DISTINCT e.user_id) as count
-            FROM l1_events e
+            FROM ${eventsTable} e
             JOIN users u ON u.id = e.user_id
             WHERE e.event_type = 'login'
               AND e.event_timestamp >= $${mauParamIndex}::timestamp
@@ -494,9 +489,9 @@ export async function GET(request: NextRequest) {
           `;
           const mauResult = await pool.query(mauQuery, [...filterParams, monthStart, monthEnd]);
           mau = parseInt(mauResult.rows[0]?.count) || 0;
+        } catch (e) {
+          // Query failed, MAU = 0
         }
-      } catch (e) {
-        // l1_events table doesn't exist, MAU = 0
       }
 
       // New users per month - users who signed up in the month containing this week
@@ -594,22 +589,24 @@ export async function GET(request: NextRequest) {
 
       // Total statements uploaded by unique person (in the week)
       let totalStatementsByUniquePerson = 0;
-      try {
-        const uniqueStatementsParamIndex = filterParams.length + 1;
-        const uniqueStatementsQuery = `
-          SELECT COUNT(DISTINCT e.user_id) as count
-          FROM l1_events e
-          JOIN users u ON u.id = e.user_id
-          WHERE e.event_type = 'statement_upload'
-            AND e.event_timestamp >= $${uniqueStatementsParamIndex}::timestamp
-            AND e.event_timestamp <= $${uniqueStatementsParamIndex + 1}::timestamp
-            AND u.email != $${adminEmailParamIndex}
-            ${filterConditions}
-        `;
-        const uniqueStatementsResult = await pool.query(uniqueStatementsQuery, [...filterParams, weekStart, weekEnd]);
-        totalStatementsByUniquePerson = parseInt(uniqueStatementsResult.rows[0]?.count) || 0;
-      } catch (e) {
-        // l1_events table doesn't exist, unique statements = 0
+      if (hasEventsTable) {
+        try {
+          const uniqueStatementsParamIndex = filterParams.length + 1;
+          const uniqueStatementsQuery = `
+            SELECT COUNT(DISTINCT e.user_id) as count
+            FROM ${eventsTable} e
+            JOIN users u ON u.id = e.user_id
+            WHERE e.event_type = 'statement_upload'
+              AND e.event_timestamp >= $${uniqueStatementsParamIndex}::timestamp
+              AND e.event_timestamp <= $${uniqueStatementsParamIndex + 1}::timestamp
+              AND u.email != $${adminEmailParamIndex}
+              ${filterConditions}
+          `;
+          const uniqueStatementsResult = await pool.query(uniqueStatementsQuery, [...filterParams, weekStart, weekEnd]);
+          totalStatementsByUniquePerson = parseInt(uniqueStatementsResult.rows[0]?.count) || 0;
+        } catch (e) {
+          // Query failed, unique statements = 0
+        }
       }
 
       metrics[weekKey] = {
