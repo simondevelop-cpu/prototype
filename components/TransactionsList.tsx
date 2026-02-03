@@ -1374,6 +1374,14 @@ export default function TransactionsList({ transactions, loading, token, onRefre
         onClose={() => {
           setShowAddCategoryModal(false);
           setAddCategoryContext(null);
+          setIsOpeningAddCategoryModal(false);
+          // Restore editing state if modal was closed without adding
+          if (isOpeningAddCategoryModal && editingCell) {
+            const tx = transactions.find(t => t.id === editingCell.txId);
+            if (tx && editingCell.field === 'category') {
+              setEditValue(tx.category || '');
+            }
+          }
         }}
         onAdd={(categoryName) => {
           if (addCategoryContext) {
@@ -1381,6 +1389,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
           }
           setShowAddCategoryModal(false);
           setAddCategoryContext(null);
+          setIsOpeningAddCategoryModal(false);
           onRefresh(); // Refresh to show new category in list
         }}
         existingCategories={categories.filter(c => c !== 'All categories')}
