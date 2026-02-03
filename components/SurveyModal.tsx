@@ -500,6 +500,9 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
     const wordCount = q5Data.trim().split(/\s+/).filter(Boolean).length;
     const maxWords = 200;
     const borderClass = wordCount >= maxWords ? 'border-red-300' : 'border-gray-300';
+    const wordLimitMessage = wordCount >= maxWords ? (
+      <p className="text-sm text-red-600 mt-1">200 word maximum</p>
+    ) : null;
     
     return (
       <div>
@@ -520,9 +523,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
           className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${borderClass}`}
           placeholder="Your comments, suggestions, or let us know if you're open to a follow-up conversation..."
         />
-        {wordCount >= maxWords ? (
-          <p className="text-sm text-red-600 mt-1">200 word maximum</p>
-        ) : null}
+        {wordLimitMessage}
       </div>
     );
   };
