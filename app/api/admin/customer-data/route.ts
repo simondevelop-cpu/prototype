@@ -54,13 +54,32 @@ export async function GET(request: NextRequest) {
       hasIsActive = schemaCheck.rows.some(row => row.column_name === 'is_active');
       hasEmailValidated = schemaCheck.rows.some(row => row.column_name === 'email_validated');
       
-      // Check if onboarding_responses table exists
-      const onboardingTableCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'onboarding_responses'
-        LIMIT 1
-      `);
-      onboardingResponsesExists = onboardingTableCheck.rows.length > 0;
+      // Check if l1_onboarding_responses or onboarding_responses table exists (migration-safe)
+      let onboardingTableForQuery = 'l1_onboarding_responses';
+      let onboardingResponsesExists = false;
+      try {
+        const newTableCheck = await pool.query(`
+          SELECT 1 FROM information_schema.tables 
+          WHERE table_name = 'l1_onboarding_responses'
+          LIMIT 1
+        `);
+        if (newTableCheck.rows.length > 0) {
+          onboardingTableForQuery = 'l1_onboarding_responses';
+          onboardingResponsesExists = true;
+        } else {
+          const oldTableCheck = await pool.query(`
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_name = 'onboarding_responses'
+            LIMIT 1
+          `);
+          onboardingResponsesExists = oldTableCheck.rows.length > 0;
+          if (onboardingResponsesExists) {
+            onboardingTableForQuery = 'onboarding_responses';
+          }
+        }
+      } catch (e) {
+        console.error('[Customer Data API] Error checking onboarding table:', e);
+      }
       
       // Check where data actually exists
       if (hasCompletedAt) {
@@ -75,27 +94,27 @@ export async function GET(request: NextRequest) {
         const usersWithData = parseInt(usersDataCheck.rows[0]?.count || '0', 10);
         useUsersTable = usersWithData > 0;
         
-        // If users table has columns but no data, check onboarding_responses
+        // If users table has columns but no data, check onboarding table
         if (!useUsersTable && onboardingResponsesExists) {
           const onboardingDataCheck = await pool.query(`
             SELECT COUNT(*) as count
-            FROM onboarding_responses
+            FROM ${onboardingTableForQuery}
           `);
           const onboardingCount = parseInt(onboardingDataCheck.rows[0]?.count || '0', 10);
           if (onboardingCount > 0) {
-            console.log('[Customer Data API] Users table has columns but no data, using onboarding_responses');
-            useUsersTable = false; // Use onboarding_responses
+            console.log(`[Customer Data API] Users table has columns but no data, using ${onboardingTableForQuery}`);
+            useUsersTable = false; // Use onboarding table
           }
         }
       } else if (onboardingResponsesExists) {
-        // No migration yet, use onboarding_responses
+        // No migration yet, use onboarding table
         useUsersTable = false;
       } else {
         // No tables with data
         return NextResponse.json({ 
           success: true,
           customerData: [],
-          message: 'No onboarding data found. Please ensure migration has been run or onboarding_responses table exists.',
+          message: `No onboarding data found. Please ensure migration has been run or ${onboardingTableForQuery} table exists.`,
           source: 'none'
         }, { status: 200 });
       }
