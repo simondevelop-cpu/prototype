@@ -131,6 +131,8 @@ export async function GET(request: NextRequest) {
             counts.date++;
           } else if (field === 'amount') {
             counts.amount++;
+          } else if (field === 'label') {
+            counts.label++;
           } else if (field === 'category' && metadata.transactionId) {
             // Track unique transaction IDs that had category edited
             categoryEditedTransactionIds.add(metadata.transactionId);
