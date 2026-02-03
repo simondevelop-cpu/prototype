@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import dayjs from 'dayjs';
 
 interface SurveyModalProps {
@@ -531,7 +531,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
   if (!isOpen) return null;
 
   return (
-    <>
+    <Fragment>
       {/* Success Modal - Center Screen - Fixed syntax error */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
@@ -597,7 +597,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
           </div>
         </div>
       </div>
-    </>
+    </Fragment>
   );
 }
 
