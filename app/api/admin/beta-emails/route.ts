@@ -272,3 +272,98 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
+// PUT: Backfill existing user emails to beta_emails table
+export async function PUT(request: NextRequest) {
+  try {
+    // Admin authentication
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      if (decoded.role !== 'admin' && decoded.email !== ADMIN_EMAIL) {
+        return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      }
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    const pool = getPool();
+    if (!pool) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 500 });
+    }
+
+    // Check if beta_emails table exists
+    let hasTable = false;
+    try {
+      const tableCheck = await pool.query(`
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'beta_emails'
+        LIMIT 1
+      `);
+      hasTable = tableCheck.rows.length > 0;
+    } catch (e) {
+      console.log('[Beta Emails API] Could not check for beta_emails table');
+    }
+
+    if (!hasTable) {
+      return NextResponse.json({ 
+        error: 'beta_emails table does not exist. Please initialize the database first.'
+      }, { status: 500 });
+    }
+
+    // Get all existing user emails that aren't in beta_emails
+    const existingUsersResult = await pool.query(`
+      SELECT DISTINCT u.email, u.created_at
+      FROM users u
+      WHERE u.email IS NOT NULL
+        AND u.email != ''
+        AND LOWER(TRIM(u.email)) NOT IN (
+          SELECT LOWER(TRIM(email)) FROM beta_emails WHERE email IS NOT NULL
+        )
+    `);
+
+    if (existingUsersResult.rows.length === 0) {
+      return NextResponse.json({ 
+        success: true,
+        message: 'All existing user emails are already in the beta list',
+        added: 0
+      }, { status: 200 });
+    }
+
+    // Insert all existing user emails into beta_emails
+    let added = 0;
+    for (const row of existingUsersResult.rows) {
+      try {
+        await pool.query(
+          `INSERT INTO beta_emails (email, added_by, created_at)
+           VALUES ($1, 'system', $2)
+           ON CONFLICT (email) DO NOTHING`,
+          [row.email.toLowerCase().trim(), row.created_at || new Date()]
+        );
+        added++;
+      } catch (error: any) {
+        console.error(`[Beta Emails API] Error adding email ${row.email}:`, error);
+        // Continue with other emails
+      }
+    }
+
+    return NextResponse.json({ 
+      success: true,
+      message: `Successfully added ${added} existing user emails to beta list`,
+      added
+    }, { status: 200 });
+
+  } catch (error: any) {
+    console.error('[Beta Emails API] Error backfilling emails:', error);
+    return NextResponse.json(
+      { error: 'Failed to backfill emails', details: error.message },
+      { status: 500 }
+    );
+  }
+}
+

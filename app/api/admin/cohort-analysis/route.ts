@@ -427,12 +427,27 @@ export async function GET(request: NextRequest) {
     // Check if l1_events table exists for engagement metrics
     let hasUserEventsTable = false;
     try {
-      const eventsTableCheck = await pool.query(`
+      // Check for l1_event_facts first (new), then l1_events (old)
+      let eventsTable = 'l1_event_facts';
+      const newTableCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'l1_events'
+        WHERE table_name = 'l1_event_facts'
         LIMIT 1
       `);
-      hasUserEventsTable = eventsTableCheck.rows.length > 0;
+      if (newTableCheck.rows.length > 0) {
+        eventsTable = 'l1_event_facts';
+        hasUserEventsTable = true;
+      } else {
+        const oldTableCheck = await pool.query(`
+          SELECT 1 FROM information_schema.tables 
+          WHERE table_name = 'l1_events'
+          LIMIT 1
+        `);
+        if (oldTableCheck.rows.length > 0) {
+          eventsTable = 'l1_events';
+          hasUserEventsTable = true;
+        }
+      }
     } catch (e) {
       // Table doesn't exist
     }
@@ -475,7 +490,7 @@ export async function GET(request: NextRequest) {
             END) as unique_login_days_week_1
           FROM users u
           LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
-          LEFT JOIN l1_events ue ON ue.tokenized_user_id = ut.tokenized_user_id
+          LEFT JOIN ${eventsTable} ue ON ue.tokenized_user_id = ut.tokenized_user_id
           WHERE u.email != $${paramIndex}
             ${filterConditions}
           GROUP BY DATE_TRUNC('week', u.created_at)

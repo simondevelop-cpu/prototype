@@ -113,7 +113,10 @@ export async function POST(request: NextRequest) {
 
     if (!isBetaEmail) {
       return NextResponse.json(
-        { error: 'This email is not on the beta access list. Please contact support to request access.' },
+        { 
+          error: 'This email is not on the pre-approved beta access list. Please contact support to request access, or verify your email with the code sent to you.',
+          betaEmailRequired: true
+        },
         { status: 403 }
       );
     }

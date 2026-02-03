@@ -31,42 +31,56 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Check if l1_events table exists
+    // Check if l1_event_facts or l1_events table exists (migration-safe)
+    let eventsTable = 'l1_event_facts';
     let hasUserEventsTable = false;
     try {
-      const tableCheck = await pool.query(`
+      const newTableCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'l1_events'
+        WHERE table_name = 'l1_event_facts'
         LIMIT 1
       `);
-      hasUserEventsTable = tableCheck.rows.length > 0;
+      if (newTableCheck.rows.length > 0) {
+        eventsTable = 'l1_event_facts';
+        hasUserEventsTable = true;
+      } else {
+        const oldTableCheck = await pool.query(`
+          SELECT 1 FROM information_schema.tables 
+          WHERE table_name = 'l1_events'
+          LIMIT 1
+        `);
+        if (oldTableCheck.rows.length > 0) {
+          eventsTable = 'l1_events';
+          hasUserEventsTable = true;
+        }
+      }
     } catch (e) {
-      console.log('[Events Data API] Could not check for l1_events table');
+      console.log('[Events Data API] Could not check for events table');
     }
 
     if (!hasUserEventsTable) {
       return NextResponse.json({ 
         success: true,
         eventsData: [],
-        message: 'l1_events table does not exist. Events will appear once the table is created and events are logged.'
+        message: 'Events table does not exist. Events will appear once the table is created and events are logged.'
       }, { status: 200 });
     }
 
     // Check how many events exist total
-    const countCheck = await pool.query(`SELECT COUNT(*) as count FROM l1_events`);
+    const countCheck = await pool.query(`SELECT COUNT(*) as count FROM ${eventsTable}`);
     const totalEvents = parseInt(countCheck.rows[0]?.count || '0', 10);
-    console.log('[Events Data API] Found', totalEvents, 'total events in l1_events table');
+    console.log(`[Events Data API] Found ${totalEvents} total events in ${eventsTable} table`);
 
-    // Check what columns exist in l1_events table
+    // Check what columns exist in events table
     let hasEventData = false;
     let hasMetadata = false;
     try {
       const columnCheck = await pool.query(`
         SELECT column_name 
         FROM information_schema.columns 
-        WHERE table_name = 'l1_events' 
+        WHERE table_name = $1 
         AND column_name IN ('event_data', 'metadata')
-      `);
+      `, [eventsTable]);
       hasEventData = columnCheck.rows.some(row => row.column_name === 'event_data');
       hasMetadata = columnCheck.rows.some(row => row.column_name === 'metadata');
       console.log('[Events Data API] Schema check - hasEventData:', hasEventData, 'hasMetadata:', hasMetadata);
@@ -91,7 +105,7 @@ export async function GET(request: NextRequest) {
     const result = await pool.query(`
       SELECT 
         ${eventFields}
-      FROM l1_events e
+      FROM ${eventsTable} e
       LEFT JOIN users u ON e.user_id = u.id
       LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
       WHERE (u.email != $1 OR u.email IS NULL)
