@@ -2139,11 +2139,47 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* Error Display */}
+            {error && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-red-800 font-medium">Error: {error}</p>
+                  </div>
+                  <button
+                    onClick={() => setError(null)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Loading State */}
+            {migrationExecuting && (
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                  <p className="text-blue-800 font-medium">
+                    {migrationPhase ? `Executing ${migrationPhase} phase...` : 'Executing migration...'}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Migration Steps Results */}
             {migrationSteps.length > 0 && (
               <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden">
                 <div className="p-4 bg-gray-50 border-b border-gray-200">
-                  <h4 className="font-semibold text-gray-900">Migration Steps ({migrationPhase})</h4>
+                  <h4 className="font-semibold text-gray-900">
+                    Migration Steps ({migrationPhase}) {migrationResults?.dryRun ? '(Dry Run)' : ''}
+                  </h4>
                   {migrationResults && (
                     <div className="mt-2 text-sm">
                       <span className={migrationResults.success ? 'text-green-700' : 'text-red-700'}>
