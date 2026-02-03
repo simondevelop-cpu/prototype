@@ -51,15 +51,35 @@ export async function GET(request: NextRequest) {
       }, { status: 200 });
     }
 
-    const result = await pool.query(`
+    // Get emails explicitly in beta_emails table
+    const betaEmailsResult = await pool.query(`
       SELECT email, created_at, added_by
       FROM beta_emails
       ORDER BY created_at DESC
     `);
 
+    // Get all existing user emails that aren't in beta_emails yet
+    const existingUsersResult = await pool.query(`
+      SELECT DISTINCT u.email, u.created_at, 'system' as added_by
+      FROM users u
+      WHERE u.email NOT IN (SELECT email FROM beta_emails)
+      ORDER BY u.created_at DESC
+    `);
+
+    // Combine both lists, marking which are explicitly added vs existing users
+    const allEmails = [
+      ...betaEmailsResult.rows.map((row: any) => ({ ...row, is_explicit: true })),
+      ...existingUsersResult.rows.map((row: any) => ({ ...row, is_explicit: false }))
+    ];
+
     return NextResponse.json({ 
       success: true,
-      emails: result.rows,
+      emails: allEmails,
+      stats: {
+        explicit: betaEmailsResult.rows.length,
+        existing: existingUsersResult.rows.length,
+        total: allEmails.length
+      }
     }, { status: 200 });
 
   } catch (error: any) {
@@ -141,13 +161,21 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Insert new beta email
+    // Insert new beta email (using ON CONFLICT to handle duplicates gracefully)
     const result = await pool.query(
       `INSERT INTO beta_emails (email, added_by, created_at)
        VALUES ($1, $2, NOW())
+       ON CONFLICT (email) DO NOTHING
        RETURNING email, created_at, added_by`,
       [email.toLowerCase(), decoded.email || 'admin']
     );
+    
+    // If no row returned, it means email already exists (from ON CONFLICT)
+    if (result.rows.length === 0) {
+      return NextResponse.json({ 
+        error: 'Email already exists in beta list'
+      }, { status: 400 });
+    }
 
     return NextResponse.json({ 
       success: true,
