@@ -72,20 +72,10 @@ export async function GET(request: NextRequest) {
       params = [tokenizedUserId, startDate.format('YYYY-MM-DD'), endDate.format('YYYY-MM-DD')];
     } else if (monthsParam) {
       // Calculate date range based on months parameter
+      // Use current date as end date to ensure consistent date range regardless of when transactions were added
       const months = parseInt(monthsParam);
-      const latestResult = await pool.query(
-        'SELECT MAX(transaction_date) as latest FROM l1_transaction_facts WHERE tokenized_user_id = $1',
-        [tokenizedUserId]
-      );
-
-      let endDate, startDate;
-      if (latestResult.rows[0]?.latest) {
-        endDate = dayjs(latestResult.rows[0].latest).endOf('month');
-        startDate = endDate.subtract(months - 1, 'month').startOf('month');
-      } else {
-        endDate = dayjs().endOf('month');
-        startDate = endDate.subtract(months - 1, 'month').startOf('month');
-      }
+      const endDate = dayjs().endOf('month');
+      const startDate = endDate.subtract(months - 1, 'month').startOf('month');
       
       query = `SELECT 
         id,
