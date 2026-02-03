@@ -4525,8 +4525,19 @@ export default function AdminDashboard() {
         body: JSON.stringify({ phase, dryRun }),
       });
       
-      const data = await response.json();
-      console.log(`[Migration] Response:`, data);
+      let data;
+      try {
+        const text = await response.text();
+        console.log(`[Migration] Raw response:`, text);
+        data = JSON.parse(text);
+      } catch (parseError: any) {
+        console.error('[Migration] Failed to parse response:', parseError);
+        setError(`Failed to parse server response: ${parseError.message}`);
+        setMigrationExecuting(false);
+        return;
+      }
+      
+      console.log(`[Migration] Parsed response:`, data);
       
       if (response.ok) {
         setMigrationSteps(data.steps || []);
