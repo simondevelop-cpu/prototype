@@ -113,22 +113,12 @@ export async function GET(request: NextRequest) {
       ? `ORDER BY cl.reviewed ASC NULLS FIRST, ${columns.includes('last_used') ? 'cl.last_used' : 'cl.created_at'} DESC`
       : `ORDER BY ${columns.includes('last_used') ? 'cl.last_used' : 'cl.created_at'} DESC`;
     
-    // Join with l0_pii_users to get email for better display (optional, won't break if join fails)
+    // Query user_id directly from the table (no join needed)
     const result = await pool.query(`
-      SELECT ${selectFields.join(', ')}, 
-             COALESCE(pii.email, 'N/A') as user_email
+      SELECT ${selectFields.join(', ')}
       FROM ${learningTable} cl
-      LEFT JOIN l1_user_permissions perm ON cl.user_id = perm.id
-      LEFT JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
       ${orderByClause}
-    `).catch(() => {
-      // If join fails (e.g., tables don't exist), fall back to simple query
-      return pool.query(`
-        SELECT ${selectFields.join(', ')}
-        FROM ${learningTable} cl
-        ${orderByClause}
-      `);
-    });
+    `);
 
     return NextResponse.json({
       recategorizations: result.rows,

@@ -233,9 +233,9 @@ export async function GET(request: NextRequest) {
         try {
           if (filters.metric === 'loginDays' || !filters.metric) {
             // Get unique login days in this week from l1_event_facts
-            // Note: We use user_id (internal ID) since login events are logged with internal user_id
-            // Use DATE_TRUNC('day', ...) instead of DATE() for better PostgreSQL compatibility
-            // Cast user.id to integer to ensure type consistency
+            // Note: user_id in l1_event_facts references l1_user_permissions.id (same as user.id)
+            // After table consolidation migration, user_id should match l1_user_permissions.id
+            // Use DATE_TRUNC('day', ...) for better PostgreSQL compatibility
             const loginDaysResult = await pool.query(`
               SELECT COUNT(DISTINCT DATE_TRUNC('day', event_timestamp)) as login_days
               FROM l1_event_facts

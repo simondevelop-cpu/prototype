@@ -1137,9 +1137,7 @@ export default function AdminDashboard() {
             {sortedRecategorizations.map((item) => (
               <tr key={item.id} className={`hover:bg-gray-50 ${(reviewed[item.id] || false) ? 'bg-gray-50' : 'bg-white'}`}>
                 <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.description_pattern}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">
-                  {item.user_email && item.user_email !== 'N/A' ? `${item.user_id} (${item.user_email})` : item.user_id}
-                </td>
+                <td className="px-6 py-4 text-sm text-gray-600 font-mono">{item.user_id || '-'}</td>
                 <td className="px-6 py-4 text-sm">
                   {item.original_category ? (
                     <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-medium">{item.original_category}</span>
