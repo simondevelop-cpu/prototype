@@ -114,16 +114,6 @@ export default function AdminDashboard() {
   const [adminLogins, setAdminLogins] = useState<any[]>([]);
   const [adminLoginsLoading, setAdminLoginsLoading] = useState(false);
   
-  // State for Migration tab
-  const [migrationTests, setMigrationTests] = useState<any[]>([]);
-  const [migrationTestsLoading, setMigrationTestsLoading] = useState(false);
-  const [migrationTestSummary, setMigrationTestSummary] = useState<any>(null);
-  const [migrationTestType, setMigrationTestType] = useState<'pre' | 'post'>('pre');
-  const [migrationSteps, setMigrationSteps] = useState<any[]>([]);
-  const [migrationExecuting, setMigrationExecuting] = useState(false);
-  const [migrationPhase, setMigrationPhase] = useState<string>('');
-  const [migrationResults, setMigrationResults] = useState<any>(null);
-  
   // State for Old Tables Cleanup
   const [cleanupAnalysis, setCleanupAnalysis] = useState<any>(null);
   const [cleanupLoading, setCleanupLoading] = useState(false);
@@ -1925,10 +1915,339 @@ export default function AdminDashboard() {
 
   const renderMigrationTab = () => {
     return (
-      <div className="space-y-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Migration Cleanup & Verification</h2>
-          <p className="text-gray-600 mb-6">Migration tab content</p>
+      <div className="space-y-8">
+        {/* Data Migration Verification Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Data Migration Verification</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Verify data migration for: categorization_learning, chat_bookings, and available_slots
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  setDataMigrationLoading(true);
+                  try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch('/api/admin/migration/verify-data-migration', {
+                      headers: {
+                        'Authorization': `Bearer ${token}`,
+                      },
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                      setDataMigrationVerification(data);
+                    } else {
+                      setError(data.error || 'Failed to verify data migration');
+                    }
+                  } catch (error: any) {
+                    setError('Failed to verify data migration: ' + error.message);
+                  } finally {
+                    setDataMigrationLoading(false);
+                  }
+                }}
+                disabled={dataMigrationLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {dataMigrationLoading ? 'Verifying...' : 'Verify Data Migration'}
+              </button>
+            </div>
+          </div>
+
+          {dataMigrationVerification && (
+            <div className="p-6 space-y-6">
+              {/* Summary */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="grid grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Total Tables:</span>
+                    <span className="ml-2 font-semibold text-gray-900">{dataMigrationVerification.summary?.total || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-green-600">Migrated:</span>
+                    <span className="ml-2 font-semibold text-green-700">{dataMigrationVerification.summary?.migrated || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-blue-600">Safe to Drop:</span>
+                    <span className="ml-2 font-semibold text-blue-700">{dataMigrationVerification.summary?.safeToDrop || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-red-600">Needs Attention:</span>
+                    <span className="ml-2 font-semibold text-red-700">{dataMigrationVerification.summary?.needsAttention || 0}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Results Table */}
+              {dataMigrationVerification.results && dataMigrationVerification.results.length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Old Table</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Table</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Old Count</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Count</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issues</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {dataMigrationVerification.results.map((result: any, index: number) => (
+                          <tr key={result.oldTable || index}>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{result.oldTable}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{result.newTable}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{result.oldTableCount || 0}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{result.newTableCount || 0}</td>
+                            <td className="px-6 py-4 text-sm">
+                              {result.dataMigrated && result.safeToDrop ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  ✅ Ready to Drop
+                                </span>
+                              ) : result.dataMigrated ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                  ⚠️ Verify
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  ❌ Not Migrated
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {result.issues && result.issues.length > 0 ? (
+                                <ul className="list-disc list-inside text-xs text-red-600">
+                                  {result.issues.map((issue: string, idx: number) => (
+                                    <li key={idx}>{issue}</li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <span className="text-green-600 text-xs">No issues</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Drop Tables Section */}
+              {dataMigrationVerification.allSafeToDrop && dataMigrationVerification.results && dataMigrationVerification.results.length > 0 && (
+                <div className="border border-green-200 rounded-lg p-4 bg-green-50">
+                  <h4 className="font-semibold text-green-900 mb-3">✅ All Tables Ready to Drop</h4>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {dataMigrationVerification.results
+                      .filter((r: any) => r.safeToDrop && r.oldTableExists)
+                      .map((r: any) => (
+                        <span key={r.oldTable} className="px-3 py-1 bg-green-100 text-green-800 rounded text-sm font-medium">
+                          {r.oldTable}
+                        </span>
+                      ))}
+                  </div>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={dataMigrationDropConfirm}
+                      onChange={(e) => setDataMigrationDropConfirm(e.target.value)}
+                      placeholder="Type 'DROP_TABLES' to confirm"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={async () => {
+                        if (dataMigrationDropConfirm !== 'DROP_TABLES') {
+                          setError('Please type DROP_TABLES to confirm');
+                          return;
+                        }
+                        setDataMigrationDropping(true);
+                        try {
+                          const token = localStorage.getItem('admin_token');
+                          const tablesToDrop = dataMigrationVerification.results
+                            .filter((r: any) => r.safeToDrop && r.oldTableExists)
+                            .map((r: any) => r.oldTable);
+                          
+                          const response = await fetch('/api/admin/migration/cleanup', {
+                            method: 'POST',
+                            headers: {
+                              'Authorization': `Bearer ${token}`,
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              tableNames: tablesToDrop,
+                              confirm: 'DROP_TABLES',
+                            }),
+                          });
+                          const data = await response.json();
+                          if (response.ok) {
+                            alert(`Successfully dropped ${data.dropped?.length || 0} table(s)`);
+                            setDataMigrationDropConfirm('');
+                            // Refresh verification
+                            const refreshResponse = await fetch('/api/admin/migration/verify-data-migration', {
+                              headers: {
+                                'Authorization': `Bearer ${token}`,
+                              },
+                            });
+                            const refreshData = await refreshResponse.json();
+                            if (refreshResponse.ok) {
+                              setDataMigrationVerification(refreshData);
+                            }
+                          } else {
+                            setError(data.error || 'Failed to drop tables');
+                          }
+                        } catch (error: any) {
+                          setError('Failed to drop tables: ' + error.message);
+                        } finally {
+                          setDataMigrationDropping(false);
+                        }
+                      }}
+                      disabled={dataMigrationDropping || dataMigrationDropConfirm !== 'DROP_TABLES' || !dataMigrationVerification.allSafeToDrop}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                    >
+                      {dataMigrationDropping ? 'Dropping...' : `Drop ${dataMigrationVerification.results.filter((r: any) => r.safeToDrop && r.oldTableExists).length} Table(s)`}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!dataMigrationVerification && !dataMigrationLoading && (
+            <div className="p-6 text-center text-gray-500">
+              <p>Click "Verify Data Migration" to check migration status</p>
+            </div>
+          )}
+        </div>
+
+        {/* Functionality Tests Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Functionality Tests</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Run comprehensive tests to verify all functionality is working correctly after migration
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  setFunctionalityTestsLoading(true);
+                  try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch('/api/admin/migration/test-functionality', {
+                      headers: {
+                        'Authorization': `Bearer ${token}`,
+                      },
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                      setFunctionalityTests(data);
+                    } else {
+                      setError(data.error || 'Failed to run functionality tests');
+                    }
+                  } catch (error: any) {
+                    setError('Failed to run functionality tests: ' + error.message);
+                  } finally {
+                    setFunctionalityTestsLoading(false);
+                  }
+                }}
+                disabled={functionalityTestsLoading}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {functionalityTestsLoading ? 'Running Tests...' : 'Run Functionality Tests'}
+              </button>
+            </div>
+          </div>
+
+          {functionalityTests && (
+            <div className="p-6 space-y-6">
+              {/* Test Summary */}
+              <div className={`p-4 rounded-lg border-2 ${
+                functionalityTests.allPassed ? 'bg-green-50 border-green-300' : 'bg-yellow-50 border-yellow-300'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-gray-900">Test Summary</h4>
+                  <div className="flex gap-4 text-sm">
+                    <span className="text-green-700 font-medium">
+                      ✅ {functionalityTests.summary?.passed || 0} Passed
+                    </span>
+                    {functionalityTests.summary?.failed > 0 && (
+                      <span className="text-red-700 font-medium">
+                        ❌ {functionalityTests.summary?.failed || 0} Failed
+                      </span>
+                    )}
+                    {functionalityTests.summary?.warnings > 0 && (
+                      <span className="text-yellow-700 font-medium">
+                        ⚠️ {functionalityTests.summary?.warnings || 0} Warnings
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Test Results Table */}
+              {functionalityTests.tests && functionalityTests.tests.length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Test</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {functionalityTests.tests.map((test: any, index: number) => (
+                          <tr key={test.name || index} className={test.status === 'fail' ? 'bg-red-50' : test.status === 'warn' ? 'bg-yellow-50' : ''}>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{test.name}</td>
+                            <td className="px-6 py-4 text-sm">
+                              {test.status === 'pass' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  ✅ Pass
+                                </span>
+                              )}
+                              {test.status === 'fail' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  ❌ Fail
+                                </span>
+                              )}
+                              {test.status === 'warn' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                  ⚠️ Warning
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{test.message}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {test.details && (
+                                <details className="text-xs">
+                                  <summary className="cursor-pointer text-gray-500 hover:text-gray-700">Show details</summary>
+                                  <pre className="mt-1 bg-gray-50 p-2 rounded overflow-auto max-h-32">
+                                    {JSON.stringify(test.details, null, 2)}
+                                  </pre>
+                                </details>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!functionalityTests && !functionalityTestsLoading && (
+            <div className="p-6 text-center text-gray-500">
+              <p>Click "Run Functionality Tests" to verify system functionality</p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -2050,143 +2369,6 @@ export default function AdminDashboard() {
     );
   };
 
-  // Fetch migration tests (pre or post)
-  const fetchMigrationTests = async (type: 'pre' | 'post' = 'pre') => {
-    setMigrationTestsLoading(true);
-    setMigrationTestType(type);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        setError('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch(`/api/admin/migration/tests?type=${type}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setMigrationTests(data.tests || []);
-        setMigrationTestSummary(data.summary || null);
-      } else {
-        setError(data.error || 'Failed to fetch migration tests');
-      }
-    } catch (error: any) {
-      setError('Failed to fetch migration tests: ' + error.message);
-    } finally {
-      setMigrationTestsLoading(false);
-    }
-  };
-
-  // Execute migration phase
-  const executeMigrationPhase = async (phase: string, dryRun: boolean = false) => {
-    if (!dryRun && !confirm(`Are you sure you want to execute the ${phase} migration? This will modify the database structure.`)) {
-      return;
-    }
-    
-    setMigrationExecuting(true);
-    setMigrationPhase(phase);
-    setMigrationSteps([]);
-    setMigrationResults(null);
-    setError(null); // Clear any previous errors
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        setError('Not authenticated. Please log in again.');
-        setMigrationExecuting(false);
-        return;
-      }
-      
-      console.log(`[Migration] Executing ${phase} phase, dryRun: ${dryRun}`);
-      
-      const response = await fetch('/api/admin/migration/execute', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ phase, dryRun }),
-      });
-      
-      let data;
-      try {
-        const text = await response.text();
-        console.log(`[Migration] Raw response:`, text);
-        data = JSON.parse(text);
-      } catch (parseError: any) {
-        console.error('[Migration] Failed to parse response:', parseError);
-        setError(`Failed to parse server response: ${parseError.message}`);
-        setMigrationExecuting(false);
-        return;
-      }
-      
-      console.log(`[Migration] Parsed response:`, data);
-      
-      if (response.ok) {
-        setMigrationSteps(data.steps || []);
-        setMigrationResults(data);
-        setError(null);
-        if (!dryRun && data.success) {
-          // Refresh tests after migration
-          await fetchMigrationTests('post');
-        }
-      } else {
-        const errorMsg = data.error || data.details || 'Failed to execute migration';
-        console.error('[Migration] API error:', errorMsg);
-        setError(errorMsg);
-        setMigrationSteps([]);
-        setMigrationResults(null);
-      }
-    } catch (error: any) {
-      console.error('Error executing migration:', error);
-      const errorMsg = error.message || 'Unknown error';
-      setError(`Error executing migration: ${errorMsg}`);
-      setMigrationSteps([]);
-      setMigrationResults(null);
-    } finally {
-      setMigrationExecuting(false);
-    }
-  };
-
-  // Legacy runMigration function - kept for backward compatibility with old investigation code
-  // New migrations should use executeMigrationPhase instead
-  const runMigration = async () => {
-    if (!confirm('Are you sure you want to run the migration? This will modify the database structure.')) {
-      return;
-    }
-    
-    setMigrationExecuting(true);
-    setMigrationResults(null);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/migration/run', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      const data = await response.json();
-      setMigrationResults(data);
-      if (response.ok && data.success) {
-        alert('Migration completed successfully!');
-        // Refresh tests
-        fetchMigrationTests('post');
-      } else {
-        alert(`Migration completed with ${data.errors || 0} error(s). Check results below.`);
-      }
-    } catch (error: any) {
-      console.error('Error running migration:', error);
-      alert(`Error running migration: ${error.message || 'Unknown error'}`);
-    } finally {
-      setMigrationExecuting(false);
-    }
-  };
 
 
   // Fetch Excel validation
