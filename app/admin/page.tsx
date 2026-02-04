@@ -2050,58 +2050,36 @@ export default function AdminDashboard() {
     );
   };
 
-  // Render Analytics Tab
-                  setDataMigrationLoading(true);
-                  try {
-                    const token = localStorage.getItem('admin_token');
-                    const response = await fetch('/api/admin/migration/verify-data-migration', {
-                      headers: {
-                        'Authorization': `Bearer ${token}`,
-                      },
-                    });
-                    const data = await response.json();
-                    if (response.ok) {
-                      setDataMigrationVerification(data);
-                    } else {
-                      setError(data.error || 'Failed to verify data migration');
-                    }
-                  } catch (error: any) {
-                    setError('Failed to verify data migration: ' + error.message);
-                  } finally {
-                    setDataMigrationLoading(false);
-                  }
-                }}
-                disabled={dataMigrationLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
-                {dataMigrationLoading ? 'Verifying...' : 'Verify Data Migration'}
-              </button>
-            </div>
+  // Fetch migration tests (pre or post)
+  const fetchMigrationTests = async (type: 'pre' | 'post' = 'pre') => {
+    setMigrationTestsLoading(true);
+    setMigrationTestType(type);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        setError('Not authenticated. Please log in again.');
+        return;
+      }
+      const response = await fetch(`/api/admin/migration/tests?type=${type}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setMigrationTests(data.tests || []);
+        setMigrationTestSummary(data.summary || null);
+      } else {
+        setError(data.error || 'Failed to fetch migration tests');
+      }
+    } catch (error: any) {
+      setError('Failed to fetch migration tests: ' + error.message);
+    } finally {
+      setMigrationTestsLoading(false);
+    }
+  };
 
-            {dataMigrationVerification && (
-              <div className="space-y-4">
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="grid grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">Total Tables:</span>
-                      <span className="ml-2 font-semibold text-gray-900">{dataMigrationVerification.summary?.total || 0}</span>
-                    </div>
-                    <div>
-                      <span className="text-green-600">Migrated:</span>
-                      <span className="ml-2 font-semibold text-green-700">{dataMigrationVerification.summary?.migrated || 0}</span>
-                    </div>
-                    <div>
-                      <span className="text-green-600">Safe to Drop:</span>
-                      <span className="ml-2 font-semibold text-green-700">{dataMigrationVerification.summary?.safeToDrop || 0}</span>
-                    </div>
-                    <div>
-                      <span className="text-red-600">Needs Attention:</span>
-                      <span className="ml-2 font-semibold text-red-700">{dataMigrationVerification.summary?.needsAttention || 0}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {dataMigrationVerification.results && dataMigrationVerification.results.length > 0 && (
+  // Fetch migration tests (pre or post)
                   <div className="border border-gray-200 rounded-lg overflow-hidden">
                     <div className="p-4 bg-gray-50 border-b border-gray-200">
                       <h4 className="font-semibold text-gray-900">Migration Status</h4>
@@ -4140,45 +4118,11 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
-            )}
+            </div>
           </div>
-        )}
+        </div>
       </div>
     );
-  };
-
-  // Fetch migration tests (pre or post)
-  const fetchMigrationTests = async (type: 'pre' | 'post' = 'pre') => {
-    setMigrationTestsLoading(true);
-    setMigrationTestType(type);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        setError('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch(`/api/admin/migration/tests?type=${type}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setMigrationTests(data.tests || []);
-        setMigrationTestSummary(data.summary || null);
-      } else {
-        setError(data.error || 'Failed to fetch migration tests');
-        setMigrationTests([]);
-        setMigrationTestSummary(null);
-      }
-    } catch (error: any) {
-      console.error('Error fetching migration tests:', error);
-      setError(`Error fetching migration tests: ${error.message || 'Unknown error'}`);
-      setMigrationTests([]);
-      setMigrationTestSummary(null);
-    } finally {
-      setMigrationTestsLoading(false);
-    }
   };
 
   // Execute migration phase
