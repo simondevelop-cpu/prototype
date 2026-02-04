@@ -92,21 +92,33 @@ export async function GET(request: NextRequest) {
       ? 'perm.id, pii.email, perm.created_at, perm.login_attempts'
       : 'perm.id, pii.email, perm.created_at';
 
-    // Check if onboarding_responses table exists
-    let hasOnboardingTable = false;
+    // Check which onboarding table exists (schema-adaptive)
+    let onboardingTableName: string | null = null;
     try {
-      const onboardingCheck = await pool.query(`
-        SELECT COUNT(*) as count FROM information_schema.tables 
-        WHERE table_name IN ('onboarding_responses', 'l1_onboarding_responses')
+      // Check for l1_onboarding_responses first (preferred)
+      const l1Check = await pool.query(`
+        SELECT table_name FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'l1_onboarding_responses'
       `);
-      hasOnboardingTable = parseInt(onboardingCheck.rows[0]?.count || '0') > 0;
+      if (l1Check.rows.length > 0) {
+        onboardingTableName = 'l1_onboarding_responses';
+      } else {
+        // Fallback to onboarding_responses
+        const oldCheck = await pool.query(`
+          SELECT table_name FROM information_schema.tables 
+          WHERE table_schema = 'public' AND table_name = 'onboarding_responses'
+        `);
+        if (oldCheck.rows.length > 0) {
+          onboardingTableName = 'onboarding_responses';
+        }
+      }
     } catch (e) {
-      console.log('[Users API] Could not check onboarding table');
+      console.log('[Users API] Could not check onboarding table:', e);
     }
 
     let result;
-    if (hasOnboardingTable) {
-      // Use l1_user_permissions and l0_pii_users with onboarding_responses
+    if (onboardingTableName) {
+      // Use l1_user_permissions and l0_pii_users with onboarding table
       result = await pool.query(`
         SELECT 
           ${selectFields}${activeFields},
@@ -117,7 +129,7 @@ export async function GET(request: NextRequest) {
         JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
         LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
         LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-        LEFT JOIN onboarding_responses o ON perm.id = o.user_id
+        LEFT JOIN ${onboardingTableName} o ON perm.id = o.user_id
         WHERE pii.email != $1
         GROUP BY ${groupByFields}${hasIsActive && hasEmailValidated ? ', perm.is_active, perm.email_validated' : ''}
         ORDER BY perm.created_at DESC
