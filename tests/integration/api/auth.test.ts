@@ -39,12 +39,38 @@ describe('Authentication API', () => {
     } as unknown as Pool;
 
     // Create schema - all tables needed by auth routes
+    // IMPORTANT: Create l1_user_permissions FIRST as it's referenced by other tables
     await testClient.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         email TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
         display_name TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS l1_user_permissions (
+        id SERIAL PRIMARY KEY,
+        password_hash TEXT NOT NULL,
+        login_attempts INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        email_validated BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS l0_pii_users (
+        internal_user_id INTEGER PRIMARY KEY REFERENCES l1_user_permissions(id),
+        email TEXT NOT NULL,
+        display_name TEXT,
+        ip_address TEXT,
+        ip_address_updated_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS l0_user_tokenization (
+        internal_user_id INTEGER PRIMARY KEY REFERENCES l1_user_permissions(id),
+        tokenized_user_id TEXT NOT NULL UNIQUE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
       
@@ -74,31 +100,6 @@ describe('Authentication API', () => {
         metadata JSONB,
         is_admin BOOLEAN DEFAULT FALSE,
         session_id TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS l0_user_tokenization (
-        internal_user_id INTEGER PRIMARY KEY REFERENCES l1_user_permissions(id),
-        tokenized_user_id TEXT NOT NULL UNIQUE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS l1_user_permissions (
-        id SERIAL PRIMARY KEY,
-        password_hash TEXT NOT NULL,
-        login_attempts INTEGER DEFAULT 0,
-        is_active BOOLEAN DEFAULT TRUE,
-        email_validated BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS l0_pii_users (
-        internal_user_id INTEGER PRIMARY KEY REFERENCES l1_user_permissions(id),
-        email TEXT NOT NULL,
-        display_name TEXT,
-        ip_address TEXT,
-        ip_address_updated_at TIMESTAMP WITH TIME ZONE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS l1_events (

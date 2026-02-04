@@ -42,6 +42,7 @@ describe('Event Logging', () => {
     } as unknown as Pool;
 
     // Create schema
+    // IMPORTANT: Create l1_user_permissions FIRST as it's referenced by other tables
     await testClient.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -51,8 +52,25 @@ describe('Event Logging', () => {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS l1_user_permissions (
+        id SERIAL PRIMARY KEY,
+        password_hash TEXT NOT NULL,
+        login_attempts INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        email_validated BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS l0_pii_users (
+        internal_user_id INTEGER PRIMARY KEY REFERENCES l1_user_permissions(id),
+        email TEXT NOT NULL,
+        display_name TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS l0_user_tokenization (
-        internal_user_id INTEGER PRIMARY KEY REFERENCES users(id),
+        internal_user_id INTEGER PRIMARY KEY REFERENCES l1_user_permissions(id),
         tokenized_user_id TEXT NOT NULL UNIQUE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
@@ -73,7 +91,18 @@ describe('Event Logging', () => {
 
       CREATE TABLE IF NOT EXISTS l1_events (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id),
+        user_id INTEGER NOT NULL REFERENCES l1_user_permissions(id),
+        tokenized_user_id TEXT REFERENCES l0_user_tokenization(tokenized_user_id),
+        event_type TEXT NOT NULL,
+        event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        metadata JSONB,
+        is_admin BOOLEAN DEFAULT FALSE,
+        session_id TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS l1_event_facts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES l1_user_permissions(id),
         tokenized_user_id TEXT REFERENCES l0_user_tokenization(tokenized_user_id),
         event_type TEXT NOT NULL,
         event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
