@@ -2399,11 +2399,210 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {analyticsSubTab === 'customer-data' && renderPlaceholder('Customer Data')}
-        {analyticsSubTab === 'events-data' && renderPlaceholder('Events Data')}
-        {analyticsSubTab === 'editing-events-data' && renderPlaceholder('Editing Events Data')}
-        {analyticsSubTab === 'sessions' && renderPlaceholder('Sessions')}
-        {analyticsSubTab === 'vanity-metrics' && renderPlaceholder('Vanity Metrics')}
+        {analyticsSubTab === 'customer-data' && (
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Customer Data</h3>
+            {customerDataLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-600 mt-4">Loading customer data...</p>
+              </div>
+            ) : customerData.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {Object.keys(customerData[0] || {}).map((key) => (
+                        <th key={key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          {key.replace(/_/g, ' ')}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {customerData.map((row: any, idx: number) => (
+                      <tr key={idx}>
+                        {Object.values(row).map((value: any, colIdx: number) => (
+                          <td key={colIdx} className="px-6 py-4 text-sm text-gray-900">
+                            {value !== null && value !== undefined ? String(value) : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-gray-600">No customer data available</p>
+            )}
+          </div>
+        )}
+
+        {analyticsSubTab === 'events-data' && (
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Events Data</h3>
+            {eventsDataLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-600 mt-4">Loading events data...</p>
+              </div>
+            ) : eventsData.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {Object.keys(eventsData[0] || {}).map((key) => (
+                        <th key={key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          {key.replace(/_/g, ' ')}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {eventsData.map((row: any, idx: number) => (
+                      <tr key={idx}>
+                        {Object.values(row).map((value: any, colIdx: number) => (
+                          <td key={colIdx} className="px-6 py-4 text-sm text-gray-900">
+                            {value !== null && value !== undefined ? String(value) : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-gray-600">No events data available</p>
+            )}
+          </div>
+        )}
+
+        {analyticsSubTab === 'editing-events-data' && (
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Editing Events Data</h3>
+            {editingEventsDataLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-600 mt-4">Loading editing events data...</p>
+              </div>
+            ) : editingEventsData.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {Object.keys(editingEventsData[0] || {}).map((key) => (
+                        <th key={key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          {key.replace(/_/g, ' ')}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {editingEventsData.map((row: any, idx: number) => (
+                      <tr key={idx}>
+                        {Object.values(row).map((value: any, colIdx: number) => (
+                          <td key={colIdx} className="px-6 py-4 text-sm text-gray-900">
+                            {value !== null && value !== undefined ? String(value) : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-gray-600">No editing events data available</p>
+            )}
+          </div>
+        )}
+
+        {analyticsSubTab === 'sessions' && (
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Sessions</h3>
+            {sessionsDataLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-600 mt-4">Loading sessions data...</p>
+              </div>
+            ) : sessionsData.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {Object.keys(sessionsData[0] || {}).map((key) => (
+                        <th key={key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          {key.replace(/_/g, ' ')}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {sessionsData.map((row: any, idx: number) => (
+                      <tr key={idx}>
+                        {Object.values(row).map((value: any, colIdx: number) => (
+                          <td key={colIdx} className="px-6 py-4 text-sm text-gray-900">
+                            {value !== null && value !== undefined ? String(value) : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-gray-600">No sessions data available</p>
+            )}
+          </div>
+        )}
+
+        {analyticsSubTab === 'vanity-metrics' && (
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Vanity Metrics</h3>
+            {vanityLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-600 mt-4">Loading vanity metrics...</p>
+              </div>
+            ) : vanityData ? (
+              <div className="space-y-4">
+                {vanityData.monthlyMetrics && (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Month</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Users</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">MAU</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Users</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transactions</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unique Banks</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {vanityData.monthlyMetrics.map((month: any, idx: number) => (
+                          <tr key={idx}>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{month.month}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{month.totalUsers || 0}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{month.mau || 0}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{month.newUsers || 0}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{month.transactions || 0}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{month.uniqueBanks || 0}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {!vanityData.monthlyMetrics && (
+                  <p className="text-gray-600">No vanity metrics data available</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-gray-600">No vanity metrics data available</p>
+            )}
+          </div>
+        )}
+
         {analyticsSubTab === 'download' && renderPlaceholder('Download')}
       </div>
     );
