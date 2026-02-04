@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
 
     // Check if slot is already booked (including requested status)
     const existingBooking = await pool.query(
-      `SELECT id FROM chat_bookings 
+      `SELECT id FROM ${tableName} 
        WHERE booking_date = $1 AND booking_time = $2 AND status IN ('pending', 'requested', 'confirmed')`,
       [bookingDate, normalizedTime]
     );
@@ -220,20 +220,6 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-    }
-
-    // Use new table name (l1_admin_chat_bookings) with fallback to old name
-    let tableName = 'l1_admin_chat_bookings';
-    try {
-      const tableCheck = await pool.query(
-        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
-        [tableName]
-      );
-      if (tableCheck.rows.length === 0) {
-        tableName = 'chat_bookings'; // Fallback to old name
-      }
-    } catch (e) {
-      tableName = 'chat_bookings'; // Fallback on error
     }
 
     // Create booking with status 'requested' (admin will confirm)
