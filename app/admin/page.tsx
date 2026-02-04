@@ -132,6 +132,9 @@ export default function AdminDashboard() {
   const [verificationTestsLoading, setVerificationTestsLoading] = useState(false);
   const [codeReferences, setCodeReferences] = useState<any>(null);
   const [codeReferencesLoading, setCodeReferencesLoading] = useState(false);
+  const [dropColumnsResult, setDropColumnsResult] = useState<any>(null);
+  const [dropColumnsLoading, setDropColumnsLoading] = useState(false);
+  const [dropColumnsConfirm, setDropColumnsConfirm] = useState('');
   
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
@@ -2518,6 +2521,133 @@ export default function AdminDashboard() {
             </div>
           )}
         </div>
+
+        {/* Drop Old Columns Section */}
+        {codeReferences && codeReferences.summary.criticalUpdates === 0 && codeReferences.summary.needsCodeUpdates === 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-green-200">
+            <div className="p-6 border-b border-green-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Drop Old Columns</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Remove email and display_name columns from users table
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Safe to proceed: All code references removed and PII migration verified
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {dropColumnsResult ? (
+                <div className={`p-4 rounded-lg border-2 ${
+                  dropColumnsResult.success ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
+                }`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-gray-900">Drop Columns Results</h4>
+                    {dropColumnsResult.success ? (
+                      <span className="text-green-700 font-medium">✅ Success</span>
+                    ) : (
+                      <span className="text-red-700 font-medium">❌ Failed</span>
+                    )}
+                  </div>
+                  
+                  {dropColumnsResult.steps && dropColumnsResult.steps.length > 0 && (
+                    <div className="space-y-2">
+                      {dropColumnsResult.steps.map((step: any, idx: number) => (
+                        <div key={idx} className="text-sm">
+                          <span className="font-medium">Step {step.step}:</span> {step.name} - 
+                          <span className={step.status === 'success' ? 'text-green-700' : step.status === 'skipped' ? 'text-gray-500' : 'text-red-700'}>
+                            {' '}{step.message}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {dropColumnsResult.errors && dropColumnsResult.errors.length > 0 && (
+                    <div className="mt-3 bg-red-100 border border-red-300 rounded p-3">
+                      <h5 className="font-semibold text-red-900 mb-1">Errors:</h5>
+                      <ul className="list-disc list-inside text-sm text-red-800">
+                        {dropColumnsResult.errors.map((error: string, idx: number) => (
+                          <li key={idx}>{error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p className="text-sm text-yellow-800">
+                      <strong>Warning:</strong> This will permanently remove the email and display_name columns from the users table. 
+                      Ensure all PII data is verified in l0_pii_users before proceeding.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={dropColumnsConfirm}
+                      onChange={(e) => setDropColumnsConfirm(e.target.value)}
+                      placeholder="Type 'DROP_USERS_COLUMNS' to confirm"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={async () => {
+                        if (dropColumnsConfirm !== 'DROP_USERS_COLUMNS') {
+                          setError('Please type DROP_USERS_COLUMNS to confirm');
+                          return;
+                        }
+                        setDropColumnsLoading(true);
+                        try {
+                          const token = localStorage.getItem('admin_token');
+                          const response = await fetch('/api/admin/migration/drop-old-users-columns', {
+                            method: 'POST',
+                            headers: {
+                              'Authorization': `Bearer ${token}`,
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              confirm: 'DROP_USERS_COLUMNS',
+                            }),
+                          });
+                          const data = await response.json();
+                          if (response.ok) {
+                            setDropColumnsResult(data);
+                            setDropColumnsConfirm('');
+                            alert('Columns dropped successfully!');
+                            // Refresh code references to see updated status
+                            const refreshResponse = await fetch('/api/admin/migration/check-code-references', {
+                              headers: {
+                                'Authorization': `Bearer ${token}`,
+                              },
+                            });
+                            const refreshData = await refreshResponse.json();
+                            if (refreshResponse.ok) {
+                              setCodeReferences(refreshData);
+                            }
+                          } else {
+                            setError(data.error || 'Failed to drop columns');
+                          }
+                        } catch (error: any) {
+                          setError('Failed to drop columns: ' + error.message);
+                        } finally {
+                          setDropColumnsLoading(false);
+                        }
+                      }}
+                      disabled={dropColumnsLoading || dropColumnsConfirm !== 'DROP_USERS_COLUMNS'}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                    >
+                      {dropColumnsLoading ? 'Dropping Columns...' : 'Drop Email & Display Name Columns'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
