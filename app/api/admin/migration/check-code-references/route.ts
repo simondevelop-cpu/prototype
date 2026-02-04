@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
       'bookings/create',
     ];
 
-    function checkFileForUsersReferences(filePath: string, relativePath: string): any {
+    const checkFileForUsersReferences = (filePath: string, relativePath: string): any => {
       try {
         if (!fs.existsSync(filePath)) return null;
         
@@ -161,9 +161,9 @@ export async function GET(request: NextRequest) {
       } catch (e: any) {
         return { file: relativePath, error: e.message };
       }
-    }
+    };
 
-    function scanDirectory(dir: string, baseDir: string = ''): void {
+    const scanDirectory = (dir: string, baseDir: string = ''): void => {
       try {
         const entries = fs.readdirSync(dir, { withFileTypes: true });
         
@@ -189,7 +189,7 @@ export async function GET(request: NextRequest) {
       } catch (e: any) {
         // Skip directories we can't read
       }
-    }
+    };
 
     // Scan API directory
     if (fs.existsSync(apiDir)) {
