@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
     
     for (const user of filteredUsers) {
       const signupDate = new Date(user.signup_date);
-      const weeks: { week: number; loginDays: number }[] = [];
+      const weeks: { week: number; loginDays: number; uploadsPerWeek: number }[] = [];
       
       // Calculate metric per week for 12 weeks from l1_event_facts
       for (let weekNum = 0; weekNum < 12; weekNum++) {
