@@ -47,6 +47,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabName>('inbox');
   const [monitoringSubTab, setMonitoringSubTab] = useState<MonitoringSubTab>('health');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
+  const [categorizationSubTab, setCategorizationSubTab] = useState<'recategorization' | 'uncategorised'>('recategorization');
   const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'editing-events-data' | 'sessions' | 'vanity-metrics' | 'download'>('cohort-analysis');
   const [inboxSubTab, setInboxSubTab] = useState<InboxSubTab>('feedback');
   const [keywords, setKeywords] = useState<GroupedData>({});
@@ -71,6 +72,11 @@ export default function AdminDashboard() {
   const [recategorizations, setRecategorizations] = useState<any[]>([]);
   const [recatLoading, setRecatLoading] = useState(false);
   const [reviewed, setReviewed] = useState<{[key: number]: boolean}>({});
+  
+  // State for Uncategorised Log tab
+  const [uncategorisedTransactions, setUncategorisedTransactions] = useState<any[]>([]);
+  const [uncategorisedLoading, setUncategorisedLoading] = useState(false);
+  const [uncategorisedReviewed, setUncategorisedReviewed] = useState<{[key: number]: boolean}>({});
   
   // State for Customer Data tab
   const [customerData, setCustomerData] = useState<any[]>([]);
@@ -125,6 +131,12 @@ export default function AdminDashboard() {
   const [dataMigrationLoading, setDataMigrationLoading] = useState(false);
   const [dataMigrationDropping, setDataMigrationDropping] = useState(false);
   const [dataMigrationDropConfirm, setDataMigrationDropConfirm] = useState('');
+  
+  // State for Table Consolidation Migration
+  const [tableConsolidationTest, setTableConsolidationTest] = useState<any>(null);
+  const [tableConsolidationTestLoading, setTableConsolidationTestLoading] = useState(false);
+  const [tableConsolidationMigration, setTableConsolidationMigration] = useState<any>(null);
+  const [tableConsolidationMigrationLoading, setTableConsolidationMigrationLoading] = useState(false);
   
   // State for Functionality Tests
   const [functionalityTests, setFunctionalityTests] = useState<any>(null);
@@ -579,24 +591,66 @@ export default function AdminDashboard() {
   // Fetch recategorizations when Recategorization Log tab is active
   useEffect(() => {
     if (activeTab === 'categories' && viewType === 'recategorization' && authenticated) {
-      const fetchRecategorizations = async () => {
-        setRecatLoading(true);
-        try {
-          const token = localStorage.getItem('admin_token');
-          const response = await fetch('/api/admin/recategorizations', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const data = await response.json();
-          setRecategorizations(data.recategorizations || []);
-        } catch (error) {
-          console.error('Error fetching recategorizations:', error);
-        } finally {
-          setRecatLoading(false);
-        }
-      };
-      fetchRecategorizations();
+      if (categorizationSubTab === 'recategorization') {
+        const fetchRecategorizations = async () => {
+          setRecatLoading(true);
+          try {
+            const token = localStorage.getItem('admin_token');
+            const response = await fetch('/api/admin/recategorizations', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            // Sort: unreviewed first, then by date (newest first)
+            const sorted = (data.recategorizations || []).sort((a: any, b: any) => {
+              const aReviewed = a.reviewed || false;
+              const bReviewed = b.reviewed || false;
+              if (aReviewed !== bReviewed) {
+                return aReviewed ? 1 : -1; // Unreviewed first
+              }
+              const aDate = a.last_used || a.created_at;
+              const bDate = b.last_used || b.created_at;
+              return new Date(bDate).getTime() - new Date(aDate).getTime(); // Newest first
+            });
+            setRecategorizations(sorted);
+            // Initialize reviewed state
+            const reviewedState: {[key: number]: boolean} = {};
+            sorted.forEach((item: any) => {
+              reviewedState[item.id] = item.reviewed || false;
+            });
+            setReviewed(reviewedState);
+          } catch (error) {
+            console.error('Error fetching recategorizations:', error);
+          } finally {
+            setRecatLoading(false);
+          }
+        };
+        fetchRecategorizations();
+      } else if (categorizationSubTab === 'uncategorised') {
+        const fetchUncategorised = async () => {
+          setUncategorisedLoading(true);
+          try {
+            const token = localStorage.getItem('admin_token');
+            const response = await fetch('/api/admin/uncategorised-transactions', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            setUncategorisedTransactions(data.transactions || []);
+            // Initialize reviewed state
+            const reviewedState: {[key: number]: boolean} = {};
+            (data.transactions || []).forEach((item: any) => {
+              reviewedState[item.id] = item.reviewed || false;
+            });
+            setUncategorisedReviewed(reviewedState);
+          } catch (error) {
+            console.error('Error fetching uncategorised transactions:', error);
+          } finally {
+            setUncategorisedLoading(false);
+          }
+        };
+        fetchUncategorised();
+      }
     }
-  }, [activeTab, viewType, authenticated]);
+  }, [activeTab, viewType, categorizationSubTab, authenticated]);
 
   // Fetch events data when Events Data tab is active
   useEffect(() => {
@@ -848,10 +902,38 @@ export default function AdminDashboard() {
             🔄 Recategorization log
           </button>
         </div>
+        
+        {/* Sub-tabs for Recategorization/Uncategorised */}
+        {viewType === 'recategorization' && (
+          <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit mb-4">
+            <button
+              onClick={() => setCategorizationSubTab('recategorization')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                categorizationSubTab === 'recategorization'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Recategorization log
+            </button>
+            <button
+              onClick={() => setCategorizationSubTab('uncategorised')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                categorizationSubTab === 'uncategorised'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Uncategorised log
+            </button>
+          </div>
+        )}
 
-        {/* Conditional Content: Recategorization Log or Patterns Table */}
+        {/* Conditional Content: Recategorization Log, Uncategorised Log, or Patterns Table */}
         {viewType === 'recategorization' ? (
-          renderRecategorizationLog()
+          categorizationSubTab === 'recategorization' 
+            ? renderRecategorizationLog()
+            : renderUncategorisedLog()
         ) : (
           renderKeywordsMerchantsContent()
         )}
@@ -984,9 +1066,60 @@ export default function AdminDashboard() {
 
   // Render Recategorization Log
   const renderRecategorizationLog = () => {
-    const handleReviewToggle = (id: number) => {
-      setReviewed(prev => ({ ...prev, [id]: !prev[id] }));
+    const handleReviewToggle = async (id: number) => {
+      const newReviewed = !reviewed[id];
+      setReviewed(prev => ({ ...prev, [id]: newReviewed }));
+      
+      try {
+        const token = localStorage.getItem('admin_token');
+        await fetch('/api/admin/recategorizations', {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ id, reviewed: newReviewed }),
+        });
+        
+        // Re-fetch to get updated order
+        const response = await fetch('/api/admin/recategorizations', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        const sorted = (data.recategorizations || []).sort((a: any, b: any) => {
+          const aReviewed = a.reviewed || false;
+          const bReviewed = b.reviewed || false;
+          if (aReviewed !== bReviewed) {
+            return aReviewed ? 1 : -1; // Unreviewed first
+          }
+          const aDate = a.last_used || a.created_at;
+          const bDate = b.last_used || b.created_at;
+          return new Date(bDate).getTime() - new Date(aDate).getTime(); // Newest first
+        });
+        setRecategorizations(sorted);
+        const reviewedState: {[key: number]: boolean} = {};
+        sorted.forEach((item: any) => {
+          reviewedState[item.id] = item.reviewed || false;
+        });
+        setReviewed(reviewedState);
+      } catch (error) {
+        console.error('Error updating reviewed status:', error);
+        // Revert on error
+        setReviewed(prev => ({ ...prev, [id]: !newReviewed }));
+      }
     };
+
+    // Sort: unreviewed first, then by date (newest first)
+    const sortedRecategorizations = [...recategorizations].sort((a, b) => {
+      const aReviewed = reviewed[a.id] || false;
+      const bReviewed = reviewed[b.id] || false;
+      if (aReviewed !== bReviewed) {
+        return aReviewed ? 1 : -1; // Unreviewed first
+      }
+      const aDate = a.last_used || a.created_at;
+      const bDate = b.last_used || b.created_at;
+      return new Date(bDate).getTime() - new Date(aDate).getTime(); // Newest first
+    });
 
     return recatLoading ? (
       <div className="text-center py-12">
@@ -998,7 +1131,7 @@ export default function AdminDashboard() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Email</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Previous Category</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Category</th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Frequency</th>
@@ -1007,10 +1140,10 @@ export default function AdminDashboard() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {recategorizations.map((item) => (
-              <tr key={item.id} className="hover:bg-gray-50">
+            {sortedRecategorizations.map((item) => (
+              <tr key={item.id} className={`hover:bg-gray-50 ${(reviewed[item.id] || false) ? 'bg-gray-50' : 'bg-white'}`}>
                 <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.description_pattern}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{item.user_email}</td>
+                <td className="px-6 py-4 text-sm text-gray-600">{item.user_id}</td>
                 <td className="px-6 py-4 text-sm">
                   {item.original_category ? (
                     <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-medium">{item.original_category}</span>
@@ -1021,9 +1154,9 @@ export default function AdminDashboard() {
                 <td className="px-6 py-4 text-sm">
                   <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">{item.corrected_category}</span>
                 </td>
-                <td className="px-6 py-4 text-center text-sm text-gray-600">{item.frequency}</td>
+                <td className="px-6 py-4 text-center text-sm text-gray-600">{item.frequency || '-'}</td>
                 <td className="px-6 py-4 text-sm text-gray-500">
-                  {item.last_used ? new Date(item.last_used).toLocaleDateString() : '-'}
+                  {item.last_used ? new Date(item.last_used).toLocaleDateString() : (item.created_at ? new Date(item.created_at).toLocaleDateString() : '-')}
                 </td>
                 <td className="px-6 py-4 text-center">
                   <input
@@ -1040,6 +1173,99 @@ export default function AdminDashboard() {
         {recategorizations.length === 0 && (
           <div className="text-center py-12 text-gray-500">
             No recategorizations found
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render Uncategorised Log
+  const renderUncategorisedLog = () => {
+    const handleReviewToggle = async (id: number) => {
+      const newReviewed = !uncategorisedReviewed[id];
+      setUncategorisedReviewed(prev => ({ ...prev, [id]: newReviewed }));
+      
+      try {
+        const token = localStorage.getItem('admin_token');
+        await fetch('/api/admin/uncategorised-transactions', {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ id, reviewed: newReviewed }),
+        });
+        
+        // Re-fetch to get updated order
+        const response = await fetch('/api/admin/uncategorised-transactions', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        setUncategorisedTransactions(data.transactions || []);
+        const reviewedState: {[key: number]: boolean} = {};
+        (data.transactions || []).forEach((item: any) => {
+          reviewedState[item.id] = item.reviewed || false;
+        });
+        setUncategorisedReviewed(reviewedState);
+      } catch (error) {
+        console.error('Error updating reviewed status:', error);
+        // Revert on error
+        setUncategorisedReviewed(prev => ({ ...prev, [id]: !newReviewed }));
+      }
+    };
+
+    // Sort: unreviewed first, then by date (newest first)
+    const sortedTransactions = [...uncategorisedTransactions].sort((a, b) => {
+      const aReviewed = uncategorisedReviewed[a.id] || false;
+      const bReviewed = uncategorisedReviewed[b.id] || false;
+      if (aReviewed !== bReviewed) {
+        return aReviewed ? 1 : -1; // Unreviewed first
+      }
+      return new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime(); // Newest first
+    });
+
+    return uncategorisedLoading ? (
+      <div className="text-center py-12">
+        <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+      </div>
+    ) : (
+      <div className="bg-white rounded-lg shadow overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bank Statement Type</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Upload Date</th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Reviewed</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {sortedTransactions.map((item) => (
+              <tr key={item.id} className={`hover:bg-gray-50 ${(uncategorisedReviewed[item.id] || false) ? 'bg-gray-50' : 'bg-white'}`}>
+                <td className="px-6 py-4 text-sm text-gray-600">{item.user_id}</td>
+                <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.description}</td>
+                <td className="px-6 py-4 text-sm text-gray-600 text-right">${Math.abs(item.amount).toFixed(2)}</td>
+                <td className="px-6 py-4 text-sm text-gray-600">{item.bank_statement_type || '-'}</td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {item.upload_date ? new Date(item.upload_date).toLocaleDateString() : '-'}
+                </td>
+                <td className="px-6 py-4 text-center">
+                  <input
+                    type="checkbox"
+                    checked={uncategorisedReviewed[item.id] || false}
+                    onChange={() => handleReviewToggle(item.id)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {uncategorisedTransactions.length === 0 && (
+          <div className="text-center py-12 text-gray-500">
+            No uncategorised transactions found
           </div>
         )}
       </div>
@@ -2291,6 +2517,293 @@ export default function AdminDashboard() {
             </div>
           )}
         </div>
+
+        {/* Table Consolidation Migration Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Table Consolidation Migration</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Migrate users table to l1_user_permissions and move PII (email, display_name) to l0_pii_users
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  <strong>Note:</strong> Onboarding data stays in onboarding_responses table (no duplication)
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    setTableConsolidationTestLoading(true);
+                    try {
+                      const token = localStorage.getItem('admin_token');
+                      const response = await fetch('/api/admin/migration/test-table-consolidation', {
+                        method: 'POST',
+                        headers: {
+                          'Authorization': `Bearer ${token}`,
+                        },
+                      });
+                      const data = await response.json();
+                      if (response.ok) {
+                        setTableConsolidationTest(data);
+                      } else {
+                        setError(data.error || 'Failed to test table consolidation');
+                      }
+                    } catch (error: any) {
+                      setError('Failed to test table consolidation: ' + error.message);
+                    } finally {
+                      setTableConsolidationTestLoading(false);
+                    }
+                  }}
+                  disabled={tableConsolidationTestLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {tableConsolidationTestLoading ? 'Testing...' : 'Test Migration'}
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!confirm('Are you sure you want to execute the table consolidation migration? This will modify your database structure.')) {
+                      return;
+                    }
+                    setTableConsolidationMigrationLoading(true);
+                    try {
+                      const token = localStorage.getItem('admin_token');
+                      const response = await fetch('/api/admin/migration/execute-table-consolidation', {
+                        method: 'POST',
+                        headers: {
+                          'Authorization': `Bearer ${token}`,
+                        },
+                      });
+                      const data = await response.json();
+                      if (response.ok) {
+                        setTableConsolidationMigration(data);
+                        alert(`Migration completed! ${data.summary?.usersMigrated || 0} users migrated, ${data.summary?.piiRecordsUpdated || 0} PII records updated, ${data.summary?.foreignKeysUpdated || 0} foreign keys updated.`);
+                      } else {
+                        setError(data.error || 'Failed to execute table consolidation migration');
+                      }
+                    } catch (error: any) {
+                      setError('Failed to execute table consolidation migration: ' + error.message);
+                    } finally {
+                      setTableConsolidationMigrationLoading(false);
+                    }
+                  }}
+                  disabled={tableConsolidationMigrationLoading || !tableConsolidationTest?.passed}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {tableConsolidationMigrationLoading ? 'Migrating...' : 'Execute Migration'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Test Results */}
+          {tableConsolidationTest && (
+            <div className="p-6 space-y-6">
+              <div className={`p-4 rounded-lg border-2 ${
+                tableConsolidationTest.passed ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-gray-900">Test Results</h4>
+                  <div className="flex gap-4 text-sm">
+                    {tableConsolidationTest.passed ? (
+                      <span className="text-green-700 font-medium">✅ All Tests Passed</span>
+                    ) : (
+                      <span className="text-red-700 font-medium">❌ Tests Failed</span>
+                    )}
+                  </div>
+                </div>
+                {tableConsolidationTest.summary && (
+                  <div className="mt-4 grid grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">Users:</span>
+                      <span className="ml-2 font-semibold">{tableConsolidationTest.summary.usersRowCount || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">PII Records:</span>
+                      <span className="ml-2 font-semibold">{tableConsolidationTest.summary.l0PiiUsersRowCount || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Onboarding Records:</span>
+                      <span className="ml-2 font-semibold">{tableConsolidationTest.summary.onboardingResponsesRowCount || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Foreign Keys:</span>
+                      <span className="ml-2 font-semibold">{tableConsolidationTest.summary.foreignKeyDependencies?.length || 0}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {tableConsolidationTest.tests && tableConsolidationTest.tests.length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Test</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {tableConsolidationTest.tests.map((test: any, index: number) => (
+                          <tr key={index} className={test.status === 'fail' ? 'bg-red-50' : test.status === 'warning' ? 'bg-yellow-50' : ''}>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{test.name}</td>
+                            <td className="px-6 py-4 text-sm">
+                              {test.status === 'pass' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  ✅ Pass
+                                </span>
+                              )}
+                              {test.status === 'fail' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  ❌ Fail
+                                </span>
+                              )}
+                              {test.status === 'warning' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                  ⚠️ Warning
+                                </span>
+                              )}
+                              {test.status === 'error' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  ❌ Error
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{test.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {tableConsolidationTest.warnings && tableConsolidationTest.warnings.length > 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <h5 className="font-semibold text-yellow-900 mb-2">Warnings:</h5>
+                  <ul className="list-disc list-inside text-sm text-yellow-800">
+                    {tableConsolidationTest.warnings.map((warning: string, idx: number) => (
+                      <li key={idx}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {tableConsolidationTest.errors && tableConsolidationTest.errors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h5 className="font-semibold text-red-900 mb-2">Errors:</h5>
+                  <ul className="list-disc list-inside text-sm text-red-800">
+                    {tableConsolidationTest.errors.map((error: string, idx: number) => (
+                      <li key={idx}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Migration Results */}
+          {tableConsolidationMigration && (
+            <div className="p-6 space-y-6">
+              <div className={`p-4 rounded-lg border-2 ${
+                tableConsolidationMigration.success ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-gray-900">Migration Results</h4>
+                  {tableConsolidationMigration.success ? (
+                    <span className="text-green-700 font-medium">✅ Migration Successful</span>
+                  ) : (
+                    <span className="text-red-700 font-medium">❌ Migration Failed</span>
+                  )}
+                </div>
+                {tableConsolidationMigration.summary && (
+                  <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">Users Migrated:</span>
+                      <span className="ml-2 font-semibold">{tableConsolidationMigration.summary.usersMigrated || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">PII Records Updated:</span>
+                      <span className="ml-2 font-semibold">{tableConsolidationMigration.summary.piiRecordsUpdated || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Foreign Keys Updated:</span>
+                      <span className="ml-2 font-semibold">{tableConsolidationMigration.summary.foreignKeysUpdated || 0}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {tableConsolidationMigration.steps && tableConsolidationMigration.steps.length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Step</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {tableConsolidationMigration.steps.map((step: any, index: number) => (
+                          <tr key={index} className={step.status === 'error' ? 'bg-red-50' : step.status === 'success' ? 'bg-green-50' : ''}>
+                            <td className="px-6 py-4 text-sm text-gray-600">{step.step}</td>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{step.name}</td>
+                            <td className="px-6 py-4 text-sm">
+                              {step.status === 'success' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  ✅ Success
+                                </span>
+                              )}
+                              {step.status === 'error' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  ❌ Error
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{step.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {tableConsolidationMigration.warnings && tableConsolidationMigration.warnings.length > 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <h5 className="font-semibold text-yellow-900 mb-2">Warnings:</h5>
+                  <ul className="list-disc list-inside text-sm text-yellow-800">
+                    {tableConsolidationMigration.warnings.map((warning: string, idx: number) => (
+                      <li key={idx}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {tableConsolidationMigration.errors && tableConsolidationMigration.errors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h5 className="font-semibold text-red-900 mb-2">Errors:</h5>
+                  <ul className="list-disc list-inside text-sm text-red-800">
+                    {tableConsolidationMigration.errors.map((error: string, idx: number) => (
+                      <li key={idx}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!tableConsolidationTest && !tableConsolidationTestLoading && (
+            <div className="p-6 text-center text-gray-500">
+              <p>Click "Test Migration" to check if the migration can be executed safely</p>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -2426,9 +2939,39 @@ export default function AdminDashboard() {
                 <button
                   onClick={fetchCohortAnalysis}
                   disabled={cohortLoading}
-                  className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
                 >
                   {cohortLoading ? 'Loading...' : 'Refresh Data'}
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('admin_token');
+                      const response = await fetch('/api/admin/export/cohort-vanity', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      });
+                      if (!response.ok) {
+                        const error = await response.json();
+                        alert(`Failed to export data: ${error.error || 'Unknown error'}`);
+                        return;
+                      }
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `cohort-vanity-metrics-${new Date().toISOString().split('T')[0]}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      document.body.removeChild(a);
+                    } catch (error: any) {
+                      console.error('Error exporting data:', error);
+                      alert(`Error exporting data: ${error.message || 'Unknown error'}`);
+                    }
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                >
+                  ⬇️ Download Cohort Data
                 </button>
               </div>
             </div>
@@ -2902,10 +3445,7 @@ export default function AdminDashboard() {
                     </LineChart>
                   </ResponsiveContainer>
                   <div className="mt-4 text-sm text-gray-600">
-                    <p className="font-medium mb-2">Chart showing: {chartMetric === 'loginDays' ? 'Unique Days Logged In' : 'Number of Uploads Per Week'}</p>
-                    <p className="text-xs text-gray-500">
-                      Unique events per week from first day of sign up
-                    </p>
+                    <p className="font-medium mb-2">Unique events per week from first day of sign up</p>
                   </div>
                 </div>
               ) : (
@@ -3258,9 +3798,39 @@ export default function AdminDashboard() {
                   <button
                     onClick={fetchVanityMetrics}
                     disabled={vanityLoading}
-                    className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
                   >
                     {vanityLoading ? 'Loading...' : 'Refresh'}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const token = localStorage.getItem('admin_token');
+                        const response = await fetch('/api/admin/export/cohort-vanity', {
+                          headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (!response.ok) {
+                          const error = await response.json();
+                          alert(`Failed to export data: ${error.error || 'Unknown error'}`);
+                          return;
+                        }
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `cohort-vanity-metrics-${new Date().toISOString().split('T')[0]}.xlsx`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                      } catch (error: any) {
+                        console.error('Error exporting data:', error);
+                        alert(`Error exporting data: ${error.message || 'Unknown error'}`);
+                      }
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                  >
+                    ⬇️ Download Vanity Metrics Data
                   </button>
                 </div>
               </div>

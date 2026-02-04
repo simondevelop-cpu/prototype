@@ -129,7 +129,7 @@ export async function logFeedbackEvent(
     const sessionId = await getOrCreateSessionId(pool, numericUserId);
     
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+      `INSERT INTO l1_event_facts (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
       [numericUserId, tokenizedUserId, 'feedback', JSON.stringify(feedbackData), sessionId]
     );
@@ -241,7 +241,7 @@ export async function logTransactionEditEvent(
     const sessionId = await getOrCreateSessionId(pool, userIdNum);
     
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+      `INSERT INTO l1_event_facts (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
       [userIdNum, tokenizedUserId, 'transaction_edit', JSON.stringify({
         transactionId,
@@ -297,7 +297,7 @@ export async function logBulkEditEvent(
     const sessionId = await getOrCreateSessionId(pool, userIdNum);
     
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+      `INSERT INTO l1_event_facts (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
       [userIdNum, tokenizedUserId, 'bulk_edit', JSON.stringify({
         transactionIds,
@@ -348,7 +348,7 @@ export async function logUserLoginEvent(userId: string | number): Promise<void> 
     const sessionId = await getOrCreateSessionId(pool, numericUserId);
     
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+      `INSERT INTO l1_event_facts (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
       [numericUserId, tokenizedUserId, 'login', JSON.stringify({
         timestamp: new Date().toISOString(),

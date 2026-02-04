@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Build query based on available columns
-    const selectFields = ['cl.id', 'cl.description_pattern', 'u.email as user_email'];
+    const selectFields = ['cl.id', 'cl.description_pattern', 'cl.user_id'];
     
     // Handle both old and new schema for category/label
     if (columns.includes('original_category')) {
@@ -106,12 +106,17 @@ export async function GET(request: NextRequest) {
     if (columns.includes('frequency')) selectFields.push('cl.frequency');
     if (columns.includes('last_used')) selectFields.push('cl.last_used');
     if (columns.includes('created_at')) selectFields.push('cl.created_at');
+    if (columns.includes('reviewed')) selectFields.push('cl.reviewed');
+    
+    // Order by reviewed status (unreviewed first), then by date (newest first)
+    const orderByClause = columns.includes('reviewed')
+      ? `ORDER BY cl.reviewed ASC NULLS FIRST, ${columns.includes('last_used') ? 'cl.last_used' : 'cl.created_at'} DESC`
+      : `ORDER BY ${columns.includes('last_used') ? 'cl.last_used' : 'cl.created_at'} DESC`;
     
     const result = await pool.query(`
       SELECT ${selectFields.join(', ')}
       FROM ${learningTable} cl
-      JOIN users u ON cl.user_id = u.id
-      ORDER BY ${columns.includes('last_used') ? 'cl.last_used' : 'cl.created_at'} DESC
+      ${orderByClause}
     `);
 
     return NextResponse.json({
@@ -156,8 +161,47 @@ export async function PUT(request: NextRequest) {
 
     const { id, reviewed } = await request.json();
 
-    // For now, we'll just return success
-    // In the future, you could add a 'reviewed' column to categorization_learning table
+    // Determine which table to use
+    let learningTable = 'l2_user_categorization_learning';
+    try {
+      const newTableCheck = await pool.query(`
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'l2_user_categorization_learning' LIMIT 1
+      `);
+      if (newTableCheck.rows.length === 0) {
+        const adminTableCheck = await pool.query(`
+          SELECT 1 FROM information_schema.tables WHERE table_name = 'admin_categorization_learning' LIMIT 1
+        `);
+        if (adminTableCheck.rows.length > 0) {
+          learningTable = 'admin_categorization_learning';
+        } else {
+          learningTable = 'categorization_learning';
+        }
+      }
+    } catch (e) {
+      // Table check failed
+    }
+
+    // Check if reviewed column exists
+    const columnCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = $1 AND column_name = 'reviewed'
+    `, [learningTable]);
+    
+    if (columnCheck.rows.length === 0) {
+      // Add reviewed column if it doesn't exist
+      await pool.query(`
+        ALTER TABLE ${learningTable} 
+        ADD COLUMN IF NOT EXISTS reviewed BOOLEAN DEFAULT FALSE
+      `);
+    }
+
+    // Update reviewed status
+    await pool.query(`
+      UPDATE ${learningTable}
+      SET reviewed = $1
+      WHERE id = $2
+    `, [reviewed, id]);
     
     return NextResponse.json({ success: true, id, reviewed });
   } catch (error: any) {
