@@ -93,17 +93,21 @@ export async function GET(request: NextRequest) {
 
     // Note: totalAccounts = true means show all accounts (no filter)
     if (filters.validatedEmails && hasEmailValidated) {
-      filterConditions += ` AND u.email_validated = true`;
+      filterConditions += ` AND perm.email_validated = true`;
     }
 
     if (filters.userIds && filters.userIds.length > 0) {
-      filterConditions += ` AND u.id = ANY($${paramIndex})`;
+      filterConditions += ` AND perm.id = ANY($${paramIndex})`;
       filterParams.push(filters.userIds);
       paramIndex++;
     }
 
-    if (filters.intentCategories && filters.intentCategories.length > 0 && hasMotivation) {
-      filterConditions += ` AND u.motivation = ANY($${paramIndex}::text[])`;
+    if (filters.intentCategories && filters.intentCategories.length > 0) {
+      filterConditions += ` AND EXISTS (
+        SELECT 1 FROM onboarding_responses o 
+        WHERE o.user_id = perm.id 
+        AND o.motivation = ANY($${paramIndex}::text[])
+      )`;
       filterParams.push(filters.intentCategories);
       paramIndex++;
     }
@@ -135,7 +139,7 @@ export async function GET(request: NextRequest) {
           const weekEnd = new Date(weekStart);
           weekEnd.setDate(weekStart.getDate() + 6);
           weekEnd.setHours(23, 59, 59, 999);
-          return `(u.created_at >= $${paramIndex + idx * 2} AND u.created_at <= $${paramIndex + idx * 2 + 1})`;
+          return `(perm.created_at >= $${paramIndex + idx * 2} AND perm.created_at <= $${paramIndex + idx * 2 + 1})`;
         }).join(' OR ');
         filterConditions += ` AND (${dateConditions})`;
         cohortDates.forEach(date => {
@@ -158,35 +162,27 @@ export async function GET(request: NextRequest) {
     // Note: upload_session_id not in l1_transaction_facts, use statement_upload events from l1_events instead
     const uploadCountSubquery = `
       SELECT COUNT(DISTINCT tf.id)
-      FROM users u2
-      LEFT JOIN l0_user_tokenization ut ON u2.id = ut.internal_user_id
+      FROM l1_user_permissions perm2
+      LEFT JOIN l0_user_tokenization ut ON perm2.id = ut.internal_user_id
       LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-      WHERE u2.id = u.id
+      WHERE perm2.id = perm.id
         AND tf.id IS NOT NULL
     `;
     
-    const usersQuery = useUsersTable ? `
+    const usersQuery = `
       SELECT 
-        u.id,
-        u.created_at as signup_date,
-        u.motivation as intent_type,
+        perm.id,
+        perm.created_at as signup_date,
+        o.motivation as intent_type,
         (
           ${uploadCountSubquery}
         ) as upload_count
-      FROM users u
-      WHERE u.email != $${paramIndex}
+      FROM l1_user_permissions perm
+      JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+      LEFT JOIN onboarding_responses o ON perm.id = o.user_id
+      WHERE pii.email != $${paramIndex}
         ${filterConditions}
-      ORDER BY u.created_at DESC
-    ` : `
-      SELECT 
-        u.id,
-        u.created_at as signup_date,
-        NULL as intent_type,
-        0 as upload_count
-      FROM users u
-      WHERE u.email != $${paramIndex}
-        ${filterConditions}
-      ORDER BY u.created_at DESC
+      ORDER BY perm.created_at DESC
     `;
 
     const usersResult = await pool.query(usersQuery, filterParams);

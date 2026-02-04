@@ -74,9 +74,10 @@ export async function GET(request: NextRequest) {
       SELECT 
         ${eventFields}
       FROM ${eventsTable} e
-      LEFT JOIN users u ON e.user_id = u.id
-      LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
-      WHERE (u.email != $1 OR u.email IS NULL)
+      LEFT JOIN l1_user_permissions perm ON e.user_id = perm.id
+      LEFT JOIN l0_pii_users p ON perm.id = p.internal_user_id AND p.deleted_at IS NULL
+      LEFT JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+      WHERE (pii.email != $1 OR pii.email IS NULL)
       ORDER BY e.event_timestamp DESC
       LIMIT 1000
     `, [ADMIN_EMAIL]);

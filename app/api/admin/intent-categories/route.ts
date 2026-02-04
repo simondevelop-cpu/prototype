@@ -33,12 +33,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Pull intent categories from users.motivation (single source of truth)
-    // Check if users table has motivation column
+    // Pull intent categories from onboarding_responses.motivation (single source of truth)
+    // Check if onboarding_responses table exists and has motivation column
     const schemaCheck = await pool.query(`
       SELECT column_name 
       FROM information_schema.columns 
-      WHERE table_name = 'users' 
+      WHERE table_name = 'onboarding_responses' 
       AND column_name = 'motivation'
       LIMIT 1
     `);
@@ -46,14 +46,16 @@ export async function GET(request: NextRequest) {
     const hasMotivation = schemaCheck.rows.length > 0;
     
     if (hasMotivation) {
-      // Pull unique motivation values from users table (single source of truth)
+      // Pull unique motivation values from onboarding_responses table (single source of truth)
       const result = await pool.query(`
-        SELECT DISTINCT motivation
-        FROM users
-        WHERE motivation IS NOT NULL
-          AND motivation != ''
-          AND email != $1
-        ORDER BY motivation
+        SELECT DISTINCT o.motivation
+        FROM onboarding_responses o
+        JOIN l1_user_permissions perm ON o.user_id = perm.id
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE o.motivation IS NOT NULL
+          AND o.motivation != ''
+          AND pii.email != $1
+        ORDER BY o.motivation
       `, [ADMIN_EMAIL]);
       
       const categories = result.rows.map((row: any) => row.motivation).filter(Boolean);

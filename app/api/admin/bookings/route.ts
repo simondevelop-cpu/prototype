@@ -50,8 +50,8 @@ export async function GET(request: NextRequest) {
         `SELECT 
           cb.id,
           cb.user_id,
-          u.email as user_email,
-          u.display_name,
+          pii.email as user_email,
+          pii.display_name,
           cb.booking_date,
           cb.booking_time,
           cb.preferred_method,
@@ -61,7 +61,8 @@ export async function GET(request: NextRequest) {
           cb.status,
           cb.created_at
          FROM ${tableName} cb
-         JOIN users u ON cb.user_id = u.id
+         JOIN l1_user_permissions perm ON cb.user_id = perm.id
+         JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
          ORDER BY cb.booking_date DESC, cb.booking_time DESC
          LIMIT 500`
       );

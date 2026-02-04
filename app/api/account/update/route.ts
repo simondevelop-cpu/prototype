@@ -64,10 +64,12 @@ export async function PUT(request: NextRequest) {
 
     if (email !== undefined) {
       // Check if email is already taken by another user
-      const emailCheck = await pool.query(
-        'SELECT id FROM users WHERE email = $1 AND id != $2',
-        [email.toLowerCase(), userId]
-      );
+      const emailCheck = await pool.query(`
+        SELECT perm.id 
+        FROM l1_user_permissions perm
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email = $1 AND perm.id != $2
+      `, [email.toLowerCase(), userId]);
       
       if (emailCheck.rows.length > 0) {
         return NextResponse.json(
@@ -76,28 +78,35 @@ export async function PUT(request: NextRequest) {
         );
       }
 
-      updates.push(`email = $${paramCount++}`);
-      values.push(email.toLowerCase());
+      // Update email in l0_pii_users
+      await pool.query(
+        'UPDATE l0_pii_users SET email = $1 WHERE internal_user_id = $2',
+        [email.toLowerCase(), userId]
+      );
     }
 
-    if (updates.length === 0) {
+    if (displayName !== undefined) {
+      // Update display_name in l0_pii_users
+      await pool.query(
+        'UPDATE l0_pii_users SET display_name = $1 WHERE internal_user_id = $2',
+        [displayName, userId]
+      );
+    }
+
+    if (email === undefined && displayName === undefined) {
       return NextResponse.json(
         { error: 'No fields to update' },
         { status: 400 }
       );
     }
 
-    // Add userId to values
-    values.push(userId);
-
-    // Update user
-    const result = await pool.query(
-      `UPDATE users 
-       SET ${updates.join(', ')}, updated_at = NOW()
-       WHERE id = $${paramCount}
-       RETURNING id, email, display_name`,
-      values
-    );
+    // Fetch updated user data
+    const result = await pool.query(`
+      SELECT perm.id, pii.email, pii.display_name
+      FROM l1_user_permissions perm
+      JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+      WHERE perm.id = $1
+    `, [userId]);
 
     if (result.rows.length === 0) {
       return NextResponse.json(
