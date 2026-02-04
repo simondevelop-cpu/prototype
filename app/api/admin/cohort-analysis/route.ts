@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
         activation: {},
         engagement: {},
         weeks: [],
-        message: 'No onboarding data found. Please ensure migration has been run or onboarding_responses table exists.'
+        message: 'No onboarding data found. Please ensure migration has been run and l1_onboarding_responses table exists.'
       }, { status: 200 });
     }
 
@@ -191,7 +191,7 @@ export async function GET(request: NextRequest) {
         0 as count_drop_off_step_6,
         0 as count_drop_off_step_7,
         COUNT(*) FILTER (WHERE EXISTS (
-          SELECT 1 FROM onboarding_responses o 
+          SELECT 1 FROM l1_onboarding_responses o 
           WHERE o.user_id = u.id AND o.completed_at IS NOT NULL
         )) as count_completed_onboarding,
         NULL as avg_time_to_onboard_days
@@ -273,18 +273,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get engagement metrics
-    // Check if l1_events table exists
-    let hasUserEvents = false;
-    try {
-      const eventsCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'l1_events'
-        LIMIT 1
-      `);
-      hasUserEvents = eventsCheck.rows.length > 0;
-    } catch (e) {
-      // Table doesn't exist
-    }
+    // Using l1_event_facts as the single source of truth
 
     // Check if transactions table has upload_session_id
     let hasUploadSession = false;
@@ -302,7 +291,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Enhanced Engagement query - Single source of truth (l1_transaction_facts only)
-    // Build upload_counts subquery - use statement_upload events from l1_events (upload_session_id not in l1_transaction_facts)
+    // Build upload_counts subquery - use statement_upload events from l1_event_facts (upload_session_id not in l1_transaction_facts)
     const uploadCountsSubquery = `
       SELECT 
         ut.internal_user_id as user_id,
