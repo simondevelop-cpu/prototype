@@ -136,6 +136,10 @@ export default function AdminDashboard() {
   const [dataMigrationDropping, setDataMigrationDropping] = useState(false);
   const [dataMigrationDropConfirm, setDataMigrationDropConfirm] = useState('');
   
+  // State for Functionality Tests
+  const [functionalityTests, setFunctionalityTests] = useState<any>(null);
+  const [functionalityTestsLoading, setFunctionalityTestsLoading] = useState(false);
+  
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
   const [bookings, setBookings] = useState<any[]>([]);
