@@ -1927,7 +1927,7 @@ export default function AdminDashboard() {
     return (
       <div className="space-y-6">
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Migration Cleanup</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Migration Cleanup & Verification</h2>
           <p className="text-gray-600 mb-6">
             Verify data migration and clean up old table names that have been migrated to new names.
           </p>
