@@ -283,7 +283,7 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
       
-    console.log(`[Customer Data API] Query returned ${result.rows.length} customer records from users table`);
+    console.log(`[Customer Data API] Query returned ${result.rows.length} customer records`);
     if (result.rows.length > 0) {
       console.log('[Customer Data API] Sample record:', {
         user_id: result.rows[0].user_id,
@@ -293,7 +293,6 @@ export async function GET(request: NextRequest) {
         has_completed_at: !!result.rows[0].completed_at
       });
     }
-    } else {
       // Use l1_onboarding_responses or onboarding_responses table (pre-migration or data not migrated yet)
       // onboardingTableForQuery is set above in the try block
       const onboardingTable = onboardingTableForQuery;
@@ -400,17 +399,14 @@ export async function GET(request: NextRequest) {
         ORDER BY o.completed_at DESC NULLS LAST, perm.created_at DESC
       `, [ADMIN_EMAIL]);
       
-      console.log(`[Customer Data API] Returning ${result.rows.length} customer records from onboarding_responses table`);
-    }
-
     console.log(`[Customer Data API] Returning ${result.rows.length} customer records`);
     
     return NextResponse.json({ 
       success: true,
       customerData: result.rows,
-      source: useUsersTable ? 'users' : 'onboarding_responses',
+      source: onboardingTableForQuery || 'onboarding_responses',
       count: result.rows.length,
-      migrationComplete: useUsersTable
+      migrationComplete: true
     }, { status: 200 });
 
   } catch (error: any) {
