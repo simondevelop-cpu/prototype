@@ -82,17 +82,27 @@ export async function GET(request: NextRequest) {
       
       // Check where data actually exists
       if (hasCompletedAt) {
-        const usersDataCheck = await pool.query(`
-          SELECT COUNT(*) as count
-          FROM onboarding_responses o
-          JOIN l1_user_permissions perm ON o.user_id = perm.id
-          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
-          WHERE (o.completed_at IS NOT NULL 
-            OR o.motivation IS NOT NULL 
-            OR o.emotional_state IS NOT NULL)
-          AND pii.email != $1
-        `, [ADMIN_EMAIL]);
-        const usersWithData = parseInt(usersDataCheck.rows[0]?.count || '0', 10);
+        // Check if onboarding_responses table exists first
+        const onboardingTableExists = await pool.query(`
+          SELECT 1 FROM information_schema.tables 
+          WHERE table_name = 'onboarding_responses' 
+          LIMIT 1
+        `);
+        
+        let usersWithData = 0;
+        if (onboardingTableExists.rows.length > 0) {
+          const usersDataCheck = await pool.query(`
+            SELECT COUNT(*) as count
+            FROM onboarding_responses o
+            JOIN l1_user_permissions perm ON o.user_id = perm.id
+            JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+            WHERE (o.completed_at IS NOT NULL 
+              OR o.motivation IS NOT NULL 
+              OR o.emotional_state IS NOT NULL)
+            AND pii.email != $1
+          `, [ADMIN_EMAIL]);
+          usersWithData = parseInt(usersDataCheck.rows[0]?.count || '0', 10);
+        }
         useUsersTable = usersWithData > 0;
         
         // If users table has columns but no data, check onboarding table

@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
       filterConditions += ` AND perm.email_validated = true`;
     }
 
-    if (filters.intentCategories && filters.intentCategories.length > 0) {
+    if (filters.intentCategories && filters.intentCategories.length > 0 && onboardingResponsesExists) {
       // Intent categories come from onboarding_responses.motivation
       filterConditions += ` AND EXISTS (
         SELECT 1 FROM onboarding_responses o 

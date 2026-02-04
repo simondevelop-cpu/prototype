@@ -242,8 +242,9 @@ export async function GET(request: NextRequest) {
       `);
       const totalUsers = await pool.query(`
         SELECT COUNT(*) as count
-        FROM users
-        WHERE email != $1
+        FROM l1_user_permissions perm
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email != $1
       `, [ADMIN_EMAIL]);
       
       const tokenized = parseInt(tokenizedCount.rows[0]?.count || '0', 10);

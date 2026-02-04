@@ -239,7 +239,7 @@ export async function GET(request: NextRequest) {
         FROM l1_user_permissions perm
         JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
         WHERE pii.email != $${adminEmailParamIndex}
-          AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex}::date)
+          AND DATE_TRUNC('day', perm.created_at) <= DATE_TRUNC('day', $${paramIndex}::date)
           ${filterConditions}
       `;
       const totalUsersResult = await pool.query(totalUsersQuery, [...filterParams, weekEnd.toISOString().split('T')[0]]);
@@ -248,14 +248,15 @@ export async function GET(request: NextRequest) {
       // Apply data coverage filter to total users if specified
       if (filters.dataCoverage && filters.dataCoverage.length > 0 && totalUsers > 0) {
         const usersWithCoverageQuery = `
-          SELECT u.id, COUNT(DISTINCT tf.id) as tx_count
-          FROM users u
-          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          SELECT perm.id, COUNT(DISTINCT tf.id) as tx_count
+          FROM l1_user_permissions perm
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+          LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
           LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-          WHERE u.email != $${adminEmailParamIndex}
-            AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex}::date)
+          WHERE pii.email != $${adminEmailParamIndex}
+            AND DATE_TRUNC('day', perm.created_at) <= DATE_TRUNC('day', $${paramIndex}::date)
             ${filterConditions}
-          GROUP BY u.id
+          GROUP BY perm.id
         `;
         const usersWithCoverage = await pool.query(usersWithCoverageQuery, [...filterParams, weekEnd.toISOString().split('T')[0]]);
         totalUsers = usersWithCoverage.rows.filter((user: any) => {
@@ -298,8 +299,8 @@ export async function GET(request: NextRequest) {
         FROM l1_user_permissions perm
         JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
         WHERE pii.email != $${adminEmailParamIndex}
-          AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
-          AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
+          AND DATE_TRUNC('day', perm.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
+          AND DATE_TRUNC('day', perm.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
           ${filterConditions}
       `;
       const newUsersResult = await pool.query(newUsersQuery, [...filterParams, weekStart.toISOString().split('T')[0], weekEnd.toISOString().split('T')[0]]);
@@ -308,15 +309,16 @@ export async function GET(request: NextRequest) {
       // Apply data coverage filter to new users if specified
       if (filters.dataCoverage && filters.dataCoverage.length > 0 && newUsers > 0) {
         const newUsersWithCoverageQuery = `
-          SELECT u.id, COUNT(DISTINCT tf.id) as tx_count
-          FROM users u
-          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          SELECT perm.id, COUNT(DISTINCT tf.id) as tx_count
+          FROM l1_user_permissions perm
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+          LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
           LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-          WHERE u.email != $${adminEmailParamIndex}
-            AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
-            AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
+          WHERE pii.email != $${adminEmailParamIndex}
+            AND DATE_TRUNC('day', perm.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
+            AND DATE_TRUNC('day', perm.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
             ${filterConditions}
-          GROUP BY u.id
+          GROUP BY perm.id
         `;
         const newUsersWithCoverage = await pool.query(newUsersWithCoverageQuery, [...filterParams, weekStart.toISOString().split('T')[0], weekEnd.toISOString().split('T')[0]]);
         newUsers = newUsersWithCoverage.rows.filter((user: any) => {
@@ -364,13 +366,14 @@ export async function GET(request: NextRequest) {
       if (filters.dataCoverage && filters.dataCoverage.length > 0) {
         // Get users matching data coverage criteria
         const usersWithCoverageQuery = `
-          SELECT DISTINCT u.id
-          FROM users u
-          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          SELECT DISTINCT perm.id
+          FROM l1_user_permissions perm
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+          LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
           LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-          WHERE u.email != $${adminEmailParamIndex}
+          WHERE pii.email != $${adminEmailParamIndex}
             ${filterConditions}
-          GROUP BY u.id
+          GROUP BY perm.id
           HAVING 
             ${filters.dataCoverage.includes('1 upload') ? 'COUNT(DISTINCT tf.id) >= 1' : 'false'}
             ${filters.dataCoverage.includes('2 uploads') ? 'OR COUNT(DISTINCT tf.id) >= 2' : ''}
@@ -402,13 +405,14 @@ export async function GET(request: NextRequest) {
       if (filters.dataCoverage && filters.dataCoverage.length > 0) {
         // Get users matching data coverage criteria
         const usersWithCoverageQuery = `
-          SELECT DISTINCT u.id
-          FROM users u
-          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          SELECT DISTINCT perm.id
+          FROM l1_user_permissions perm
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+          LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
           LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-          WHERE u.email != $${adminEmailParamIndex}
+          WHERE pii.email != $${adminEmailParamIndex}
             ${filterConditions}
-          GROUP BY u.id
+          GROUP BY perm.id
           HAVING 
             ${filters.dataCoverage.includes('1 upload') ? 'COUNT(DISTINCT tf.id) >= 1' : 'false'}
             ${filters.dataCoverage.includes('2 uploads') ? 'OR COUNT(DISTINCT tf.id) >= 2' : ''}
@@ -494,8 +498,8 @@ export async function GET(request: NextRequest) {
         FROM l1_user_permissions perm
         JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
         WHERE pii.email != $${adminEmailParamIndex}
-          AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
-          AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
+          AND DATE_TRUNC('day', perm.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
+          AND DATE_TRUNC('day', perm.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
           ${filterConditions}
       `;
       const newUsersPerMonthResult = await pool.query(newUsersPerMonthQuery, [...filterParams, monthStart.toISOString().split('T')[0], monthEnd.toISOString().split('T')[0]]);
