@@ -285,7 +285,7 @@ export async function GET(request: NextRequest) {
           WHERE e.event_type = 'login'
             AND e.event_timestamp >= $${wauParamIndex}::timestamp
             AND e.event_timestamp <= $${wauParamIndex + 1}::timestamp
-            AND u.email != $${adminEmailParamIndex}
+            AND pii.email != $${adminEmailParamIndex}
             ${filterConditions}
         `;
         const wauResult = await pool.query(wauQuery, [...filterParams, weekStart, weekEnd]);
@@ -477,7 +477,7 @@ export async function GET(request: NextRequest) {
           WHERE e.event_type = 'login'
             AND e.event_timestamp >= $${mauParamIndex}::timestamp
             AND e.event_timestamp <= $${mauParamIndex + 1}::timestamp
-            AND u.email != $${adminEmailParamIndex}
+            AND pii.email != $${adminEmailParamIndex}
             ${filterConditions}
         `;
         const mauResult = await pool.query(mauQuery, [...filterParams, monthStart, monthEnd]);
@@ -521,7 +521,7 @@ export async function GET(request: NextRequest) {
           WHERE e.event_type = 'transaction_edit'
             AND e.event_timestamp >= $${recatParamIndex}::timestamp
             AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
-            AND u.email != $${adminEmailParamIndex}
+            AND pii.email != $${adminEmailParamIndex}
             AND e.metadata->>'transactionId' IS NOT NULL
             ${filterConditions}
         `;
@@ -537,7 +537,7 @@ export async function GET(request: NextRequest) {
           WHERE e.event_type = 'bulk_edit'
             AND e.event_timestamp >= $${recatParamIndex}::timestamp
             AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
-            AND u.email != $${adminEmailParamIndex}
+            AND pii.email != $${adminEmailParamIndex}
             AND e.metadata->'transactionIds' IS NOT NULL
             ${filterConditions}
         `;
@@ -571,7 +571,7 @@ export async function GET(request: NextRequest) {
           WHERE e.event_type = 'statement_upload'
             AND e.event_timestamp >= $${statementsParamIndex}::timestamp
             AND e.event_timestamp <= $${statementsParamIndex + 1}::timestamp
-            AND u.email != $${adminEmailParamIndex}
+            AND pii.email != $${adminEmailParamIndex}
             ${filterConditions}
         `;
         const statementsResult = await pool.query(statementsQuery, [...filterParams, weekStart, weekEnd]);
@@ -592,7 +592,7 @@ export async function GET(request: NextRequest) {
           WHERE e.event_type = 'statement_upload'
             AND e.event_timestamp >= $${uniqueStatementsParamIndex}::timestamp
             AND e.event_timestamp <= $${uniqueStatementsParamIndex + 1}::timestamp
-            AND u.email != $${adminEmailParamIndex}
+            AND pii.email != $${adminEmailParamIndex}
             ${filterConditions}
         `;
         const uniqueStatementsResult = await pool.query(uniqueStatementsQuery, [...filterParams, weekStart, weekEnd]);
