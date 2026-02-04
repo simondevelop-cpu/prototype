@@ -1137,7 +1137,9 @@ export default function AdminDashboard() {
             {sortedRecategorizations.map((item) => (
               <tr key={item.id} className={`hover:bg-gray-50 ${(reviewed[item.id] || false) ? 'bg-gray-50' : 'bg-white'}`}>
                 <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.description_pattern}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{item.user_id}</td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  {item.user_email && item.user_email !== 'N/A' ? `${item.user_id} (${item.user_email})` : item.user_id}
+                </td>
                 <td className="px-6 py-4 text-sm">
                   {item.original_category ? (
                     <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-medium">{item.original_category}</span>
@@ -3090,7 +3092,7 @@ export default function AdminDashboard() {
             {/* Engagement Chart - Number of Days Logged In */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Unique days logged in per week from first day signed up</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Unique events per week from first day of sign up</h3>
                 <p className="text-sm text-gray-600 mt-1">
                   Y-axis: Total unique days logged in per week | X-axis: Week from signup (12 weeks)
                 </p>
