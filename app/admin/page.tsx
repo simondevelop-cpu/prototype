@@ -1928,16 +1928,30 @@ export default function AdminDashboard() {
       <div className="space-y-6">
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Migration Cleanup & Verification</h2>
-          <p className="text-gray-600 mb-6">
-            Verify data migration and clean up old table names that have been migrated to new names.
-          </p>
+          <p className="text-gray-600 mb-6">Migration tab content</p>
+        </div>
+      </div>
+    );
+  };
 
-          {/* Error Display */}
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  // Render Analytics Tab
+  const renderAnalyticsTab = () => {
+    const renderPlaceholder = (title: string) => (
+      <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
+        <div className="text-6xl mb-4">🚧</div>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
+        <p className="text-gray-600">Coming soon...</p>
+      </div>
+    );
+
+    return (
+      <div className="space-y-6">
+        {/* Sub-tabs */}
+        <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit">
+          <button
+            onClick={() => setAnalyticsSubTab('cohort-analysis')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'cohort-analysis'
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <p className="text-red-800 font-medium">Error: {error}</p>
