@@ -1924,8 +1924,6 @@ export default function AdminDashboard() {
   };
 
   const renderMigrationTab = () => {
-    return null;
-    /* TEMPORARILY COMMENTED FOR DEBUGGING
     return (
       <div className="space-y-6">
         <div className="bg-white rounded-lg shadow p-6">
@@ -2155,7 +2153,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Old Tables Cleanup Section */}
-            <div className="mt-8 border-t border-gray-200 pt-8">
+          <div className="mt-8 border-t border-gray-200 pt-8">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Old Tables Cleanup</h3>
@@ -2488,7 +2486,6 @@ export default function AdminDashboard() {
         </div>
       </div>
     );
-    */
   };
 
   // Render Analytics Tab
