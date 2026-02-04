@@ -132,6 +132,7 @@ function getTableDescription(tableName: string): string {
     'l1_admin_available_slots': 'Available chat slots. Admin-marked time slots available for booking.',
     'l1_survey_responses': 'Survey responses. User responses to the "What\'s coming" feature prioritization survey. Free text fields may contain unstructured PII. See Foreign Keys sheet for relationships.',
     'user_feedback': 'User feedback submissions. Stores user feedback and suggestions. Free text fields may contain unstructured PII.',
+    'beta_emails': 'Beta access control table. Pre-approved email addresses allowed to register accounts. Used for beta program access control.',
     'l1_support_tickets': 'Support tickets table. Reserved for future use. See Foreign Keys sheet for relationships.',
     'l0_category_list': 'Category configuration table. Admin-defined transaction categories. See Foreign Keys sheet for relationships.',
     'l0_insight_list': 'Insight configuration table. Admin-defined financial insights.',
@@ -375,7 +376,8 @@ export async function GET(request: NextRequest) {
       'l1_admin_available_slots',
       'l2_user_categorization_learning',
       'l1_admin_chat_bookings',
-      // TBC
+      // Configuration and metadata
+      'beta_emails',
       'l0_category_list',
       'l0_insight_list',
       'l1_support_tickets',

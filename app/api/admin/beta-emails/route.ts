@@ -339,13 +339,17 @@ export async function PUT(request: NextRequest) {
     let added = 0;
     for (const row of existingUsersResult.rows) {
       try {
-        await pool.query(
+        const result = await pool.query(
           `INSERT INTO beta_emails (email, added_by, created_at)
            VALUES ($1, 'system', $2)
-           ON CONFLICT (email) DO NOTHING`,
+           ON CONFLICT (email) DO NOTHING
+           RETURNING email`,
           [row.email.toLowerCase().trim(), row.created_at || new Date()]
         );
-        added++;
+        // Only increment if a row was actually inserted (not a conflict)
+        if (result.rows.length > 0) {
+          added++;
+        }
       } catch (error: any) {
         console.error(`[Beta Emails API] Error adding email ${row.email}:`, error);
         // Continue with other emails
