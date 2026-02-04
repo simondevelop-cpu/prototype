@@ -1923,10 +1923,10 @@ export default function AdminDashboard() {
     );
   };
 
-  // Render Migration Tab
-  const renderMigrationTab = () => {
+  const renderMigrationTab = (): JSX.Element => {
     return (
-      <div className="space-y-6">
+      <>
+        <div className="space-y-6">
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Migration Cleanup & Verification</h2>
           <p className="text-gray-600 mb-6">
@@ -2486,6 +2486,7 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+      </>
     );
   };
 
