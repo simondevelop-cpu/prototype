@@ -228,6 +228,108 @@ export async function GET(request: NextRequest) {
       results.allPassed = false;
     }
 
+    // Test 2.4: PII data migration completeness (if users table still exists)
+    try {
+      const usersTableCheck = await pool.query(`
+        SELECT COUNT(*) as count FROM information_schema.tables 
+        WHERE table_name = 'users'
+      `);
+      const usersTableExists = parseInt(usersTableCheck.rows[0]?.count || '0') > 0;
+      
+      if (usersTableExists) {
+        // Check if users table has email/display_name columns
+        const usersColumns = await pool.query(`
+          SELECT column_name FROM information_schema.columns
+          WHERE table_name = 'users' 
+            AND column_name IN ('email', 'display_name')
+        `);
+        const hasEmailCol = usersColumns.rows.some((r: any) => r.column_name === 'email');
+        const hasDisplayNameCol = usersColumns.rows.some((r: any) => r.column_name === 'display_name');
+        
+        if (hasEmailCol || hasDisplayNameCol) {
+          // Compare data between users and l0_pii_users
+          const emailCheck = hasEmailCol ? await pool.query(`
+            SELECT 
+              COUNT(*) as total,
+              COUNT(CASE WHEN u.email IS NOT NULL AND pii.email IS NOT NULL AND u.email = pii.email THEN 1 END) as matched,
+              COUNT(CASE WHEN u.email IS NOT NULL AND (pii.email IS NULL OR u.email != pii.email) THEN 1 END) as mismatched
+            FROM users u
+            LEFT JOIN l0_pii_users pii ON u.id = pii.internal_user_id
+          `) : null;
+          
+          const displayNameCheck = hasDisplayNameCol ? await pool.query(`
+            SELECT 
+              COUNT(*) as total,
+              COUNT(CASE WHEN u.display_name IS NOT NULL AND pii.display_name IS NOT NULL AND u.display_name = pii.display_name THEN 1 END) as matched,
+              COUNT(CASE WHEN u.display_name IS NOT NULL AND (pii.display_name IS NULL OR u.display_name != pii.display_name) THEN 1 END) as mismatched
+            FROM users u
+            LEFT JOIN l0_pii_users pii ON u.id = pii.internal_user_id
+          `) : null;
+          
+          const emailStatus = emailCheck ? {
+            total: parseInt(emailCheck.rows[0]?.total || '0'),
+            matched: parseInt(emailCheck.rows[0]?.matched || '0'),
+            mismatched: parseInt(emailCheck.rows[0]?.mismatched || '0'),
+          } : null;
+          
+          const displayNameStatus = displayNameCheck ? {
+            total: parseInt(displayNameCheck.rows[0]?.total || '0'),
+            matched: parseInt(displayNameCheck.rows[0]?.matched || '0'),
+            mismatched: parseInt(displayNameCheck.rows[0]?.mismatched || '0'),
+          } : null;
+          
+          const allMatched = (!emailStatus || emailStatus.mismatched === 0) && 
+                            (!displayNameStatus || displayNameStatus.mismatched === 0);
+          
+          let message = '';
+          if (emailStatus) {
+            message += `Email: ${emailStatus.matched}/${emailStatus.total} matched`;
+            if (emailStatus.mismatched > 0) message += `, ${emailStatus.mismatched} mismatched`;
+          }
+          if (displayNameStatus) {
+            if (message) message += '. ';
+            message += `Display name: ${displayNameStatus.matched}/${displayNameStatus.total} matched`;
+            if (displayNameStatus.mismatched > 0) message += `, ${displayNameStatus.mismatched} mismatched`;
+          }
+          
+          results.tests.push({
+            category: 'Data Integrity',
+            name: 'PII data migration completeness (users → l0_pii_users)',
+            status: allMatched ? 'pass' : 'warn',
+            message: allMatched 
+              ? `All PII data migrated: ${message}` 
+              : `PII migration incomplete: ${message}`,
+          });
+          if (allMatched) results.summary.passed++;
+          else { results.summary.warnings++; }
+        } else {
+          results.tests.push({
+            category: 'Data Integrity',
+            name: 'PII data migration completeness',
+            status: 'pass',
+            message: 'Users table no longer has email/display_name columns - migration complete',
+          });
+          results.summary.passed++;
+        }
+      } else {
+        results.tests.push({
+          category: 'Data Integrity',
+          name: 'PII data migration completeness',
+          status: 'pass',
+          message: 'Users table does not exist - migration complete',
+        });
+        results.summary.passed++;
+      }
+    } catch (e: any) {
+      results.tests.push({
+        category: 'Data Integrity',
+        name: 'PII data migration completeness',
+        status: 'warn',
+        message: `Could not verify: ${e.message}`,
+      });
+      results.summary.warnings++;
+    }
+
     // ============================================
     // 3. API FUNCTIONALITY TESTS
     // ============================================
