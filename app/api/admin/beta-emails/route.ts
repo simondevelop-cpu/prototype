@@ -317,14 +317,14 @@ export async function PUT(request: NextRequest) {
     }
 
     // Get all existing user emails that aren't in beta_emails
+    // Use LEFT JOIN instead of NOT IN to avoid issues with NULL values
     const existingUsersResult = await pool.query(`
       SELECT DISTINCT u.email, u.created_at
       FROM users u
+      LEFT JOIN beta_emails be ON LOWER(TRIM(u.email)) = LOWER(TRIM(be.email))
       WHERE u.email IS NOT NULL
         AND u.email != ''
-        AND LOWER(TRIM(u.email)) NOT IN (
-          SELECT LOWER(TRIM(email)) FROM beta_emails WHERE email IS NOT NULL
-        )
+        AND be.email IS NULL
     `);
 
     if (existingUsersResult.rows.length === 0) {

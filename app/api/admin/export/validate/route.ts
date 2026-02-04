@@ -49,7 +49,26 @@ export async function GET(request: NextRequest) {
     const allTables = tablesResult.rows.map(row => row.table_name);
     
     // Tables that should be excluded from export (old/deprecated tables)
-    const excludedTables = ['l1_event_facts', 'user_events', 'transactions', 'accounts', 'insight_feedback'];
+    // Note: These tables should have been dropped after migration, but we exclude them
+    // in case they still exist during the migration period
+    const excludedTables = [
+      'l1_events', // Old name, should be l1_event_facts
+      'l1_event_facts', // Empty duplicate (if exists)
+      'user_events', // Old name
+      'transactions', // Legacy, migrated to l1_transaction_facts
+      'accounts', // Empty, unused
+      'insight_feedback', // Empty, unused
+      'onboarding_responses', // Old name, should be l1_onboarding_responses
+      'survey_responses', // Old name, should be l1_survey_responses
+      'categorization_learning', // Old name, should be l2_user_categorization_learning
+      'admin_categorization_learning', // Old name
+      'admin_keywords', // Old name, should be l1_admin_keywords
+      'admin_merchants', // Old name, should be l1_admin_merchants
+      'admin_available_slots', // Old name, should be l1_admin_available_slots
+      'admin_chat_bookings', // Old name, should be l1_admin_chat_bookings
+      'chat_bookings', // Old name
+      'available_slots', // Old name
+    ];
     const expectedTables = allTables.filter(table => !excludedTables.includes(table));
 
     // Get columns for each table

@@ -1337,25 +1337,25 @@ export default function TransactionsList({ transactions, loading, token, onRefre
             <div>
               <h4 className="text-sm font-semibold text-gray-800 mb-3">Data and categorisation coverage</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                  <div className="text-2xl font-bold text-blue-700 mb-1">{editCounts.totalUploads}</div>
-                  <div className="text-xs font-medium text-blue-600">Total uploads</div>
+                <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                  <div className="text-2xl font-bold text-green-700 mb-1">{editCounts.totalUploads}</div>
+                  <div className="text-xs font-medium text-green-600">Total uploads</div>
                 </div>
-                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                  <div className="text-2xl font-bold text-blue-700 mb-1">{editCounts.monthsWithData}</div>
-                  <div className="text-xs font-medium text-blue-600">Months with data</div>
+                <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                  <div className="text-2xl font-bold text-green-700 mb-1">{editCounts.monthsWithData}</div>
+                  <div className="text-xs font-medium text-green-600">Months with data</div>
                 </div>
                 <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                   <div className="text-2xl font-bold mb-1">
-                    <span className="text-blue-700">{editCounts.autoCategorisedNumerator}</span>
+                    <span className="text-red-700">{editCounts.autoCategorisedNumerator}</span>
                     <span className="text-blue-600 text-lg">/{editCounts.autoCategorisedDenominator}</span>
                   </div>
                   <div className="text-xs font-medium text-blue-600">Unedited auto-categorised</div>
                 </div>
                 <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                   <div className="text-2xl font-bold mb-1">
-                    <span className="text-blue-700">{editCounts.notCategorisedNumerator}</span>
-                    <span className="text-blue-600 text-lg">/{editCounts.notCategorisedDenominator}</span>
+                    <span className="text-green-700">{editCounts.notCategorisedNumerator}</span>
+                    <span className="text-black text-lg">/{editCounts.notCategorisedDenominator}</span>
                   </div>
                   <div className="text-xs font-medium text-blue-600">Edited un-categorised</div>
                 </div>
