@@ -1923,36 +1923,76 @@ export default function AdminDashboard() {
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Data Migration Verification</h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Verify data migration for: categorization_learning, chat_bookings, and available_slots
+                  Create new tables and migrate data from: categorization_learning, chat_bookings, and available_slots
                 </p>
               </div>
-              <button
-                onClick={async () => {
-                  setDataMigrationLoading(true);
-                  try {
-                    const token = localStorage.getItem('admin_token');
-                    const response = await fetch('/api/admin/migration/verify-data-migration', {
-                      headers: {
-                        'Authorization': `Bearer ${token}`,
-                      },
-                    });
-                    const data = await response.json();
-                    if (response.ok) {
-                      setDataMigrationVerification(data);
-                    } else {
-                      setError(data.error || 'Failed to verify data migration');
+              <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    setDataMigrationLoading(true);
+                    try {
+                      const token = localStorage.getItem('admin_token');
+                      const response = await fetch('/api/admin/migration/create-and-migrate-tables', {
+                        method: 'POST',
+                        headers: {
+                          'Authorization': `Bearer ${token}`,
+                        },
+                      });
+                      const data = await response.json();
+                      if (response.ok) {
+                        alert(`Success! ${data.results.map((r: any) => `${r.table}: ${r.action}${r.rowsMigrated ? ` (${r.rowsMigrated} rows)` : ''}`).join(', ')}`);
+                        // Refresh verification
+                        const verifyResponse = await fetch('/api/admin/migration/verify-data-migration', {
+                          headers: {
+                            'Authorization': `Bearer ${token}`,
+                          },
+                        });
+                        const verifyData = await verifyResponse.json();
+                        if (verifyResponse.ok) {
+                          setDataMigrationVerification(verifyData);
+                        }
+                      } else {
+                        setError(data.error || 'Failed to create and migrate tables');
+                      }
+                    } catch (error: any) {
+                      setError('Failed to create and migrate tables: ' + error.message);
+                    } finally {
+                      setDataMigrationLoading(false);
                     }
-                  } catch (error: any) {
-                    setError('Failed to verify data migration: ' + error.message);
-                  } finally {
-                    setDataMigrationLoading(false);
-                  }
-                }}
-                disabled={dataMigrationLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-              >
-                {dataMigrationLoading ? 'Verifying...' : 'Verify Data Migration'}
-              </button>
+                  }}
+                  disabled={dataMigrationLoading}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {dataMigrationLoading ? 'Creating...' : 'Create & Migrate Tables'}
+                </button>
+                <button
+                  onClick={async () => {
+                    setDataMigrationLoading(true);
+                    try {
+                      const token = localStorage.getItem('admin_token');
+                      const response = await fetch('/api/admin/migration/verify-data-migration', {
+                        headers: {
+                          'Authorization': `Bearer ${token}`,
+                        },
+                      });
+                      const data = await response.json();
+                      if (response.ok) {
+                        setDataMigrationVerification(data);
+                      } else {
+                        setError(data.error || 'Failed to verify data migration');
+                      }
+                    } catch (error: any) {
+                      setError('Failed to verify data migration: ' + error.message);
+                    } finally {
+                      setDataMigrationLoading(false);
+                    }
+                  }}
+                  disabled={dataMigrationLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {dataMigrationLoading ? 'Verifying...' : 'Verify Data Migration'}
+                </button>
+              </div>
             </div>
           </div>
 

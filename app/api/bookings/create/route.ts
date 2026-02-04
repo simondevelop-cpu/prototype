@@ -218,9 +218,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Use new table name (l1_admin_chat_bookings) with fallback to old name
+    let tableName = 'l1_admin_chat_bookings';
+    try {
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'chat_bookings'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'chat_bookings'; // Fallback on error
+    }
+
     // Create booking with status 'requested' (admin will confirm)
     const result = await pool.query(
-      `INSERT INTO chat_bookings 
+      `INSERT INTO ${tableName} 
        (user_id, booking_date, booking_time, preferred_method, share_screen, record_conversation, notes, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'requested')
        RETURNING id, booking_date, booking_time, preferred_method, share_screen, record_conversation, notes, status, created_at`,
