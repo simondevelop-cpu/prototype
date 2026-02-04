@@ -33,21 +33,58 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Always return all 6 intent categories from the onboarding questionnaire
-    // These are the standard options regardless of what data exists in the database
-    const allIntentCategories = [
-      "Just exploring",
-      "Get organized (see where my money goes, combine accounts)",
-      "Improve my finances (spend smarter, save more, get back on track)",
-      "Plan ahead (for a goal, trip, event or the next year)",
-      "Discover smarter, AI-powered insights",
-      "Something else"
-    ];
+    // Pull intent categories from users.motivation (single source of truth)
+    // Check if users table has motivation column
+    const schemaCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' 
+      AND column_name = 'motivation'
+      LIMIT 1
+    `);
+    
+    const hasMotivation = schemaCheck.rows.length > 0;
+    
+    if (hasMotivation) {
+      // Pull unique motivation values from users table (single source of truth)
+      const result = await pool.query(`
+        SELECT DISTINCT motivation
+        FROM users
+        WHERE motivation IS NOT NULL
+          AND motivation != ''
+          AND email != $1
+        ORDER BY motivation
+      `, [ADMIN_EMAIL]);
+      
+      const categories = result.rows.map((row: any) => row.motivation).filter(Boolean);
+      
+      return NextResponse.json({
+        success: true,
+        categories: categories.length > 0 ? categories : [
+          "Just exploring",
+          "Get organized (see where my money goes, combine accounts)",
+          "Improve my finances (spend smarter, save more, get back on track)",
+          "Plan ahead (for a goal, trip, event or the next year)",
+          "Discover smarter, AI-powered insights",
+          "Something else"
+        ],
+      }, { status: 200 });
+    } else {
+      // Fallback: return standard intent categories if motivation column doesn't exist
+      const allIntentCategories = [
+        "Just exploring",
+        "Get organized (see where my money goes, combine accounts)",
+        "Improve my finances (spend smarter, save more, get back on track)",
+        "Plan ahead (for a goal, trip, event or the next year)",
+        "Discover smarter, AI-powered insights",
+        "Something else"
+      ];
 
-    return NextResponse.json({
-      success: true,
-      categories: allIntentCategories,
-    }, { status: 200 });
+      return NextResponse.json({
+        success: true,
+        categories: allIntentCategories,
+      }, { status: 200 });
+    }
 
   } catch (error: any) {
     console.error('[Intent Categories API] Error:', error);

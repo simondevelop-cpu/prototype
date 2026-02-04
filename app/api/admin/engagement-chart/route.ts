@@ -17,6 +17,7 @@ interface ChartFilters {
   intentCategories?: string[];
   dataCoverage?: string[]; // ['1 upload', '2 uploads', '3+ uploads']
   userIds?: number[];
+  metric?: 'loginDays' | 'uploadsPerWeek'; // Chart metric type
 }
 
 export async function GET(request: NextRequest) {
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
       intentCategories: url.searchParams.get('intentCategories')?.split('|').filter(Boolean) || [],
       dataCoverage: url.searchParams.get('dataCoverage')?.split(',').filter(Boolean) || [],
       userIds: url.searchParams.get('userIds')?.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) || [],
+      metric: (url.searchParams.get('metric') as 'loginDays' | 'uploadsPerWeek') || 'loginDays',
     };
 
     // Check if users table has required columns (schema-adaptive)
@@ -208,7 +210,7 @@ export async function GET(request: NextRequest) {
       const signupDate = new Date(user.signup_date);
       const weeks: { week: number; loginDays: number }[] = [];
       
-      // Calculate login days per week for 12 weeks from l1_event_facts
+      // Calculate metric per week for 12 weeks from l1_event_facts
       for (let weekNum = 0; weekNum < 12; weekNum++) {
         const weekStart = new Date(signupDate);
         weekStart.setDate(signupDate.getDate() + (weekNum * 7));
@@ -218,25 +220,46 @@ export async function GET(request: NextRequest) {
         weekEnd.setDate(weekStart.getDate() + 6);
         weekEnd.setHours(23, 59, 59, 999);
         
-        // Get unique login days in this week from l1_event_facts
-        // Note: We use user_id (internal ID) since login events are logged with internal user_id
-        // Use DATE_TRUNC('day', ...) instead of DATE() for better PostgreSQL compatibility
-        // Cast user.id to integer to ensure type consistency
+        let loginDays = 0;
+        let uploadsPerWeek = 0;
+        
         try {
-          const loginDaysResult = await pool.query(`
-            SELECT COUNT(DISTINCT DATE_TRUNC('day', event_timestamp)) as login_days
-            FROM l1_event_facts
-            WHERE user_id = $1::integer
-              AND event_type = 'login'
-              AND event_timestamp >= $2::timestamp
-              AND event_timestamp <= $3::timestamp
-          `, [user.id, weekStart.toISOString(), weekEnd.toISOString()]);
+          if (filters.metric === 'loginDays' || !filters.metric) {
+            // Get unique login days in this week from l1_event_facts
+            // Note: We use user_id (internal ID) since login events are logged with internal user_id
+            // Use DATE_TRUNC('day', ...) instead of DATE() for better PostgreSQL compatibility
+            // Cast user.id to integer to ensure type consistency
+            const loginDaysResult = await pool.query(`
+              SELECT COUNT(DISTINCT DATE_TRUNC('day', event_timestamp)) as login_days
+              FROM l1_event_facts
+              WHERE user_id = $1::integer
+                AND event_type = 'login'
+                AND event_timestamp >= $2::timestamp
+                AND event_timestamp <= $3::timestamp
+            `, [user.id, weekStart.toISOString(), weekEnd.toISOString()]);
+            
+            loginDays = parseInt(loginDaysResult.rows[0]?.login_days) || 0;
+          }
           
-          const loginDays = parseInt(loginDaysResult.rows[0]?.login_days) || 0;
-          weeks.push({ week: weekNum, loginDays });
+          if (filters.metric === 'uploadsPerWeek' || !filters.metric) {
+            // Get number of statement uploads in this week from l1_event_facts
+            // Count distinct statement_upload events per week
+            const uploadsResult = await pool.query(`
+              SELECT COUNT(*) as upload_count
+              FROM l1_event_facts
+              WHERE user_id = $1::integer
+                AND event_type = 'statement_upload'
+                AND event_timestamp >= $2::timestamp
+                AND event_timestamp <= $3::timestamp
+            `, [user.id, weekStart.toISOString(), weekEnd.toISOString()]);
+            
+            uploadsPerWeek = parseInt(uploadsResult.rows[0]?.upload_count) || 0;
+          }
+          
+          weeks.push({ week: weekNum, loginDays, uploadsPerWeek });
         } catch (e) {
           // If query fails, return zero for this week
-          weeks.push({ week: weekNum, loginDays: 0 });
+          weeks.push({ week: weekNum, loginDays: 0, uploadsPerWeek: 0 });
         }
       }
       

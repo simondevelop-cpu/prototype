@@ -159,6 +159,7 @@ export default function AdminDashboard() {
     dataCoverage: [] as string[],
     userIds: [] as number[],
   });
+  const [chartMetric, setChartMetric] = useState<'loginDays' | 'uploadsPerWeek'>('loginDays');
   const [vanityFilters, setVanityFilters] = useState({
     totalAccounts: true,
     validatedEmails: false,
@@ -345,6 +346,7 @@ export default function AdminDashboard() {
         intentCategories: chartFilters.intentCategories.join('|'),
         dataCoverage: chartFilters.dataCoverage.join(','),
         userIds: chartFilters.userIds.join(','),
+        metric: chartMetric,
       });
       const response = await fetch(`/api/admin/engagement-chart?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -740,7 +742,7 @@ export default function AdminDashboard() {
       fetchCohortAnalysis();
       fetchEngagementChart();
     }
-  }, [activeTab, analyticsSubTab, authenticated, cohortFilters, chartFilters]);
+  }, [activeTab, analyticsSubTab, authenticated, cohortFilters, chartFilters, chartMetric]);
 
   // Fetch vanity metrics when Analytics → Vanity Metrics tab is active
   useEffect(() => {
@@ -2785,6 +2787,20 @@ export default function AdminDashboard() {
                       placeholder="Select data coverage..."
                     />
                   </div>
+                  <div className="min-w-[200px]">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Chart Metric</label>
+                    <select
+                      value={chartMetric}
+                      onChange={(e) => {
+                        setChartMetric(e.target.value as 'loginDays' | 'uploadsPerWeek');
+                        fetchEngagementChart();
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="loginDays">Unique Days Logged In</option>
+                      <option value="uploadsPerWeek">Number of Uploads Per Week</option>
+                    </select>
+                  </div>
                   <button
                     onClick={fetchEngagementChart}
                     disabled={engagementChartLoading}
@@ -2822,7 +2838,8 @@ export default function AdminDashboard() {
                         engagementChartData.userLines.forEach((userLine: any) => {
                           const weekMap = new Map<number, number>();
                           userLine.weeks.forEach((w: any) => {
-                            weekMap.set(w.week, w.loginDays);
+                            const value = chartMetric === 'loginDays' ? w.loginDays : (w.uploadsPerWeek || 0);
+                            weekMap.set(w.week, value);
                           });
                           userDataByWeek.set(userLine.userId, weekMap);
                         });
@@ -2850,16 +2867,18 @@ export default function AdminDashboard() {
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
-                            return (
-                              <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
-                                <p className="font-semibold">Week {data.week}</p>
-                                <p className="text-sm">User ID: {data.userId}</p>
-                                <p className="text-sm">Cohort: {data.cohortWeek}</p>
-                                <p className="text-sm">Intent: {data.intentType}</p>
-                                <p className="text-sm">Data Coverage: {data.dataCoverage}</p>
-                                <p className="text-sm font-medium">Login Days: {data.loginDays}</p>
-                              </div>
-                            );
+                        const metricValue = chartMetric === 'loginDays' ? data.loginDays : data.uploadsPerWeek;
+                        const metricLabel = chartMetric === 'loginDays' ? 'Login Days' : 'Uploads';
+                        return (
+                          <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
+                            <p className="font-semibold">Week {data.week}</p>
+                            <p className="text-sm">User ID: {data.userId}</p>
+                            <p className="text-sm">Cohort: {data.cohortWeek}</p>
+                            <p className="text-sm">Intent: {data.intentType}</p>
+                            <p className="text-sm">Data Coverage: {data.dataCoverage}</p>
+                            <p className="text-sm font-medium">{metricLabel}: {metricValue}</p>
+                          </div>
+                        );
                           }
                           return null;
                         }}
@@ -2875,20 +2894,28 @@ export default function AdminDashboard() {
                             stroke={color}
                             strokeWidth={2}
                             dot={{ r: 4 }}
-                            name={`User ${userLine.userId}`}
+                            name={`User ${userLine.userId} (${userLine.cohortWeek})`}
                             connectNulls
                           />
                         );
                       })}
                     </LineChart>
                   </ResponsiveContainer>
+                  <div className="mt-4 text-sm text-gray-600">
+                    <p className="font-medium mb-2">Chart showing: {chartMetric === 'loginDays' ? 'Unique Days Logged In' : 'Number of Uploads Per Week'}</p>
+                    <p className="text-xs text-gray-500">
+                      {chartMetric === 'loginDays' 
+                        ? 'Tracks unique days each user logged in per week from Day 1 of signup'
+                        : 'Tracks number of statement uploads per week from Day 1 of signup'}
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-500">
                   No engagement chart data available. Click "Refresh Chart" to load.
                   {!engagementChartData?.hasUserEvents && (
                     <p className="text-sm text-gray-400 mt-2">
-                      Note: Requires user_events table for login tracking data.
+                      Note: Requires l1_event_facts table for tracking data.
                     </p>
                   )}
                 </div>
@@ -2938,79 +2965,204 @@ export default function AdminDashboard() {
         )}
 
         {analyticsSubTab === 'events-data' && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Events Data</h3>
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Events Data</h2>
+                <p className="text-gray-600 mt-1">User events and activity tracking from l1_event_facts table</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={fetchEventsData}
+                  disabled={eventsDataLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  <svg className={`w-4 h-4 ${eventsDataLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh Data
+                </button>
+              </div>
+            </div>
+
             {eventsDataLoading ? (
               <div className="text-center py-12">
                 <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
                 <p className="text-gray-600 mt-4">Loading events data...</p>
               </div>
-            ) : eventsData.length > 0 ? (
+            ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      {Object.keys(eventsData[0] || {}).map((key) => (
-                        <th key={key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          {key.replace(/_/g, ' ')}
-                        </th>
-                      ))}
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Data</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metadata</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created At</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {eventsData.map((row: any, idx: number) => (
-                      <tr key={idx}>
-                        {Object.values(row).map((value: any, colIdx: number) => (
-                          <td key={colIdx} className="px-6 py-4 text-sm text-gray-900">
-                            {value !== null && value !== undefined ? String(value) : '-'}
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {eventsData.length > 0 ? (
+                      eventsData.map((event) => (
+                        <tr key={event.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm text-gray-600 font-mono">{formatEventId(event.id)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600 font-mono">{formatUserId(event.user_id)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            {event.first_name || <span className="text-gray-400 italic">null</span>}
                           </td>
-                        ))}
+                          <td className="px-6 py-4 text-sm">
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                              {event.event_type || 'unknown'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                            {event.event_data ? (
+                              <pre className="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-32">
+                                {typeof event.event_data === 'string' 
+                                  ? event.event_data 
+                                  : JSON.stringify(event.event_data, null, 2)}
+                              </pre>
+                            ) : (
+                              <span className="text-gray-400 italic">null</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                            {event.metadata ? (
+                              <pre className="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-32">
+                                {typeof event.metadata === 'string' 
+                                  ? event.metadata 
+                                  : JSON.stringify(event.metadata, null, 2)}
+                              </pre>
+                            ) : (
+                              <span className="text-gray-400 italic">null</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            {event.created_at 
+                              ? new Date(event.created_at).toLocaleString()
+                              : <span className="text-gray-400 italic">null</span>}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                          <div className="flex flex-col items-center">
+                            <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            <p className="text-lg font-medium mb-2">No events data available</p>
+                            <p className="text-sm text-gray-400">
+                              Events will appear here once the l1_event_facts table is created and events are logged.
+                            </p>
+                          </div>
+                        </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <p className="text-gray-600">No events data available</p>
             )}
           </div>
         )}
 
         {analyticsSubTab === 'editing-events-data' && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Editing Events Data</h3>
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Editing events data</h2>
+                <p className="text-gray-600 mt-1">Transaction editing events - all changes made to transactions</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={fetchEditingEventsData}
+                  disabled={editingEventsDataLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  <svg className={`w-4 h-4 ${editingEventsDataLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh Data
+                </button>
+              </div>
+            </div>
+
             {editingEventsDataLoading ? (
               <div className="text-center py-12">
                 <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
                 <p className="text-gray-600 mt-4">Loading editing events data...</p>
               </div>
-            ) : editingEventsData.length > 0 ? (
+            ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      {Object.keys(editingEventsData[0] || {}).map((key) => (
-                        <th key={key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          {key.replace(/_/g, ' ')}
-                        </th>
-                      ))}
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Changes</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {editingEventsData.map((row: any, idx: number) => (
-                      <tr key={idx}>
-                        {Object.values(row).map((value: any, colIdx: number) => (
-                          <td key={colIdx} className="px-6 py-4 text-sm text-gray-900">
-                            {value !== null && value !== undefined ? String(value) : '-'}
-                          </td>
-                        ))}
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {editingEventsData.length > 0 ? (
+                      editingEventsData.map((event) => {
+                        const metadata = typeof event.metadata === 'string' ? JSON.parse(event.metadata) : event.metadata;
+                        const changes = metadata?.changes || [];
+                        return (
+                          <tr key={event.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm text-gray-600 font-mono">{formatEventId(event.id)}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600 font-mono">{formatUserId(event.user_id)}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{event.email || '-'}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600 font-mono">{metadata?.transactionId ? formatTransactionId(metadata.transactionId) : (metadata?.transactionIds ? metadata.transactionIds.map((id: number) => formatTransactionId(id)).join(', ') : '-')}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {changes.length > 0 ? (
+                                <div className="space-y-1">
+                                  {changes.map((change: any, idx: number) => (
+                                    <div key={idx} className="text-xs">
+                                      <span className="font-medium">{change.field}:</span>{' '}
+                                      <span className="text-red-600 line-through">{String(change.oldValue || '-')}</span>
+                                      {' → '}
+                                      <span className="text-green-600">{String(change.newValue || '-')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : event.event_type === 'bulk_edit' && metadata?.transactionIds ? (
+                                <span className="text-xs text-gray-600">Bulk edit: {metadata.transactionIds.length} transaction(s)</span>
+                              ) : (
+                                <span className="text-gray-400 italic">No changes</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {event.created_at 
+                                ? new Date(event.created_at).toLocaleString()
+                                : <span className="text-gray-400 italic">null</span>}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                          <div className="flex flex-col items-center">
+                            <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            <p className="text-lg font-medium mb-2">No editing events available</p>
+                            <p className="text-sm text-gray-400">
+                              Editing events will appear here once users start editing transactions.
+                            </p>
+                          </div>
+                        </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <p className="text-gray-600">No editing events data available</p>
             )}
           </div>
         )}
