@@ -5393,4 +5393,3 @@ function ColumnFilterHeader({
 
 
 
-// Build trigger
