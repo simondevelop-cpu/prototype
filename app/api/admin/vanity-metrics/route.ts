@@ -94,11 +94,15 @@ export async function GET(request: NextRequest) {
     let paramIndex = 1;
 
     if (filters.validatedEmails && hasEmailValidated) {
-      filterConditions += ` AND u.email_validated = true`;
+      filterConditions += ` AND perm.email_validated = true`;
     }
 
-    if (filters.intentCategories && filters.intentCategories.length > 0 && hasMotivation) {
-      filterConditions += ` AND u.motivation = ANY($${paramIndex}::text[])`;
+    if (filters.intentCategories && filters.intentCategories.length > 0) {
+      filterConditions += ` AND EXISTS (
+        SELECT 1 FROM onboarding_responses o 
+        WHERE o.user_id = perm.id 
+        AND o.motivation = ANY($${paramIndex}::text[])
+      )`;
       filterParams.push(filters.intentCategories);
       paramIndex++;
     }
@@ -126,9 +130,10 @@ export async function GET(request: NextRequest) {
     // Generate all weeks from earliest user to current week (same week calculation as cohort analysis)
     // Find the earliest user creation date
     const earliestUserCheck = await pool.query(`
-      SELECT MIN(created_at) as earliest_date
-      FROM users
-      WHERE email != $1
+      SELECT MIN(perm.created_at) as earliest_date
+      FROM l1_user_permissions perm
+      JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+      WHERE pii.email != $1
     `, [ADMIN_EMAIL]);
     
     const earliestDateStr = earliestUserCheck.rows[0]?.earliest_date;
@@ -231,9 +236,10 @@ export async function GET(request: NextRequest) {
       // Note: Cohort filter does NOT filter users - it only controls which columns are displayed
       const totalUsersQuery = `
         SELECT COUNT(*) as count
-        FROM users u
-        WHERE u.email != $${adminEmailParamIndex}
-          AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex}::date)
+        FROM l1_user_permissions perm
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email != $${adminEmailParamIndex}
+          AND DATE_TRUNC('day', perm.created_at) <= DATE_TRUNC('day', $${paramIndex}::date)
           ${filterConditions}
       `;
       const totalUsersResult = await pool.query(totalUsersQuery, [...filterParams, weekEnd.toISOString().split('T')[0]]);
@@ -242,14 +248,15 @@ export async function GET(request: NextRequest) {
       // Apply data coverage filter to total users if specified
       if (filters.dataCoverage && filters.dataCoverage.length > 0 && totalUsers > 0) {
         const usersWithCoverageQuery = `
-          SELECT u.id, COUNT(DISTINCT tf.id) as tx_count
-          FROM users u
-          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          SELECT perm.id, COUNT(DISTINCT tf.id) as tx_count
+          FROM l1_user_permissions perm
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+          LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
           LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-          WHERE u.email != $${adminEmailParamIndex}
-            AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex}::date)
+          WHERE pii.email != $${adminEmailParamIndex}
+            AND DATE_TRUNC('day', perm.created_at) <= DATE_TRUNC('day', $${paramIndex}::date)
             ${filterConditions}
-          GROUP BY u.id
+          GROUP BY perm.id
         `;
         const usersWithCoverage = await pool.query(usersWithCoverageQuery, [...filterParams, weekEnd.toISOString().split('T')[0]]);
         totalUsers = usersWithCoverage.rows.filter((user: any) => {
@@ -262,42 +269,39 @@ export async function GET(request: NextRequest) {
       }
 
       // Weekly Active Users (users who logged in during the week)
-      // Check if l1_events table exists
+      // Use l1_event_facts for all event queries
+      const eventsTable = 'l1_event_facts';
+      
       let wau = 0;
       try {
-        const eventsCheck = await pool.query(`
-          SELECT 1 FROM information_schema.tables 
-          WHERE table_name = 'l1_events'
-          LIMIT 1
-        `);
-        if (eventsCheck.rows.length > 0) {
-          // Build WAU query with correct parameter order
-          // filterParams come first, then weekStart and weekEnd
-          const wauParamIndex = filterParams.length + 1;
-          const wauQuery = `
-            SELECT COUNT(DISTINCT e.user_id) as count
-            FROM l1_events e
-            JOIN users u ON u.id = e.user_id
-            WHERE e.event_type = 'login'
-              AND e.event_timestamp >= $${wauParamIndex}::timestamp
-              AND e.event_timestamp <= $${wauParamIndex + 1}::timestamp
-              AND u.email != $${adminEmailParamIndex}
-              ${filterConditions}
-          `;
-          const wauResult = await pool.query(wauQuery, [...filterParams, weekStart, weekEnd]);
-          wau = parseInt(wauResult.rows[0]?.count) || 0;
-        }
+        // Build WAU query with correct parameter order
+        // filterParams come first, then weekStart and weekEnd
+        const wauParamIndex = filterParams.length + 1;
+        const wauQuery = `
+          SELECT COUNT(DISTINCT e.user_id) as count
+          FROM l1_event_facts e
+          JOIN l1_user_permissions perm ON perm.id = e.user_id
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+          WHERE e.event_type = 'login'
+            AND e.event_timestamp >= $${wauParamIndex}::timestamp
+            AND e.event_timestamp <= $${wauParamIndex + 1}::timestamp
+            AND pii.email != $${adminEmailParamIndex}
+            ${filterConditions}
+        `;
+        const wauResult = await pool.query(wauQuery, [...filterParams, weekStart, weekEnd]);
+        wau = parseInt(wauResult.rows[0]?.count) || 0;
       } catch (e) {
-        // l1_events table doesn't exist, WAU = 0
+        // Query failed, WAU = 0
       }
 
       // New users per week - use DATE_TRUNC to ensure proper date comparison
       const newUsersQuery = `
         SELECT COUNT(*) as count
-        FROM users u
-        WHERE u.email != $${adminEmailParamIndex}
-          AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
-          AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
+        FROM l1_user_permissions perm
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email != $${adminEmailParamIndex}
+          AND DATE_TRUNC('day', perm.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
+          AND DATE_TRUNC('day', perm.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
           ${filterConditions}
       `;
       const newUsersResult = await pool.query(newUsersQuery, [...filterParams, weekStart.toISOString().split('T')[0], weekEnd.toISOString().split('T')[0]]);
@@ -306,15 +310,16 @@ export async function GET(request: NextRequest) {
       // Apply data coverage filter to new users if specified
       if (filters.dataCoverage && filters.dataCoverage.length > 0 && newUsers > 0) {
         const newUsersWithCoverageQuery = `
-          SELECT u.id, COUNT(DISTINCT tf.id) as tx_count
-          FROM users u
-          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          SELECT perm.id, COUNT(DISTINCT tf.id) as tx_count
+          FROM l1_user_permissions perm
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+          LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
           LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-          WHERE u.email != $${adminEmailParamIndex}
-            AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
-            AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
+          WHERE pii.email != $${adminEmailParamIndex}
+            AND DATE_TRUNC('day', perm.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
+            AND DATE_TRUNC('day', perm.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
             ${filterConditions}
-          GROUP BY u.id
+          GROUP BY perm.id
         `;
         const newUsersWithCoverage = await pool.query(newUsersWithCoverageQuery, [...filterParams, weekStart.toISOString().split('T')[0], weekEnd.toISOString().split('T')[0]]);
         newUsers = newUsersWithCoverage.rows.filter((user: any) => {
@@ -334,8 +339,9 @@ export async function GET(request: NextRequest) {
         SELECT COUNT(*) as count
         FROM l1_transaction_facts tf
         JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
-        JOIN users u ON ut.internal_user_id = u.id
-        WHERE u.email != $${adminEmailParamIndex}
+        JOIN l1_user_permissions perm ON ut.internal_user_id = perm.id
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email != $${adminEmailParamIndex}
           AND tf.created_at >= $${newTransactionsDateParamIndex}::timestamp
           AND tf.created_at <= $${newTransactionsDateParamIndex + 1}::timestamp
           ${filterConditions}
@@ -349,8 +355,9 @@ export async function GET(request: NextRequest) {
         SELECT COUNT(*) as count
         FROM l1_transaction_facts tf
         JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
-        JOIN users u ON ut.internal_user_id = u.id
-        WHERE u.email != $${adminEmailParamIndex}
+        JOIN l1_user_permissions perm ON ut.internal_user_id = perm.id
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email != $${adminEmailParamIndex}
           AND tf.created_at <= $${totalTransactionsDateParamIndex}::timestamp
           ${filterConditions}
       `;
@@ -360,13 +367,14 @@ export async function GET(request: NextRequest) {
       if (filters.dataCoverage && filters.dataCoverage.length > 0) {
         // Get users matching data coverage criteria
         const usersWithCoverageQuery = `
-          SELECT DISTINCT u.id
-          FROM users u
-          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          SELECT DISTINCT perm.id
+          FROM l1_user_permissions perm
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+          LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
           LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-          WHERE u.email != $${adminEmailParamIndex}
+          WHERE pii.email != $${adminEmailParamIndex}
             ${filterConditions}
-          GROUP BY u.id
+          GROUP BY perm.id
           HAVING 
             ${filters.dataCoverage.includes('1 upload') ? 'COUNT(DISTINCT tf.id) >= 1' : 'false'}
             ${filters.dataCoverage.includes('2 uploads') ? 'OR COUNT(DISTINCT tf.id) >= 2' : ''}
@@ -398,13 +406,14 @@ export async function GET(request: NextRequest) {
       if (filters.dataCoverage && filters.dataCoverage.length > 0) {
         // Get users matching data coverage criteria
         const usersWithCoverageQuery = `
-          SELECT DISTINCT u.id
-          FROM users u
-          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          SELECT DISTINCT perm.id
+          FROM l1_user_permissions perm
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+          LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
           LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-          WHERE u.email != $${adminEmailParamIndex}
+          WHERE pii.email != $${adminEmailParamIndex}
             ${filterConditions}
-          GROUP BY u.id
+          GROUP BY perm.id
           HAVING 
             ${filters.dataCoverage.includes('1 upload') ? 'COUNT(DISTINCT tf.id) >= 1' : 'false'}
             ${filters.dataCoverage.includes('2 uploads') ? 'OR COUNT(DISTINCT tf.id) >= 2' : ''}
@@ -434,8 +443,9 @@ export async function GET(request: NextRequest) {
         SELECT COUNT(DISTINCT tf.account) as count
         FROM l1_transaction_facts tf
         JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
-        JOIN users u ON ut.internal_user_id = u.id
-        WHERE u.email != $${adminEmailParamIndex}
+        JOIN l1_user_permissions perm ON ut.internal_user_id = perm.id
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email != $${adminEmailParamIndex}
           AND tf.created_at >= $${paramIndex}::timestamp
           AND tf.created_at <= $${paramIndex + 1}::timestamp
           AND tf.account IS NOT NULL
@@ -447,39 +457,33 @@ export async function GET(request: NextRequest) {
       // Monthly Active Users (MAU) - users who logged in during the month containing this week
       let mau = 0;
       try {
-        const eventsCheck = await pool.query(`
-          SELECT 1 FROM information_schema.tables 
-          WHERE table_name = 'l1_events'
-          LIMIT 1
-        `);
-        if (eventsCheck.rows.length > 0) {
-          // Get the month start and end for this week
-          const monthStart = new Date(weekStart);
-          monthStart.setDate(1);
-          monthStart.setHours(0, 0, 0, 0);
-          const monthEnd = new Date(monthStart);
-          monthEnd.setMonth(monthEnd.getMonth() + 1);
-          monthEnd.setDate(0); // Last day of month
-          monthEnd.setHours(23, 59, 59, 999);
-          
-          // Build MAU query with correct parameter order
-          // filterParams come first, then monthStart and monthEnd
-          const mauParamIndex = filterParams.length + 1;
-          const mauQuery = `
-            SELECT COUNT(DISTINCT e.user_id) as count
-            FROM l1_events e
-            JOIN users u ON u.id = e.user_id
-            WHERE e.event_type = 'login'
-              AND e.event_timestamp >= $${mauParamIndex}::timestamp
-              AND e.event_timestamp <= $${mauParamIndex + 1}::timestamp
-              AND u.email != $${adminEmailParamIndex}
-              ${filterConditions}
-          `;
-          const mauResult = await pool.query(mauQuery, [...filterParams, monthStart, monthEnd]);
-          mau = parseInt(mauResult.rows[0]?.count) || 0;
-        }
+        // Get the month start and end for this week
+        const monthStart = new Date(weekStart);
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        const monthEnd = new Date(monthStart);
+        monthEnd.setMonth(monthEnd.getMonth() + 1);
+        monthEnd.setDate(0); // Last day of month
+        monthEnd.setHours(23, 59, 59, 999);
+        
+        // Build MAU query with correct parameter order
+        // filterParams come first, then monthStart and monthEnd
+        const mauParamIndex = filterParams.length + 1;
+        const mauQuery = `
+          SELECT COUNT(DISTINCT e.user_id) as count
+          FROM l1_event_facts e
+          JOIN l1_user_permissions perm ON perm.id = e.user_id
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+          WHERE e.event_type = 'login'
+            AND e.event_timestamp >= $${mauParamIndex}::timestamp
+            AND e.event_timestamp <= $${mauParamIndex + 1}::timestamp
+            AND pii.email != $${adminEmailParamIndex}
+            ${filterConditions}
+        `;
+        const mauResult = await pool.query(mauQuery, [...filterParams, monthStart, monthEnd]);
+        mau = parseInt(mauResult.rows[0]?.count) || 0;
       } catch (e) {
-        // l1_events table doesn't exist, MAU = 0
+        // Query failed, MAU = 0
       }
 
       // New users per month - users who signed up in the month containing this week
@@ -493,10 +497,11 @@ export async function GET(request: NextRequest) {
       
       const newUsersPerMonthQuery = `
         SELECT COUNT(*) as count
-        FROM users u
-        WHERE u.email != $${adminEmailParamIndex}
-          AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
-          AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
+        FROM l1_user_permissions perm
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email != $${adminEmailParamIndex}
+          AND DATE_TRUNC('day', perm.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
+          AND DATE_TRUNC('day', perm.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
           ${filterConditions}
       `;
       const newUsersPerMonthResult = await pool.query(newUsersPerMonthQuery, [...filterParams, monthStart.toISOString().split('T')[0], monthEnd.toISOString().split('T')[0]]);
@@ -506,56 +511,51 @@ export async function GET(request: NextRequest) {
       // Count distinct transaction IDs from transaction_edit and bulk_edit events
       let totalTransactionsRecategorised = 0;
       try {
-        const eventsCheck = await pool.query(`
-          SELECT 1 FROM information_schema.tables 
-          WHERE table_name = 'l1_events'
-          LIMIT 1
-        `);
-        if (eventsCheck.rows.length > 0) {
-          // Get all transaction_edit events (single transaction per event)
-          const recatParamIndex = filterParams.length + 1;
-          const singleEditQuery = `
-            SELECT DISTINCT (e.metadata->>'transactionId')::int as transaction_id
-            FROM l1_events e
-            JOIN users u ON u.id = e.user_id
-            WHERE e.event_type = 'transaction_edit'
-              AND e.event_timestamp >= $${recatParamIndex}::timestamp
-              AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
-              AND u.email != $${adminEmailParamIndex}
-              AND e.metadata->>'transactionId' IS NOT NULL
-              ${filterConditions}
-          `;
-          const singleEditResult = await pool.query(singleEditQuery, [...filterParams, weekStart, weekEnd]);
-          const singleEditIds = new Set(singleEditResult.rows.map((r: any) => r.transaction_id).filter((id: any) => id !== null));
-          
-          // Get all bulk_edit events (multiple transactions per event)
-          const bulkEditQuery = `
-            SELECT e.metadata->'transactionIds' as transaction_ids
-            FROM l1_events e
-            JOIN users u ON u.id = e.user_id
-            WHERE e.event_type = 'bulk_edit'
-              AND e.event_timestamp >= $${recatParamIndex}::timestamp
-              AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
-              AND u.email != $${adminEmailParamIndex}
-              AND e.metadata->'transactionIds' IS NOT NULL
-              ${filterConditions}
-          `;
-          const bulkEditResult = await pool.query(bulkEditQuery, [...filterParams, weekStart, weekEnd]);
-          bulkEditResult.rows.forEach((row: any) => {
-            const ids = row.transaction_ids;
-            if (Array.isArray(ids)) {
-              ids.forEach((id: any) => {
-                if (id !== null && id !== undefined) {
-                  singleEditIds.add(parseInt(id));
-                }
-              });
-            }
-          });
-          
-          totalTransactionsRecategorised = singleEditIds.size;
-        }
+        // Get all transaction_edit events (single transaction per event)
+        const recatParamIndex = filterParams.length + 1;
+        const singleEditQuery = `
+          SELECT DISTINCT (e.metadata->>'transactionId')::int as transaction_id
+          FROM l1_event_facts e
+          JOIN l1_user_permissions perm ON perm.id = e.user_id
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+          WHERE e.event_type = 'transaction_edit'
+            AND e.event_timestamp >= $${recatParamIndex}::timestamp
+            AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
+            AND pii.email != $${adminEmailParamIndex}
+            AND e.metadata->>'transactionId' IS NOT NULL
+            ${filterConditions}
+        `;
+        const singleEditResult = await pool.query(singleEditQuery, [...filterParams, weekStart, weekEnd]);
+        const singleEditIds = new Set(singleEditResult.rows.map((r: any) => r.transaction_id).filter((id: any) => id !== null));
+        
+        // Get all bulk_edit events (multiple transactions per event)
+        const bulkEditQuery = `
+          SELECT e.metadata->'transactionIds' as transaction_ids
+          FROM l1_event_facts e
+          JOIN l1_user_permissions perm ON perm.id = e.user_id
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+          WHERE e.event_type = 'bulk_edit'
+            AND e.event_timestamp >= $${recatParamIndex}::timestamp
+            AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
+            AND pii.email != $${adminEmailParamIndex}
+            AND e.metadata->'transactionIds' IS NOT NULL
+            ${filterConditions}
+        `;
+        const bulkEditResult = await pool.query(bulkEditQuery, [...filterParams, weekStart, weekEnd]);
+        bulkEditResult.rows.forEach((row: any) => {
+          const ids = row.transaction_ids;
+          if (Array.isArray(ids)) {
+            ids.forEach((id: any) => {
+              if (id !== null && id !== undefined) {
+                singleEditIds.add(parseInt(id));
+              }
+            });
+          }
+        });
+        
+        totalTransactionsRecategorised = singleEditIds.size;
       } catch (e) {
-        // l1_events table doesn't exist or error, recategorised = 0
+        // Query failed, recategorised = 0
         console.error('[Vanity Metrics] Error counting recategorised transactions:', e);
       }
 
@@ -565,18 +565,19 @@ export async function GET(request: NextRequest) {
         const statementsParamIndex = filterParams.length + 1;
         const statementsQuery = `
           SELECT COUNT(*) as count
-          FROM l1_events e
-          JOIN users u ON u.id = e.user_id
+          FROM l1_event_facts e
+          JOIN l1_user_permissions perm ON perm.id = e.user_id
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
           WHERE e.event_type = 'statement_upload'
             AND e.event_timestamp >= $${statementsParamIndex}::timestamp
             AND e.event_timestamp <= $${statementsParamIndex + 1}::timestamp
-            AND u.email != $${adminEmailParamIndex}
+            AND pii.email != $${adminEmailParamIndex}
             ${filterConditions}
         `;
         const statementsResult = await pool.query(statementsQuery, [...filterParams, weekStart, weekEnd]);
         totalStatementsUploaded = parseInt(statementsResult.rows[0]?.count) || 0;
       } catch (e) {
-        // l1_events table doesn't exist, statements = 0
+        // Query failed, statements = 0
       }
 
       // Total statements uploaded by unique person (in the week)
@@ -585,18 +586,19 @@ export async function GET(request: NextRequest) {
         const uniqueStatementsParamIndex = filterParams.length + 1;
         const uniqueStatementsQuery = `
           SELECT COUNT(DISTINCT e.user_id) as count
-          FROM l1_events e
-          JOIN users u ON u.id = e.user_id
+          FROM l1_event_facts e
+          JOIN l1_user_permissions perm ON perm.id = e.user_id
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
           WHERE e.event_type = 'statement_upload'
             AND e.event_timestamp >= $${uniqueStatementsParamIndex}::timestamp
             AND e.event_timestamp <= $${uniqueStatementsParamIndex + 1}::timestamp
-            AND u.email != $${adminEmailParamIndex}
+            AND pii.email != $${adminEmailParamIndex}
             ${filterConditions}
         `;
         const uniqueStatementsResult = await pool.query(uniqueStatementsQuery, [...filterParams, weekStart, weekEnd]);
         totalStatementsByUniquePerson = parseInt(uniqueStatementsResult.rows[0]?.count) || 0;
       } catch (e) {
-        // l1_events table doesn't exist, unique statements = 0
+        // Query failed, unique statements = 0
       }
 
       metrics[weekKey] = {

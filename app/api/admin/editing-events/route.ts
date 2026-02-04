@@ -29,42 +29,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Check if l1_events table exists
-    let hasEventsTable = false;
-    try {
-      const tableCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'l1_events'
-        LIMIT 1
-      `);
-      hasEventsTable = tableCheck.rows.length > 0;
-    } catch (e) {
-      console.log('[Editing Events API] Could not check for l1_events table');
-    }
-
-    if (!hasEventsTable) {
-      return NextResponse.json({ 
-        success: true,
-        editingEvents: [],
-        message: 'l1_events table does not exist.'
-      }, { status: 200 });
-    }
-
-    // Fetch transaction editing events (both transaction_edit and bulk_edit)
+    // Fetch transaction editing events (both transaction_edit and bulk_edit) from l1_event_facts
     const result = await pool.query(`
       SELECT 
         e.id,
         e.user_id,
         COALESCE(p.first_name, 'Unknown') as first_name,
-        u.email,
+        pii.email,
         e.event_type,
         e.metadata,
         e.event_timestamp as created_at
-      FROM l1_events e
-      LEFT JOIN users u ON e.user_id = u.id
-      LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
+      FROM l1_event_facts e
+      LEFT JOIN l1_user_permissions perm ON e.user_id = perm.id
+      LEFT JOIN l0_pii_users p ON perm.id = p.internal_user_id AND p.deleted_at IS NULL
+      LEFT JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
       WHERE e.event_type IN ('transaction_edit', 'bulk_edit')
-        AND (u.email != $1 OR u.email IS NULL)
+        AND (pii.email != $1 OR pii.email IS NULL)
       ORDER BY e.event_timestamp DESC
       LIMIT 1000
     `, [ADMIN_EMAIL]);

@@ -6,6 +6,7 @@ import utc from 'dayjs/plugin/utc';
 import TransactionModal from './TransactionModal';
 import BulkRecategorizeModal from './BulkRecategorizeModal';
 import StatementUploadModal from './StatementUploadModal';
+import AddCategoryModal from './AddCategoryModal';
 import { CATEGORIES } from '@/lib/categorization-engine';
 
 dayjs.extend(utc);
@@ -52,8 +53,36 @@ export default function TransactionsList({ transactions, loading, token, onRefre
   const [showAddCategoryInput, setShowAddCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [deleteConfirmTxId, setDeleteConfirmTxId] = useState<number | null>(null);
-  const [editCounts, setEditCounts] = useState({ description: 0, category: 0, label: 0, date: 0, amount: 0, statementsUploaded: 0, bulkEdit: 0 });
+  const [editCounts, setEditCounts] = useState<{
+    totalUploads: number;
+    monthsWithData: number;
+    autoCategorisedNumerator: number;
+    autoCategorisedDenominator: number;
+    notCategorisedNumerator: number;
+    notCategorisedDenominator: number;
+    description: number;
+    date: number;
+    amount: number;
+    label: number;
+    bulkEdit: number;
+  }>({ 
+    totalUploads: 0,
+    monthsWithData: 0,
+    autoCategorisedNumerator: 0,
+    autoCategorisedDenominator: 0,
+    notCategorisedNumerator: 0,
+    notCategorisedDenominator: 0,
+    description: 0,
+    date: 0,
+    amount: 0,
+    label: 0,
+    bulkEdit: 0,
+  });
   const [editCountsLoading, setEditCountsLoading] = useState(false);
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [addCategoryContext, setAddCategoryContext] = useState<{ field: 'category'; onAdd: (cat: string) => void } | null>(null);
+  const [isOpeningAddCategoryModal, setIsOpeningAddCategoryModal] = useState(false);
+  const [errorModal, setErrorModal] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
   
   const cashflowDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
   const accountDropdownRef = useRef<HTMLTableHeaderCellElement>(null);
@@ -116,7 +145,19 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       });
       if (response.ok) {
         const data = await response.json();
-        setEditCounts(data);
+        setEditCounts({
+          totalUploads: data.totalUploads || 0,
+          monthsWithData: data.monthsWithData || 0,
+          autoCategorisedNumerator: data.autoCategorisedNumerator || 0,
+          autoCategorisedDenominator: data.autoCategorisedDenominator || 0,
+          notCategorisedNumerator: data.notCategorisedNumerator || 0,
+          notCategorisedDenominator: data.notCategorisedDenominator || 0,
+          description: data.description || 0,
+          date: data.date || 0,
+          amount: data.amount || 0,
+          label: data.label || 0,
+          bulkEdit: data.bulkEdit || 0,
+        });
       }
     } catch (error) {
       console.error('Error fetching edit counts:', error);
@@ -239,6 +280,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       }
 
       onRefresh(); // Refresh the list
+      fetchEditCounts(); // Refresh edit counts
     } catch (error: any) {
       console.error('Create transaction error:', error);
       throw error;
@@ -298,8 +340,7 @@ export default function TransactionsList({ transactions, loading, token, onRefre
 
       setEditingTransaction(null);
       onRefresh(); // Refresh the list
-      // Refresh edit counts after successful update
-      fetchEditCounts();
+      fetchEditCounts(); // Refresh edit counts
     } catch (error: any) {
       console.error('Update transaction error:', error);
       throw error;
@@ -421,9 +462,10 @@ export default function TransactionsList({ transactions, loading, token, onRefre
       }
 
       onRefresh(); // Refresh the list
+      fetchEditCounts(); // Refresh edit counts
     } catch (error: any) {
       console.error('Delete transaction error:', error);
-      alert(error.message);
+      setErrorModal({ show: true, message: error.message || 'Failed to delete transaction' });
     }
   };
 
@@ -560,53 +602,30 @@ export default function TransactionsList({ transactions, loading, token, onRefre
 
   return (
     <div className="space-y-6">
+      {/* Error Modal */}
+      {errorModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
+            <div className="mb-4">
+              <svg className="w-16 h-16 text-red-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Error</h3>
+            <p className="text-gray-600 mb-6">{errorModal.message}</p>
+            <button
+              onClick={() => setErrorModal({ show: false, message: '' })}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Show empty state or normal content */}
       {emptyStateContent || (
         <>
-          {/* Your Activity Section */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Your monthly activity... measuring just how much we got wrong (and can get better)!</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Let's play a game - you try and get these numbers as high as you can, and we'll try and bring the blue ones down over time!
-            </p>
-            {editCountsLoading ? (
-              <div className="text-center py-4">
-                <div className="animate-spin w-6 h-6 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{editCounts.description}</div>
-                  <div className="text-sm text-gray-600 mt-1">Description</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{editCounts.category}</div>
-                  <div className="text-sm text-gray-600 mt-1">Category</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{editCounts.label}</div>
-                  <div className="text-sm text-gray-600 mt-1">Label</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{editCounts.date}</div>
-                  <div className="text-sm text-gray-600 mt-1">Date</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{editCounts.amount}</div>
-                  <div className="text-sm text-gray-600 mt-1">Amount</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-green-600">{editCounts.statementsUploaded}</div>
-                  <div className="text-sm text-gray-600 mt-1">Statements uploaded</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{editCounts.bulkEdit}</div>
-                  <div className="text-sm text-gray-600 mt-1">Bulk edit</div>
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Header with Title and Action Buttons */}
           <div className="flex items-center justify-between">
             <div>
@@ -1147,19 +1166,33 @@ export default function TransactionsList({ transactions, loading, token, onRefre
                             onChange={(e) => {
                               const newVal = e.target.value;
                               if (newVal === '__ADD_NEW__') {
-                                const newCat = prompt('Enter new category name:');
-                                if (newCat && newCat.trim() && !categories.includes(newCat.trim())) {
-                                  setEditValue(newCat.trim());
-                                  saveInlineEdit(tx, 'category', newCat.trim());
-                                } else {
-                                  setEditValue('');
-                                }
+                                // Prevent blur from saving empty value
+                                setIsOpeningAddCategoryModal(true);
+                                setAddCategoryContext({
+                                  field: 'category',
+                                  onAdd: (cat: string) => {
+                                    if (!categories.includes(cat)) {
+                                      setEditValue(cat);
+                                      saveInlineEdit(tx, 'category', cat);
+                                    }
+                                    setIsOpeningAddCategoryModal(false);
+                                  }
+                                });
+                                setShowAddCategoryModal(true);
+                                // Don't clear editValue - keep the original category value
+                                // The modal will handle setting the new value
                               } else {
+                                setIsOpeningAddCategoryModal(false); // Reset flag when selecting existing category
                                 setEditValue(newVal);
                                 saveInlineEdit(tx, 'category', newVal);
                               }
                             }}
-                            onBlur={() => saveInlineEdit(tx, 'category')}
+                            onBlur={() => {
+                              // Don't save if we're opening the add category modal
+                              if (!isOpeningAddCategoryModal) {
+                                saveInlineEdit(tx, 'category');
+                              }
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === 'Escape') cancelInlineEdit(tx, 'category');
                             }}
@@ -1285,6 +1318,79 @@ export default function TransactionsList({ transactions, loading, token, onRefre
           </table>
         </div>
       </div>
+
+      {/* Your Activity Section - Moved to bottom */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
+        <div className="mb-4">
+          <h3 className="text-base font-bold text-gray-900 mb-1">Your monthly activity... let's play a game!</h3>
+          <p className="text-sm text-gray-600">
+            You try and bring green numbers up, red numbers down and we'll try and increase the blue (accurately).
+          </p>
+        </div>
+        {editCountsLoading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin w-6 h-6 border-3 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Data and categorisation coverage */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-800 mb-3">Data and categorisation coverage</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                  <div className="text-2xl font-bold text-green-700 mb-1">{editCounts.totalUploads}</div>
+                  <div className="text-xs font-medium text-green-600">Total uploads</div>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                  <div className="text-2xl font-bold text-green-700 mb-1">{editCounts.monthsWithData}</div>
+                  <div className="text-xs font-medium text-green-600">Months with data</div>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                  <div className="text-2xl font-bold mb-1">
+                    <span className="text-red-700">{editCounts.autoCategorisedNumerator}</span>
+                    <span className="text-blue-600 text-lg">/{editCounts.autoCategorisedDenominator}</span>
+                  </div>
+                  <div className="text-xs font-medium text-blue-600">Unedited auto-categorised</div>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                  <div className="text-2xl font-bold mb-1">
+                    <span className="text-green-700">{editCounts.notCategorisedNumerator}</span>
+                    <span className="text-black text-lg">/{editCounts.notCategorisedDenominator}</span>
+                  </div>
+                  <div className="text-xs font-medium text-blue-600">Edited un-categorised</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Other edits */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-800 mb-3">Other edits</h4>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{editCounts.description}</div>
+                  <div className="text-xs font-medium text-gray-600">Description</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{editCounts.date}</div>
+                  <div className="text-xs font-medium text-gray-600">Date</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{editCounts.amount}</div>
+                  <div className="text-xs font-medium text-gray-600">Amount</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{editCounts.bulkEdit}</div>
+                  <div className="text-xs font-medium text-gray-600">Bulk edit</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{editCounts.label || 0}</div>
+                  <div className="text-xs font-medium text-gray-600">Label</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
         </>
       )}
 
@@ -1315,7 +1421,36 @@ export default function TransactionsList({ transactions, loading, token, onRefre
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         token={token}
-        onSuccess={onRefresh}
+        onSuccess={() => {
+          onRefresh();
+          fetchEditCounts();
+        }}
+      />
+
+      <AddCategoryModal
+        isOpen={showAddCategoryModal}
+        onClose={() => {
+          setShowAddCategoryModal(false);
+          setAddCategoryContext(null);
+          setIsOpeningAddCategoryModal(false);
+          // Restore editing state if modal was closed without adding
+          if (isOpeningAddCategoryModal && editingCell) {
+            const tx = transactions.find(t => t.id === editingCell.txId);
+            if (tx && editingCell.field === 'category') {
+              setEditValue(tx.category || '');
+            }
+          }
+        }}
+        onAdd={(categoryName) => {
+          if (addCategoryContext) {
+            addCategoryContext.onAdd(categoryName);
+          }
+          setShowAddCategoryModal(false);
+          setAddCategoryContext(null);
+          setIsOpeningAddCategoryModal(false);
+          onRefresh(); // Refresh to show new category in list
+        }}
+        existingCategories={categories.filter(c => c !== 'All categories')}
       />
     </div>
   );

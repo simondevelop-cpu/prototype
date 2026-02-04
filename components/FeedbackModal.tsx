@@ -7,9 +7,10 @@ interface FeedbackModalProps {
   onClose: () => void;
   token: string;
   onSubmitSuccess?: () => void;
+  onOpenSurvey?: () => void;
 }
 
-export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess }: FeedbackModalProps) {
+export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess, onOpenSurvey }: FeedbackModalProps) {
   const [usefulness, setUsefulness] = useState<number | null>(null);
   const [trust, setTrust] = useState<number | null>(null);
   const [problems, setProblems] = useState('');
@@ -141,10 +142,21 @@ export default function FeedbackModal({ isOpen, onClose, token, onSubmitSuccess 
         </div>
 
         {showSuccess ? (
-          <div className="p-6 text-center">
+          <div className="p-6 text-center space-y-4">
             <div className="bg-green-50 border border-green-200 text-green-700 px-6 py-4 rounded-lg">
-              <p className="text-lg font-medium">Feedback collected. Thank you for taking the time to help us improve the App!</p>
+              <p className="text-lg font-medium">Thank you for submitting your feedback! Your input helps us improve the App.</p>
             </div>
+            {onOpenSurvey && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenSurvey();
+                }}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Begin 2 minute survey again
+              </button>
+            )}
           </div>
         ) : (
         <form onSubmit={handleSubmit} className="p-6 space-y-6">

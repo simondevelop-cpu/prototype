@@ -29,27 +29,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Ensure chat_bookings table exists
+    // Use new table name (l1_admin_chat_bookings) with fallback to old name
+    let tableName = 'l1_admin_chat_bookings';
     try {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS chat_bookings (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          booking_date DATE NOT NULL,
-          booking_time TIME NOT NULL,
-          preferred_method TEXT NOT NULL CHECK (preferred_method IN ('teams', 'google-meet', 'phone')),
-          share_screen BOOLEAN,
-          record_conversation BOOLEAN,
-          notes TEXT,
-          status TEXT DEFAULT 'requested' CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed')),
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(booking_date, booking_time)
-        )
-      `);
-    } catch (createError: any) {
-      console.error('[API] Error ensuring chat_bookings table exists:', createError);
-      // Continue anyway - might already exist
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'chat_bookings'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'chat_bookings'; // Fallback on error
     }
 
     // Get all bookings with user information
@@ -59,8 +50,8 @@ export async function GET(request: NextRequest) {
         `SELECT 
           cb.id,
           cb.user_id,
-          u.email as user_email,
-          u.display_name,
+          pii.email as user_email,
+          pii.display_name,
           cb.booking_date,
           cb.booking_time,
           cb.preferred_method,
@@ -69,8 +60,9 @@ export async function GET(request: NextRequest) {
           cb.notes,
           cb.status,
           cb.created_at
-         FROM chat_bookings cb
-         JOIN users u ON cb.user_id = u.id
+         FROM ${tableName} cb
+         JOIN l1_user_permissions perm ON cb.user_id = perm.id
+         JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
          ORDER BY cb.booking_date DESC, cb.booking_time DESC
          LIMIT 500`
       );

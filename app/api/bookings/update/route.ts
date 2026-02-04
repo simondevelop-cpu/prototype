@@ -47,9 +47,23 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // Use new table name (l1_admin_chat_bookings) with fallback to old name
+    let tableName = 'l1_admin_chat_bookings';
+    try {
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'chat_bookings'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'chat_bookings'; // Fallback on error
+    }
+
     // Verify the booking belongs to this user
     const bookingCheck = await pool.query(
-      `SELECT id, status FROM chat_bookings WHERE id = $1 AND user_id = $2`,
+      `SELECT id, status FROM ${tableName} WHERE id = $1 AND user_id = $2`,
       [bookingId, userId]
     );
 
@@ -72,7 +86,7 @@ export async function PUT(request: NextRequest) {
       }
 
       await pool.query(
-        `UPDATE chat_bookings 
+        `UPDATE ${tableName} 
          SET status = 'cancelled', updated_at = NOW()
          WHERE id = $1 AND user_id = $2`,
         [bookingId, userId]
@@ -106,7 +120,7 @@ export async function PUT(request: NextRequest) {
       }
 
       await pool.query(
-        `UPDATE chat_bookings 
+        `UPDATE ${tableName} 
          SET notes = $1, updated_at = NOW()
          WHERE id = $2 AND user_id = $3`,
         [notes || null, bookingId, userId]

@@ -29,30 +29,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Ensure table exists
+    // Use new table name (l1_admin_available_slots) with fallback to old name
+    let tableName = 'l1_admin_available_slots';
     try {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS available_slots (
-          id SERIAL PRIMARY KEY,
-          slot_date DATE NOT NULL,
-          slot_time TIME NOT NULL,
-          is_available BOOLEAN DEFAULT TRUE,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(slot_date, slot_time)
-        )
-      `);
-      await pool.query(`CREATE INDEX IF NOT EXISTS idx_available_slots_date_time ON available_slots(slot_date, slot_time)`);
-      await pool.query(`CREATE INDEX IF NOT EXISTS idx_available_slots_available ON available_slots(is_available)`);
-    } catch (createError: any) {
-      console.error('[API] Error ensuring available_slots table exists:', createError);
-      // Continue anyway - might already exist
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'available_slots'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'available_slots'; // Fallback on error
     }
 
     // Get all available slots
     const result = await pool.query(
       `SELECT slot_date, slot_time 
-       FROM available_slots 
+       FROM ${tableName} 
        WHERE is_available = TRUE
        ORDER BY slot_date, slot_time`
     );
@@ -114,24 +108,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Ensure table exists
+    // Use new table name (l1_admin_available_slots) with fallback to old name
+    let tableName = 'l1_admin_available_slots';
     try {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS available_slots (
-          id SERIAL PRIMARY KEY,
-          slot_date DATE NOT NULL,
-          slot_time TIME NOT NULL,
-          is_available BOOLEAN DEFAULT TRUE,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(slot_date, slot_time)
-        )
-      `);
-      await pool.query(`CREATE INDEX IF NOT EXISTS idx_available_slots_date_time ON available_slots(slot_date, slot_time)`);
-      await pool.query(`CREATE INDEX IF NOT EXISTS idx_available_slots_available ON available_slots(is_available)`);
-    } catch (createError: any) {
-      console.error('[API] Error ensuring available_slots table exists:', createError);
-      // Continue anyway - might already exist
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'available_slots'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'available_slots'; // Fallback on error
     }
 
     const body = await request.json();
@@ -171,7 +159,7 @@ export async function POST(request: NextRequest) {
 
     // Upsert the slot availability
     const result = await pool.query(
-      `INSERT INTO available_slots (slot_date, slot_time, is_available, updated_at)
+      `INSERT INTO ${tableName} (slot_date, slot_time, is_available, updated_at)
        VALUES ($1, $2, $3, NOW())
        ON CONFLICT (slot_date, slot_time)
        DO UPDATE SET is_available = $3, updated_at = NOW()

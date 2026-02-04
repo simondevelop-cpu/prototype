@@ -49,6 +49,9 @@ export default function StatementReviewModal({
 }: StatementReviewModalProps) {
   const [currentStep, setCurrentStep] = useState<ReviewStep>('summary');
   const [importing, setImporting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string>('');
+  const [errorModal, setErrorModal] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
   
   // Track which transactions are included/excluded
   const [excludedTransactions, setExcludedTransactions] = useState<Set<string>>(new Set());
@@ -206,7 +209,7 @@ export default function StatementReviewModal({
     const transactionsToImport = getTransactionsToImport();
     
     if (transactionsToImport.length === 0) {
-      alert('No transactions selected for import');
+      setErrorModal({ show: true, message: 'No transactions selected for import' });
       return;
     }
 
@@ -276,15 +279,14 @@ export default function StatementReviewModal({
       const result = await response.json();
 
       if (response.ok) {
-        alert(`Successfully imported ${result.imported} of ${result.total} transactions!`);
-        onSuccess();
-        onClose();
+        setSuccessMessage(`Successfully imported ${result.imported} of ${result.total} transactions!`);
+        setShowSuccessModal(true);
       } else {
-        alert(`Import failed: ${result.error}`);
+        setErrorModal({ show: true, message: `Import failed: ${result.error}` });
       }
     } catch (error: any) {
       console.error('Import error:', error);
-      alert(`Import error: ${error.message}`);
+      setErrorModal({ show: true, message: `Import error: ${error.message}` });
     } finally {
       setImporting(false);
     }
@@ -878,6 +880,56 @@ export default function StatementReviewModal({
   };
 
   if (!isOpen || parsedStatements.length === 0) return null;
+
+  // Success modal
+  if (showSuccessModal) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
+          <div className="mb-4">
+            <svg className="w-16 h-16 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Success!</h3>
+          <p className="text-gray-600 mb-6">{successMessage}</p>
+          <button
+            onClick={() => {
+              setShowSuccessModal(false);
+              onSuccess();
+              onClose();
+            }}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Error modal
+  if (errorModal.show) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
+          <div className="mb-4">
+            <svg className="w-16 h-16 text-red-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Error</h3>
+          <p className="text-gray-600 mb-6">{errorModal.message}</p>
+          <button
+            onClick={() => setErrorModal({ show: false, message: '' })}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

@@ -169,54 +169,59 @@ export async function GET(request: NextRequest) {
 
     // Test 10: Single Source of Truth - Events
     try {
-      // Check if l1_events exists
-      const eventTables = await pool.query(`
+      // Check if l1_event_facts exists
+      const tableCheck = await pool.query(`
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'public' 
-          AND table_name = 'l1_events'
+          AND table_name = 'l1_event_facts'
       `);
-      const hasL1 = eventTables.rows.length > 0;
+      const hasTable = tableCheck.rows.length > 0;
       
       // Check for legacy tables (should not exist after migration)
       const legacyCheck = await pool.query(`
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'public' 
-          AND table_name IN ('user_events', 'l1_event_facts')
+          AND table_name IN ('user_events', 'l1_events')
       `);
       const hasLegacy = legacyCheck.rows.length > 0;
       
-      // Verify l1_events has both user_id and tokenized_user_id columns (dual-column approach)
+      // Verify l1_event_facts has both user_id and tokenized_user_id columns (dual-column approach)
       let hasDualColumns = false;
-      if (hasL1) {
+      if (hasTable) {
         const columnCheck = await pool.query(`
           SELECT column_name 
           FROM information_schema.columns 
           WHERE table_schema = 'public' 
-            AND table_name = 'l1_events'
+            AND table_name = 'l1_event_facts'
             AND column_name IN ('user_id', 'tokenized_user_id')
         `);
         hasDualColumns = columnCheck.rows.length === 2;
       }
       
+      const status = hasTable && !hasLegacy && hasDualColumns ? 'pass' 
+        : hasTable && !hasLegacy ? 'warning' 
+        : hasTable ? 'warning' 
+        : 'fail';
+      
       tests.push({
         name: 'Event Logging Integrity',
         description: 'All user actions and system events are logged in a single, consistent location',
         category: 'data-integrity',
-        status: hasL1 && !hasLegacy && hasDualColumns ? 'pass' : hasL1 && !hasLegacy ? 'warning' : 'fail',
-        message: hasL1 && !hasLegacy && hasDualColumns
+        status,
+        message: hasTable && !hasLegacy && hasDualColumns
           ? 'All events logged in secure, centralized system with dual-column support'
-          : hasL1 && !hasLegacy
-            ? 'l1_events exists but missing tokenized_user_id column'
-            : hasL1
-              ? 'l1_events exists but legacy tables may still exist'
-              : 'l1_events table not found',
-        details: hasL1 && !hasLegacy && hasDualColumns
-          ? 'All events use l1_events table with user_id (operational) and tokenized_user_id (analytics)'
-          : hasL1
-            ? `l1_events exists. Legacy tables: ${hasLegacy ? legacyCheck.rows.map((r: any) => r.table_name).join(', ') : 'none'}. Dual columns: ${hasDualColumns ? 'yes' : 'no'}`
-            : 'l1_events table not found',
+          : hasTable && !hasLegacy
+            ? 'l1_event_facts exists but missing tokenized_user_id column'
+            : hasTable
+              ? 'l1_event_facts exists but legacy tables may still exist'
+              : 'l1_event_facts table not found',
+        details: hasTable && !hasLegacy && hasDualColumns
+          ? 'All events use l1_event_facts table with user_id (operational) and tokenized_user_id (analytics)'
+          : hasTable
+            ? `l1_event_facts exists. Legacy tables: ${hasLegacy ? legacyCheck.rows.map((r: any) => r.table_name).join(', ') : 'none'}. Dual columns: ${hasDualColumns ? 'yes' : 'no'}`
+            : 'l1_event_facts table not found',
       });
     } catch (error: any) {
       tests.push({
@@ -237,8 +242,9 @@ export async function GET(request: NextRequest) {
       `);
       const totalUsers = await pool.query(`
         SELECT COUNT(*) as count
-        FROM users
-        WHERE email != $1
+        FROM l1_user_permissions perm
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email != $1
       `, [ADMIN_EMAIL]);
       
       const tokenized = parseInt(tokenizedCount.rows[0]?.count || '0', 10);

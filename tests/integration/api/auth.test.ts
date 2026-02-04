@@ -39,6 +39,7 @@ describe('Authentication API', () => {
     } as unknown as Pool;
 
     // Create schema - all tables needed by auth routes
+    // IMPORTANT: Create l1_user_permissions FIRST as it's referenced by other tables
     await testClient.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -47,10 +48,35 @@ describe('Authentication API', () => {
         display_name TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS l1_user_permissions (
+        id SERIAL PRIMARY KEY,
+        password_hash TEXT NOT NULL,
+        login_attempts INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        email_validated BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS l0_pii_users (
+        internal_user_id INTEGER PRIMARY KEY REFERENCES l1_user_permissions(id),
+        email TEXT NOT NULL,
+        display_name TEXT,
+        ip_address TEXT,
+        ip_address_updated_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS l0_user_tokenization (
+        internal_user_id INTEGER PRIMARY KEY REFERENCES l1_user_permissions(id),
+        tokenized_user_id TEXT NOT NULL UNIQUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
       
       CREATE TABLE IF NOT EXISTS transactions (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
+        user_id INTEGER REFERENCES l1_user_permissions(id),
         date DATE NOT NULL,
         description TEXT NOT NULL,
         amount NUMERIC(12, 2) NOT NULL,
@@ -60,28 +86,36 @@ describe('Authentication API', () => {
       
       CREATE TABLE IF NOT EXISTS onboarding_responses (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
+        user_id INTEGER REFERENCES l1_user_permissions(id),
         completed_at TIMESTAMP WITH TIME ZONE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
-      CREATE TABLE IF NOT EXISTS l0_user_tokenization (
-        internal_user_id INTEGER PRIMARY KEY REFERENCES users(id),
-        tokenized_user_id TEXT NOT NULL UNIQUE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS l0_pii_users (
-        internal_user_id INTEGER PRIMARY KEY REFERENCES users(id),
-        email TEXT NOT NULL,
-        ip_address TEXT,
-        ip_address_updated_at TIMESTAMP WITH TIME ZONE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      CREATE TABLE IF NOT EXISTS l1_event_facts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES l1_user_permissions(id),
+        tokenized_user_id TEXT REFERENCES l0_user_tokenization(tokenized_user_id),
+        event_type TEXT NOT NULL,
+        event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        metadata JSONB,
+        is_admin BOOLEAN DEFAULT FALSE,
+        session_id TEXT
       );
 
       CREATE TABLE IF NOT EXISTS l1_events (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id),
+        user_id INTEGER NOT NULL REFERENCES l1_user_permissions(id),
+        tokenized_user_id TEXT REFERENCES l0_user_tokenization(tokenized_user_id),
+        event_type TEXT NOT NULL,
+        event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        metadata JSONB,
+        is_admin BOOLEAN DEFAULT FALSE,
+        session_id TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS l1_event_facts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES l1_user_permissions(id),
         tokenized_user_id TEXT REFERENCES l0_user_tokenization(tokenized_user_id),
         event_type TEXT NOT NULL,
         event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -170,11 +204,14 @@ describe('Authentication API', () => {
         await registerHandler(request);
 
         const result = await testClient.query(
-          'SELECT password_hash FROM users WHERE email = $1',
+          `SELECT perm.password_hash 
+           FROM l0_pii_users pii
+           JOIN l1_user_permissions perm ON pii.internal_user_id = perm.id
+           WHERE pii.email = $1`,
           ['hashtest@test.com']
         );
 
-        const hash = result.rows[0].password_hash;
+        const hash = result.rows[0]?.password_hash;
         expect(hash).toMatch(/^\$2[aby]\$/); // bcrypt hash format
       });
     });
@@ -277,11 +314,17 @@ describe('Authentication API', () => {
     beforeEach(async () => {
       // Create a test user for login tests
       const passwordHash = await hashPassword('TestP@ss1');
-      const userResult = await testClient.query(
-        'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id',
-        ['logintest@test.com', passwordHash, 'Login Test User']
+      const permResult = await testClient.query(
+        'INSERT INTO l1_user_permissions (password_hash) VALUES ($1) RETURNING id',
+        [passwordHash]
       );
-      const userId = userResult.rows[0].id;
+      const userId = permResult.rows[0].id;
+
+      // Create PII record
+      await testClient.query(
+        'INSERT INTO l0_pii_users (internal_user_id, email, display_name) VALUES ($1, $2, $3)',
+        [userId, 'logintest@test.com', 'Login Test User']
+      );
       
       // Create completed onboarding response (required for login)
       await testClient.query(

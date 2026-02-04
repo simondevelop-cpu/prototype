@@ -15,6 +15,7 @@ export default function BookingItem({ booking, token, onUpdate }: BookingItemPro
   const [updating, setUpdating] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleUpdateNotes = async () => {
     setUpdating(true);
@@ -34,14 +35,15 @@ export default function BookingItem({ booking, token, onUpdate }: BookingItemPro
 
       if (response.ok) {
         setEditingNotes(false);
+        setError(null);
         onUpdate(); // Refresh bookings
       } else {
         const errorData = await response.json().catch(() => ({}));
-        alert(errorData.error || 'Failed to update notes');
+        setError(errorData.error || 'Failed to update notes');
       }
     } catch (error) {
       console.error('Error updating notes:', error);
-      alert('Failed to update notes');
+      setError('Failed to update notes');
     } finally {
       setUpdating(false);
     }
@@ -68,14 +70,15 @@ export default function BookingItem({ booking, token, onUpdate }: BookingItemPro
       });
 
       if (response.ok) {
+        setError(null);
         onUpdate(); // Refresh bookings
       } else {
         const errorData = await response.json().catch(() => ({}));
-        alert(errorData.error || 'Failed to cancel booking');
+        setError(errorData.error || 'Failed to cancel booking');
       }
     } catch (error) {
       console.error('Error cancelling booking:', error);
-      alert('Failed to cancel booking');
+      setError('Failed to cancel booking');
     } finally {
       setCancelling(false);
     }
@@ -83,6 +86,21 @@ export default function BookingItem({ booking, token, onUpdate }: BookingItemPro
 
   return (
     <div className="border border-gray-200 rounded-lg p-4">
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-red-700">{error}</p>
+            <button
+              onClick={() => setError(null)}
+              className="text-red-500 hover:text-red-700"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="font-medium text-gray-900">

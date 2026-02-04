@@ -41,9 +41,35 @@ export async function GET(request: NextRequest) {
     let query;
     let params: any[] = [];
 
+    // Determine table names (new architecture with fallback)
+    let merchantsTable = 'l1_admin_merchants';
+    let keywordsTable = 'l1_admin_keywords';
+    
+    try {
+      const merchantsCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [merchantsTable]
+      );
+      if (merchantsCheck.rows.length === 0) {
+        merchantsTable = 'admin_merchants';
+      }
+      
+      const keywordsCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [keywordsTable]
+      );
+      if (keywordsCheck.rows.length === 0) {
+        keywordsTable = 'admin_keywords';
+      }
+    } catch (e) {
+      // Fallback to old names on error
+      merchantsTable = 'admin_merchants';
+      keywordsTable = 'admin_keywords';
+    }
+    
     if (type === 'merchants') {
       query = `
-        SELECT * FROM admin_merchants 
+        SELECT * FROM ${merchantsTable} 
         WHERE is_active = TRUE
         ${category ? 'AND category = $1' : ''}
         ORDER BY category, merchant_pattern
@@ -51,7 +77,7 @@ export async function GET(request: NextRequest) {
       if (category) params.push(category);
     } else {
       query = `
-        SELECT * FROM admin_keywords 
+        SELECT * FROM ${keywordsTable} 
         WHERE is_active = TRUE
         ${category ? 'AND category = $1' : ''}
         ORDER BY category, keyword

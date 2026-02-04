@@ -23,30 +23,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Ensure table exists
+    // Use new table name (l1_admin_available_slots) with fallback to old name
+    let availableSlotsTableName = 'l1_admin_available_slots';
     try {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS available_slots (
-          id SERIAL PRIMARY KEY,
-          slot_date DATE NOT NULL,
-          slot_time TIME NOT NULL,
-          is_available BOOLEAN DEFAULT TRUE,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(slot_date, slot_time)
-        )
-      `);
-      await pool.query(`CREATE INDEX IF NOT EXISTS idx_available_slots_date_time ON available_slots(slot_date, slot_time)`);
-      await pool.query(`CREATE INDEX IF NOT EXISTS idx_available_slots_available ON available_slots(is_available)`);
-    } catch (createError: any) {
-      console.error('[API] Error ensuring available_slots table exists:', createError);
-      // Continue anyway - might already exist
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [availableSlotsTableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        availableSlotsTableName = 'available_slots'; // Fallback to old name
+      }
+    } catch (e) {
+      availableSlotsTableName = 'available_slots'; // Fallback on error
     }
 
     // Get admin-marked available slots
     const availableSlotsResult = await pool.query(
       `SELECT slot_date, slot_time 
-       FROM available_slots 
+       FROM ${availableSlotsTableName} 
        WHERE is_available = TRUE`
     );
     const adminMarkedSlots = new Set(
@@ -69,27 +63,18 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    // Ensure chat_bookings table exists
+    // Use new table name (l1_admin_chat_bookings) with fallback to old name
+    let bookingsTableName = 'l1_admin_chat_bookings';
     try {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS chat_bookings (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          booking_date DATE NOT NULL,
-          booking_time TIME NOT NULL,
-          preferred_method TEXT NOT NULL CHECK (preferred_method IN ('teams', 'google-meet', 'phone')),
-          share_screen BOOLEAN,
-          record_conversation BOOLEAN,
-          notes TEXT,
-          status TEXT DEFAULT 'requested' CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed')),
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(booking_date, booking_time)
-        )
-      `);
-    } catch (createError: any) {
-      console.error('[API] Error ensuring chat_bookings table exists:', createError);
-      // Continue anyway - might already exist
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [bookingsTableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        bookingsTableName = 'chat_bookings'; // Fallback to old name
+      }
+    } catch (e) {
+      bookingsTableName = 'chat_bookings'; // Fallback on error
     }
 
     // Get all bookings
@@ -97,7 +82,7 @@ export async function GET(request: NextRequest) {
     try {
       bookingsResult = await pool.query(
         `SELECT booking_date, booking_time 
-         FROM chat_bookings 
+         FROM ${bookingsTableName} 
          WHERE status IN ('pending', 'requested', 'confirmed')`
       );
     } catch (error: any) {

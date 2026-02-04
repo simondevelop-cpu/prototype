@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import dayjs from 'dayjs';
 
 interface SurveyModalProps {
@@ -17,18 +17,16 @@ interface RankedItem {
 
 export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [q1Data, setQ1Data] = useState<Array<{ feature: string; expect: boolean; use: boolean; love: boolean }>>([]);
   const [q2Ranked, setQ2Ranked] = useState<RankedItem[]>([
     { text: 'Maintain user trust with obsession on data security', rank: 1 },
     { text: 'More accurate automatic categorization', rank: null },
     { text: 'Faster transaction import and processing', rank: null },
     { text: 'Better visualizations and charts', rank: null },
-    { text: 'Personalized financial tips and recommendations', rank: null },
-    { text: 'Ability to set and track custom spending limits', rank: null },
-    { text: 'Notifications about unusual spending patterns', rank: null },
-    { text: 'Comparison with peers - is my spend normal type charts', rank: null },
-    { text: 'Integration with investment tracking', rank: null },
-    { text: 'Tax preparation features', rank: null },
     { text: 'Better mobile experience', rank: null },
     { text: 'More detailed category breakdowns', rank: null },
     { text: 'Ability to add notes or tags to transactions', rank: null },
@@ -47,18 +45,15 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
   useEffect(() => {
     if (!isOpen) {
       setCurrentStep(0);
+      setIsSubmitting(false);
+      setIsSubmitted(false);
+      setShowSuccessModal(false);
       setQ1Data([]);
       setQ2Ranked([
         { text: 'Maintain user trust with obsession on data security', rank: 1 },
         { text: 'More accurate automatic categorization', rank: null },
         { text: 'Faster transaction import and processing', rank: null },
         { text: 'Better visualizations and charts', rank: null },
-        { text: 'Personalized financial tips and recommendations', rank: null },
-        { text: 'Ability to set and track custom spending limits', rank: null },
-        { text: 'Notifications about unusual spending patterns', rank: null },
-        { text: 'Comparison with peers - is my spend normal type charts', rank: null },
-        { text: 'Integration with investment tracking', rank: null },
-        { text: 'Tax preparation features', rank: null },
         { text: 'Better mobile experience', rank: null },
         { text: 'More detailed category breakdowns', rank: null },
         { text: 'Ability to add notes or tags to transactions', rank: null },
@@ -179,6 +174,13 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
   };
 
   const handleSubmit = async () => {
+    // Prevent double submission
+    if (isSubmitting || isSubmitted) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    
     try {
       const q2Final = q2Ranked
         .filter(item => item.rank !== null)
@@ -201,14 +203,22 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
       });
 
       if (response.ok) {
-        alert('Thank you for your feedback! Your responses will help shape our roadmap.');
-        onClose();
+        setIsSubmitted(true);
+        setShowSuccessModal(true);
+        setError(null);
+        // Auto-close after 2 seconds
+        setTimeout(() => {
+          setShowSuccessModal(false);
+          onClose();
+        }, 2000);
       } else {
-        alert('Failed to submit survey. Please try again.');
+        setIsSubmitting(false);
+        setError('Failed to submit survey. Please try again.');
       }
     } catch (error) {
       console.error('Error submitting survey:', error);
-      alert('Failed to submit survey. Please try again.');
+      setIsSubmitting(false);
+      setError('Failed to submit survey. Please try again.');
     }
   };
 
@@ -235,9 +245,16 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
               'Multi-currency support for travel expenses',
               'Integration with more banks and credit cards',
               'Predictive insights (e.g., "You usually spend $X on groceries this week")',
-              'Export data to Excel or CSV for my own analysis',
+              'Do my own analysis based on excels pulled from the App',
+              'Recommendations and comparisons',
               'Mobile app for on-the-go expense tracking',
               'Family/household budget sharing',
+              'Personalized financial tips and recommendations',
+              'Ability to set and track custom spending limits',
+              'Notifications about unusual spending patterns',
+              'Comparison with peers - is my spend normal type charts',
+              'Integration with investment tracking',
+              'Tax preparation features',
             ].map((feature, idx) => {
               const existing = q1Data.find(item => item.feature === feature);
               return (
@@ -412,7 +429,7 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
         <div className="space-y-3">
           {[
             { emoji: '🧾', text: 'Accountant / CPA (taxes, filings, cleanup, year-end)' },
-            { emoji: '🏦', text: 'Fee-only financial planner (budgeting, saving, big decisions)' },
+            { emoji: '🏦', text: 'Fee-only financial planner (budgeting, saving, big decisions, retirement planning)' },
             { emoji: '💳', text: 'Credit card / rewards specialist (optimize cards based on spend)' },
             { emoji: '🏠', text: 'Mortgage or home-buying advisor' },
             { emoji: '📈', text: 'Investment advisor (non-sales / fee-only)' },
@@ -478,6 +495,10 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
   const renderStep4 = () => {
     const wordCount = q5Data.trim().split(/\s+/).filter(Boolean).length;
     const maxWords = 200;
+    const borderClass = wordCount >= maxWords ? 'border-red-300' : 'border-gray-300';
+    const wordLimitMessage = wordCount >= maxWords ? (
+      <p className="text-sm text-red-600 mt-1">200 word maximum</p>
+    ) : null;
     
     return (
       <div>
@@ -495,21 +516,39 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
             }
           }}
           rows={6}
-          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-            wordCount >= maxWords ? 'border-red-300' : 'border-gray-300'
-          }`}
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${borderClass}`}
           placeholder="Your comments, suggestions, or let us know if you're open to a follow-up conversation..."
         />
-        {wordCount >= maxWords && (
-          <p className="text-sm text-red-600 mt-1">200 word maximum</p>
-        )}
+        {wordLimitMessage}
       </div>
     );
   };
 
-  if (!isOpen) return null;
+  // Early return if modal is not open
+  if (!isOpen) {
+    return null;
+  }
 
-  return (
+  // Prepare success modal content
+  let successModalContent: JSX.Element | null = null;
+  if (showSuccessModal) {
+    successModalContent = (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
+          <div className="mb-4">
+            <svg className="w-16 h-16 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Thank you!</h3>
+          <p className="text-gray-600">Your responses will help shape our roadmap.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Main component content
+  const mainContent = (
     <div className="fixed inset-0 z-50 bg-gradient-to-br from-blue-50 to-indigo-100 overflow-y-auto">
       <div className="min-h-screen py-12 px-4">
         <div className="max-w-3xl mx-auto">
@@ -547,15 +586,48 @@ export default function SurveyModal({ isOpen, onClose, token }: SurveyModalProps
               </button>
               <button
                 onClick={handleNext}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={isSubmitting || isSubmitted}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {currentStep === totalSteps - 1 ? 'Submit Survey' : 'Continue'}
+                {isSubmitted 
+                  ? 'Thank you for submitting' 
+                  : currentStep === totalSteps - 1 
+                    ? (isSubmitting ? 'Submitting...' : 'Submit Survey')
+                    : 'Continue'}
               </button>
             </div>
           </div>
         </div>
       </div>
     </div>
+  );
+
+  // Return both success modal and main content
+  return (
+    <Fragment>
+      {successModalContent}
+      {mainContent}
+      {/* Error message - inline at top of modal */}
+      {error && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
+            <div className="mb-4">
+              <svg className="w-16 h-16 text-red-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Error</h3>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <button
+              onClick={() => setError(null)}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+    </Fragment>
   );
 }
 

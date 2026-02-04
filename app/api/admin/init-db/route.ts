@@ -85,9 +85,9 @@ async function initializeTables() {
     `);
     console.log('[DB Init] ✅ categorization_learning table created');
     
-    // Create l1_events table for login and dashboard access tracking (renamed from user_events)
+    // Create l1_event_facts table for login and dashboard access tracking (migrated from l1_events)
     await client.query(`
-      CREATE TABLE IF NOT EXISTS l1_events (
+      CREATE TABLE IF NOT EXISTS l1_event_facts (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         tokenized_user_id TEXT,
@@ -101,30 +101,53 @@ async function initializeTables() {
       )
     `);
     
+    // Create beta_emails table for pre-approved email addresses
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS beta_emails (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        added_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('[DB Init] ✅ beta_emails table created');
+    
+    // Create index on email for faster lookups
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_beta_emails_email ON beta_emails(email)
+    `);
+    
+    // Add unique index to prevent duplicate consent events (race condition fix)
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_l1_event_facts_unique_consent 
+      ON l1_event_facts (user_id, event_type, ((metadata->>'consentType')))
+      WHERE event_type = 'consent'
+    `);
+    
     // Add session_id column if it doesn't exist (for existing tables)
     await client.query(`
       DO $$ 
       BEGIN
         IF NOT EXISTS (
           SELECT 1 FROM information_schema.columns 
-          WHERE table_name = 'l1_events' AND column_name = 'session_id'
+          WHERE table_name = 'l1_event_facts' AND column_name = 'session_id'
         ) THEN
-          ALTER TABLE l1_events ADD COLUMN session_id TEXT;
+          ALTER TABLE l1_event_facts ADD COLUMN session_id TEXT;
         END IF;
       END $$;
     `);
     
     // Create index for session queries
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_l1_events_session_id 
-      ON l1_events(session_id) 
+      CREATE INDEX IF NOT EXISTS idx_l1_event_facts_session_id 
+      ON l1_event_facts(session_id) 
       WHERE session_id IS NOT NULL;
     `);
-    console.log('[DB Init] ✅ l1_events table created');
+    console.log('[DB Init] ✅ l1_event_facts table created');
     
     // Populate tokenized_user_id for existing events
     await client.query(`
-      UPDATE l1_events e
+      UPDATE l1_event_facts e
       SET tokenized_user_id = ut.tokenized_user_id
       FROM l0_user_tokenization ut
       WHERE ut.internal_user_id = e.user_id
@@ -133,28 +156,28 @@ async function initializeTables() {
     
     // Create index for analytics queries
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_l1_events_tokenized_user_id 
-      ON l1_events(tokenized_user_id) 
+      CREATE INDEX IF NOT EXISTS idx_l1_event_facts_tokenized_user_id 
+      ON l1_event_facts(tokenized_user_id) 
       WHERE tokenized_user_id IS NOT NULL
     `);
     
-    // Create indexes for l1_events table
+    // Create indexes for l1_event_facts table
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_l1_events_user_id ON l1_events(user_id)
+      CREATE INDEX IF NOT EXISTS idx_l1_event_facts_user_id ON l1_event_facts(user_id)
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_l1_events_type ON l1_events(event_type)
+      CREATE INDEX IF NOT EXISTS idx_l1_event_facts_type ON l1_event_facts(event_type)
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_l1_events_timestamp ON l1_events(event_timestamp)
+      CREATE INDEX IF NOT EXISTS idx_l1_event_facts_timestamp ON l1_event_facts(event_timestamp)
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_l1_events_user_type ON l1_events(user_id, event_type)
+      CREATE INDEX IF NOT EXISTS idx_l1_event_facts_user_type ON l1_event_facts(user_id, event_type)
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_l1_events_is_admin ON l1_events(is_admin) WHERE is_admin = TRUE
+      CREATE INDEX IF NOT EXISTS idx_l1_event_facts_is_admin ON l1_event_facts(is_admin) WHERE is_admin = TRUE
     `);
-    console.log('[DB Init] ✅ l1_events indexes created');
+    console.log('[DB Init] ✅ l1_event_facts indexes created');
     
     // Create onboarding_responses table
     await client.query(`

@@ -32,6 +32,7 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showFirstUploadConsent, setShowFirstUploadConsent] = useState(false);
   const [hasFirstUploadConsent, setHasFirstUploadConsent] = useState<boolean | null>(null); // null = checking, true/false = result
+  const [errorModal, setErrorModal] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Check for existing first upload consent when modal opens
@@ -125,7 +126,7 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
         const successfulParses = result.results.filter((r: any) => r.status === 'success');
 
         if (successfulParses.length === 0) {
-          alert('No statements could be parsed. Please check the error messages.');
+          setErrorModal({ show: true, message: 'No statements could be parsed. Please check the error messages.' });
           setUploadProgress(result.results.reduce((acc: any, r: any) => {
             acc[r.filename] = { status: r.status, message: r.message };
             return acc;
@@ -137,11 +138,11 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
         setParsedStatements(successfulParses);
         setShowReviewModal(true);
       } else {
-        alert(`Parse failed: ${result.error || 'Unknown error'}`);
+        setErrorModal({ show: true, message: `Parse failed: ${result.error || 'Unknown error'}` });
       }
     } catch (error: any) {
       console.error('[Upload] Parse error:', error);
-      alert(`Parse error: ${error.message}`);
+      setErrorModal({ show: true, message: `Parse error: ${error.message}` });
     } finally {
       setUploading(false);
     }
@@ -214,6 +215,26 @@ export default function StatementUploadModal({ isOpen, onClose, token, onSuccess
 
   return (
     <>
+      {/* Error Modal */}
+      {errorModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
+            <div className="mb-4">
+              <svg className="w-16 h-16 text-red-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Error</h3>
+            <p className="text-gray-600 mb-6">{errorModal.message}</p>
+            <button
+              onClick={() => setErrorModal({ show: false, message: '' })}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Review Modal */}
       {showReviewModal && (

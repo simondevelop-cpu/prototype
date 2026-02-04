@@ -43,11 +43,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch from users table (display_name, email)
-    const userResult = await pool.query(
-      'SELECT id, email, display_name FROM users WHERE id = $1',
-      [userId]
-    );
+    // Fetch from l0_pii_users (display_name, email)
+    const userResult = await pool.query(`
+      SELECT perm.id, pii.email, pii.display_name
+      FROM l1_user_permissions perm
+      JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+      WHERE perm.id = $1
+    `, [userId]);
 
     if (userResult.rows.length === 0) {
       return NextResponse.json(

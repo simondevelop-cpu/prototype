@@ -10,33 +10,10 @@ export async function requireCompletedOnboarding(
   userId: number
 ): Promise<{ completed: boolean; error?: string }> {
   try {
-    // Schema-adaptive: Check if onboarding columns exist in users table (post-migration)
-    let useUsersTable = false;
-    try {
-      const schemaCheck = await pool.query(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'users' 
-        AND column_name = 'completed_at'
-      `);
-      useUsersTable = schemaCheck.rows.length > 0;
-    } catch (e) {
-      console.log('[Auth Middleware] Could not check schema, using fallback');
-    }
-
+    // Check onboarding_responses table for completed_at (post-migration: onboarding data is in onboarding_responses)
     let hasCompleted = false;
-
-    if (useUsersTable) {
-      // Use users table (post-migration)
-      const result = await pool.query(
-        `SELECT completed_at 
-         FROM users 
-         WHERE id = $1`,
-        [userId]
-      );
-      hasCompleted = result.rows.length > 0 && result.rows[0].completed_at !== null;
-    } else {
-      // Fallback to onboarding_responses table (pre-migration)
+    
+    try {
       const schemaCheck = await pool.query(`
         SELECT column_name 
         FROM information_schema.columns 
@@ -58,6 +35,10 @@ export async function requireCompletedOnboarding(
         [userId]
       );
       hasCompleted = parseInt(result.rows[0]?.count || '0') > 0;
+    } catch (e) {
+      console.log('[Auth Middleware] Could not check onboarding_responses, using fallback');
+      // Fallback: allow access if we can't check (fail open)
+      return { completed: true };
     }
 
     if (!hasCompleted) {

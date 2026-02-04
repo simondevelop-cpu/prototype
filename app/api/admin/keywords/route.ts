@@ -27,8 +27,22 @@ export async function POST(request: NextRequest) {
     
     const { keyword, category, label } = await request.json();
     
+    // Use new table name (l1_admin_keywords) with fallback to old name
+    let tableName = 'l1_admin_keywords';
+    try {
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'admin_keywords'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'admin_keywords'; // Fallback on error
+    }
+    
     const result = await pool.query(
-      `INSERT INTO admin_keywords (keyword, category, label, is_active)
+      `INSERT INTO ${tableName} (keyword, category, label, is_active)
        VALUES ($1, $2, $3, true)
        RETURNING *`,
       [keyword, category, label]

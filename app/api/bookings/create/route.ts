@@ -37,61 +37,110 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Ensure chat_bookings table exists with correct constraint
+    // Use new table name (l1_admin_chat_bookings) with fallback to old name
+    let tableName = 'l1_admin_chat_bookings';
     try {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS chat_bookings (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          booking_date DATE NOT NULL,
-          booking_time TIME NOT NULL,
-          preferred_method TEXT NOT NULL CHECK (preferred_method IN ('teams', 'google-meet', 'phone')),
-          share_screen BOOLEAN,
-          record_conversation BOOLEAN,
-          notes TEXT,
-          status TEXT DEFAULT 'requested' CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed')),
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(booking_date, booking_time)
-        )
-      `);
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'chat_bookings'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'chat_bookings'; // Fallback on error
+    }
+
+    // Fix foreign key constraint if it references users.id instead of l1_user_permissions.id
+    try {
+      const fkCheck = await pool.query(`
+        SELECT
+          tc.constraint_name,
+          ccu.table_name AS referenced_table
+        FROM information_schema.table_constraints AS tc
+        JOIN information_schema.key_column_usage AS kcu
+          ON tc.constraint_name = kcu.constraint_name
+          AND tc.table_schema = kcu.table_schema
+        JOIN information_schema.constraint_column_usage AS ccu
+          ON ccu.constraint_name = tc.constraint_name
+          AND ccu.table_schema = tc.table_schema
+        WHERE tc.constraint_type = 'FOREIGN KEY'
+          AND tc.table_name = $1
+          AND kcu.column_name = 'user_id'
+      `, [tableName]);
+
+      // If foreign key references users instead of l1_user_permissions, fix it
+      if (fkCheck.rows.length > 0) {
+        const fk = fkCheck.rows[0];
+        if (fk.referenced_table === 'users') {
+          const constraintName = fk.constraint_name;
+          // Drop old constraint
+          await pool.query(`
+            ALTER TABLE ${tableName}
+            DROP CONSTRAINT IF EXISTS ${constraintName}
+          `);
+          // Add new constraint pointing to l1_user_permissions
+          const newConstraintName = `${tableName}_user_id_fkey`;
+          await pool.query(`
+            ALTER TABLE ${tableName}
+            ADD CONSTRAINT ${newConstraintName}
+            FOREIGN KEY (user_id)
+            REFERENCES l1_user_permissions(id)
+            ON DELETE CASCADE
+          `);
+          console.log(`[API] Fixed foreign key constraint on ${tableName} to reference l1_user_permissions`);
+        }
+      }
+    } catch (fkError: any) {
+      // Log but don't fail - constraint might already be correct or table might not exist
+      console.warn('[API] Could not check/fix foreign key constraint:', fkError.message);
+    }
+
+    // Check if table exists and has correct constraint
+    try {
+      const tableExists = await pool.query(`
+        SELECT 1 FROM information_schema.tables WHERE table_name = $1
+      `, [tableName]);
       
-      // Try to update the constraint if table already exists with old constraint
-      try {
-        // First, check if constraint exists and what values it allows
-        const constraintCheck = await pool.query(`
-          SELECT conname, pg_get_constraintdef(oid) as definition
-          FROM pg_constraint
-          WHERE conrelid = 'chat_bookings'::regclass
-          AND conname = 'chat_bookings_status_check'
-        `);
-        
-        if (constraintCheck.rows.length > 0) {
-          const definition = constraintCheck.rows[0].definition;
-          // Check if 'requested' is in the constraint
-          if (!definition.includes("'requested'")) {
-            // Drop old constraint and add new one
+      if (tableExists.rows.length > 0) {
+        // Try to update the constraint if table already exists with old constraint
+        try {
+          // First, check if constraint exists and what values it allows
+          const constraintCheck = await pool.query(`
+            SELECT conname, pg_get_constraintdef(oid) as definition
+            FROM pg_constraint
+            WHERE conrelid = $1::regclass
+            AND conname LIKE '%status_check'
+          `, [tableName]);
+          
+          if (constraintCheck.rows.length > 0) {
+            const definition = constraintCheck.rows[0].definition;
+            // Check if 'requested' is in the constraint
+            if (!definition.includes("'requested'")) {
+              // Drop old constraint and add new one
+              const constraintName = constraintCheck.rows[0].conname;
+              await pool.query(`
+                ALTER TABLE ${tableName} DROP CONSTRAINT IF EXISTS ${constraintName};
+              `);
+              await pool.query(`
+                ALTER TABLE ${tableName} ADD CONSTRAINT ${tableName}_status_check 
+                  CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed'));
+              `);
+            }
+          } else {
+            // Constraint doesn't exist, add it
             await pool.query(`
-              ALTER TABLE chat_bookings DROP CONSTRAINT chat_bookings_status_check;
-            `);
-            await pool.query(`
-              ALTER TABLE chat_bookings ADD CONSTRAINT chat_bookings_status_check 
+              ALTER TABLE ${tableName} ADD CONSTRAINT ${tableName}_status_check 
                 CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed'));
             `);
           }
-        } else {
-          // Constraint doesn't exist, add it
-          await pool.query(`
-            ALTER TABLE chat_bookings ADD CONSTRAINT chat_bookings_status_check 
-              CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed'));
-          `);
+        } catch (alterError: any) {
+          // Log error but continue - constraint might already be correct or table might not exist yet
+          console.warn('[API] Constraint update note:', alterError.message);
         }
-      } catch (alterError: any) {
-        // Log error but continue - constraint might already be correct or table might not exist yet
-        console.warn('[API] Constraint update note:', alterError.message);
       }
     } catch (createError: any) {
-      console.error('[API] Error ensuring chat_bookings table exists:', createError);
+      console.error('[API] Error checking table:', createError);
       // Continue anyway - might already exist
     }
 
@@ -189,7 +238,7 @@ export async function POST(request: NextRequest) {
 
     // Check if slot is already booked (including requested status)
     const existingBooking = await pool.query(
-      `SELECT id FROM chat_bookings 
+      `SELECT id FROM ${tableName} 
        WHERE booking_date = $1 AND booking_time = $2 AND status IN ('pending', 'requested', 'confirmed')`,
       [bookingDate, normalizedTime]
     );
@@ -220,7 +269,7 @@ export async function POST(request: NextRequest) {
 
     // Create booking with status 'requested' (admin will confirm)
     const result = await pool.query(
-      `INSERT INTO chat_bookings 
+      `INSERT INTO ${tableName} 
        (user_id, booking_date, booking_time, preferred_method, share_screen, record_conversation, notes, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'requested')
        RETURNING id, booking_date, booking_time, preferred_method, share_screen, record_conversation, notes, status, created_at`,

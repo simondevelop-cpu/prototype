@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, FormEvent } from 'react';
+import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { invalidatePatternCache } from '@/lib/categorization-engine';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -8,7 +8,7 @@ import CheckboxDropdown from '@/components/CheckboxDropdown';
 import { formatUserId, formatTransactionId, formatEventId } from '@/lib/id-formatter';
 
 type TabName = 'monitoring' | 'inbox' | 'categories' | 'analytics' | 'migration';
-type MonitoringSubTab = 'accounts' | 'health' | 'admin-logins';
+type MonitoringSubTab = 'accounts' | 'health' | 'admin-logins' | 'beta-accounts';
 type InboxSubTab = 'chat-scheduler' | 'feedback' | 'whats-coming-survey';
 
 interface Keyword {
@@ -47,6 +47,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabName>('inbox');
   const [monitoringSubTab, setMonitoringSubTab] = useState<MonitoringSubTab>('health');
   const [viewType, setViewType] = useState<'keywords' | 'merchants' | 'recategorization'>('keywords');
+  const [categorizationSubTab, setCategorizationSubTab] = useState<'recategorization' | 'uncategorised'>('recategorization');
   const [analyticsSubTab, setAnalyticsSubTab] = useState<'cohort-analysis' | 'customer-data' | 'events-data' | 'editing-events-data' | 'sessions' | 'vanity-metrics' | 'download'>('cohort-analysis');
   const [inboxSubTab, setInboxSubTab] = useState<InboxSubTab>('feedback');
   const [keywords, setKeywords] = useState<GroupedData>({});
@@ -71,6 +72,11 @@ export default function AdminDashboard() {
   const [recategorizations, setRecategorizations] = useState<any[]>([]);
   const [recatLoading, setRecatLoading] = useState(false);
   const [reviewed, setReviewed] = useState<{[key: number]: boolean}>({});
+  
+  // State for Uncategorised Log tab
+  const [uncategorisedTransactions, setUncategorisedTransactions] = useState<any[]>([]);
+  const [uncategorisedLoading, setUncategorisedLoading] = useState(false);
+  const [uncategorisedReviewed, setUncategorisedReviewed] = useState<{[key: number]: boolean}>({});
   
   // State for Customer Data tab
   const [customerData, setCustomerData] = useState<any[]>([]);
@@ -98,37 +104,37 @@ export default function AdminDashboard() {
   
   // State for App Health tab
   const [healthData, setHealthData] = useState<any>(null);
+  
+  // State for Beta Accounts tab
+  const [betaEmails, setBetaEmails] = useState<any[]>([]);
+  const [betaEmailsLoading, setBetaEmailsLoading] = useState(false);
+  const [newBetaEmail, setNewBetaEmail] = useState('');
+  const [addingBetaEmail, setAddingBetaEmail] = useState(false);
   const [healthLoading, setHealthLoading] = useState(false);
   
+  // State for Excel validation
+  const [excelValidation, setExcelValidation] = useState<any>(null);
+  const [excelValidationLoading, setExcelValidationLoading] = useState(false);
   
   // State for Admin Logins tab
   const [adminLogins, setAdminLogins] = useState<any[]>([]);
   const [adminLoginsLoading, setAdminLoginsLoading] = useState(false);
   
-  // State for Migration tab
-  const [migrationTests, setMigrationTests] = useState<any[]>([]);
-  const [migrationTestsLoading, setMigrationTestsLoading] = useState(false);
-  const [migrationResults, setMigrationResults] = useState<any>(null);
-  const [migrationRunning, setMigrationRunning] = useState(false);
-  const [dropVerification, setDropVerification] = useState<any>(null);
-  const [dropVerificationLoading, setDropVerificationLoading] = useState(false);
-  const [investigationData, setInvestigationData] = useState<any>(null);
-  const [investigationLoading, setInvestigationLoading] = useState(false);
-  const [emptyTablesVerification, setEmptyTablesVerification] = useState<any>(null);
-  const [emptyTablesLoading, setEmptyTablesLoading] = useState(false);
-  const [emptyTablesDropping, setEmptyTablesDropping] = useState(false);
-  const [singleSourceTests, setSingleSourceTests] = useState<any>(null);
-  const [singleSourceTestsLoading, setSingleSourceTestsLoading] = useState(false);
-  const [fixingUnmigrated, setFixingUnmigrated] = useState(false);
-  const [deletingOrphaned, setDeletingOrphaned] = useState(false);
-  const [fixingTokenization, setFixingTokenization] = useState(false);
-  const [droppingTables, setDroppingTables] = useState(false);
-  const [migratingPII, setMigratingPII] = useState(false);
-  const [piiMigrationResult, setPiiMigrationResult] = useState<any>(null);
-  const [completingPIIIsolation, setCompletingPIIIsolation] = useState(false);
-  const [completePIIIsolationResult, setCompletePIIIsolationResult] = useState<any>(null);
-  const [fixEventsAndPIIResult, setFixEventsAndPIIResult] = useState<any>(null);
-  const [fixingEventsAndPII, setFixingEventsAndPII] = useState(false);
+  // State for Old Tables Cleanup
+  const [cleanupAnalysis, setCleanupAnalysis] = useState<any>(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupDropping, setCleanupDropping] = useState(false);
+  const [cleanupDropConfirm, setCleanupDropConfirm] = useState('');
+  
+  // State for Data Migration Verification
+  // State for Post-Migration Verification
+  const [verificationTests, setVerificationTests] = useState<any>(null);
+  const [verificationTestsLoading, setVerificationTestsLoading] = useState(false);
+  const [codeReferences, setCodeReferences] = useState<any>(null);
+  const [codeReferencesLoading, setCodeReferencesLoading] = useState(false);
+  const [dropColumnsResult, setDropColumnsResult] = useState<any>(null);
+  const [dropColumnsLoading, setDropColumnsLoading] = useState(false);
+  const [dropColumnsConfirm, setDropColumnsConfirm] = useState('');
   
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
@@ -159,6 +165,7 @@ export default function AdminDashboard() {
     dataCoverage: [] as string[],
     userIds: [] as number[],
   });
+  const [chartMetric, setChartMetric] = useState<'loginDays' | 'uploadsPerWeek'>('loginDays');
   const [vanityFilters, setVanityFilters] = useState({
     totalAccounts: true,
     validatedEmails: false,
@@ -345,6 +352,7 @@ export default function AdminDashboard() {
         intentCategories: chartFilters.intentCategories.join('|'),
         dataCoverage: chartFilters.dataCoverage.join(','),
         userIds: chartFilters.userIds.join(','),
+        metric: chartMetric,
       });
       const response = await fetch(`/api/admin/engagement-chart?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -459,27 +467,184 @@ export default function AdminDashboard() {
     }
   }, [activeTab, monitoringSubTab, authenticated]);
 
+  const fetchBetaEmails = async () => {
+    setBetaEmailsLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        setError('Not authenticated. Please log in again.');
+        return;
+      }
+
+      const response = await fetch('/api/admin/beta-emails', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setBetaEmails(data.emails || []);
+        setError(null); // Clear any previous errors
+      } else {
+        setError(data.error || 'Failed to fetch beta emails');
+        setBetaEmails([]);
+      }
+    } catch (error) {
+      console.error('Error fetching beta emails:', error);
+      setError('Failed to fetch beta emails');
+    } finally {
+      setBetaEmailsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'monitoring' && monitoringSubTab === 'beta-accounts' && authenticated) {
+      fetchBetaEmails();
+    }
+  }, [activeTab, monitoringSubTab, authenticated]);
+
+  const handleAddBetaEmail = async () => {
+    if (!newBetaEmail.trim()) {
+      setError('Please enter an email address');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newBetaEmail.trim())) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setAddingBetaEmail(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        setError('Not authenticated. Please log in again.');
+        setAddingBetaEmail(false);
+        return;
+      }
+
+      const response = await fetch('/api/admin/beta-emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email: newBetaEmail.trim() }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setNewBetaEmail('');
+        await fetchBetaEmails(); // Refresh the list
+      } else {
+        setError(data.error || 'Failed to add beta email');
+      }
+    } catch (error) {
+      console.error('Error adding beta email:', error);
+      setError('Failed to add beta email');
+    } finally {
+      setAddingBetaEmail(false);
+    }
+  };
+
+  const handleRemoveBetaEmail = async (email: string) => {
+    if (!confirm(`Are you sure you want to remove ${email} from the beta list?`)) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        setError('Not authenticated. Please log in again.');
+        return;
+      }
+
+      const response = await fetch(`/api/admin/beta-emails?email=${encodeURIComponent(email)}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        await fetchBetaEmails(); // Refresh the list
+      } else {
+        setError(data.error || 'Failed to remove beta email');
+      }
+    } catch (error) {
+      console.error('Error removing beta email:', error);
+      setError('Failed to remove beta email');
+    }
+  };
+
   // Fetch recategorizations when Recategorization Log tab is active
   useEffect(() => {
     if (activeTab === 'categories' && viewType === 'recategorization' && authenticated) {
-      const fetchRecategorizations = async () => {
-        setRecatLoading(true);
-        try {
-          const token = localStorage.getItem('admin_token');
-          const response = await fetch('/api/admin/recategorizations', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const data = await response.json();
-          setRecategorizations(data.recategorizations || []);
-        } catch (error) {
-          console.error('Error fetching recategorizations:', error);
-        } finally {
-          setRecatLoading(false);
-        }
-      };
-      fetchRecategorizations();
+      if (categorizationSubTab === 'recategorization') {
+        const fetchRecategorizations = async () => {
+          setRecatLoading(true);
+          try {
+            const token = localStorage.getItem('admin_token');
+            const response = await fetch('/api/admin/recategorizations', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            // Sort: unreviewed first, then by date (newest first)
+            const sorted = (data.recategorizations || []).sort((a: any, b: any) => {
+              const aReviewed = a.reviewed || false;
+              const bReviewed = b.reviewed || false;
+              if (aReviewed !== bReviewed) {
+                return aReviewed ? 1 : -1; // Unreviewed first
+              }
+              const aDate = a.last_used || a.created_at;
+              const bDate = b.last_used || b.created_at;
+              return new Date(bDate).getTime() - new Date(aDate).getTime(); // Newest first
+            });
+            setRecategorizations(sorted);
+            // Initialize reviewed state
+            const reviewedState: {[key: number]: boolean} = {};
+            sorted.forEach((item: any) => {
+              reviewedState[item.id] = item.reviewed || false;
+            });
+            setReviewed(reviewedState);
+          } catch (error) {
+            console.error('Error fetching recategorizations:', error);
+          } finally {
+            setRecatLoading(false);
+          }
+        };
+        fetchRecategorizations();
+      } else if (categorizationSubTab === 'uncategorised') {
+        const fetchUncategorised = async () => {
+          setUncategorisedLoading(true);
+          try {
+            const token = localStorage.getItem('admin_token');
+            const response = await fetch('/api/admin/uncategorised-transactions', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await response.json();
+            setUncategorisedTransactions(data.transactions || []);
+            // Initialize reviewed state
+            const reviewedState: {[key: number]: boolean} = {};
+            (data.transactions || []).forEach((item: any) => {
+              reviewedState[item.id] = item.reviewed || false;
+            });
+            setUncategorisedReviewed(reviewedState);
+          } catch (error) {
+            console.error('Error fetching uncategorised transactions:', error);
+          } finally {
+            setUncategorisedLoading(false);
+          }
+        };
+        fetchUncategorised();
+      }
     }
-  }, [activeTab, viewType, authenticated]);
+  }, [activeTab, viewType, categorizationSubTab, authenticated]);
 
   // Fetch events data when Events Data tab is active
   useEffect(() => {
@@ -625,7 +790,7 @@ export default function AdminDashboard() {
       fetchCohortAnalysis();
       fetchEngagementChart();
     }
-  }, [activeTab, analyticsSubTab, authenticated, cohortFilters, chartFilters]);
+  }, [activeTab, analyticsSubTab, authenticated, cohortFilters, chartFilters, chartMetric]);
 
   // Fetch vanity metrics when Analytics → Vanity Metrics tab is active
   useEffect(() => {
@@ -731,10 +896,38 @@ export default function AdminDashboard() {
             🔄 Recategorization log
           </button>
         </div>
+        
+        {/* Sub-tabs for Recategorization/Uncategorised */}
+        {viewType === 'recategorization' && (
+          <div className="flex gap-2 p-1 bg-gray-100 rounded-lg w-fit mb-4">
+            <button
+              onClick={() => setCategorizationSubTab('recategorization')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                categorizationSubTab === 'recategorization'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Recategorization log
+            </button>
+            <button
+              onClick={() => setCategorizationSubTab('uncategorised')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                categorizationSubTab === 'uncategorised'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Uncategorised log
+            </button>
+          </div>
+        )}
 
-        {/* Conditional Content: Recategorization Log or Patterns Table */}
+        {/* Conditional Content: Recategorization Log, Uncategorised Log, or Patterns Table */}
         {viewType === 'recategorization' ? (
-          renderRecategorizationLog()
+          categorizationSubTab === 'recategorization' 
+            ? renderRecategorizationLog()
+            : renderUncategorisedLog()
         ) : (
           renderKeywordsMerchantsContent()
         )}
@@ -867,9 +1060,60 @@ export default function AdminDashboard() {
 
   // Render Recategorization Log
   const renderRecategorizationLog = () => {
-    const handleReviewToggle = (id: number) => {
-      setReviewed(prev => ({ ...prev, [id]: !prev[id] }));
+    const handleReviewToggle = async (id: number) => {
+      const newReviewed = !reviewed[id];
+      setReviewed(prev => ({ ...prev, [id]: newReviewed }));
+      
+      try {
+        const token = localStorage.getItem('admin_token');
+        await fetch('/api/admin/recategorizations', {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ id, reviewed: newReviewed }),
+        });
+        
+        // Re-fetch to get updated order
+        const response = await fetch('/api/admin/recategorizations', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        const sorted = (data.recategorizations || []).sort((a: any, b: any) => {
+          const aReviewed = a.reviewed || false;
+          const bReviewed = b.reviewed || false;
+          if (aReviewed !== bReviewed) {
+            return aReviewed ? 1 : -1; // Unreviewed first
+          }
+          const aDate = a.last_used || a.created_at;
+          const bDate = b.last_used || b.created_at;
+          return new Date(bDate).getTime() - new Date(aDate).getTime(); // Newest first
+        });
+        setRecategorizations(sorted);
+        const reviewedState: {[key: number]: boolean} = {};
+        sorted.forEach((item: any) => {
+          reviewedState[item.id] = item.reviewed || false;
+        });
+        setReviewed(reviewedState);
+      } catch (error) {
+        console.error('Error updating reviewed status:', error);
+        // Revert on error
+        setReviewed(prev => ({ ...prev, [id]: !newReviewed }));
+      }
     };
+
+    // Sort: unreviewed first, then by date (newest first)
+    const sortedRecategorizations = [...recategorizations].sort((a, b) => {
+      const aReviewed = reviewed[a.id] || false;
+      const bReviewed = reviewed[b.id] || false;
+      if (aReviewed !== bReviewed) {
+        return aReviewed ? 1 : -1; // Unreviewed first
+      }
+      const aDate = a.last_used || a.created_at;
+      const bDate = b.last_used || b.created_at;
+      return new Date(bDate).getTime() - new Date(aDate).getTime(); // Newest first
+    });
 
     return recatLoading ? (
       <div className="text-center py-12">
@@ -881,7 +1125,7 @@ export default function AdminDashboard() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Email</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Previous Category</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Category</th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Frequency</th>
@@ -890,10 +1134,10 @@ export default function AdminDashboard() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {recategorizations.map((item) => (
-              <tr key={item.id} className="hover:bg-gray-50">
+            {sortedRecategorizations.map((item) => (
+              <tr key={item.id} className={`hover:bg-gray-50 ${(reviewed[item.id] || false) ? 'bg-gray-50' : 'bg-white'}`}>
                 <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.description_pattern}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{item.user_email}</td>
+                <td className="px-6 py-4 text-sm text-gray-600 font-mono">{item.user_id || '-'}</td>
                 <td className="px-6 py-4 text-sm">
                   {item.original_category ? (
                     <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-medium">{item.original_category}</span>
@@ -904,9 +1148,9 @@ export default function AdminDashboard() {
                 <td className="px-6 py-4 text-sm">
                   <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">{item.corrected_category}</span>
                 </td>
-                <td className="px-6 py-4 text-center text-sm text-gray-600">{item.frequency}</td>
+                <td className="px-6 py-4 text-center text-sm text-gray-600">{item.frequency || '-'}</td>
                 <td className="px-6 py-4 text-sm text-gray-500">
-                  {item.last_used ? new Date(item.last_used).toLocaleDateString() : '-'}
+                  {item.last_used ? new Date(item.last_used).toLocaleDateString() : (item.created_at ? new Date(item.created_at).toLocaleDateString() : '-')}
                 </td>
                 <td className="px-6 py-4 text-center">
                   <input
@@ -923,6 +1167,99 @@ export default function AdminDashboard() {
         {recategorizations.length === 0 && (
           <div className="text-center py-12 text-gray-500">
             No recategorizations found
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render Uncategorised Log
+  const renderUncategorisedLog = () => {
+    const handleReviewToggle = async (id: number) => {
+      const newReviewed = !uncategorisedReviewed[id];
+      setUncategorisedReviewed(prev => ({ ...prev, [id]: newReviewed }));
+      
+      try {
+        const token = localStorage.getItem('admin_token');
+        await fetch('/api/admin/uncategorised-transactions', {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ id, reviewed: newReviewed }),
+        });
+        
+        // Re-fetch to get updated order
+        const response = await fetch('/api/admin/uncategorised-transactions', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        setUncategorisedTransactions(data.transactions || []);
+        const reviewedState: {[key: number]: boolean} = {};
+        (data.transactions || []).forEach((item: any) => {
+          reviewedState[item.id] = item.reviewed || false;
+        });
+        setUncategorisedReviewed(reviewedState);
+      } catch (error) {
+        console.error('Error updating reviewed status:', error);
+        // Revert on error
+        setUncategorisedReviewed(prev => ({ ...prev, [id]: !newReviewed }));
+      }
+    };
+
+    // Sort: unreviewed first, then by date (newest first)
+    const sortedTransactions = [...uncategorisedTransactions].sort((a, b) => {
+      const aReviewed = uncategorisedReviewed[a.id] || false;
+      const bReviewed = uncategorisedReviewed[b.id] || false;
+      if (aReviewed !== bReviewed) {
+        return aReviewed ? 1 : -1; // Unreviewed first
+      }
+      return new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime(); // Newest first
+    });
+
+    return uncategorisedLoading ? (
+      <div className="text-center py-12">
+        <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+      </div>
+    ) : (
+      <div className="bg-white rounded-lg shadow overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bank Statement Type</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Upload Date</th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Reviewed</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {sortedTransactions.map((item) => (
+              <tr key={item.id} className={`hover:bg-gray-50 ${(uncategorisedReviewed[item.id] || false) ? 'bg-gray-50' : 'bg-white'}`}>
+                <td className="px-6 py-4 text-sm text-gray-600">{item.user_id}</td>
+                <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.description}</td>
+                <td className="px-6 py-4 text-sm text-gray-600 text-right">${Math.abs(item.amount).toFixed(2)}</td>
+                <td className="px-6 py-4 text-sm text-gray-600">{item.bank_statement_type || '-'}</td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {item.upload_date ? new Date(item.upload_date).toLocaleDateString() : '-'}
+                </td>
+                <td className="px-6 py-4 text-center">
+                  <input
+                    type="checkbox"
+                    checked={uncategorisedReviewed[item.id] || false}
+                    onChange={() => handleReviewToggle(item.id)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {uncategorisedTransactions.length === 0 && (
+          <div className="text-center py-12 text-gray-500">
+            No uncategorised transactions found
           </div>
         )}
       </div>
@@ -1593,759 +1930,724 @@ export default function AdminDashboard() {
     );
   };
 
-  // Render Migration Tab
-  const renderMigrationTab = () => {
+  const renderBetaAccountsTab = () => {
     return (
       <div className="space-y-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Database Migration</h2>
-          <p className="text-gray-600 mb-6">
-            Run the comprehensive table consolidation migration and verify table drops.
-          </p>
-
-          {/* Pre-Migration Tests */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Pre-Migration Tests</h3>
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Beta Accounts</h2>
+              <p className="text-gray-600 mt-1">Manage pre-approved email addresses for account registration</p>
+            </div>
+            <div className="flex gap-2">
               <button
-                onClick={fetchMigrationTests}
-                disabled={migrationTestsLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                onClick={async () => {
+                  const token = localStorage.getItem('admin_token');
+                  if (!token) {
+                    setError('Not authenticated. Please log in again.');
+                    return;
+                  }
+                  if (!confirm('This will add all existing user emails to the beta list. Continue?')) {
+                    return;
+                  }
+                  try {
+                    const response = await fetch('/api/admin/beta-emails', {
+                      method: 'PUT',
+                      headers: {
+                        'Authorization': `Bearer ${token}`,
+                      },
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                      setError(null); // Clear any previous errors
+                      // Force refresh by clearing and re-fetching
+                      setBetaEmails([]);
+                      await fetchBetaEmails();
+                      alert(`Success: ${data.message}`);
+                    } else {
+                      setError(data.error || 'Failed to backfill emails');
+                    }
+                  } catch (error) {
+                    console.error('Error backfilling emails:', error);
+                    setError('Failed to backfill emails');
+                  }
+                }}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
               >
-                {migrationTestsLoading ? 'Loading...' : 'Run Tests'}
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Backfill Existing Users
+              </button>
+              <button
+                onClick={fetchBetaEmails}
+                disabled={betaEmailsLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                <svg className={`w-4 h-4 ${betaEmailsLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
               </button>
             </div>
-            
-            {migrationTests.length > 0 && (
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Test</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {migrationTests.map((test, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{test.name}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{test.description}</td>
+          </div>
+
+          {/* Add New Beta Email */}
+          <div className="p-6 border-b border-gray-200 bg-gray-50">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Beta Email</h3>
+            <div className="flex gap-3">
+              <input
+                type="email"
+                value={newBetaEmail}
+                onChange={(e) => setNewBetaEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !addingBetaEmail) {
+                    handleAddBetaEmail();
+                  }
+                }}
+                placeholder="Enter email address"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={addingBetaEmail}
+              />
+              <button
+                onClick={handleAddBetaEmail}
+                disabled={addingBetaEmail || !newBetaEmail.trim()}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {addingBetaEmail ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Email
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Beta Emails List */}
+          {betaEmailsLoading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+              <p className="text-gray-600 mt-4">Loading beta emails...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Added By</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Added At</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {betaEmails && betaEmails.length > 0 ? (
+                    betaEmails.map((betaEmail: any, index: number) => (
+                      <tr key={betaEmail.email || index} className={`hover:bg-gray-50 ${!betaEmail.is_explicit ? 'bg-blue-50' : ''}`}>
+                        <td className="px-6 py-4 text-sm text-gray-900 font-mono">{betaEmail.email}</td>
                         <td className="px-6 py-4 text-sm">
-                          {test.passed ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              ✓ Pass
-                            </span>
+                          {betaEmail.is_explicit ? (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">Explicit</span>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              ✗ Fail
-                            </span>
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">Existing User</span>
                           )}
                         </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{betaEmail.added_by || '-'}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">
-                          {test.actualValue !== null && test.actualValue !== undefined ? String(test.actualValue) : '-'}
-                          {test.error && <span className="text-red-600 ml-2">({test.error})</span>}
+                          {betaEmail.created_at ? new Date(betaEmail.created_at).toLocaleString() : '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          {betaEmail.is_explicit ? (
+                            <button
+                              onClick={() => handleRemoveBetaEmail(betaEmail.email)}
+                              className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors text-xs font-medium"
+                            >
+                              Remove
+                            </button>
+                          ) : (
+                            <button
+                              onClick={async () => {
+                                const token = localStorage.getItem('admin_token');
+                                if (!token) {
+                                  setError('Not authenticated. Please log in again.');
+                                  return;
+                                }
+                                try {
+                                  const response = await fetch('/api/admin/beta-emails', {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      'Authorization': `Bearer ${token}`,
+                                    },
+                                    body: JSON.stringify({ email: betaEmail.email }),
+                                  });
+                                  const data = await response.json();
+                                  if (response.ok) {
+                                    await fetchBetaEmails();
+                                  } else {
+                                    setError(data.error || 'Failed to add email');
+                                  }
+                                } catch (error) {
+                                  console.error('Error adding email:', error);
+                                  setError('Failed to add email');
+                                }
+                              }}
+                              className="px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors text-xs font-medium"
+                            >
+                              Add to Beta
+                            </button>
+                          )}
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                        <div className="flex flex-col items-center">
+                          <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          <p className="text-lg font-medium mb-2">No beta emails yet</p>
+                          <p className="text-sm text-gray-400">
+                            Add email addresses above to allow users to register accounts.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
-          {/* Run Migration */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
+  const renderMigrationTab = () => {
+    return (
+      <div className="space-y-8">
+        {/* Post-Migration Verification Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Run Migration</h3>
+                <h2 className="text-2xl font-bold text-gray-900">Post-Migration Verification</h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Execute the comprehensive table consolidation migration script.
+                  Verify all functionality is working correctly after table consolidation migration
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Tests database structure, data integrity, API functionality, user functionality, and admin functionality
                 </p>
               </div>
               <button
-                onClick={runMigration}
-                disabled={migrationRunning}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-semibold"
+                onClick={async () => {
+                  setVerificationTestsLoading(true);
+                  try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch('/api/admin/migration/post-migration-verification', {
+                      headers: {
+                        'Authorization': `Bearer ${token}`,
+                      },
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                      setVerificationTests(data);
+                    } else {
+                      setError(data.error || 'Failed to run verification tests');
+                    }
+                  } catch (error: any) {
+                    setError('Failed to run verification tests: ' + error.message);
+                  } finally {
+                    setVerificationTestsLoading(false);
+                  }
+                }}
+                disabled={verificationTestsLoading}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
-                {migrationRunning ? 'Running...' : 'Run Migration'}
+                {verificationTestsLoading ? 'Running Tests...' : 'Run Verification Tests'}
               </button>
             </div>
+          </div>
 
-            {migrationResults && (
-              <div className={`border rounded-lg p-4 ${migrationResults.success ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold text-gray-900">
-                    Migration Results
-                  </h4>
-                  <span className={`text-sm font-medium ${migrationResults.success ? 'text-green-800' : 'text-yellow-800'}`}>
-                    {migrationResults.successful} / {migrationResults.executed} statements successful
-                  </span>
-                </div>
-                {migrationResults.errors > 0 && (
-                  <p className="text-sm text-yellow-800 mb-2">
-                    {migrationResults.errors} error(s) occurred. Check details below.
-                  </p>
-                )}
-                {migrationResults.error && (
-                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
-                    <p className="text-sm text-red-800 font-medium">Error:</p>
-                    <p className="text-sm text-red-700">{migrationResults.error}</p>
-                    {migrationResults.details && (
-                      <p className="text-xs text-red-600 mt-1">{migrationResults.details}</p>
+          {verificationTests && (
+            <div className="p-6 space-y-6">
+              {/* Test Summary */}
+              <div className={`p-4 rounded-lg border-2 ${
+                verificationTests.allPassed ? 'bg-green-50 border-green-300' : 'bg-yellow-50 border-yellow-300'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-gray-900">Test Summary</h4>
+                  <div className="flex gap-4 text-sm">
+                    <span className="text-green-700 font-medium">
+                      ✅ {verificationTests.summary?.passed || 0} Passed
+                    </span>
+                    {verificationTests.summary?.failed > 0 && (
+                      <span className="text-red-700 font-medium">
+                        ❌ {verificationTests.summary?.failed || 0} Failed
+                      </span>
+                    )}
+                    {verificationTests.summary?.warnings > 0 && (
+                      <span className="text-yellow-700 font-medium">
+                        ⚠️ {verificationTests.summary?.warnings || 0} Warnings
+                      </span>
                     )}
                   </div>
-                )}
-                {migrationResults.message && (
-                  <p className="text-sm text-green-800">{migrationResults.message}</p>
-                )}
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Investigation */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
+              {/* Test Results by Category */}
+              {verificationTests.tests && verificationTests.tests.length > 0 && (
+                <div className="space-y-4">
+                  {['Database Structure', 'Data Integrity', 'API Functionality', 'User Functionality', 'Admin Functionality'].map((category) => {
+                    const categoryTests = verificationTests.tests.filter((t: any) => t.category === category);
+                    if (categoryTests.length === 0) return null;
+                    
+                    return (
+                      <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
+                        <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+                          <h5 className="font-semibold text-gray-900">{category}</h5>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Test</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {categoryTests.map((test: any, index: number) => (
+                                <tr key={test.name || index} className={test.status === 'fail' ? 'bg-red-50' : test.status === 'warn' ? 'bg-yellow-50' : ''}>
+                                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{test.name}</td>
+                                  <td className="px-6 py-4 text-sm">
+                                    {test.status === 'pass' && (
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        ✅ Pass
+                                      </span>
+                                    )}
+                                    {test.status === 'fail' && (
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        ❌ Fail
+                                      </span>
+                                    )}
+                                    {test.status === 'warn' && (
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        ⚠️ Warning
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 text-sm text-gray-600">{test.message}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!verificationTests && !verificationTestsLoading && (
+            <div className="p-6 text-center text-gray-500">
+              <p>Click "Run Verification Tests" to check system functionality</p>
+            </div>
+          )}
+        </div>
+
+        {/* Code References Check Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Investigation</h3>
+                <h2 className="text-2xl font-bold text-gray-900">Code References Check</h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Investigate unmigrated transactions and table dependencies.
+                  Check which code files still reference the old users table
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Identifies what needs to be updated before dropping old fields
                 </p>
               </div>
               <button
-                onClick={fetchInvestigation}
-                disabled={investigationLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                onClick={async () => {
+                  setCodeReferencesLoading(true);
+                  try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch('/api/admin/migration/check-code-references', {
+                      headers: {
+                        'Authorization': `Bearer ${token}`,
+                      },
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                      setCodeReferences(data);
+                    } else {
+                      setError(data.error || 'Failed to check code references');
+                    }
+                  } catch (error: any) {
+                    setError('Failed to check code references: ' + error.message);
+                  } finally {
+                    setCodeReferencesLoading(false);
+                  }
+                }}
+                disabled={codeReferencesLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
-                {investigationLoading ? 'Loading...' : 'Investigate'}
+                {codeReferencesLoading ? 'Checking...' : 'Check Code References'}
               </button>
             </div>
+          </div>
 
-            {investigationData && (
-              <div className="space-y-4">
-                {investigationData.unmigratedTransactions && investigationData.unmigratedTransactions.length > 0 && (
-                  <div className="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-yellow-900">
-                        Unmigrated Transactions ({investigationData.unmigratedTransactions.length})
-                      </h4>
-                      <div className="flex gap-2">
-                        {investigationData.unmigratedTransactions.some((tx: any) => !tx.user_id || tx.status?.includes('orphaned') || tx.status === 'No tokenization record') && (
-                          <button
-                            onClick={() => {
-                              const orphanedIds = investigationData.unmigratedTransactions
-                                .filter((tx: any) => !tx.user_id || tx.status?.includes('orphaned') || tx.status === 'No tokenization record')
-                                .map((tx: any) => tx.id);
-                              if (orphanedIds.length > 0) {
-                                deleteOrphanedTransactions(orphanedIds);
-                              }
-                            }}
-                            disabled={deletingOrphaned}
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-semibold"
-                          >
-                            {deletingOrphaned ? 'Deleting...' : 'Delete Orphaned'}
-                          </button>
-                        )}
-                        <button
-                          onClick={fixUnmigratedTransactions}
-                          disabled={fixingUnmigrated}
-                          className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 font-semibold"
-                        >
-                          {fixingUnmigrated ? 'Fixing...' : 'Fix Unmigrated'}
-                        </button>
+          {codeReferences && (
+            <div className="p-6 space-y-6">
+              {/* Database Status */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <h4 className="font-semibold text-gray-900 mb-3">Database Status</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Users table exists:</span>
+                    <span className={`ml-2 font-semibold ${codeReferences.databaseStatus.usersTableExists ? 'text-yellow-700' : 'text-green-700'}`}>
+                      {codeReferences.databaseStatus.usersTableExists ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  {codeReferences.databaseStatus.usersTableExists && (
+                    <>
+                      <div>
+                        <span className="text-gray-600">Users table rows:</span>
+                        <span className="ml-2 font-semibold">{codeReferences.databaseStatus.usersTableRowCount || 0}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Has email column:</span>
+                        <span className={`ml-2 font-semibold ${codeReferences.databaseStatus.usersHasEmail ? 'text-yellow-700' : 'text-green-700'}`}>
+                          {codeReferences.databaseStatus.usersHasEmail ? 'Yes (should be removed)' : 'No'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Has display_name column:</span>
+                        <span className={`ml-2 font-semibold ${codeReferences.databaseStatus.usersHasDisplayName ? 'text-yellow-700' : 'text-green-700'}`}>
+                          {codeReferences.databaseStatus.usersHasDisplayName ? 'Yes (should be removed)' : 'No'}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <span className="text-gray-600">l1_user_permissions exists:</span>
+                    <span className={`ml-2 font-semibold ${codeReferences.databaseStatus.l1UserPermissionsExists ? 'text-green-700' : 'text-red-700'}`}>
+                      {codeReferences.databaseStatus.l1UserPermissionsExists ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  {codeReferences.databaseStatus.l1UserPermissionsExists && (
+                    <div>
+                      <span className="text-gray-600">l1_user_permissions rows:</span>
+                      <span className="ml-2 font-semibold">{codeReferences.databaseStatus.l1UserPermissionsRowCount || 0}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className={`p-4 rounded-lg border-2 ${
+                codeReferences.summary.criticalUpdates === 0 && codeReferences.summary.needsCodeUpdates === 0 
+                  ? 'bg-green-50 border-green-300' 
+                  : codeReferences.summary.criticalUpdates > 0 
+                    ? 'bg-red-50 border-red-300' 
+                    : 'bg-yellow-50 border-yellow-300'
+              }`}>
+                <h4 className="font-semibold text-gray-900 mb-3">Summary</h4>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Files with users references:</span>
+                    <span className="ml-2 font-semibold">{codeReferences.summary.needsCodeUpdates || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Critical endpoints:</span>
+                    <span className={`ml-2 font-semibold ${codeReferences.summary.criticalUpdates > 0 ? 'text-red-700' : 'text-green-700'}`}>
+                      {codeReferences.summary.criticalUpdates || 0}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Safe to drop:</span>
+                    <span className={`ml-2 font-semibold ${
+                      codeReferences.summary.criticalUpdates === 0 && codeReferences.summary.needsCodeUpdates === 0 
+                        ? 'text-green-700' 
+                        : 'text-red-700'
+                    }`}>
+                      {codeReferences.summary.criticalUpdates === 0 && codeReferences.summary.needsCodeUpdates === 0 ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recommendations */}
+              {codeReferences.recommendations && codeReferences.recommendations.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-gray-900">Recommendations</h4>
+                  {codeReferences.recommendations.map((rec: any, idx: number) => (
+                    <div key={idx} className={`p-4 rounded-lg border ${
+                      rec.priority === 'HIGH' ? 'bg-red-50 border-red-200' :
+                      rec.priority === 'MEDIUM' ? 'bg-yellow-50 border-yellow-200' :
+                      'bg-blue-50 border-blue-200'
+                    }`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                              rec.priority === 'HIGH' ? 'bg-red-200 text-red-800' :
+                              rec.priority === 'MEDIUM' ? 'bg-yellow-200 text-yellow-800' :
+                              'bg-blue-200 text-blue-800'
+                            }`}>
+                              {rec.priority}
+                            </span>
+                            <span className="font-semibold text-gray-900">{rec.action}</span>
+                          </div>
+                          <p className="text-sm text-gray-700">{rec.reason}</p>
+                          {rec.endpoints && rec.endpoints.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-xs font-medium text-gray-600 mb-1">Affected endpoints:</p>
+                              <ul className="list-disc list-inside text-xs text-gray-700">
+                                {rec.endpoints.map((ep: string, epIdx: number) => (
+                                  <li key={epIdx}>{ep}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm">
-                        <thead>
-                          <tr>
-                            <th className="text-left font-medium text-yellow-900">ID</th>
-                            <th className="text-left font-medium text-yellow-900">User</th>
-                            <th className="text-left font-medium text-yellow-900">Date</th>
-                            <th className="text-left font-medium text-yellow-900">Description</th>
-                            <th className="text-left font-medium text-yellow-900">Status</th>
+                  ))}
+                </div>
+              )}
+
+              {/* Critical Endpoints */}
+              {codeReferences.criticalEndpoints && codeReferences.criticalEndpoints.length > 0 && (
+                <div className="border border-red-200 rounded-lg overflow-hidden">
+                  <div className="bg-red-50 px-6 py-3 border-b border-red-200">
+                    <h5 className="font-semibold text-red-900">Critical Endpoints Needing Updates</h5>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">File</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">References</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {codeReferences.criticalEndpoints.map((endpoint: any, index: number) => (
+                          <tr key={index} className="bg-red-50">
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{endpoint.file}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              <div className="space-y-1">
+                                {endpoint.references.slice(0, 5).map((ref: any, refIdx: number) => (
+                                  <div key={refIdx} className="text-xs">
+                                    <span className="font-medium">{ref.type}</span> (line {ref.line})
+                                  </div>
+                                ))}
+                                {endpoint.references.length > 5 && (
+                                  <div className="text-xs text-gray-500">
+                                    +{endpoint.references.length - 5} more...
+                                  </div>
+                                )}
+                              </div>
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-yellow-200">
-                          {investigationData.unmigratedTransactions.slice(0, 10).map((tx: any, idx: number) => (
-                            <tr key={idx}>
-                              <td className="py-2 text-yellow-800">{tx.id}</td>
-                              <td className="py-2 text-yellow-800">{tx.email || tx.user_id || 'null (orphaned)'}</td>
-                              <td className="py-2 text-yellow-800">{tx.date}</td>
-                              <td className="py-2 text-yellow-800">{tx.description?.substring(0, 30)}...</td>
-                              <td className="py-2 text-yellow-800">{tx.status}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {investigationData.viewsUsingTransactions && investigationData.viewsUsingTransactions.length > 0 && (
-                  <div className="border border-orange-200 rounded-lg p-4 bg-orange-50">
-                    <h4 className="font-semibold text-orange-900 mb-2">
-                      Views Using Transactions Table
-                    </h4>
-                    <ul className="list-disc list-inside text-sm text-orange-800">
-                      {investigationData.viewsUsingTransactions.map((view: any, idx: number) => (
-                        <li key={idx} className="font-mono">{view.viewname}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {investigationData.emptyTablesAnalysis && (
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-2">Empty Tables Analysis</h4>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm">
-                        <thead>
-                          <tr>
-                            <th className="text-left font-medium text-gray-700">Table</th>
-                            <th className="text-left font-medium text-gray-700">Row Count</th>
-                            <th className="text-left font-medium text-gray-700">Foreign Keys</th>
-                            <th className="text-left font-medium text-gray-700">Referenced By</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {investigationData.emptyTablesAnalysis.map((table: any, idx: number) => (
-                            <tr key={idx}>
-                              <td className="py-2 font-mono text-gray-900">{table.tableName}</td>
-                              <td className="py-2 text-gray-600">{table.rowCount || 0}</td>
-                              <td className="py-2 text-gray-600">{table.foreignKeysFrom?.length || 0}</td>
-                              <td className="py-2 text-gray-600">{table.referencedBy || 0}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Drop Verification */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Table Drop Verification</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Verify if empty/unused tables can be safely dropped.
-                </p>
-              </div>
-              <button
-                onClick={fetchDropVerification}
-                disabled={dropVerificationLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
-                {dropVerificationLoading ? 'Loading...' : 'Verify Drops'}
-              </button>
-            </div>
-
-            {dropVerification && (
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <div className={`p-4 ${dropVerification.allSafeToDrop ? 'bg-green-50' : 'bg-yellow-50'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-gray-900">Drop Verification Summary</h4>
-                    <span className={`text-sm font-medium ${dropVerification.allSafeToDrop ? 'text-green-800' : 'text-yellow-800'}`}>
-                      {dropVerification.summary.safeToDrop} / {dropVerification.summary.total} tables safe to drop
-                    </span>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Table</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Safe to Drop</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Row Count</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reasons</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {dropVerification.tables.map((table: any, index: number) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900 font-mono">{table.tableName}</td>
-                        <td className="px-6 py-4 text-sm">
-                          <div className="flex items-center gap-2">
-                            {table.safeToDrop ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                ✓ Safe
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                ✗ Not Safe
-                              </span>
-                            )}
-                            {table.safeToDrop && (
-                              <button
-                                onClick={() => dropSafeTables([table.tableName])}
-                                className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-                              >
-                                Drop
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{table.rowCount}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          <ul className="list-disc list-inside space-y-1">
-                            {table.reasons.map((reason: string, rIndex: number) => (
-                              <li key={rIndex}>{reason}</li>
-                            ))}
-                          </ul>
-                          {table.hasForeignKeys && (
-                            <div className="mt-2 text-xs text-red-600">
-                              <strong>Foreign Keys:</strong>
-                              <ul className="list-disc list-inside mt-1">
-                                {table.foreignKeyDetails.map((fk: any, fkIndex: number) => (
-                                  <li key={fkIndex}>{fk.referencedTable}.{fk.referencedColumn}</li>
+              )}
+
+              {/* All Code References */}
+              {codeReferences.codeReferences && codeReferences.codeReferences.length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+                    <h5 className="font-semibold text-gray-900">All Code References</h5>
+                  </div>
+                  <div className="overflow-x-auto max-h-96">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">File</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">References</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {codeReferences.codeReferences.map((ref: any, index: number) => (
+                          <tr key={index} className={ref.isCritical ? 'bg-yellow-50' : ''}>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{ref.file}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              <div className="space-y-1">
+                                {ref.references.slice(0, 3).map((r: any, rIdx: number) => (
+                                  <div key={rIdx} className="text-xs">
+                                    <span className="font-medium">{r.type}</span> (line {r.line})
+                                  </div>
                                 ))}
-                              </ul>
-                            </div>
-                          )}
-                          {table.hasDependentObjects && table.dependentObjects.length > 0 && (
-                            <div className="mt-2 text-xs text-orange-600">
-                              <strong>Dependencies:</strong>
-                              <ul className="list-disc list-inside mt-1">
-                                {table.dependentObjects.map((dep: string, depIndex: number) => (
-                                  <li key={depIndex}>{dep}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {dropVerification && dropVerification.summary.safeToDrop > 0 && (
-                  <div className="p-4 bg-green-50 border-t border-green-200">
+                                {ref.references.length > 3 && (
+                                  <div className="text-xs text-gray-500">
+                                    +{ref.references.length - 3} more...
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!codeReferences && !codeReferencesLoading && (
+            <div className="p-6 text-center text-gray-500">
+              <p>Click "Check Code References" to see which files still reference the users table</p>
+            </div>
+          )}
+        </div>
+
+        {/* Drop Old Columns Section */}
+        {codeReferences && codeReferences.summary.criticalUpdates === 0 && codeReferences.summary.needsCodeUpdates === 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-green-200">
+            <div className="p-6 border-b border-green-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Drop Old Columns</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Remove email and display_name columns from users table
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Safe to proceed: All code references removed and PII migration verified
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {dropColumnsResult ? (
+                <div className={`p-4 rounded-lg border-2 ${
+                  dropColumnsResult.success ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
+                }`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-gray-900">Drop Columns Results</h4>
+                    {dropColumnsResult.success ? (
+                      <span className="text-green-700 font-medium">✅ Success</span>
+                    ) : (
+                      <span className="text-red-700 font-medium">❌ Failed</span>
+                    )}
+                  </div>
+                  
+                  {dropColumnsResult.steps && dropColumnsResult.steps.length > 0 && (
+                    <div className="space-y-2">
+                      {dropColumnsResult.steps.map((step: any, idx: number) => (
+                        <div key={idx} className="text-sm">
+                          <span className="font-medium">Step {step.step}:</span> {step.name} - 
+                          <span className={step.status === 'success' ? 'text-green-700' : step.status === 'skipped' ? 'text-gray-500' : 'text-red-700'}>
+                            {' '}{step.message}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {dropColumnsResult.errors && dropColumnsResult.errors.length > 0 && (
+                    <div className="mt-3 bg-red-100 border border-red-300 rounded p-3">
+                      <h5 className="font-semibold text-red-900 mb-1">Errors:</h5>
+                      <ul className="list-disc list-inside text-sm text-red-800">
+                        {dropColumnsResult.errors.map((error: string, idx: number) => (
+                          <li key={idx}>{error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p className="text-sm text-yellow-800">
+                      <strong>Warning:</strong> This will permanently remove the email and display_name columns from the users table. 
+                      Ensure all PII data is verified in l0_pii_users before proceeding.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={dropColumnsConfirm}
+                      onChange={(e) => setDropColumnsConfirm(e.target.value)}
+                      placeholder="Type 'DROP_USERS_COLUMNS' to confirm"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    />
                     <button
-                      onClick={() => {
-                        const safeTables = dropVerification.tables
-                          .filter((t: any) => t.safeToDrop)
-                          .map((t: any) => t.tableName);
-                        dropSafeTables(safeTables);
+                      onClick={async () => {
+                        if (dropColumnsConfirm !== 'DROP_USERS_COLUMNS') {
+                          setError('Please type DROP_USERS_COLUMNS to confirm');
+                          return;
+                        }
+                        setDropColumnsLoading(true);
+                        try {
+                          const token = localStorage.getItem('admin_token');
+                          const response = await fetch('/api/admin/migration/drop-old-users-columns', {
+                            method: 'POST',
+                            headers: {
+                              'Authorization': `Bearer ${token}`,
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              confirm: 'DROP_USERS_COLUMNS',
+                            }),
+                          });
+                          const data = await response.json();
+                          if (response.ok) {
+                            setDropColumnsResult(data);
+                            setDropColumnsConfirm('');
+                            alert('Columns dropped successfully!');
+                            // Refresh code references to see updated status
+                            const refreshResponse = await fetch('/api/admin/migration/check-code-references', {
+                              headers: {
+                                'Authorization': `Bearer ${token}`,
+                              },
+                            });
+                            const refreshData = await refreshResponse.json();
+                            if (refreshResponse.ok) {
+                              setCodeReferences(refreshData);
+                            }
+                          } else {
+                            setError(data.error || 'Failed to drop columns');
+                          }
+                        } catch (error: any) {
+                          setError('Failed to drop columns: ' + error.message);
+                        } finally {
+                          setDropColumnsLoading(false);
+                        }
                       }}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+                      disabled={dropColumnsLoading || dropColumnsConfirm !== 'DROP_USERS_COLUMNS'}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
                     >
-                      Drop All Safe Tables ({dropVerification.summary.safeToDrop})
+                      {dropColumnsLoading ? 'Dropping Columns...' : 'Drop Email & Display Name Columns'}
                     </button>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Drop Empty Unused Tables */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Drop Empty Unused Tables</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Drop empty tables that are not needed (l1_support_tickets will be kept).
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={fetchEmptyTablesVerification}
-                  disabled={emptyTablesLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                >
-                  {emptyTablesLoading ? 'Loading...' : 'Verify'}
-                </button>
-                {emptyTablesVerification && emptyTablesVerification.safeToDropCount > 0 && (
-                  <button
-                    onClick={dropEmptyTables}
-                    disabled={emptyTablesDropping}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-semibold"
-                  >
-                    {emptyTablesDropping ? 'Dropping...' : `Drop ${emptyTablesVerification.safeToDropCount} Tables`}
-                  </button>
-                )}
-              </div>
+                </>
+              )}
             </div>
-
-            {emptyTablesVerification && (
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <div className="p-4 bg-gray-50 border-b border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-gray-900">Empty Tables Verification</h4>
-                    <span className="text-sm font-medium text-gray-700">
-                      {emptyTablesVerification.safeToDropCount} / {emptyTablesVerification.totalTables} safe to drop
-                    </span>
-                  </div>
-                </div>
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Table</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purpose</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Row Count</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Referenced By</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {emptyTablesVerification.tables.map((table: any, index: number) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900 font-mono">{table.tableName}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{table.purpose}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{table.rowCount}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{table.referencedBy}</td>
-                        <td className="px-6 py-4 text-sm">
-                          {table.keep ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              🔒 Keep
-                            </span>
-                          ) : table.safeToDrop ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              ✓ Safe to Drop
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              ✗ Not Safe
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
-
-          {/* Single Source of Truth Tests */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Single Source of Truth Tests</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Verify that all code uses l1_transaction_facts and no fallbacks exist.
-                </p>
-              </div>
-              <button
-                onClick={fetchSingleSourceTests}
-                disabled={singleSourceTestsLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
-                {singleSourceTestsLoading ? 'Running...' : 'Run Tests'}
-              </button>
-            </div>
-
-            {singleSourceTests && (
-              <div className="space-y-4">
-                <div className={`border rounded-lg p-4 ${
-                  singleSourceTests.success 
-                    ? 'bg-green-50 border-green-200' 
-                    : 'bg-yellow-50 border-yellow-200'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-gray-900">Test Summary</h4>
-                    <span className={`text-sm font-medium ${
-                      singleSourceTests.success ? 'text-green-800' : 'text-yellow-800'
-                    }`}>
-                      {singleSourceTests.summary.passed} / {singleSourceTests.summary.total} tests passed
-                    </span>
-                  </div>
-                  <div className="flex gap-4 text-sm">
-                    <span className="text-green-700">✓ Passed: {singleSourceTests.summary.passed}</span>
-                    <span className="text-red-700">✗ Failed: {singleSourceTests.summary.failed}</span>
-                    <span className="text-yellow-700">⚠ Warnings: {singleSourceTests.summary.warnings}</span>
-                    <span className="text-gray-700">⚠ Errors: {singleSourceTests.summary.errors}</span>
-                  </div>
-                  {/* Action buttons */}
-                  <div className="mt-4 flex gap-2">
-                    {singleSourceTests.tests.some((t: any) => t.name === 'Tokenization coverage' && t.status === 'warn') && (
-                      <button
-                        onClick={fixTokenization}
-                        disabled={fixingTokenization}
-                        className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 text-sm"
-                      >
-                        {fixingTokenization ? 'Fixing...' : 'Fix Tokenization'}
-                      </button>
-                    )}
-                    {singleSourceTests.tests.some((t: any) => 
-                      (t.name === 'transactions table foreign keys removed' && t.status === 'fail') ||
-                      (t.name === 'accounts table foreign keys removed' && t.status === 'fail')
-                    ) && (
-                      <button
-                        onClick={dropTransactionsAndAccounts}
-                        disabled={droppingTables}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm"
-                      >
-                        {droppingTables ? 'Dropping...' : 'Drop Tables & Establish SSOT'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Test</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {singleSourceTests.tests.map((test: any, index: number) => (
-                        <tr key={index}>
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{test.name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              test.status === 'pass' ? 'bg-green-100 text-green-800' :
-                              test.status === 'fail' ? 'bg-red-100 text-red-800' :
-                              test.status === 'warn' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {test.status === 'pass' ? '✓ Pass' : 
-                               test.status === 'fail' ? '✗ Fail' : 
-                               test.status === 'warn' ? '⚠ Warn' : '⚠ Error'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{test.message}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{test.details || '-'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* PII Migration from Onboarding */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">PII Migration from Onboarding</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Migrate remaining PII from onboarding_responses to l0_pii_users and drop PII columns to complete PII isolation.
-                </p>
-              </div>
-              <button
-                onClick={migratePIIFromOnboarding}
-                disabled={migratingPII}
-                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 font-semibold"
-              >
-                {migratingPII ? 'Migrating...' : 'Migrate PII from Onboarding'}
-              </button>
-            </div>
-
-            {piiMigrationResult && (
-              <div className={`border rounded-lg p-4 ${piiMigrationResult.success ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold text-gray-900">
-                    PII Migration Results
-                  </h4>
-                  <span className={`text-sm font-medium ${piiMigrationResult.success ? 'text-green-800' : 'text-yellow-800'}`}>
-                    {piiMigrationResult.success ? '✓ Success' : '✗ Failed'}
-                  </span>
-                </div>
-                {piiMigrationResult.details && (
-                  <div className="mt-2 space-y-1">
-                    <p className="text-sm text-gray-700">
-                      PII columns dropped: {piiMigrationResult.details.piiColumnsDropped ? 'Yes' : 'No'}
-                    </p>
-                    {piiMigrationResult.details.remainingPIIColumns && piiMigrationResult.details.remainingPIIColumns.length > 0 && (
-                      <p className="text-sm text-yellow-800">
-                        Remaining PII columns: {piiMigrationResult.details.remainingPIIColumns.join(', ')}
-                      </p>
-                    )}
-                  </div>
-                )}
-                {piiMigrationResult.error && (
-                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
-                    <p className="text-sm text-red-800 font-medium">Error:</p>
-                    <p className="text-sm text-red-700">{piiMigrationResult.error}</p>
-                    {piiMigrationResult.details && (
-                      <p className="text-xs text-red-600 mt-1">{piiMigrationResult.details}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Complete PII Isolation */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Complete PII Isolation</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Remove ALL PII from chat_bookings, onboarding_responses, and users tables. All PII will be consolidated in l0_pii_users only.
-                </p>
-              </div>
-              <button
-                onClick={completePIIIsolation}
-                disabled={completingPIIIsolation}
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 font-semibold"
-              >
-                {completingPIIIsolation ? 'Migrating...' : 'Complete PII Isolation'}
-              </button>
-            </div>
-
-            {completePIIIsolationResult && (
-              <div className={`border rounded-lg p-4 ${completePIIIsolationResult.success ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold text-gray-900">
-                    Complete PII Isolation Results
-                  </h4>
-                  <span className={`text-sm font-medium ${completePIIIsolationResult.success ? 'text-green-800' : 'text-yellow-800'}`}>
-                    {completePIIIsolationResult.success ? '✓ Success' : '✗ Failed'}
-                  </span>
-                </div>
-                {completePIIIsolationResult.details && (
-                  <div className="mt-2 space-y-1">
-                    <p className="text-sm text-gray-700">
-                      Remaining PII columns in onboarding_responses: {completePIIIsolationResult.details.remainingPIIColumnsInOnboarding}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      PII records in l0_pii_users: {completePIIIsolationResult.details.piiRecordsCount}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      User records: {completePIIIsolationResult.details.userRecordsCount}
-                    </p>
-                    {completePIIIsolationResult.details.note && (
-                      <p className="text-sm text-blue-700 mt-2">
-                        {completePIIIsolationResult.details.note}
-                      </p>
-                    )}
-                  </div>
-                )}
-                {completePIIIsolationResult.error && (
-                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
-                    <p className="text-sm text-red-800 font-medium">Error:</p>
-                    <p className="text-sm text-red-700">{completePIIIsolationResult.error}</p>
-                    {completePIIIsolationResult.details && (
-                      <p className="text-xs text-red-600 mt-1">{completePIIIsolationResult.details}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Fix Events Table and Remove PII */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Fix Events Table and Remove PII</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Add tokenized_user_id to l1_events for analytics consistency, drop unused l1_event_facts table, and remove any remaining PII from onboarding_responses.
-                </p>
-              </div>
-              <button
-                onClick={fixEventsAndPII}
-                disabled={fixingEventsAndPII}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 font-semibold"
-              >
-                {fixingEventsAndPII ? 'Running...' : 'Fix Events & Remove PII'}
-              </button>
-            </div>
-
-            {fixEventsAndPIIResult && (
-              <div className={`border rounded-lg p-4 ${fixEventsAndPIIResult.success ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold text-gray-900">
-                    Migration Results
-                  </h4>
-                  <span className={`text-sm font-medium ${fixEventsAndPIIResult.success ? 'text-green-800' : 'text-yellow-800'}`}>
-                    {fixEventsAndPIIResult.success ? '✓ Success' : '✗ Failed'}
-                  </span>
-                </div>
-                {fixEventsAndPIIResult.message && (
-                  <p className="text-sm text-gray-700 mt-2">{fixEventsAndPIIResult.message}</p>
-                )}
-                {fixEventsAndPIIResult.changes && fixEventsAndPIIResult.changes.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-sm font-medium text-gray-700 mb-1">Changes made:</p>
-                    <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                      {fixEventsAndPIIResult.changes.map((change: string, index: number) => (
-                        <li key={index}>{change}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {fixEventsAndPIIResult.error && (
-                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
-                    <p className="text-sm text-red-800 font-medium">Error:</p>
-                    <p className="text-sm text-red-700">{fixEventsAndPIIResult.error}</p>
-                    {fixEventsAndPIIResult.details && (
-                      <p className="text-xs text-red-600 mt-1">{fixEventsAndPIIResult.details}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Complete PII Isolation */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Complete PII Isolation</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Remove ALL PII from chat_bookings, onboarding_responses, and users tables. All PII will be consolidated in l0_pii_users only.
-                </p>
-              </div>
-              <button
-                onClick={completePIIIsolation}
-                disabled={completingPIIIsolation}
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 font-semibold"
-              >
-                {completingPIIIsolation ? 'Migrating...' : 'Complete PII Isolation'}
-              </button>
-            </div>
-
-            {completePIIIsolationResult && (
-              <div className={`border rounded-lg p-4 ${completePIIIsolationResult.success ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold text-gray-900">
-                    Complete PII Isolation Results
-                  </h4>
-                  <span className={`text-sm font-medium ${completePIIIsolationResult.success ? 'text-green-800' : 'text-yellow-800'}`}>
-                    {completePIIIsolationResult.success ? '✓ Success' : '✗ Failed'}
-                  </span>
-                </div>
-                {completePIIIsolationResult.details && (
-                  <div className="mt-2 space-y-1">
-                    <p className="text-sm text-gray-700">
-                      Remaining PII columns in onboarding_responses: {completePIIIsolationResult.details.remainingPIIColumnsInOnboarding}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      PII records in l0_pii_users: {completePIIIsolationResult.details.piiRecordsCount}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      User records: {completePIIIsolationResult.details.userRecordsCount}
-                    </p>
-                    {completePIIIsolationResult.details.note && (
-                      <p className="text-sm text-blue-700 mt-2">
-                        {completePIIIsolationResult.details.note}
-                      </p>
-                    )}
-                  </div>
-                )}
-                {completePIIIsolationResult.error && (
-                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
-                    <p className="text-sm text-red-800 font-medium">Error:</p>
-                    <p className="text-sm text-red-700">{completePIIIsolationResult.error}</p>
-                    {completePIIIsolationResult.details && (
-                      <p className="text-xs text-red-600 mt-1">{completePIIIsolationResult.details}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        )}
       </div>
     );
   };
@@ -2382,7 +2684,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            👤 Customer data
+            👥 Customer data
           </button>
           <button
             onClick={() => setAnalyticsSubTab('events-data')}
@@ -2392,7 +2694,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            📅 All user events
+            📊 Events data
           </button>
           <button
             onClick={() => setAnalyticsSubTab('editing-events-data')}
@@ -2402,7 +2704,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            ✏️ Editing events
+            ✏️ Editing events data
           </button>
           <button
             onClick={() => setAnalyticsSubTab('sessions')}
@@ -2412,7 +2714,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            🔐 Sessions
+            Sessions
           </button>
           <button
             onClick={() => setAnalyticsSubTab('vanity-metrics')}
@@ -2548,7 +2850,7 @@ export default function AdminDashboard() {
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.hasUserEventsTable 
                               ? (cohortData?.engagement?.[week]?.loggedInTwoPlusDays || 0)
-                              : <span className="text-gray-400 italic">Requires l1_events table</span>}
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
                           </td>
                         ))}
                       </tr>
@@ -2558,7 +2860,7 @@ export default function AdminDashboard() {
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.hasUserEventsTable 
                               ? (cohortData?.engagement?.[week]?.avgDaysLoggedInPerMonth || '-')
-                              : <span className="text-gray-400 italic">Requires l1_events table</span>}
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
                           </td>
                         ))}
                       </tr>
@@ -2568,7 +2870,7 @@ export default function AdminDashboard() {
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.hasUserEventsTable 
                               ? (cohortData?.engagement?.[week]?.loggedInTwoPlusMonths || 0)
-                              : <span className="text-gray-400 italic">Requires l1_events table</span>}
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
                           </td>
                         ))}
                       </tr>
@@ -2578,7 +2880,7 @@ export default function AdminDashboard() {
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
                             {cohortData?.hasUserEventsTable 
                               ? (cohortData?.engagement?.[week]?.avgUniqueMonthsLoggedIn || '-')
-                              : <span className="text-gray-400 italic">Requires l1_events table</span>}
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
                           </td>
                         ))}
                       </tr>
@@ -2788,7 +3090,7 @@ export default function AdminDashboard() {
             {/* Engagement Chart - Number of Days Logged In */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="p-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Unique days logged in per week from first day signed up</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Unique events per week from first day of sign up</h3>
                 <p className="text-sm text-gray-600 mt-1">
                   Y-axis: Total unique days logged in per week | X-axis: Week from signup (12 weeks)
                 </p>
@@ -2842,6 +3144,20 @@ export default function AdminDashboard() {
                       placeholder="Select data coverage..."
                     />
                   </div>
+                  <div className="min-w-[200px]">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Chart Metric</label>
+                    <select
+                      value={chartMetric}
+                      onChange={(e) => {
+                        setChartMetric(e.target.value as 'loginDays' | 'uploadsPerWeek');
+                        fetchEngagementChart();
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="loginDays">Unique Days Logged In</option>
+                      <option value="uploadsPerWeek">Number of Uploads Per Week</option>
+                    </select>
+                  </div>
                   <button
                     onClick={fetchEngagementChart}
                     disabled={engagementChartLoading}
@@ -2862,8 +3178,8 @@ export default function AdminDashboard() {
                   {!engagementChartData.hasUserEvents && (
                     <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                       <p className="text-sm text-yellow-800">
-                        ⚠️ <strong>Note:</strong> l1_events table not found. Chart shows placeholder data (all zeros). 
-                        Login tracking data will appear once l1_events table is created and login events are logged.
+                        ⚠️ <strong>Note:</strong> user_events table not found. Chart shows placeholder data (all zeros). 
+                        Login tracking data will appear once user_events table is created and login events are logged.
                       </p>
                     </div>
                   )}
@@ -2879,7 +3195,8 @@ export default function AdminDashboard() {
                         engagementChartData.userLines.forEach((userLine: any) => {
                           const weekMap = new Map<number, number>();
                           userLine.weeks.forEach((w: any) => {
-                            weekMap.set(w.week, w.loginDays);
+                            const value = chartMetric === 'loginDays' ? w.loginDays : (w.uploadsPerWeek || 0);
+                            weekMap.set(w.week, value);
                           });
                           userDataByWeek.set(userLine.userId, weekMap);
                         });
@@ -2907,16 +3224,18 @@ export default function AdminDashboard() {
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             const data = payload[0].payload;
-                            return (
-                              <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
-                                <p className="font-semibold">Week {data.week}</p>
-                                <p className="text-sm">User ID: {data.userId}</p>
-                                <p className="text-sm">Cohort: {data.cohortWeek}</p>
-                                <p className="text-sm">Intent: {data.intentType}</p>
-                                <p className="text-sm">Data Coverage: {data.dataCoverage}</p>
-                                <p className="text-sm font-medium">Login Days: {data.loginDays}</p>
-                              </div>
-                            );
+                        const metricValue = chartMetric === 'loginDays' ? data.loginDays : data.uploadsPerWeek;
+                        const metricLabel = chartMetric === 'loginDays' ? 'Login Days' : 'Uploads';
+                        return (
+                          <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
+                            <p className="font-semibold">Week {data.week}</p>
+                            <p className="text-sm">User ID: {data.userId}</p>
+                            <p className="text-sm">Cohort: {data.cohortWeek}</p>
+                            <p className="text-sm">Intent: {data.intentType}</p>
+                            <p className="text-sm">Data Coverage: {data.dataCoverage}</p>
+                            <p className="text-sm font-medium">{metricLabel}: {metricValue}</p>
+                          </div>
+                        );
                           }
                           return null;
                         }}
@@ -2932,20 +3251,23 @@ export default function AdminDashboard() {
                             stroke={color}
                             strokeWidth={2}
                             dot={{ r: 4 }}
-                            name={`User ${userLine.userId}`}
+                            name={`User ${userLine.userId} (${userLine.cohortWeek})`}
                             connectNulls
                           />
                         );
                       })}
                     </LineChart>
                   </ResponsiveContainer>
+                  <div className="mt-4 text-sm text-gray-600">
+                    <p className="font-medium mb-2">Unique events per week from first day of sign up</p>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-500">
                   No engagement chart data available. Click "Refresh Chart" to load.
                   {!engagementChartData?.hasUserEvents && (
                     <p className="text-sm text-gray-400 mt-2">
-                      Note: Requires l1_events table for login tracking data.
+                      Note: Requires l1_event_facts table for tracking data.
                     </p>
                   )}
                 </div>
@@ -2954,6 +3276,288 @@ export default function AdminDashboard() {
 
           </div>
         )}
+
+        {analyticsSubTab === 'customer-data' && (
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Customer Data</h3>
+            {customerDataLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-600 mt-4">Loading customer data...</p>
+              </div>
+            ) : customerData.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {Object.keys(customerData[0] || {}).map((key) => (
+                        <th key={key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          {key.replace(/_/g, ' ')}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {customerData.map((row: any, idx: number) => (
+                      <tr key={idx}>
+                        {Object.values(row).map((value: any, colIdx: number) => (
+                          <td key={colIdx} className="px-6 py-4 text-sm text-gray-900">
+                            {value !== null && value !== undefined ? String(value) : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-gray-600">No customer data available</p>
+            )}
+          </div>
+        )}
+
+        {analyticsSubTab === 'events-data' && (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Events Data</h2>
+                <p className="text-gray-600 mt-1">User events and activity tracking from l1_event_facts table</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={fetchEventsData}
+                  disabled={eventsDataLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  <svg className={`w-4 h-4 ${eventsDataLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh Data
+                </button>
+              </div>
+            </div>
+
+            {eventsDataLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-600 mt-4">Loading events data...</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Data</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metadata</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created At</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {eventsData.length > 0 ? (
+                      eventsData.map((event) => (
+                        <tr key={event.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm text-gray-600 font-mono">{formatEventId(event.id)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600 font-mono">{formatUserId(event.user_id)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            {event.first_name || <span className="text-gray-400 italic">null</span>}
+                          </td>
+                          <td className="px-6 py-4 text-sm">
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                              {event.event_type || 'unknown'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                            {event.event_data ? (
+                              <pre className="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-32">
+                                {typeof event.event_data === 'string' 
+                                  ? event.event_data 
+                                  : JSON.stringify(event.event_data, null, 2)}
+                              </pre>
+                            ) : (
+                              <span className="text-gray-400 italic">null</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                            {event.metadata ? (
+                              <pre className="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-32">
+                                {typeof event.metadata === 'string' 
+                                  ? event.metadata 
+                                  : JSON.stringify(event.metadata, null, 2)}
+                              </pre>
+                            ) : (
+                              <span className="text-gray-400 italic">null</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            {event.created_at 
+                              ? new Date(event.created_at).toLocaleString()
+                              : <span className="text-gray-400 italic">null</span>}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                          <div className="flex flex-col items-center">
+                            <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            <p className="text-lg font-medium mb-2">No events data available</p>
+                            <p className="text-sm text-gray-400">
+                              Events will appear here once the l1_event_facts table is created and events are logged.
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {analyticsSubTab === 'editing-events-data' && (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Editing events data</h2>
+                <p className="text-gray-600 mt-1">Transaction editing events - all changes made to transactions</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={fetchEditingEventsData}
+                  disabled={editingEventsDataLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  <svg className={`w-4 h-4 ${editingEventsDataLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh Data
+                </button>
+              </div>
+            </div>
+
+            {editingEventsDataLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-600 mt-4">Loading editing events data...</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Changes</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {editingEventsData.length > 0 ? (
+                      editingEventsData.map((event) => {
+                        const metadata = typeof event.metadata === 'string' ? JSON.parse(event.metadata) : event.metadata;
+                        const changes = metadata?.changes || [];
+                        return (
+                          <tr key={event.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm text-gray-600 font-mono">{formatEventId(event.id)}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600 font-mono">{formatUserId(event.user_id)}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{event.email || '-'}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600 font-mono">{metadata?.transactionId ? formatTransactionId(metadata.transactionId) : (metadata?.transactionIds ? metadata.transactionIds.map((id: number) => formatTransactionId(id)).join(', ') : '-')}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {changes.length > 0 ? (
+                                <div className="space-y-1">
+                                  {changes.map((change: any, idx: number) => (
+                                    <div key={idx} className="text-xs">
+                                      <span className="font-medium">{change.field}:</span>{' '}
+                                      <span className="text-red-600 line-through">{String(change.oldValue || '-')}</span>
+                                      {' → '}
+                                      <span className="text-green-600">{String(change.newValue || '-')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : event.event_type === 'bulk_edit' && metadata?.transactionIds ? (
+                                <span className="text-xs text-gray-600">Bulk edit: {metadata.transactionIds.length} transaction(s)</span>
+                              ) : (
+                                <span className="text-gray-400 italic">No changes</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {event.created_at 
+                                ? new Date(event.created_at).toLocaleString()
+                                : <span className="text-gray-400 italic">null</span>}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                          <div className="flex flex-col items-center">
+                            <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            <p className="text-lg font-medium mb-2">No editing events available</p>
+                            <p className="text-sm text-gray-400">
+                              Editing events will appear here once users start editing transactions.
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {analyticsSubTab === 'sessions' && (
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Sessions</h3>
+            {sessionsDataLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-600 mt-4">Loading sessions data...</p>
+              </div>
+            ) : sessionsData.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {Object.keys(sessionsData[0] || {}).map((key) => (
+                        <th key={key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          {key.replace(/_/g, ' ')}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {sessionsData.map((row: any, idx: number) => (
+                      <tr key={idx}>
+                        {Object.values(row).map((value: any, colIdx: number) => (
+                          <td key={colIdx} className="px-6 py-4 text-sm text-gray-900">
+                            {value !== null && value !== undefined ? String(value) : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-gray-600">No sessions data available</p>
+            )}
+          </div>
+        )}
+
         {analyticsSubTab === 'vanity-metrics' && (
           <div className="space-y-6">
             {/* Vanity Metrics Table */}
@@ -3249,60 +3853,6 @@ export default function AdminDashboard() {
                         })()}
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total statements uploaded</td>
-                        {vanityData?.weeks?.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {vanityData.metrics?.[week]?.totalStatementsUploaded || 0}
-                          </td>
-                        )) || (() => {
-                          const now = new Date();
-                          const novemberStart = new Date(now.getFullYear(), 10, 1);
-                          const firstMonday = new Date(novemberStart);
-                          const dayOfWeek = novemberStart.getDay();
-                          if (dayOfWeek === 0) {
-                            firstMonday.setDate(novemberStart.getDate() + 1);
-                          } else if (dayOfWeek !== 1) {
-                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
-                          }
-                          firstMonday.setHours(0, 0, 0, 0);
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
-                          const numWeeks = Math.max(1, weeksDiff + 1);
-                          return Array.from({ length: numWeeks }, () => (
-                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
-                          ));
-                        })()}
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total statements uploaded by unique person</td>
-                        {vanityData?.weeks?.map((week: string) => (
-                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
-                            {vanityData.metrics?.[week]?.totalStatementsByUniquePerson || 0}
-                          </td>
-                        )) || (() => {
-                          const now = new Date();
-                          const novemberStart = new Date(now.getFullYear(), 10, 1);
-                          const firstMonday = new Date(novemberStart);
-                          const dayOfWeek = novemberStart.getDay();
-                          if (dayOfWeek === 0) {
-                            firstMonday.setDate(novemberStart.getDate() + 1);
-                          } else if (dayOfWeek !== 1) {
-                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
-                          }
-                          firstMonday.setHours(0, 0, 0, 0);
-                          const currentWeekStart = new Date(now);
-                          currentWeekStart.setDate(now.getDate() - now.getDay());
-                          currentWeekStart.setHours(0, 0, 0, 0);
-                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
-                          const numWeeks = Math.max(1, weeksDiff + 1);
-                          return Array.from({ length: numWeeks }, () => (
-                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
-                          ));
-                        })()}
-                      </tr>
-                      <tr>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">Total unique banks uploaded</td>
                         {vanityData?.weeks?.map((week: string) => (
                           <td key={week} className="px-4 py-3 text-sm text-gray-600">
@@ -3336,7 +3886,7 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-        
+
         {analyticsSubTab === 'download' && (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="p-6 border-b border-gray-200">
@@ -3344,6 +3894,44 @@ export default function AdminDashboard() {
               <p className="text-gray-600 mt-1">Export raw database data or API documentation</p>
             </div>
             <div className="p-6 space-y-6">
+              {/* Export Cohort & Vanity Metrics */}
+              <div className="border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export Cohort Analysis & Vanity Metrics</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Download combined Excel file with Cohort Analysis and Vanity Metrics data details sheets.
+                </p>
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('admin_token');
+                      const response = await fetch('/api/admin/export/cohort-vanity', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      });
+                      if (!response.ok) {
+                        const error = await response.json();
+                        alert(`Failed to export data: ${error.error || 'Unknown error'}`);
+                        return;
+                      }
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `cohort-vanity-metrics-${new Date().toISOString().split('T')[0]}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      document.body.removeChild(a);
+                    } catch (error: any) {
+                      console.error('Error exporting data:', error);
+                      alert(`Error exporting data: ${error.message || 'Unknown error'}`);
+                    }
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  ⬇️ Download Cohort & Vanity Metrics (Excel)
+                </button>
+              </div>
+
               {/* Export All Raw Data */}
               <div className="border border-gray-200 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Export all raw data</h3>
@@ -3357,1021 +3945,64 @@ export default function AdminDashboard() {
                       const response = await fetch('/api/admin/export/all-data', {
                         headers: { 'Authorization': `Bearer ${token}` }
                       });
-                      
                       if (!response.ok) {
                         const error = await response.json();
-                        alert(`Error: ${error.error || 'Failed to export data'}`);
+                        alert(`Failed to export data: ${error.error || 'Unknown error'}`);
                         return;
                       }
-                      
                       const blob = await response.blob();
-                      const link = document.createElement('a');
-                      link.href = URL.createObjectURL(blob);
-                      link.download = `all-database-data-${new Date().toISOString().split('T')[0]}.xlsx`;
-                      link.click();
-                    } catch (error) {
-                      console.error('Export error:', error);
-                      alert('Failed to export data. Please try again.');
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `database-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      document.body.removeChild(a);
+                    } catch (error: any) {
+                      console.error('Error exporting data:', error);
+                      alert(`Error exporting data: ${error.message || 'Unknown error'}`);
                     }
                   }}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Download all raw data
-                </button>
-              </div>
-              
-              {/* Cohort & Vanity Metrics Export */}
-              <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export cohort & vanity metrics</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Download cohort analysis and vanity metrics data with data details sheets documenting all KPIs, formulas, and data sources.
-                </p>
-                <button
-                  onClick={async () => {
-                    try {
-                      const token = localStorage.getItem('admin_token');
-                      const response = await fetch('/api/admin/export/cohort-vanity', {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                      });
-                      
-                      if (!response.ok) {
-                        const error = await response.json();
-                        alert(`Error: ${error.error || 'Failed to export data'}`);
-                        return;
-                      }
-                      
-                      const blob = await response.blob();
-                      const link = document.createElement('a');
-                      link.href = URL.createObjectURL(blob);
-                      link.download = `cohort-vanity-metrics-${new Date().toISOString().split('T')[0]}.xlsx`;
-                      link.click();
-                    } catch (error) {
-                      console.error('Export error:', error);
-                      alert('Failed to export data. Please try again.');
-                    }
-                  }}
-                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Download cohort & vanity metrics
+                  ⬇️ Download All Data (Excel)
                 </button>
               </div>
             </div>
-          </div>
-        )}
-        
-        {false && analyticsSubTab === 'download' && (
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Download</h2>
-              <p className="text-gray-600 mt-1">Export raw database data or API documentation</p>
-            </div>
-            <div className="p-6 space-y-6">
-              {/* Export All Raw Data */}
-              <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export all raw data</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Download all data from every table in the database. Includes API documentation and table of contents as the first sheets. Each table will be a separate sheet in the Excel file.
-                </p>
-                <button
-                  onClick={async () => {
-                    try {
-                      const token = localStorage.getItem('admin_token');
-                      const response = await fetch('/api/admin/export/all-data', {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                      });
-                      
-                      if (!response.ok) {
-                        const error = await response.json();
-                        alert(`Error: ${error.error || 'Failed to export data'}`);
-                        return;
-                      }
-                      
-                      const blob = await response.blob();
-                      const link = document.createElement('a');
-                      link.href = URL.createObjectURL(blob);
-                      link.download = `all-database-data-${new Date().toISOString().split('T')[0]}.xlsx`;
-                      link.click();
-                    } catch (error) {
-                      console.error('Export error:', error);
-                      alert('Failed to export data. Please try again.');
-                    }
-                  }}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Download all raw data
-                </button>
-              </div>
-              
-              {/* Cohort & Vanity Metrics Export */}
-              <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export cohort & vanity metrics</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Download cohort analysis and vanity metrics data with data details sheets documenting all KPIs, formulas, and data sources.
-                </p>
-                <button
-                  onClick={async () => {
-                    try {
-                      const token = localStorage.getItem('admin_token');
-                      const response = await fetch('/api/admin/export/cohort-vanity', {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                      });
-                      
-                      if (!response.ok) {
-                        const error = await response.json();
-                        alert(`Error: ${error.error || 'Failed to export data'}`);
-                        return;
-                      }
-                      
-                      const blob = await response.blob();
-                      const link = document.createElement('a');
-                      link.href = URL.createObjectURL(blob);
-                      link.download = `cohort-vanity-metrics-${new Date().toISOString().split('T')[0]}.xlsx`;
-                      link.click();
-                    } catch (error) {
-                      console.error('Export error:', error);
-                      alert('Failed to export data. Please try again.');
-                    }
-                  }}
-                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Download cohort & vanity metrics
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {false && (
-          <div>
-            {/* REMOVED DATA DETAILS CONTENT */}
-          </div>
-        )}
-        
-        {false && analyticsSubTab === 'download' && (
-          <div>
-            {/* REMOVED DUPLICATE DOWNLOAD CONTENT */}
-          </div>
-        )}
-        
-        {/* REMOVED: All the old data-details content from line 3251 to 3949 */}
-        
-        {analyticsSubTab === 'customer-data' && (
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Customer Data</h2>
-                <p className="text-gray-600 mt-1">All user onboarding responses and profile information</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={fetchCustomerData}
-                  disabled={customerDataLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                >
-                  <svg className={`w-4 h-4 ${customerDataLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh Data
-                </button>
-              </div>
-            </div>
-
-            {customerDataLoading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-                <p className="text-gray-600 mt-4">Loading customer data...</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emotional State</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Financial Context</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Motivation</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acquisition</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Insights Wanted</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Insight Suggestions</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email Validated</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Is Active</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Created</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Onboarding Completed</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Onboarding Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white">
-                    {customerData.map((user) => (
-                      <tr key={user.user_id || user.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm text-gray-600 font-mono">{user.user_id || user.id || '-'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {user.first_name || <span className="text-gray-400 italic">null</span>}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                          {user.emotional_state && user.emotional_state.length > 0
-                            ? <div className="text-xs">{user.emotional_state.join(', ')}</div>
-                            : <span className="text-gray-400 italic">null</span>}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                          {user.financial_context && user.financial_context.length > 0
-                            ? <div className="text-xs">{user.financial_context.join(', ')}</div>
-                            : <span className="text-gray-400 italic">null</span>}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                          {user.motivation || <span className="text-gray-400 italic">null</span>}
-                          {user.motivation_other && <div className="text-xs text-gray-500 mt-1">({user.motivation_other})</div>}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {user.acquisition_source || <span className="text-gray-400 italic">null</span>}
-                          {user.acquisition_other && <div className="text-xs text-gray-500 mt-1">({user.acquisition_other})</div>}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                          {user.insight_preferences && user.insight_preferences.length > 0
-                            ? <div className="text-xs">{user.insight_preferences.join(', ')}</div>
-                            : <span className="text-gray-400 italic">null</span>}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                          {user.insight_other || <span className="text-gray-400 italic">null</span>}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {user.email_validated ? <span className="text-green-600 font-medium">True</span> : <span className="text-gray-400">False</span>}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {user.is_active !== false ? <span className="text-green-600 font-medium">True</span> : <span className="text-red-600 font-medium">False</span>}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {user.created_at 
-                            ? new Date(user.created_at).toLocaleString()
-                            : <span className="text-gray-400 italic">null</span>}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {user.completed_at 
-                            ? new Date(user.completed_at).toLocaleString()
-                            : <span className="text-gray-400 italic">null</span>}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {user.completed_at 
-                            ? <span className="text-green-600 font-medium">Completed</span>
-                            : user.last_step 
-                            ? (
-                              <div>
-                                <span className="text-orange-600 font-medium">Dropped after Step {user.last_step}</span>
-                                {user.updated_at && (
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    {new Date(user.updated_at).toLocaleString()}
-                                  </div>
-                                )}
-                              </div>
-                            )
-                            : <span className="text-gray-400 italic">Not started</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {customerData.length === 0 && (
-                  <div className="text-center py-12 text-gray-500">
-                    No customer data available yet
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-        
-        {analyticsSubTab === 'events-data' && (
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">All user events</h2>
-                <p className="text-gray-600 mt-1">User events and activity tracking from l1_events table</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={fetchEventsData}
-                  disabled={eventsDataLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                >
-                  <svg className={`w-4 h-4 ${eventsDataLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh Data
-                </button>
-              </div>
-            </div>
-
-            {eventsDataLoading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-                <p className="text-gray-600 mt-4">Loading events data...</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event ID</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Type</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Data</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metadata</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created At</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white">
-                    {eventsData.length > 0 ? (
-                      eventsData.map((event) => (
-                        <tr key={event.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm text-gray-600 font-mono">{formatEventId(event.id)}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600 font-mono">{formatUserId(event.user_id)}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">
-                            {event.first_name || <span className="text-gray-400 italic">null</span>}
-                          </td>
-                          <td className="px-6 py-4 text-sm">
-                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-                              {event.event_type || 'unknown'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                            {event.event_data ? (
-                              <pre className="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-32">
-                                {typeof event.event_data === 'string' 
-                                  ? event.event_data 
-                                  : JSON.stringify(event.event_data, null, 2)}
-                              </pre>
-                            ) : (
-                              <span className="text-gray-400 italic">null</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                            {event.metadata ? (
-                              <pre className="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-32">
-                                {typeof event.metadata === 'string' 
-                                  ? event.metadata 
-                                  : JSON.stringify(event.metadata, null, 2)}
-                              </pre>
-                            ) : (
-                              <span className="text-gray-400 italic">null</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-600">
-                            {event.created_at 
-                              ? new Date(event.created_at).toLocaleString()
-                              : <span className="text-gray-400 italic">null</span>}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                          <div className="flex flex-col items-center">
-                            <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                            </svg>
-                            <p className="text-lg font-medium mb-2">No events data available</p>
-                            <p className="text-sm text-gray-400">
-                              Events will appear here once the l1_events table is created and events are logged.
-                            </p>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-        
-        {/* Editing Events Data Tab - Shows transaction editing events from l1_events table
-            Events are logged when users edit transactions (category, label, amount, etc.)
-            This tab displays all transaction_edit events with change details */}
-        {analyticsSubTab === 'editing-events-data' && (
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Editing events</h2>
-                <p className="text-gray-600 mt-1">Transaction editing events - all changes made to transactions</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={fetchEditingEventsData}
-                  disabled={editingEventsDataLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                >
-                  <svg className={`w-4 h-4 ${editingEventsDataLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh Data
-                </button>
-              </div>
-            </div>
-
-            {editingEventsDataLoading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-                <p className="text-gray-600 mt-4">Loading editing events data...</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event ID</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">First Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Changes</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created At</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white">
-                    {editingEventsData && editingEventsData.length > 0 ? (
-                      editingEventsData.map((event: any) => {
-                        const metadata = typeof event.metadata === 'string' ? JSON.parse(event.metadata) : event.metadata;
-                        const changes = metadata?.changes || [];
-                        return (
-                          <tr key={event.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 text-sm text-gray-600 font-mono">{event.id}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600 font-mono">{event.user_id}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">
-                              {event.first_name || <span className="text-gray-400 italic">null</span>}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-600 font-mono">
-                              {metadata?.transactionId || '-'}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                              {changes.length > 0 ? (
-                                <div className="space-y-1">
-                                  {changes.map((change: any, idx: number) => (
-                                    <div key={idx} className="text-xs">
-                                      <span className="font-medium">{change.field}:</span>{' '}
-                                      <span className="text-red-600 line-through">{String(change.oldValue || '-')}</span>
-                                      {' → '}
-                                      <span className="text-green-600">{String(change.newValue || '-')}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-gray-400 italic">No changes</span>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-600">
-                              {event.created_at 
-                                ? new Date(event.created_at).toLocaleString()
-                                : <span className="text-gray-400 italic">null</span>}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                          <div className="flex flex-col items-center">
-                            <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                            </svg>
-                            <p className="text-lg font-medium mb-2">No editing events available</p>
-                            <p className="text-sm text-gray-400">
-                              Editing events will appear here once users start editing transactions.
-                            </p>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
         )}
       </div>
     );
   };
 
-  // Fetch migration pre-tests
-  const fetchMigrationTests = async () => {
-    setMigrationTestsLoading(true);
+
+
+  // Fetch Excel validation
+  const fetchExcelValidation = async () => {
+    setExcelValidationLoading(true);
     try {
       const token = localStorage.getItem('admin_token');
       if (!token) {
         alert('Not authenticated. Please log in again.');
         return;
       }
-      const response = await fetch('/api/admin/migration/run', {
+      const response = await fetch('/api/admin/export/validate', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
       const data = await response.json();
       if (response.ok) {
-        setMigrationTests(data.tests || []);
+        setExcelValidation(data);
       } else {
-        alert(`Failed to fetch migration tests: ${data.error || 'Unknown error'}`);
+        alert(`Failed to validate Excel export: ${data.error || 'Unknown error'}`);
       }
     } catch (error: any) {
-      console.error('Error fetching migration tests:', error);
-      alert(`Error fetching migration tests: ${error.message || 'Unknown error'}`);
+      console.error('Error validating Excel export:', error);
+      alert(`Error validating Excel export: ${error.message || 'Unknown error'}`);
     } finally {
-      setMigrationTestsLoading(false);
-    }
-  };
-
-  // Run migration
-  const runMigration = async () => {
-    if (!confirm('Are you sure you want to run the migration? This will modify the database structure.')) {
-      return;
-    }
-    
-    setMigrationRunning(true);
-    setMigrationResults(null);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/migration/run', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      const data = await response.json();
-      setMigrationResults(data);
-      if (response.ok && data.success) {
-        alert('Migration completed successfully!');
-        // Refresh tests
-        fetchMigrationTests();
-        fetchDropVerification();
-      } else {
-        alert(`Migration completed with ${data.errors || 0} error(s). Check results below.`);
-      }
-    } catch (error: any) {
-      console.error('Error running migration:', error);
-      alert(`Error running migration: ${error.message || 'Unknown error'}`);
-    } finally {
-      setMigrationRunning(false);
-    }
-  };
-
-  // Fetch investigation data
-  const fetchInvestigation = async () => {
-    setInvestigationLoading(true);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/migration/investigate', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setInvestigationData(data.investigation);
-      } else {
-        alert(`Failed to fetch investigation: ${data.error || 'Unknown error'}`);
-      }
-    } catch (error: any) {
-      console.error('Error fetching investigation:', error);
-      alert(`Error fetching investigation: ${error.message || 'Unknown error'}`);
-    } finally {
-      setInvestigationLoading(false);
-    }
-  };
-
-  // Drop safe tables
-  const dropSafeTables = async (tableNames: string[]) => {
-    if (!confirm(`Are you sure you want to drop these tables: ${tableNames.join(', ')}? This cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/migration/drop-safe-tables', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ tableNames }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        alert(`Successfully dropped ${data.results.filter((r: any) => r.status === 'dropped').length} table(s)`);
-        fetchDropVerification(); // Refresh verification
-      } else {
-        alert(`Failed to drop tables: ${data.error || 'Unknown error'}`);
-      }
-    } catch (error: any) {
-      console.error('Error dropping tables:', error);
-      alert(`Error dropping tables: ${error.message || 'Unknown error'}`);
-    }
-  };
-
-  // Fetch empty tables verification
-  const fetchEmptyTablesVerification = async () => {
-    setEmptyTablesLoading(true);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/migration/drop-empty-tables', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setEmptyTablesVerification(data);
-      } else {
-        alert(`Failed to verify empty tables: ${data.error || 'Unknown error'}`);
-      }
-    } catch (error: any) {
-      console.error('Error fetching empty tables verification:', error);
-      alert(`Error fetching empty tables verification: ${error.message || 'Unknown error'}`);
-    } finally {
-      setEmptyTablesLoading(false);
-    }
-  };
-
-  // Drop empty tables
-  const dropEmptyTables = async () => {
-    if (!confirm('Are you sure you want to drop these empty unused tables? This cannot be undone.')) {
-      return;
-    }
-
-    setEmptyTablesDropping(true);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/migration/drop-empty-tables', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        alert(`Successfully dropped ${data.droppedTables.length} empty table(s)`);
-        fetchEmptyTablesVerification(); // Refresh verification
-        fetchDropVerification(); // Also refresh main drop verification
-      } else {
-        alert(`Failed to drop empty tables: ${data.error || 'Unknown error'}`);
-      }
-    } catch (error: any) {
-      console.error('Error dropping empty tables:', error);
-      alert(`Error dropping empty tables: ${error.message || 'Unknown error'}`);
-    } finally {
-      setEmptyTablesDropping(false);
-    }
-  };
-
-  // Delete orphaned transactions
-  const deleteOrphanedTransactions = async (transactionIds: number[]) => {
-    if (!confirm(`Delete ${transactionIds.length} orphaned transaction(s) from transactions table? These transactions have no valid user and cannot be migrated. This cannot be undone.`)) {
-      return;
-    }
-
-    setDeletingOrphaned(true);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/migration/delete-orphaned', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ transactionIds }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        alert(`Successfully deleted ${data.deleted} orphaned transaction(s) from transactions table.`);
-        fetchInvestigation(); // Refresh investigation
-        fetchDropVerification(); // Refresh drop verification
-        fetchSingleSourceTests(); // Refresh tests
-      } else {
-        alert(`Failed to delete orphaned transactions: ${data.error || 'Unknown error'}`);
-      }
-    } catch (error: any) {
-      console.error('Error deleting orphaned transactions:', error);
-      alert(`Error deleting orphaned transactions: ${error.message || 'Unknown error'}`);
-    } finally {
-      setDeletingOrphaned(false);
-    }
-  };
-
-  // Fix unmigrated transactions
-  const fixUnmigratedTransactions = async () => {
-    if (!confirm('Fix the unmigrated transaction? This will create tokenization if needed and migrate it.')) {
-      return;
-    }
-
-    setFixingUnmigrated(true);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/migration/fix-unmigrated', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        if (data.errors > 0) {
-          const errorDetails = data.errorDetails?.map((e: any) => `Transaction ${e.transactionId}: ${e.error}`).join('\n') || 'Unknown error';
-          alert(`Migration completed with errors:\n\n${errorDetails}\n\nSuccessfully migrated: ${data.migrated} transaction(s)`);
-        } else {
-          alert(`Successfully migrated ${data.migrated} transaction(s)!`);
-        }
-        fetchInvestigation(); // Refresh investigation
-        fetchDropVerification(); // Refresh drop verification
-        fetchSingleSourceTests(); // Refresh tests
-      } else {
-        alert(`Failed to fix unmigrated transactions: ${data.error || 'Unknown error'}`);
-      }
-    } catch (error: any) {
-      console.error('Error fixing unmigrated transactions:', error);
-      alert(`Error fixing unmigrated transactions: ${error.message || 'Unknown error'}`);
-    } finally {
-      setFixingUnmigrated(false);
-    }
-  };
-
-  // Fetch maintenance tests (Single Source of Truth + PII Isolation)
-  const fetchSingleSourceTests = async () => {
-    setSingleSourceTestsLoading(true);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/health/maintenance-tests', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setSingleSourceTests(data);
-      } else {
-        alert(`Failed to fetch tests: ${data.error || 'Unknown error'}`);
-      }
-    } catch (error: any) {
-      console.error('Error fetching maintenance tests:', error);
-      alert(`Error fetching tests: ${error.message || 'Unknown error'}`);
-    } finally {
-      setSingleSourceTestsLoading(false);
-    }
-  };
-
-  const fixTokenization = async () => {
-    if (!confirm('Fix tokenization for all users missing it? This will create tokenization entries for users that don\'t have them.')) {
-      return;
-    }
-    setFixingTokenization(true);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/migration/fix-tokenization', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        alert(`Successfully fixed tokenization for ${data.fixed} user(s).`);
-        // Refresh tests
-        await fetchSingleSourceTests();
-      } else {
-        alert(`Failed to fix tokenization: ${data.error || 'Unknown error'}`);
-      }
-    } catch (error: any) {
-      console.error('Error fixing tokenization:', error);
-      alert(`Error fixing tokenization: ${error.message || 'Unknown error'}`);
-    } finally {
-      setFixingTokenization(false);
-    }
-  };
-
-  const fixEventsAndPII = async () => {
-    setFixingEventsAndPII(true);
-    setFixEventsAndPIIResult(null);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        throw new Error('No admin token found');
-      }
-
-      const response = await fetch('/api/admin/migration/fix-events-and-pii', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-      if (response.ok) {
-        setFixEventsAndPIIResult({
-          success: true,
-          message: data.message || 'Migration completed successfully',
-          changes: data.changes || [],
-        });
-      } else {
-        setFixEventsAndPIIResult({
-          success: false,
-          error: data.error || 'Migration failed',
-          details: data.details || '',
-        });
-      }
-    } catch (error: any) {
-      setFixEventsAndPIIResult({
-        success: false,
-        error: error.message || 'Failed to run migration',
-      });
-    } finally {
-      setFixingEventsAndPII(false);
-    }
-  };
-
-  const completePIIIsolation = async () => {
-    if (!confirm('Complete PII isolation by removing ALL PII from chat_bookings, onboarding_responses, and users tables? This will migrate all PII to l0_pii_users only.')) {
-      return;
-    }
-    setCompletingPIIIsolation(true);
-    setCompletePIIIsolationResult(null);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/migration/complete-pii-isolation', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setCompletePIIIsolationResult(data);
-        alert('Complete PII isolation migration completed successfully! All PII is now only in l0_pii_users.');
-        // Refresh maintenance tests to see updated PII isolation status
-        await fetchSingleSourceTests();
-      } else {
-        alert(`Failed to complete PII isolation: ${data.error || 'Unknown error'}\n\nDetails: ${data.details || ''}`);
-        setCompletePIIIsolationResult({ success: false, error: data.error, details: data.details });
-      }
-    } catch (error: any) {
-      console.error('Error completing PII isolation:', error);
-      alert(`Error completing PII isolation: ${error.message || 'Unknown error'}`);
-      setCompletePIIIsolationResult({ success: false, error: error.message });
-    } finally {
-      setCompletingPIIIsolation(false);
-    }
-  };
-
-  const migratePIIFromOnboarding = async () => {
-    if (!confirm('Migrate PII from onboarding_responses to l0_pii_users and drop PII columns? This will complete PII isolation.')) {
-      return;
-    }
-    setMigratingPII(true);
-    setPiiMigrationResult(null);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/migration/migrate-pii-onboarding', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setPiiMigrationResult(data);
-        alert('PII migration completed successfully! PII columns have been dropped from onboarding_responses.');
-        // Refresh maintenance tests to see updated PII isolation status
-        await fetchSingleSourceTests();
-      } else {
-        alert(`Failed to migrate PII: ${data.error || 'Unknown error'}\n\nDetails: ${data.details || ''}`);
-        setPiiMigrationResult({ success: false, error: data.error, details: data.details });
-      }
-    } catch (error: any) {
-      console.error('Error migrating PII:', error);
-      alert(`Error migrating PII: ${error.message || 'Unknown error'}`);
-      setPiiMigrationResult({ success: false, error: error.message });
-    } finally {
-      setMigratingPII(false);
-    }
-  };
-
-  const dropTransactionsAndAccounts = async () => {
-    if (!confirm('Are you sure you want to drop the transactions and accounts tables? This will:\n\n1. Verify all transactions are migrated\n2. Update l2_customer_summary_view\n3. Drop foreign keys\n4. Drop transactions and accounts tables\n\nThis action CANNOT be undone!')) {
-      return;
-    }
-    if (!confirm('This is your final warning. Dropping these tables establishes Single Source of Truth. Are you absolutely sure?')) {
-      return;
-    }
-    setDroppingTables(true);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/migration/drop-transactions-accounts', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        alert('Successfully dropped transactions and accounts tables. Single Source of Truth established!');
-        // Refresh tests
-        await fetchSingleSourceTests();
-        await fetchDropVerification();
-      } else {
-        alert(`Failed to drop tables: ${data.error || 'Unknown error'}\n\nDetails: ${data.details || ''}`);
-      }
-    } catch (error: any) {
-      console.error('Error dropping tables:', error);
-      alert(`Error dropping tables: ${error.message || 'Unknown error'}`);
-    } finally {
-      setDroppingTables(false);
-    }
-  };
-
-  // Fetch drop verification
-  const fetchDropVerification = async () => {
-    setDropVerificationLoading(true);
-    try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        alert('Not authenticated. Please log in again.');
-        return;
-      }
-      const response = await fetch('/api/admin/migration/verify-drop', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setDropVerification(data);
-      } else {
-        alert(`Failed to verify table drops: ${data.error || 'Unknown error'}`);
-      }
-    } catch (error: any) {
-      console.error('Error fetching drop verification:', error);
-      alert(`Error fetching drop verification: ${error.message || 'Unknown error'}`);
-    } finally {
-      setDropVerificationLoading(false);
+      setExcelValidationLoading(false);
     }
   };
 
@@ -4440,15 +4071,111 @@ export default function AdminDashboard() {
                 Security and compliance health checks to verify data protection and user rights are properly implemented.
               </p>
             </div>
-            <button
-              onClick={fetchHealthData}
-              disabled={healthLoading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {healthLoading ? 'Checking...' : '🔄 Refresh'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={fetchExcelValidation}
+                disabled={excelValidationLoading}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {excelValidationLoading ? 'Validating...' : '📊 Validate Excel Export'}
+              </button>
+              <button
+                onClick={fetchHealthData}
+                disabled={healthLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {healthLoading ? 'Checking...' : '🔄 Refresh'}
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Excel Validation Results */}
+        {excelValidation && (
+          <div className={`rounded-lg border-2 p-6 ${
+            excelValidation.passed ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
+          }`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold">
+                Excel Export Validation: {excelValidation.passed ? '✅ Passed' : '❌ Failed'}
+              </h3>
+              <button
+                onClick={() => setExcelValidation(null)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {excelValidation.results && (
+              <div className="space-y-4">
+                {/* Accuracy */}
+                <div>
+                  <h4 className="font-semibold mb-2">Accuracy:</h4>
+                  <div className={`p-3 rounded ${excelValidation.results.accuracy.passed ? 'bg-green-100' : 'bg-red-100'}`}>
+                    {excelValidation.results.accuracy.issues.length > 0 && (
+                      <div className="mb-2">
+                        <p className="font-medium text-red-800">Issues:</p>
+                        <ul className="list-disc list-inside text-sm text-red-700">
+                          {excelValidation.results.accuracy.issues.map((issue: string, idx: number) => (
+                            <li key={idx}>{issue}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {excelValidation.results.accuracy.warnings.length > 0 && (
+                      <div>
+                        <p className="font-medium text-yellow-800">Warnings:</p>
+                        <ul className="list-disc list-inside text-sm text-yellow-700">
+                          {excelValidation.results.accuracy.warnings.map((warning: string, idx: number) => (
+                            <li key={idx}>{warning}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {excelValidation.results.accuracy.issues.length === 0 && excelValidation.results.accuracy.warnings.length === 0 && (
+                      <p className="text-green-700">✓ All table names are accurate</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Schema Alignment */}
+                {excelValidation.results.schemaAlignment && (
+                  <div>
+                    <h4 className="font-semibold mb-2">Schema Alignment:</h4>
+                    <div className={`p-3 rounded ${excelValidation.results.schemaAlignment.passed ? 'bg-green-100' : 'bg-yellow-100'}`}>
+                      {excelValidation.results.schemaAlignment.expectedMigrations.length > 0 && (
+                        <div>
+                          <p className="font-medium text-yellow-800">Migration Status:</p>
+                          <ul className="list-disc list-inside text-sm text-yellow-700">
+                            {excelValidation.results.schemaAlignment.expectedMigrations.map((migration: string, idx: number) => (
+                              <li key={idx}>{migration}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {excelValidation.results.schemaAlignment.expectedMigrations.length === 0 && (
+                        <p className="text-green-700">✓ Schema is aligned with current architecture</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recommendations */}
+                {excelValidation.recommendations && excelValidation.recommendations.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-2">Recommendations:</h4>
+                    <ul className="list-disc list-inside text-sm text-gray-700">
+                      {excelValidation.recommendations.map((rec: string, idx: number) => (
+                        <li key={idx}>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Overall Status */}
         {healthData && healthData.summary && (
@@ -4797,6 +4524,16 @@ export default function AdminDashboard() {
             >
               🔍 App monitoring
             </button>
+            <button
+              onClick={() => setActiveTab('migration')}
+              className={`px-6 py-4 font-medium text-sm transition-colors relative ${
+                activeTab === 'migration'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              🔄 Migration
+            </button>
           </div>
         </div>
       </div>
@@ -4837,10 +4574,21 @@ export default function AdminDashboard() {
               >
                 👥 Accounts
               </button>
+              <button
+                onClick={() => setMonitoringSubTab('beta-accounts')}
+                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                  monitoringSubTab === 'beta-accounts'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🧪 Beta accounts
+              </button>
             </div>
             {/* Monitoring Content */}
             {monitoringSubTab === 'accounts' && renderAccountsTab()}
             {monitoringSubTab === 'health' && renderAppHealth()}
+            {monitoringSubTab === 'beta-accounts' && renderBetaAccountsTab()}
             {monitoringSubTab === 'admin-logins' && (
               <div className="space-y-6">
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -5131,6 +4879,7 @@ export default function AdminDashboard() {
         )}
         {activeTab === 'categories' && renderCategoriesTab()}
         {activeTab === 'analytics' && renderAnalyticsTab()}
+        {activeTab === 'migration' && renderMigrationTab()}
       </div>
       
       {/* Add Modal - only for keywords and merchants */}

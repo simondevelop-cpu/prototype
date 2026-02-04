@@ -29,28 +29,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Check if l1_events table exists (or legacy user_events for backward compatibility)
-    let hasEventsTable = false;
-    try {
-      const tableCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables 
-        WHERE table_name IN ('l1_events', 'user_events')
-        LIMIT 1
-      `);
-      hasEventsTable = tableCheck.rows.length > 0;
-    } catch (e) {
-      console.log('[Admin Logins API] Could not check for events table');
-    }
-
-    if (!hasEventsTable) {
-      return NextResponse.json({ 
-        success: true,
-        logins: [],
-        message: 'l1_events table does not exist.'
-      }, { status: 200 });
-    }
-
-    // Fetch admin login, tab access, and data download events
+    // Fetch admin login, tab access, and data download events from l1_event_facts
     // All these events have event_type = 'admin_login' or 'admin_tab_access'
     // Data downloads are logged as 'admin_tab_access' with metadata.action = 'data_download'
     const result = await pool.query(`
@@ -59,7 +38,7 @@ export async function GET(request: NextRequest) {
         event_type,
         event_timestamp,
         metadata
-      FROM l1_events
+      FROM l1_event_facts
       WHERE event_type IN ('admin_login', 'admin_tab_access')
         AND is_admin = TRUE
       ORDER BY event_timestamp DESC

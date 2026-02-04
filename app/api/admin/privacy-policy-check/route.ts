@@ -659,7 +659,7 @@ export async function GET(request: NextRequest) {
     try {
       const eventsTableCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables
-        WHERE table_name = 'l1_events'
+        WHERE table_name = 'l1_event_facts'
         LIMIT 1
       `);
       
@@ -668,7 +668,7 @@ export async function GET(request: NextRequest) {
         const recentEventsCheck = await pool.query(`
           SELECT COUNT(*) as count,
                  MAX(event_timestamp) as latest_event
-          FROM l1_events
+          FROM l1_event_facts
           WHERE event_timestamp > NOW() - INTERVAL '7 days'
         `);
         
@@ -681,8 +681,8 @@ export async function GET(request: NextRequest) {
           name: 'Breach monitoring in place',
           status: recentEvents > 0 ? 'pass' : 'warning',
           message: recentEvents > 0
-            ? `l1_events table active - ${recentEvents} event(s) in last 7 days (latest: ${latestEvent ? new Date(latestEvent).toLocaleString() : 'N/A'})`
-            : 'l1_events table exists but no recent events - monitoring may not be working',
+            ? `l1_event_facts table active - ${recentEvents} event(s) in last 7 days (latest: ${latestEvent ? new Date(latestEvent).toLocaleString() : 'N/A'})`
+            : 'l1_event_facts table exists but no recent events - monitoring may not be working',
           details: 'Event logging enables breach detection and audit trails'
         });
       } else {
@@ -691,8 +691,8 @@ export async function GET(request: NextRequest) {
           category: 'Data Security',
           name: 'Breach monitoring in place',
           status: 'fail',
-          message: 'l1_events table missing - CRITICAL: Breach monitoring cannot work',
-          details: 'Event logging requires l1_events table for breach detection'
+          message: 'l1_event_facts table missing - CRITICAL: Breach monitoring cannot work',
+          details: 'Event logging requires l1_event_facts table for breach detection'
         });
       }
     } catch (e: any) {

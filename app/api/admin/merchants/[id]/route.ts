@@ -31,8 +31,22 @@ export async function PUT(
     const { merchant_pattern, alternate_patterns, category, label } = await request.json();
     const id = parseInt(params.id);
     
+    // Use new table name (l1_admin_merchants) with fallback to old name
+    let tableName = 'l1_admin_merchants';
+    try {
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'admin_merchants'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'admin_merchants'; // Fallback on error
+    }
+    
     const result = await pool.query(
-      `UPDATE admin_merchants 
+      `UPDATE ${tableName} 
        SET merchant_pattern = $1, alternate_patterns = $2, category = $3, label = $4, updated_at = NOW()
        WHERE id = $5
        RETURNING *`,
@@ -74,8 +88,22 @@ export async function DELETE(
     
     const id = parseInt(params.id);
     
+    // Use new table name (l1_admin_merchants) with fallback to old name
+    let tableName = 'l1_admin_merchants';
+    try {
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'admin_merchants'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'admin_merchants'; // Fallback on error
+    }
+    
     const result = await pool.query(
-      'DELETE FROM admin_merchants WHERE id = $1 RETURNING id',
+      `DELETE FROM ${tableName} WHERE id = $1 RETURNING id`,
       [id]
     );
     

@@ -42,6 +42,7 @@ describe('Event Logging', () => {
     } as unknown as Pool;
 
     // Create schema
+    // IMPORTANT: Create l1_user_permissions FIRST as it's referenced by other tables
     await testClient.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -51,8 +52,25 @@ describe('Event Logging', () => {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS l1_user_permissions (
+        id SERIAL PRIMARY KEY,
+        password_hash TEXT NOT NULL,
+        login_attempts INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        email_validated BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS l0_pii_users (
+        internal_user_id INTEGER PRIMARY KEY REFERENCES l1_user_permissions(id),
+        email TEXT NOT NULL,
+        display_name TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS l0_user_tokenization (
-        internal_user_id INTEGER PRIMARY KEY REFERENCES users(id),
+        internal_user_id INTEGER PRIMARY KEY REFERENCES l1_user_permissions(id),
         tokenized_user_id TEXT NOT NULL UNIQUE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
@@ -73,7 +91,18 @@ describe('Event Logging', () => {
 
       CREATE TABLE IF NOT EXISTS l1_events (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id),
+        user_id INTEGER NOT NULL REFERENCES l1_user_permissions(id),
+        tokenized_user_id TEXT REFERENCES l0_user_tokenization(tokenized_user_id),
+        event_type TEXT NOT NULL,
+        event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        metadata JSONB,
+        is_admin BOOLEAN DEFAULT FALSE,
+        session_id TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS l1_event_facts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES l1_user_permissions(id),
         tokenized_user_id TEXT REFERENCES l0_user_tokenization(tokenized_user_id),
         event_type TEXT NOT NULL,
         event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -85,13 +114,20 @@ describe('Event Logging', () => {
 
     vi.spyOn(dbModule, 'getPool').mockReturnValue(mockPool);
 
-    // Create test user
+    // Create test user in l1_user_permissions
     const passwordHash = await hashPassword('testpassword123');
-    const userResult = await testClient.query(
-      `INSERT INTO users (email, password_hash) VALUES ('eventtest@test.com', $1) RETURNING id`,
+    const permResult = await testClient.query(
+      `INSERT INTO l1_user_permissions (password_hash) VALUES ($1) RETURNING id`,
       [passwordHash]
     );
-    testUserId = userResult.rows[0].id;
+    testUserId = permResult.rows[0].id;
+
+    // Create PII record
+    await testClient.query(
+      `INSERT INTO l0_pii_users (internal_user_id, email, display_name) 
+       VALUES ($1, 'eventtest@test.com', 'Test User')`,
+      [testUserId]
+    );
     
     // Generate tokenized user ID using the same method as the app (SHA256 hash)
     const crypto = await import('crypto');
@@ -125,6 +161,7 @@ describe('Event Logging', () => {
   });
 
   beforeEach(async () => {
+    await testClient.query('DELETE FROM l1_event_facts');
     await testClient.query('DELETE FROM l1_events');
   });
 
@@ -146,7 +183,7 @@ describe('Event Logging', () => {
       expect(response.status).toBe(200);
 
       const events = await testClient.query(
-        `SELECT event_type, user_id FROM l1_events WHERE event_type = 'login'`
+        `SELECT event_type, user_id FROM l1_event_facts WHERE event_type = 'login'`
       );
 
       expect(events.rows.length).toBe(1);
@@ -185,7 +222,7 @@ describe('Event Logging', () => {
       expect(response.status).toBe(200);
 
       const events = await testClient.query(
-        `SELECT event_type, user_id, metadata FROM l1_events WHERE event_type = 'transaction_edit'`
+        `SELECT event_type, user_id, metadata FROM l1_event_facts WHERE event_type = 'transaction_edit'`
       );
 
       expect(events.rows.length).toBe(1);
@@ -255,7 +292,7 @@ describe('Event Logging', () => {
       expect(responseData.updatedCount).toBeGreaterThan(0);
 
       const events = await testClient.query(
-        `SELECT event_type, user_id, metadata FROM l1_events WHERE event_type = 'bulk_edit'`
+        `SELECT event_type, user_id, metadata FROM l1_event_facts WHERE event_type = 'bulk_edit'`
       );
 
       expect(events.rows.length).toBe(1);

@@ -8,7 +8,6 @@ import CookieBanner from './CookieBanner';
 import BookingModal from './BookingModal';
 import BookingItem from './BookingItem';
 import SurveyModal from './SurveyModal';
-import TokenExpirationWarning from './TokenExpirationWarning';
 import { apiFetch } from '@/lib/api-client';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -124,16 +123,14 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Build query params
+      // Build query params for summary (filtered by timeframe for chart)
       let summaryUrl = `/api/summary?months=${getMonthCount(timeframe)}`;
-      let txUrl = `/api/transactions?months=${getMonthCount(timeframe)}`;
       
       if (timeframe === 'custom' && customDateRange.start && customDateRange.end) {
         summaryUrl = `/api/summary?start=${customDateRange.start}&end=${customDateRange.end}`;
-        txUrl = `/api/transactions?start=${customDateRange.start}&end=${customDateRange.end}`;
       }
 
-      // Fetch summary using apiFetch
+      // Fetch summary using apiFetch (for chart - filtered by timeframe)
       const summaryResponse = await apiFetch(summaryUrl, {
         method: 'GET',
       }, onLogout);
@@ -142,8 +139,9 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         setSummary(summaryResponse.data.summary || []);
       }
 
-      // Fetch transactions (filtered by timeframe for dashboard)
-      const txResponse = await apiFetch(txUrl, {
+      // Fetch ALL transactions (no timeframe filter) for dashboard breakdown
+      // This ensures all user transactions are available on the dashboard
+      const txResponse = await apiFetch('/api/transactions', {
         method: 'GET',
       }, onLogout);
       
@@ -867,6 +865,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         isOpen={showFeedback}
         onClose={() => setShowFeedback(false)}
         token={currentToken}
+        onOpenSurvey={() => setShowSurveyModal(true)}
       />
 
       {/* Booking Modal */}
@@ -891,16 +890,6 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
         isOpen={showSurveyModal}
         onClose={() => setShowSurveyModal(false)}
         token={currentToken}
-      />
-
-      {/* Token Expiration Warning */}
-      <TokenExpirationWarning 
-        token={currentToken} 
-        onRefresh={(newToken) => {
-          setCurrentToken(newToken);
-          // Update localStorage
-          localStorage.setItem('ci.session.token', newToken);
-        }}
       />
 
       {/* Cookie Banner - shown for signed-in users until choice recorded */}

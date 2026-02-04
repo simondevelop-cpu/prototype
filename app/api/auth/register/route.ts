@@ -65,6 +65,62 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if email is on beta/pre-approved list
+    const pool = getPool();
+    if (!pool) {
+      return NextResponse.json(
+        { error: 'Database not available' },
+        { status: 500 }
+      );
+    }
+
+    // Check if beta_emails table exists and if email is pre-approved
+    let isBetaEmail = false;
+    try {
+      const tableCheck = await pool.query(`
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'beta_emails'
+        LIMIT 1
+      `);
+      
+      if (tableCheck.rows.length > 0) {
+        // Check if table has any entries at all
+        const countCheck = await pool.query('SELECT COUNT(*) as count FROM beta_emails');
+        const emailCount = parseInt(countCheck.rows[0]?.count || '0', 10);
+        
+        // If table is empty, allow registration (backward compatibility - treat empty as "all emails allowed")
+        if (emailCount === 0) {
+          console.log('[Register] beta_emails table exists but is empty, allowing registration');
+          isBetaEmail = true;
+        } else {
+          // Table has entries, check if this email is in the list
+          const betaCheck = await pool.query(
+            'SELECT email FROM beta_emails WHERE email = $1',
+            [email.toLowerCase()]
+          );
+          isBetaEmail = betaCheck.rows.length > 0;
+        }
+      } else {
+        // If table doesn't exist yet, allow registration (backward compatibility)
+        console.log('[Register] beta_emails table does not exist, allowing registration');
+        isBetaEmail = true;
+      }
+    } catch (e) {
+      console.error('[Register] Error checking beta emails:', e);
+      // On error, allow registration (fail open for backward compatibility)
+      isBetaEmail = true;
+    }
+
+    if (!isBetaEmail) {
+      return NextResponse.json(
+        { 
+          error: 'This email is not on the pre-approved beta access list. Please contact support to request access, or verify your email with the code sent to you.',
+          betaEmailRequired: true
+        },
+        { status: 403 }
+      );
+    }
+
     // Validate password strength
     const passwordValidation = validatePasswordStrength(password);
     if (!passwordValidation.valid) {
@@ -85,51 +141,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const pool = getPool();
-    if (!pool) {
-      return NextResponse.json(
-        { error: 'Database not available' },
-        { status: 500 }
-      );
-    }
-
-    // Check if user exists
-    // Using separate queries to avoid pg-mem limitations with correlated subqueries
-    const userResult = await pool.query(
-      'SELECT id, email FROM users WHERE email = $1',
-      [email.toLowerCase()]
-    );
+    // Check if user exists by email in l0_pii_users
+    const userResult = await pool.query(`
+      SELECT perm.id, pii.email
+      FROM l0_pii_users pii
+      JOIN l1_user_permissions perm ON pii.internal_user_id = perm.id
+      WHERE pii.email = $1
+    `, [email.toLowerCase()]);
 
     if (userResult.rows.length === 0) {
       // User doesn't exist, proceed with registration
       const passwordHash = await hashPassword(password);
       
-      // Check if email_validated column exists, and set it to true by default
-      // Schema-adaptive: handle both cases
-      let hasEmailValidated = false;
-      try {
-        const columnCheck = await pool.query(`
-          SELECT column_name 
-          FROM information_schema.columns 
-          WHERE table_name = 'users' 
-          AND column_name = 'email_validated'
-        `);
-        hasEmailValidated = columnCheck.rows.length > 0;
-      } catch (e) {
-        console.log('[Register] Could not check email_validated column, skipping');
-      }
+      // Insert into l1_user_permissions first (returns id)
+      const permResult = await pool.query(
+        'INSERT INTO l1_user_permissions (password_hash, email_validated, is_active) VALUES ($1, $2, $3) RETURNING id',
+        [passwordHash, true, true]
+      );
       
-      const result = hasEmailValidated
-        ? await pool.query(
-            'INSERT INTO users (email, password_hash, display_name, email_validated) VALUES ($1, $2, $3, $4) RETURNING id, email, display_name',
-            [email.toLowerCase(), passwordHash, name || email, true]
-          )
-        : await pool.query(
-            'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id, email, display_name',
-            [email.toLowerCase(), passwordHash, name || email]
-          );
+      const userId = permResult.rows[0].id;
+      
+      // Insert into l0_pii_users with email and display_name
+      await pool.query(
+        'INSERT INTO l0_pii_users (internal_user_id, email, display_name) VALUES ($1, $2, $3) ON CONFLICT (internal_user_id) DO UPDATE SET email = EXCLUDED.email, display_name = EXCLUDED.display_name',
+        [userId, email.toLowerCase(), name || email]
+      );
 
-      const user = result.rows[0];
+      const user = { id: userId, email: email.toLowerCase(), display_name: name || email };
       const token = createToken(user.id);
 
       // Log IP address
@@ -177,27 +215,41 @@ export async function POST(request: NextRequest) {
 
     // User exists - check transactions and onboarding
     const userId = userResult.rows[0].id;
-    // Check l1_transaction_facts (preferred) or transactions (legacy)
+    // Check l1_transaction_facts (new architecture)
     const tokenizedUserId = await getTokenizedUserId(userId);
-    let transactionCount;
+    let transactionCount = { rows: [{ count: '0' }] };
     if (tokenizedUserId) {
-      transactionCount = await pool.query(
-        'SELECT COUNT(*) as count FROM l1_transaction_facts WHERE tokenized_user_id = $1',
-        [tokenizedUserId]
-      );
-    } else {
-      // Fallback to legacy transactions table
-      transactionCount = await pool.query(
-        'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1',
+      try {
+        transactionCount = await pool.query(
+          'SELECT COUNT(*) as count FROM l1_transaction_facts WHERE tokenized_user_id = $1',
+          [tokenizedUserId]
+        );
+      } catch (error) {
+        console.error('[Register] Error checking l1_transaction_facts:', error);
+        // If table doesn't exist, assume 0 transactions
+        transactionCount = { rows: [{ count: '0' }] };
+      }
+    }
+    // Check onboarding - use l1_onboarding_responses if exists, otherwise fallback to onboarding_responses
+    let onboardingCount;
+    try {
+      onboardingCount = await pool.query(
+        'SELECT COUNT(*) as count FROM l1_onboarding_responses WHERE user_id = $1 AND completed_at IS NOT NULL',
         [userId]
       );
+    } catch (error) {
+      // Fallback to legacy table name if migration not complete
+      try {
+        onboardingCount = await pool.query(
+          'SELECT COUNT(*) as count FROM onboarding_responses WHERE user_id = $1 AND completed_at IS NOT NULL',
+          [userId]
+        );
+      } catch (fallbackError) {
+        console.error('[Register] Error checking onboarding:', fallbackError);
+        onboardingCount = { rows: [{ count: '0' }] };
+      }
     }
-    const onboardingCount = await pool.query(
-      'SELECT COUNT(*) as count FROM onboarding_responses WHERE user_id = $1 AND completed_at IS NOT NULL',
-      [userId]
-    );
 
-    const user = userResult.rows[0];
     const txCount = parseInt(transactionCount.rows[0]?.count || '0');
     const completedOnboarding = parseInt(onboardingCount.rows[0]?.count || '0');
     const isSpecialAccount = ['test@gmail.com', 'test2@gmail.com', 'demo@canadianinsights.ca'].includes(email.toLowerCase());
@@ -217,11 +269,13 @@ export async function POST(request: NextRequest) {
     // Allow re-registration: delete old incomplete onboarding attempts and keep user
     console.log('[Register] User exists with incomplete onboarding, allowing fresh start:', email);
     
-    // Get full user data
-    const fullUserResult = await pool.query(
-      'SELECT id, email, display_name FROM users WHERE id = $1',
-      [userId]
-    );
+    // Get full user data from l0_pii_users
+    const fullUserResult = await pool.query(`
+      SELECT perm.id, pii.email, pii.display_name
+      FROM l0_pii_users pii
+      JOIN l1_user_permissions perm ON pii.internal_user_id = perm.id
+      WHERE perm.id = $1
+    `, [userId]);
     const fullUser = fullUserResult.rows[0];
     
     // Delete all incomplete onboarding attempts for this user
@@ -230,14 +284,14 @@ export async function POST(request: NextRequest) {
       [userId]
     );
     
-    // Increment login attempts (counts as a login) - schema-adaptive
+    // Increment login attempts (counts as a login)
     try {
       await pool.query(
-        'UPDATE users SET login_attempts = COALESCE(login_attempts, 0) + 1 WHERE id = $1',
+        'UPDATE l1_user_permissions SET login_attempts = COALESCE(login_attempts, 0) + 1 WHERE id = $1',
         [userId]
       );
     } catch (e: any) {
-      // Column doesn't exist yet - skip increment (will be added by migration)
+      // Column doesn't exist yet - skip increment
       console.log('[Register] login_attempts column not found, skipping increment');
     }
     

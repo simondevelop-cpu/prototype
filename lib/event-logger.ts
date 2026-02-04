@@ -15,7 +15,7 @@ async function getOrCreateSessionId(pool: any, userId: number): Promise<string> 
   try {
     // Check for recent session (within 30 minutes)
     const recentSessionResult = await pool.query(
-      `SELECT session_id FROM l1_events 
+      `SELECT session_id FROM l1_event_facts 
        WHERE user_id = $1 
          AND session_id IS NOT NULL
          AND event_timestamp > NOW() - INTERVAL '30 minutes'
@@ -86,7 +86,7 @@ export async function logBankStatementEvent(
     const sessionId = await getOrCreateSessionId(pool, numericUserId);
     
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+      `INSERT INTO l1_event_facts (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
       [numericUserId, tokenizedUserId, eventType, JSON.stringify(metadata), sessionId]
     );
@@ -129,7 +129,7 @@ export async function logFeedbackEvent(
     const sessionId = await getOrCreateSessionId(pool, numericUserId);
     
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+      `INSERT INTO l1_event_facts (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
       [numericUserId, tokenizedUserId, 'feedback', JSON.stringify(feedbackData), sessionId]
     );
@@ -180,13 +180,34 @@ export async function logConsentEvent(
     // Get or create session ID (for account creation, use new session; for others, try to get existing)
     const sessionId = await getOrCreateSessionId(pool, numericUserId);
     
-    await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
-       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
+    // Use INSERT ... ON CONFLICT DO NOTHING to prevent race conditions
+    // Check if consent event already exists first (pg-mem doesn't support ON CONFLICT ... WHERE well)
+    const existingCheck = await pool.query(
+      `SELECT id FROM l1_event_facts 
+       WHERE user_id = $1 
+         AND event_type = 'consent' 
+         AND metadata->>'consentType' = $2
+       LIMIT 1`,
+      [numericUserId, consentType]
+    ).catch(() => ({ rows: [] }));
+
+    if (existingCheck.rows.length > 0) {
+      console.log(`[Event Logger] Consent event (${consentType}) for user ${userId} already exists, skipped duplicate`);
+      return;
+    }
+
+    const result = await pool.query(
+      `INSERT INTO l1_event_facts (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+       VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)
+       RETURNING id`,
       [numericUserId, tokenizedUserId, 'consent', JSON.stringify(eventMetadata), sessionId]
     );
     
-    console.log(`[Event Logger] Logged consent event (${consentType}) for user ${userId}`);
+    if (result.rows.length > 0) {
+      console.log(`[Event Logger] Logged consent event (${consentType}) for user ${userId}`);
+    } else {
+      console.log(`[Event Logger] Consent event (${consentType}) for user ${userId} already exists, skipped duplicate`);
+    }
   } catch (error: any) {
     // Don't throw - event logging should not break the main flow
     console.error('[Event Logger] Failed to log consent event:', error);
@@ -230,7 +251,7 @@ export async function logTransactionEditEvent(
     const sessionId = await getOrCreateSessionId(pool, userIdNum);
     
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+      `INSERT INTO l1_event_facts (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
       [userIdNum, tokenizedUserId, 'transaction_edit', JSON.stringify({
         transactionId,
@@ -286,7 +307,7 @@ export async function logBulkEditEvent(
     const sessionId = await getOrCreateSessionId(pool, userIdNum);
     
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+      `INSERT INTO l1_event_facts (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
       [userIdNum, tokenizedUserId, 'bulk_edit', JSON.stringify({
         transactionIds,
@@ -337,7 +358,7 @@ export async function logUserLoginEvent(userId: string | number): Promise<void> 
     const sessionId = await getOrCreateSessionId(pool, numericUserId);
     
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+      `INSERT INTO l1_event_facts (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
       [numericUserId, tokenizedUserId, 'login', JSON.stringify({
         timestamp: new Date().toISOString(),
@@ -375,8 +396,12 @@ export async function logAdminEvent(
     let adminUserId: number | null = null;
     
     try {
+      // Query l0_pii_users for email, then get id from l1_user_permissions
       const userResult = await pool.query(
-        'SELECT id FROM users WHERE email = $1 LIMIT 1',
+        `SELECT perm.id 
+         FROM l0_pii_users pii
+         JOIN l1_user_permissions perm ON pii.internal_user_id = perm.id
+         WHERE pii.email = $1 LIMIT 1`,
         [adminEmail.toLowerCase()]
       );
       
@@ -390,17 +415,30 @@ export async function logAdminEvent(
           // Use a secure random password hash that will never match any real password
           const randomPassword = crypto.randomBytes(32).toString('hex');
           const dummyHash = await hashPassword(randomPassword);
-          const createResult = await pool.query(
-            'INSERT INTO users (email, password_hash, display_name, email_validated) VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email RETURNING id',
-            [adminEmail.toLowerCase(), dummyHash, 'Admin User', true]
+          
+          // Insert into l1_user_permissions first
+          const createPermResult = await pool.query(
+            'INSERT INTO l1_user_permissions (password_hash, email_validated, is_active) VALUES ($1, $2, $3) RETURNING id',
+            [dummyHash, true, true]
           );
-          adminUserId = createResult.rows[0].id;
+          const newUserId = createPermResult.rows[0].id;
+          
+          // Insert into l0_pii_users
+          await pool.query(
+            'INSERT INTO l0_pii_users (internal_user_id, email, display_name) VALUES ($1, $2, $3) ON CONFLICT (internal_user_id) DO UPDATE SET email = EXCLUDED.email, display_name = EXCLUDED.display_name',
+            [newUserId, adminEmail.toLowerCase(), 'Admin User']
+          );
+          
+          adminUserId = newUserId;
           console.log(`[Event Logger] Created admin user record for ${adminEmail} with ID ${adminUserId}`);
         } catch (createError: any) {
           // If creation fails (e.g., email conflict), try to fetch again
           if (createError.code === '23505') { // Unique violation
             const retryResult = await pool.query(
-              'SELECT id FROM users WHERE email = $1 LIMIT 1',
+              `SELECT perm.id 
+               FROM l0_pii_users pii
+               JOIN l1_user_permissions perm ON pii.internal_user_id = perm.id
+               WHERE pii.email = $1 LIMIT 1`,
               [adminEmail.toLowerCase()]
             );
             if (retryResult.rows.length > 0) {
@@ -425,7 +463,7 @@ export async function logAdminEvent(
 
     // Insert the admin event with the valid user_id and is_admin flag
     await pool.query(
-      `INSERT INTO l1_events (user_id, event_type, event_timestamp, metadata, is_admin)
+      `INSERT INTO l1_event_facts (user_id, event_type, event_timestamp, metadata, is_admin)
        VALUES ($1, $2, NOW(), $3::jsonb, TRUE)`,
       [adminUserId, eventType, JSON.stringify({
         adminEmail,

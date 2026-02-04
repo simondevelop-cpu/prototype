@@ -29,23 +29,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Ensure survey_responses table exists
+    // Determine table name (new architecture with fallback)
+    let tableName = 'l1_survey_responses';
     try {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS survey_responses (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          q1_data JSONB,
-          q2_data JSONB,
-          q3_data JSONB,
-          q4_data TEXT,
-          q5_data TEXT,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-    } catch (createError: any) {
-      console.error('[API] Error ensuring survey_responses table exists:', createError);
-      // Continue anyway - might already exist
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'survey_responses'; // Fallback to old name
+        // Ensure old table exists if using fallback
+        try {
+          await pool.query(`
+            CREATE TABLE IF NOT EXISTS survey_responses (
+              id SERIAL PRIMARY KEY,
+              user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              q1_data JSONB,
+              q2_data JSONB,
+              q3_data JSONB,
+              q4_data TEXT,
+              q5_data TEXT,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+        } catch (createError: any) {
+          console.error('[API] Error ensuring survey_responses table exists:', createError);
+        }
+      }
+    } catch (e) {
+      tableName = 'survey_responses'; // Fallback on error
     }
 
     // Get all survey responses with user information
@@ -63,7 +75,7 @@ export async function GET(request: NextRequest) {
           sr.q4_data,
           sr.q5_data,
           sr.created_at
-         FROM survey_responses sr
+         FROM ${tableName} sr
          JOIN users u ON sr.user_id = u.id
          ORDER BY sr.created_at DESC
          LIMIT 500`

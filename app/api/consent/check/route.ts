@@ -25,8 +25,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Extract user ID from token (token uses 'sub' field)
-    const userId = decoded.userId || decoded.id || decoded.sub;
-    if (!userId) {
+    const userId = parseInt(decoded.sub, 10);
+    if (!userId || isNaN(userId)) {
       return NextResponse.json(
         { error: 'Invalid token: no user ID' },
         { status: 401 }
@@ -60,26 +60,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user_events table exists
-    const tableCheck = await pool.query(`
-      SELECT 1 
-      FROM information_schema.tables 
-      WHERE table_name = 'user_events'
-      LIMIT 1
-    `);
-
-    if (tableCheck.rows.length === 0) {
-      // Table doesn't exist, no consent recorded
-      return NextResponse.json({
-        hasConsent: false,
-        timestamp: null,
-      });
-    }
-
-    // Check for existing consent event
+    // Check for existing consent event in l1_event_facts
     const result = await pool.query(`
       SELECT event_timestamp, metadata->>'choice' as choice
-      FROM l1_events
+      FROM l1_event_facts
       WHERE user_id = $1
         AND event_type = 'consent'
         AND metadata->>'consentType' = $2

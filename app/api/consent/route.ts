@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequestOrigin } from '@/lib/csrf';
 import { logConsentEvent } from '@/lib/event-logger';
 import { verifyToken } from '@/lib/auth';
+import { getPool } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +55,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Log consent event
+    // Log consent event - database unique constraint will prevent duplicates
+    // No need to check first, as logConsentEvent uses INSERT ... ON CONFLICT DO NOTHING
     await logConsentEvent(userId, consentType as any, {
       choice,
       setting,

@@ -71,19 +71,32 @@ export async function POST(req: NextRequest) {
     // Extract pattern from description
     const pattern = extractPattern(description);
 
+    // Use new table name (l2_user_categorization_learning) with fallback to old name
+    let tableName = 'l2_user_categorization_learning';
+    try {
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'categorization_learning'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'categorization_learning'; // Fallback on error
+    }
+
     // Check if this pattern already exists for this user
     const existing = await pool.query(
-      `SELECT id, frequency FROM categorization_learning 
+      `SELECT id, frequency FROM ${tableName} 
        WHERE user_id = $1 AND description_pattern = $2`,
       [userId, pattern]
     );
 
     if (existing.rows.length > 0) {
       // Update existing pattern (increment frequency, update last_used)
-      // Use dynamic query to handle both old and new schemas
       try {
         await pool.query(
-          `UPDATE categorization_learning 
+          `UPDATE ${tableName} 
            SET frequency = frequency + 1,
                last_used = CURRENT_TIMESTAMP,
                corrected_category = $1,
@@ -94,7 +107,7 @@ export async function POST(req: NextRequest) {
       } catch {
         // Fallback for old schema without corrected_category/corrected_label
         await pool.query(
-          `UPDATE categorization_learning 
+          `UPDATE ${tableName} 
            SET frequency = frequency + 1,
                last_used = CURRENT_TIMESTAMP
            WHERE id = $1`,
@@ -109,42 +122,13 @@ export async function POST(req: NextRequest) {
         frequency: existing.rows[0].frequency + 1,
       });
     } else {
-      // Insert new pattern
-      // Try new schema first, fallback to minimal schema if columns don't exist
-      try {
-        await pool.query(
-          `INSERT INTO categorization_learning 
-           (user_id, description_pattern, original_category, original_label, corrected_category, corrected_label)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [userId, pattern, originalCategory, originalLabel, correctedCategory, correctedLabel]
-        );
-      } catch (insertError: any) {
-        if (insertError.code === '42703') {
-          // Column doesn't exist - try old schema with simple column names
-          console.log('[Learn API] Using old schema (corrected_ prefix missing)');
-          try {
-            await pool.query(
-              `INSERT INTO categorization_learning 
-               (user_id, description_pattern, category, label)
-               VALUES ($1, $2, $3, $4)`,
-              [userId, pattern, correctedCategory, correctedLabel]
-            );
-          } catch (fallbackError: any) {
-            console.error('[Learn API] Fallback insert also failed:', fallbackError.message);
-            console.error('[Learn API] Available columns might be different. Checking table schema...');
-            // Try to get table structure for debugging
-            const schemaCheck = await pool.query(`
-              SELECT column_name, data_type 
-              FROM information_schema.columns 
-              WHERE table_name = 'categorization_learning'
-            `);
-            console.log('[Learn API] Table columns:', schemaCheck.rows);
-            throw fallbackError;
-          }
-        } else {
-          throw insertError;
-        }
-      }
+      // Insert new pattern into l2_user_categorization_learning
+      await pool.query(
+        `INSERT INTO l2_user_categorization_learning 
+         (user_id, description_pattern, original_category, original_label, corrected_category, corrected_label)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [userId, pattern, originalCategory, originalLabel, correctedCategory, correctedLabel]
+      );
 
       return NextResponse.json({
         success: true,

@@ -143,7 +143,11 @@ export default function Login({ onLogin }: LoginProps) {
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className={`mb-4 p-3 border rounded-lg text-sm ${
+              error.includes('beta access') || error.includes('pre-approved')
+                ? 'bg-red-50 border-red-300 text-red-800 font-medium'
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}>
               {error}
             </div>
           )}

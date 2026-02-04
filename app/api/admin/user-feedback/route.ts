@@ -28,28 +28,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Check if l1_events table exists
-    let hasUserEventsTable = false;
-    try {
-      const tableCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'l1_events'
-        LIMIT 1
-      `);
-      hasUserEventsTable = tableCheck.rows.length > 0;
-    } catch (e) {
-      console.log('[User Feedback API] Could not check for l1_events table');
-    }
-
-    if (!hasUserEventsTable) {
-      return NextResponse.json({ 
-        success: true,
-        feedback: [],
-        message: 'l1_events table does not exist. Feedback will appear once the table is created and feedback is submitted.'
-      }, { status: 200 });
-    }
-
-    // Fetch all feedback events
+    // Fetch all feedback events from l1_event_facts
     const result = await pool.query(`
       SELECT 
         e.id,
@@ -57,11 +36,12 @@ export async function GET(request: NextRequest) {
         COALESCE(p.first_name, 'Unknown') as first_name,
         e.event_timestamp as submitted_at,
         e.metadata
-      FROM l1_events e
-      LEFT JOIN users u ON e.user_id = u.id
-      LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
+      FROM l1_event_facts e
+      LEFT JOIN l1_user_permissions perm ON e.user_id = perm.id
+      LEFT JOIN l0_pii_users p ON perm.id = p.internal_user_id AND p.deleted_at IS NULL
+      LEFT JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
       WHERE e.event_type = 'feedback'
-        AND (u.email != $1 OR u.email IS NULL)
+        AND (pii.email != $1 OR pii.email IS NULL)
       ORDER BY e.event_timestamp DESC
       LIMIT 1000
     `, [ADMIN_EMAIL]);

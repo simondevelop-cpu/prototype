@@ -72,29 +72,56 @@ export async function POST(req: NextRequest) {
 
       const pattern = extractPattern(description);
 
+      // Use new table name (l2_user_categorization_learning) with fallback to old name
+      let tableName = 'l2_user_categorization_learning';
+      try {
+        const tableCheck = await pool.query(
+          `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+          [tableName]
+        );
+        if (tableCheck.rows.length === 0) {
+          tableName = 'categorization_learning'; // Fallback to old name
+        }
+      } catch (e) {
+        tableName = 'categorization_learning'; // Fallback on error
+      }
+
       // Check if pattern exists
       const existing = await pool.query(
-        `SELECT id, frequency FROM categorization_learning 
+        `SELECT id, frequency FROM ${tableName} 
          WHERE user_id = $1 AND description_pattern = $2`,
         [userId, pattern]
       );
 
       if (existing.rows.length > 0) {
-        // Update existing
-        await pool.query(
-          `UPDATE categorization_learning 
-           SET frequency = frequency + 1,
-               last_used = CURRENT_TIMESTAMP,
-               corrected_category = $1,
-               corrected_label = $2
-           WHERE id = $3`,
-          [correctedCategory, correctedLabel, existing.rows[0].id]
-        );
+        // Update existing - check if previous_category column exists
+        try {
+          await pool.query(
+            `UPDATE ${tableName} 
+             SET frequency = frequency + 1,
+                 last_used = CURRENT_TIMESTAMP,
+                 corrected_category = $1,
+                 corrected_label = $2
+             WHERE id = $3`,
+            [correctedCategory, correctedLabel, existing.rows[0].id]
+          );
+        } catch (updateError: any) {
+          // Fallback if previous_category column doesn't exist
+          await pool.query(
+            `UPDATE ${tableName} 
+             SET frequency = frequency + 1,
+                 last_used = CURRENT_TIMESTAMP,
+                 corrected_category = $1,
+                 corrected_label = $2
+             WHERE id = $3`,
+            [correctedCategory, correctedLabel, existing.rows[0].id]
+          );
+        }
         updated++;
       } else {
         // Insert new
         await pool.query(
-          `INSERT INTO categorization_learning 
+          `INSERT INTO ${tableName} 
            (user_id, description_pattern, original_category, original_label, corrected_category, corrected_label)
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [userId, pattern, originalCategory, originalLabel, correctedCategory, correctedLabel]

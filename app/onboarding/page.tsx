@@ -42,6 +42,8 @@ export default function OnboardingPage() {
   });
 
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [isBetaEmail, setIsBetaEmail] = useState<boolean | null>(null);
+  const [checkingBetaEmail, setCheckingBetaEmail] = useState(false);
 
   const totalSteps = 7; // 0=verification, 1-6=questions (step 6 is profile, the final step)
 
@@ -82,6 +84,54 @@ export default function OnboardingPage() {
       localStorage.removeItem('onboarding.lock');
       window.removeEventListener('popstate', handleBrowserBack);
     };
+  }, [currentStep, userEmail]);
+
+  // Check if email is a beta email
+  const checkBetaEmail = async (email: string) => {
+    if (!email) {
+      setIsBetaEmail(null);
+      return;
+    }
+
+    setCheckingBetaEmail(true);
+    try {
+      const response = await fetch('/api/auth/check-beta-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email.toLowerCase().trim() }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setIsBetaEmail(data.isBetaEmail || false);
+      } else {
+        console.error('[Onboarding] Failed to check beta email:', data.error);
+        setIsBetaEmail(null); // Default to null if check fails
+      }
+    } catch (error) {
+      console.error('[Onboarding] Error checking beta email:', error);
+      setIsBetaEmail(null); // Default to null if check fails
+    } finally {
+      setCheckingBetaEmail(false);
+    }
+  };
+
+  // Check beta email when userEmail changes or when on verification step
+  useEffect(() => {
+    if (userEmail && currentStep === 0) {
+      checkBetaEmail(userEmail);
+    }
+  }, [userEmail, currentStep]);
+
+  // Re-check beta email when step changes to 0 (email verification)
+  useEffect(() => {
+    if (currentStep === 0 && userEmail) {
+      // Reset state and re-check
+      setIsBetaEmail(null);
+      checkBetaEmail(userEmail);
+    }
   }, [currentStep]);
 
   const handleMultiSelect = (field: 'emotionalState' | 'financialContext' | 'insightPreferences', value: string) => {
@@ -206,6 +256,34 @@ export default function OnboardingPage() {
   };
 
   const handleNext = async () => {
+    // On email verification step (step 0), check if user has beta email before allowing skip
+    if (currentStep === 0) {
+      if (!userEmail) {
+        alert('Please enter your email address first.');
+        return;
+      }
+
+      // Always check if email is a beta email (don't rely on cached state)
+      if (isBetaEmail === null || checkingBetaEmail) {
+        // Still checking or not checked yet, check now
+        await checkBetaEmail(userEmail);
+        // Wait a moment for the check to complete
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
+
+      // Re-check after waiting (state should be updated)
+      if (isBetaEmail === false) {
+        alert('This email is not on the pre-approved beta list. Please verify your email with the code sent to you, or contact support to be added to the beta list.');
+        return;
+      }
+
+      // Only allow if explicitly true (not null - null means check failed or table doesn't exist, which should block)
+      if (isBetaEmail !== true) {
+        alert('Unable to verify beta email status. Please verify your email with the code sent to you, or contact support.');
+        return;
+      }
+    }
+
     if (validateStep()) {
       // Update progress after each step (to track drop-offs)
       if (currentStep > 0) { // Don't save on email verification step
@@ -372,9 +450,14 @@ export default function OnboardingPage() {
         </button>
         <button
           onClick={handleNext}
-          className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium"
+          disabled={checkingBetaEmail}
+          className={`px-4 py-2 font-medium ${
+            checkingBetaEmail
+              ? 'text-gray-400 cursor-not-allowed'
+              : 'text-blue-600 hover:text-blue-700'
+          }`}
         >
-          Skip
+          {checkingBetaEmail ? 'Checking...' : 'Skip - I have a preapproved email address'}
         </button>
       </div>
     </div>

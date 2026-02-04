@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify auth
-    const authHeader = request.headers.get('authorization');
+    // Verify auth (check both lowercase and capitalized header)
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
     const token = authHeader.substring(7);
     const payload = verifyToken(token);
     if (!payload) {
+      console.error('[API] Transaction create: Invalid token -', token.substring(0, 20) + '...');
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
