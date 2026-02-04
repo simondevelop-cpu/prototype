@@ -120,10 +120,11 @@ export async function GET(request: NextRequest) {
       );
 
       // Check for dependent views
+      // Use pg_views which has a definition column
       const viewResult = await pool.query(`
-        SELECT DISTINCT table_name
-        FROM information_schema.views
-        WHERE table_schema = 'public'
+        SELECT DISTINCT viewname as table_name
+        FROM pg_views
+        WHERE schemaname = 'public'
           AND definition LIKE '%${tableName}%'
       `);
 
