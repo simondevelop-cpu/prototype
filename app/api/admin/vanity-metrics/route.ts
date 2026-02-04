@@ -280,7 +280,8 @@ export async function GET(request: NextRequest) {
         const wauQuery = `
           SELECT COUNT(DISTINCT e.user_id) as count
           FROM l1_event_facts e
-          JOIN users u ON u.id = e.user_id
+          JOIN l1_user_permissions perm ON perm.id = e.user_id
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
           WHERE e.event_type = 'login'
             AND e.event_timestamp >= $${wauParamIndex}::timestamp
             AND e.event_timestamp <= $${wauParamIndex + 1}::timestamp
@@ -471,7 +472,8 @@ export async function GET(request: NextRequest) {
         const mauQuery = `
           SELECT COUNT(DISTINCT e.user_id) as count
           FROM l1_event_facts e
-          JOIN users u ON u.id = e.user_id
+          JOIN l1_user_permissions perm ON perm.id = e.user_id
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
           WHERE e.event_type = 'login'
             AND e.event_timestamp >= $${mauParamIndex}::timestamp
             AND e.event_timestamp <= $${mauParamIndex + 1}::timestamp
@@ -514,7 +516,8 @@ export async function GET(request: NextRequest) {
         const singleEditQuery = `
           SELECT DISTINCT (e.metadata->>'transactionId')::int as transaction_id
           FROM l1_event_facts e
-          JOIN users u ON u.id = e.user_id
+          JOIN l1_user_permissions perm ON perm.id = e.user_id
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
           WHERE e.event_type = 'transaction_edit'
             AND e.event_timestamp >= $${recatParamIndex}::timestamp
             AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
@@ -529,7 +532,8 @@ export async function GET(request: NextRequest) {
         const bulkEditQuery = `
           SELECT e.metadata->'transactionIds' as transaction_ids
           FROM l1_event_facts e
-          JOIN users u ON u.id = e.user_id
+          JOIN l1_user_permissions perm ON perm.id = e.user_id
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
           WHERE e.event_type = 'bulk_edit'
             AND e.event_timestamp >= $${recatParamIndex}::timestamp
             AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
@@ -562,7 +566,8 @@ export async function GET(request: NextRequest) {
         const statementsQuery = `
           SELECT COUNT(*) as count
           FROM l1_event_facts e
-          JOIN users u ON u.id = e.user_id
+          JOIN l1_user_permissions perm ON perm.id = e.user_id
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
           WHERE e.event_type = 'statement_upload'
             AND e.event_timestamp >= $${statementsParamIndex}::timestamp
             AND e.event_timestamp <= $${statementsParamIndex + 1}::timestamp
@@ -582,7 +587,8 @@ export async function GET(request: NextRequest) {
         const uniqueStatementsQuery = `
           SELECT COUNT(DISTINCT e.user_id) as count
           FROM l1_event_facts e
-          JOIN users u ON u.id = e.user_id
+          JOIN l1_user_permissions perm ON perm.id = e.user_id
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
           WHERE e.event_type = 'statement_upload'
             AND e.event_timestamp >= $${uniqueStatementsParamIndex}::timestamp
             AND e.event_timestamp <= $${uniqueStatementsParamIndex + 1}::timestamp
