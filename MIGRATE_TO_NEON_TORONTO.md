@@ -30,27 +30,77 @@ Your app currently uses **one database connection** via the `DATABASE_URL` or `P
 
 ## Step-by-Step Migration Guide
 
-### Step 1: Create Neon Account & Project (Toronto Region)
+### Option A: Use Vercel's Neon Integration (Recommended - Easiest)
+
+**This is the easiest method!** Vercel has a built-in Neon Postgres integration that handles everything automatically.
+
+#### Step 1: Create Neon Project via Vercel
+
+1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
+2. Select your project: **prototype**
+3. Go to **Storage** tab
+4. Click **"Create Database"**
+5. Choose **"Neon Postgres"** (not "Postgres" - that's Vercel's own Postgres)
+6. **Important:** When creating, select **"Toronto, Canada"** as the region
+   - This ensures PIPEDA compliance (data stays in Canada)
+7. Choose **Free tier** (3GB storage)
+8. Click **"Create"**
+
+Vercel will automatically:
+- ✅ Create the Neon project
+- ✅ Set up the connection string
+- ✅ Configure environment variables (`POSTGRES_URL`, etc.)
+- ✅ Link it to your project
+
+#### Step 2: Verify Region
+
+1. In Vercel Dashboard → Storage → Your Neon database
+2. Click **"Open in Neon"** (top right button)
+3. In Neon dashboard, verify the region shows **"Toronto"**
+4. If it's not Toronto, you may need to create a new project in Toronto region
+
+#### Step 3: Redeploy
+
+1. Go to **Deployments** tab
+2. Click **"..."** on latest deployment → **"Redeploy"**
+3. The app will automatically use the new Neon database
+
+---
+
+### Option B: Manual Neon Setup (If You Prefer More Control)
+
+If you want to set up Neon manually or already have a Neon project:
+
+#### Step 1: Create Neon Project (Toronto Region)
 
 1. Go to [Neon.tech](https://neon.tech)
 2. Sign up or log in
-3. Click **"Create a project"**
+3. Click **"New project"** (or use Vercel integration as shown in tooltip)
 4. **Important:** Select **"Toronto, Canada"** as the region
    - This ensures PIPEDA compliance (data stays in Canada)
 5. Choose a project name (e.g., "canadian-insights")
 6. Select **Free tier** (3GB storage, perfect for your needs)
 7. Click **"Create project"**
 
-### Step 2: Get Connection String
+#### Step 2: Connect Neon to Vercel
 
-1. In your Neon project dashboard, click **"Connection Details"**
-2. Copy the **connection string** (it will look like):
+1. In Neon dashboard, go to your project
+2. Click **"Connect Project"** or go to **Settings** → **Integrations**
+3. Connect to Vercel (if available)
+4. Or manually copy the connection string from **"Connection Details"**
+
+#### Step 3: Update Vercel Environment Variables
+
+1. Go to Vercel Dashboard → Your Project → **Settings** → **Environment Variables**
+2. Add or update `POSTGRES_URL` with your Neon connection string:
    ```
    postgresql://username:password@ep-xxxxx-toronto.aws.neon.tech/dbname?sslmode=require
    ```
 3. **Note:** The connection string should contain "toronto" in the hostname
+4. Make sure to check all scopes: Production, Preview, Development
+5. Click **"Save"**
 
-### Step 3: Export Data from Current Database (If Needed)
+### Step 4: Export Data from Current Database (If Needed)
 
 **If you have existing data you want to keep:**
 
@@ -71,7 +121,7 @@ Your app currently uses **one database connection** via the `DATABASE_URL` or `P
 
 **For your prototype:** Option C is probably fine if you don't have critical production data.
 
-### Step 4: Update Vercel Environment Variables
+### Step 5: Update Vercel Environment Variables (Only if using Option B)
 
 1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
 2. Select your project: **prototype**
@@ -87,7 +137,7 @@ Your app currently uses **one database connection** via the `DATABASE_URL` or `P
    - ✅ Development
 7. Click **"Save"**
 
-### Step 5: Remove Old Database (Optional)
+### Step 6: Remove Old Database (Optional)
 
 **If you were using Vercel Postgres:**
 
@@ -99,7 +149,7 @@ Your app currently uses **one database connection** via the `DATABASE_URL` or `P
 
 **Note:** Only do this after confirming Neon is working!
 
-### Step 6: Redeploy Application
+### Step 7: Redeploy Application
 
 1. Go to Vercel Dashboard → Your Project
 2. Go to **Deployments** tab
@@ -107,7 +157,7 @@ Your app currently uses **one database connection** via the `DATABASE_URL` or `P
 4. Click **"Redeploy"**
 5. Wait for deployment to complete
 
-### Step 7: Verify Connection
+### Step 8: Verify Connection
 
 1. **Check Vercel Logs:**
    - Go to your deployment → **Functions** tab
@@ -132,14 +182,39 @@ Your app currently uses **one database connection** via the `DATABASE_URL` or `P
 
 After migration, verify:
 
-- [ ] Neon project created in **Toronto region**
-- [ ] Connection string contains "toronto" in hostname
-- [ ] `DATABASE_URL` updated in Vercel (all environments)
+- [ ] Neon project created in **Toronto region** (check in Neon dashboard)
+- [ ] Connection string contains "toronto" in hostname (if manually set)
+- [ ] `POSTGRES_URL` or `DATABASE_URL` set in Vercel (automatically if using Vercel integration)
 - [ ] Application redeployed
 - [ ] Health check endpoint returns `{"status": "ok"}`
 - [ ] Login works without errors
-- [ ] Tables visible in Neon dashboard
+- [ ] Tables visible in Neon dashboard (click "Open in Neon" from Vercel)
 - [ ] Old Vercel Postgres database deleted (if applicable)
+
+## Important Notes
+
+### About the Neon Tooltip
+
+The tooltip in Neon that says *"To create a new project, use the Neon Postgres integration in Vercel"* is suggesting you use **Option A** (Vercel's integration). This is the recommended approach because:
+
+- ✅ Automatic setup and configuration
+- ✅ Environment variables configured automatically
+- ✅ Easier to manage from Vercel dashboard
+- ✅ Better integration with Vercel deployments
+
+### If You Already Have a Neon Project
+
+If you already have a Neon project (like "neon-orange-queen" shown in your screenshot):
+
+1. **Check the region:**
+   - Click "Open in Neon" from Vercel Storage tab
+   - Check if it's in Toronto region
+   - If not, you may need to create a new project in Toronto
+
+2. **Connect existing project:**
+   - If it's already in Toronto, you can use it
+   - Make sure `POSTGRES_URL` is set correctly in Vercel
+   - The connection details are shown in the Vercel Storage tab
 
 ---
 
