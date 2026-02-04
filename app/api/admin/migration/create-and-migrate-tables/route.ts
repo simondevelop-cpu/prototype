@@ -68,24 +68,58 @@ export async function POST(request: NextRequest) {
         const existingCountNum = parseInt(existingCount.rows[0]?.count || '0', 10);
 
         if (existingCountNum === 0) {
-          // Migrate data from old table
-          // Handle both old schema (category, label) and new schema (corrected_category, corrected_label)
-          await pool.query(`
-            INSERT INTO l2_user_categorization_learning 
-            (user_id, description_pattern, original_category, original_label, corrected_category, corrected_label, frequency, last_used, created_at)
-            SELECT 
-              user_id,
-              description_pattern,
-              COALESCE(original_category, NULL) as original_category,
-              COALESCE(original_label, NULL) as original_label,
-              COALESCE(corrected_category, category, '') as corrected_category,
-              COALESCE(corrected_label, label, '') as corrected_label,
-              frequency,
-              last_used,
-              created_at
-            FROM categorization_learning
-            ON CONFLICT (user_id, description_pattern) DO NOTHING
+          // Check what columns exist in the old table
+          const columnCheck = await pool.query(`
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_schema = 'public' 
+              AND table_name = 'categorization_learning'
           `);
+          const columns = columnCheck.rows.map((r: any) => r.column_name);
+          const hasCorrectedColumns = columns.includes('corrected_category') && columns.includes('corrected_label');
+          const hasOldColumns = columns.includes('category') && columns.includes('label');
+
+          // Migrate data from old table
+          if (hasCorrectedColumns) {
+            // New schema - has corrected_category and corrected_label
+            await pool.query(`
+              INSERT INTO l2_user_categorization_learning 
+              (user_id, description_pattern, original_category, original_label, corrected_category, corrected_label, frequency, last_used, created_at)
+              SELECT 
+                user_id,
+                description_pattern,
+                original_category,
+                original_label,
+                corrected_category,
+                corrected_label,
+                frequency,
+                last_used,
+                created_at
+              FROM categorization_learning
+              ON CONFLICT (user_id, description_pattern) DO NOTHING
+            `);
+          } else if (hasOldColumns) {
+            // Old schema - has category and label (no corrected_* columns)
+            await pool.query(`
+              INSERT INTO l2_user_categorization_learning 
+              (user_id, description_pattern, original_category, original_label, corrected_category, corrected_label, frequency, last_used, created_at)
+              SELECT 
+                user_id,
+                description_pattern,
+                NULL as original_category,
+                NULL as original_label,
+                category as corrected_category,
+                COALESCE(label, '') as corrected_label,
+                frequency,
+                last_used,
+                created_at
+              FROM categorization_learning
+              ON CONFLICT (user_id, description_pattern) DO NOTHING
+            `);
+          } else {
+            // Unknown schema - try to get all available columns
+            throw new Error(`Unknown schema for categorization_learning. Available columns: ${columns.join(', ')}`);
+          }
 
           const migratedCount = await pool.query(`
             SELECT COUNT(*) as count FROM l2_user_categorization_learning
