@@ -85,13 +85,20 @@ describe('Event Logging', () => {
 
     vi.spyOn(dbModule, 'getPool').mockReturnValue(mockPool);
 
-    // Create test user
+    // Create test user in l1_user_permissions
     const passwordHash = await hashPassword('testpassword123');
-    const userResult = await testClient.query(
-      `INSERT INTO users (email, password_hash) VALUES ('eventtest@test.com', $1) RETURNING id`,
+    const permResult = await testClient.query(
+      `INSERT INTO l1_user_permissions (password_hash) VALUES ($1) RETURNING id`,
       [passwordHash]
     );
-    testUserId = userResult.rows[0].id;
+    testUserId = permResult.rows[0].id;
+
+    // Create PII record
+    await testClient.query(
+      `INSERT INTO l0_pii_users (internal_user_id, email, display_name) 
+       VALUES ($1, 'eventtest@test.com', 'Test User')`,
+      [testUserId]
+    );
     
     // Generate tokenized user ID using the same method as the app (SHA256 hash)
     const crypto = await import('crypto');
@@ -125,6 +132,7 @@ describe('Event Logging', () => {
   });
 
   beforeEach(async () => {
+    await testClient.query('DELETE FROM l1_event_facts');
     await testClient.query('DELETE FROM l1_events');
   });
 
@@ -146,7 +154,7 @@ describe('Event Logging', () => {
       expect(response.status).toBe(200);
 
       const events = await testClient.query(
-        `SELECT event_type, user_id FROM l1_events WHERE event_type = 'login'`
+        `SELECT event_type, user_id FROM l1_event_facts WHERE event_type = 'login'`
       );
 
       expect(events.rows.length).toBe(1);

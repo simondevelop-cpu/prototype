@@ -36,20 +36,43 @@ describe('Consent API', () => {
     } as unknown as Pool;
 
     await testClient.query(`
-      CREATE TABLE IF NOT EXISTS users (
+      CREATE TABLE IF NOT EXISTS l1_user_permissions (
         id SERIAL PRIMARY KEY,
-        email TEXT NOT NULL UNIQUE
+        password_hash TEXT NOT NULL,
+        login_attempts INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        email_validated BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS l0_pii_users (
+        internal_user_id INTEGER PRIMARY KEY REFERENCES l1_user_permissions(id),
+        email TEXT NOT NULL,
+        display_name TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS l0_user_tokenization (
-        internal_user_id INTEGER PRIMARY KEY REFERENCES users(id),
+        internal_user_id INTEGER PRIMARY KEY REFERENCES l1_user_permissions(id),
         tokenized_user_id TEXT NOT NULL UNIQUE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS l1_events (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id),
+        user_id INTEGER NOT NULL REFERENCES l1_user_permissions(id),
+        tokenized_user_id TEXT REFERENCES l0_user_tokenization(tokenized_user_id),
+        event_type TEXT NOT NULL,
+        event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        metadata JSONB,
+        is_admin BOOLEAN DEFAULT FALSE,
+        session_id TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS l1_event_facts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES l1_user_permissions(id),
         tokenized_user_id TEXT REFERENCES l0_user_tokenization(tokenized_user_id),
         event_type TEXT NOT NULL,
         event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -62,11 +85,17 @@ describe('Consent API', () => {
     // Mock getPool to return our test pool
     vi.spyOn(dbModule, 'getPool').mockReturnValue(mockPool);
 
-    // Create a test user
-    const userResult = await testClient.query(
-      `INSERT INTO users (email) VALUES ('consent@test.com') RETURNING id`
+    // Create a test user in l1_user_permissions
+    const permResult = await testClient.query(
+      `INSERT INTO l1_user_permissions (password_hash) VALUES ('dummy_hash') RETURNING id`
     );
-    const userId = userResult.rows[0].id;
+    const userId = permResult.rows[0].id;
+
+    // Create PII record
+    await testClient.query(
+      `INSERT INTO l0_pii_users (internal_user_id, email) VALUES ($1, 'consent@test.com')`,
+      [userId]
+    );
 
     // Create tokenized user ID for event logging
     await testClient.query(
@@ -90,6 +119,7 @@ describe('Consent API', () => {
   });
 
   beforeEach(async () => {
+    await testClient.query('DELETE FROM l1_event_facts');
     await testClient.query('DELETE FROM l1_events');
   });
 
@@ -115,7 +145,7 @@ describe('Consent API', () => {
 
     const events = await testClient.query(
       `SELECT event_type, metadata->>'consentType' as consent_type, metadata->>'choice' as choice
-       FROM l1_events`
+       FROM l1_event_facts`
     );
 
     expect(events.rows.length).toBe(1);

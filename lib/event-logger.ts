@@ -181,14 +181,24 @@ export async function logConsentEvent(
     const sessionId = await getOrCreateSessionId(pool, numericUserId);
     
     // Use INSERT ... ON CONFLICT DO NOTHING to prevent race conditions
-    // The unique index on (user_id, event_type, metadata->>'consentType') will prevent duplicates
-    // For partial unique indexes, we must reference the columns, not the constraint name
+    // Check if consent event already exists first (pg-mem doesn't support ON CONFLICT ... WHERE well)
+    const existingCheck = await pool.query(
+      `SELECT id FROM l1_event_facts 
+       WHERE user_id = $1 
+         AND event_type = 'consent' 
+         AND metadata->>'consentType' = $2
+       LIMIT 1`,
+      [numericUserId, consentType]
+    ).catch(() => ({ rows: [] }));
+
+    if (existingCheck.rows.length > 0) {
+      console.log(`[Event Logger] Consent event (${consentType}) for user ${userId} already exists, skipped duplicate`);
+      return;
+    }
+
     const result = await pool.query(
       `INSERT INTO l1_event_facts (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)
-       ON CONFLICT (user_id, event_type, ((metadata->>'consentType')))
-       WHERE event_type = 'consent'
-       DO NOTHING
        RETURNING id`,
       [numericUserId, tokenizedUserId, 'consent', JSON.stringify(eventMetadata), sessionId]
     );
