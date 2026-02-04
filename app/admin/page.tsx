@@ -2278,7 +2278,7 @@ export default function AdminDashboard() {
                   onClick={async () => {
                     setCleanupLoading(true);
                     try {
-                      const token = localStorage.getItem('adminToken');
+                      const token = localStorage.getItem('admin_token');
                       const response = await fetch('/api/admin/migration/cleanup', {
                         headers: {
                           'Authorization': `Bearer ${token}`,
@@ -2352,7 +2352,7 @@ export default function AdminDashboard() {
                             }
                             setCleanupDropping(true);
                             try {
-                              const token = localStorage.getItem('adminToken');
+                              const token = localStorage.getItem('admin_token');
                               const response = await fetch('/api/admin/migration/cleanup', {
                                 method: 'POST',
                                 headers: {
