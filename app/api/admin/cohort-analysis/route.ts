@@ -321,7 +321,7 @@ export async function GET(request: NextRequest) {
       GROUP BY ut.internal_user_id
     `;
     
-    const engagementQuery = useUsersTable ? `
+    const engagementQuery = onboardingResponsesExists ? `
       SELECT 
         DATE_TRUNC('week', perm.created_at) as signup_week,
         -- Onboarding and data coverage
@@ -345,6 +345,8 @@ export async function GET(request: NextRequest) {
         AVG(transaction_counts.tx_count) FILTER (WHERE transaction_counts.tx_count > 0) as avg_transactions_per_user,
         COUNT(DISTINCT CASE WHEN transaction_counts.tx_count > 0 THEN perm.id END) as users_with_transactions
       FROM l1_user_permissions perm
+      JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+      LEFT JOIN onboarding_responses o ON perm.id = o.user_id
       LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
       LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
       LEFT JOIN (
