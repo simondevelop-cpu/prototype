@@ -313,11 +313,17 @@ describe('Authentication API', () => {
     beforeEach(async () => {
       // Create a test user for login tests
       const passwordHash = await hashPassword('TestP@ss1');
-      const userResult = await testClient.query(
-        'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id',
-        ['logintest@test.com', passwordHash, 'Login Test User']
+      const permResult = await testClient.query(
+        'INSERT INTO l1_user_permissions (password_hash) VALUES ($1) RETURNING id',
+        [passwordHash]
       );
-      const userId = userResult.rows[0].id;
+      const userId = permResult.rows[0].id;
+
+      // Create PII record
+      await testClient.query(
+        'INSERT INTO l0_pii_users (internal_user_id, email, display_name) VALUES ($1, $2, $3)',
+        [userId, 'logintest@test.com', 'Login Test User']
+      );
       
       // Create completed onboarding response (required for login)
       await testClient.query(
