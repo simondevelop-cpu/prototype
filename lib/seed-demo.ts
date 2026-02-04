@@ -164,8 +164,12 @@ export async function seedDemoTransactions(pool: any, userId: string | number) {
 export async function ensureDemoDataExists(pool: any) {
   try {
     console.log('[DB] Checking if demo data exists for:', DEMO_EMAIL.toLowerCase());
+    // Query l0_pii_users for email, then get id from l1_user_permissions
     const demoUser = await pool.query(
-      'SELECT id FROM users WHERE email = $1',
+      `SELECT perm.id 
+       FROM l0_pii_users pii
+       JOIN l1_user_permissions perm ON pii.internal_user_id = perm.id
+       WHERE pii.email = $1 LIMIT 1`,
       [DEMO_EMAIL.toLowerCase()]
     );
     
