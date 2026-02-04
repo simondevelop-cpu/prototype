@@ -100,10 +100,10 @@ export async function GET(request: NextRequest) {
       filterConditions += ` AND perm.email_validated = true`;
     }
 
-    if (filters.intentCategories && filters.intentCategories.length > 0 && onboardingResponsesExists) {
+    if (filters.intentCategories && filters.intentCategories.length > 0 && onboardingResponsesExists && onboardingTableName) {
       // Intent categories come from onboarding_responses.motivation
       filterConditions += ` AND EXISTS (
-        SELECT 1 FROM onboarding_responses o 
+        SELECT 1 FROM ${onboardingTableName} o 
         WHERE o.user_id = perm.id 
         AND o.motivation = ANY($${paramIndex}::text[])
       )`;
