@@ -220,25 +220,29 @@ export async function POST(request: NextRequest) {
       });
 
       // Step 4: Migrate data from users to l1_user_permissions
+      // Build INSERT statement dynamically based on which columns exist in users table
+      const baseColumns = ['id', 'password_hash', 'login_attempts', 'is_active', 'email_validated', 'created_at', 'updated_at'];
+      const consentColumns = ['account_creation_consent_at', 'cookie_consent_at', 'cookie_consent_choice', 'first_upload_consent_at'];
+      
+      // Filter to only include consent columns that exist in users table
+      const existingConsentColumns = consentColumns.filter(col => usersColumnNames.includes(col));
+      
+      // Build column lists
+      const insertColumns = [...baseColumns, ...existingConsentColumns];
+      const selectColumns = [
+        'id',
+        'password_hash',
+        'COALESCE(login_attempts, 0) as login_attempts',
+        'COALESCE(is_active, TRUE) as is_active',
+        'COALESCE(email_validated, FALSE) as email_validated',
+        'created_at',
+        'COALESCE(updated_at, created_at) as updated_at',
+        ...existingConsentColumns // These columns exist in users, so we can select them directly
+      ];
+      
       const migratePermissions = await client.query(`
-        INSERT INTO l1_user_permissions (
-          id, password_hash, login_attempts, is_active, email_validated,
-          created_at, updated_at,
-          account_creation_consent_at, cookie_consent_at, 
-          cookie_consent_choice, first_upload_consent_at
-        )
-        SELECT 
-          id,
-          password_hash,
-          COALESCE(login_attempts, 0) as login_attempts,
-          COALESCE(is_active, TRUE) as is_active,
-          COALESCE(email_validated, FALSE) as email_validated,
-          created_at,
-          COALESCE(updated_at, created_at) as updated_at,
-          account_creation_consent_at,
-          cookie_consent_at,
-          cookie_consent_choice,
-          first_upload_consent_at
+        INSERT INTO l1_user_permissions (${insertColumns.join(', ')})
+        SELECT ${selectColumns.join(', ')}
         FROM users
         ON CONFLICT (id) DO NOTHING
       `);
