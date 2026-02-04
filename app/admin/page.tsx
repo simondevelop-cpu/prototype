@@ -1923,7 +1923,6 @@ export default function AdminDashboard() {
     );
   };
 
-  // Render Migration Tab - Simplified: Only cleanup and data migration verification
   const renderMigrationTab = () => {
     return (
       <div className="space-y-6">
