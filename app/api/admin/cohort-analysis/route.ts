@@ -424,33 +424,8 @@ export async function GET(request: NextRequest) {
       LIMIT 12
     `;
 
-    // Check if l1_events table exists for engagement metrics
-    let hasUserEventsTable = false;
-    let eventsTable = 'l1_event_facts'; // Default to new table name
-    try {
-      // Check for l1_event_facts first (new), then l1_events (old)
-      const newTableCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'l1_event_facts'
-        LIMIT 1
-      `);
-      if (newTableCheck.rows.length > 0) {
-        eventsTable = 'l1_event_facts';
-        hasUserEventsTable = true;
-      } else {
-        const oldTableCheck = await pool.query(`
-          SELECT 1 FROM information_schema.tables 
-          WHERE table_name = 'l1_events'
-          LIMIT 1
-        `);
-        if (oldTableCheck.rows.length > 0) {
-          eventsTable = 'l1_events';
-          hasUserEventsTable = true;
-        }
-      }
-    } catch (e) {
-      // Table doesn't exist
-    }
+    // Use l1_event_facts for engagement metrics
+    const eventsTable = 'l1_event_facts';
 
     // Execute engagement query and extract weeks
     let engagementResult;
@@ -468,34 +443,33 @@ export async function GET(request: NextRequest) {
       engagementResult = { rows: [] };
     }
 
-    // Get l1_events data if table exists
+    // Get l1_event_facts data for engagement metrics
     let userEventsData: any = {};
-    if (hasUserEventsTable) {
-      try {
-        // Calculate login metrics per week
-        const eventsQuery = `
-          SELECT 
-            DATE_TRUNC('week', u.created_at) as signup_week,
-            COUNT(DISTINCT CASE 
-              WHEN ue.event_timestamp >= u.created_at 
-              AND ue.event_timestamp < u.created_at + INTERVAL '7 days'
-              AND ue.event_type = 'login' 
-              THEN DATE(ue.event_timestamp) 
-            END) as unique_login_days_week_0,
-            COUNT(DISTINCT CASE 
-              WHEN ue.event_timestamp >= u.created_at + INTERVAL '7 days'
-              AND ue.event_timestamp < u.created_at + INTERVAL '14 days'
-              AND ue.event_type = 'login' 
-              THEN DATE(ue.event_timestamp) 
-            END) as unique_login_days_week_1
-          FROM users u
-          LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
-          LEFT JOIN ${eventsTable} ue ON ue.tokenized_user_id = ut.tokenized_user_id
-          WHERE u.email != $${paramIndex}
-            ${filterConditions}
-          GROUP BY DATE_TRUNC('week', u.created_at)
-        `;
-        const eventsResult = await pool.query(eventsQuery, filterParams);
+    try {
+      // Calculate login metrics per week
+      const eventsQuery = `
+        SELECT 
+          DATE_TRUNC('week', u.created_at) as signup_week,
+          COUNT(DISTINCT CASE 
+            WHEN ue.event_timestamp >= u.created_at 
+            AND ue.event_timestamp < u.created_at + INTERVAL '7 days'
+            AND ue.event_type = 'login' 
+            THEN DATE(ue.event_timestamp) 
+          END) as unique_login_days_week_0,
+          COUNT(DISTINCT CASE 
+            WHEN ue.event_timestamp >= u.created_at + INTERVAL '7 days'
+            AND ue.event_timestamp < u.created_at + INTERVAL '14 days'
+            AND ue.event_type = 'login' 
+            THEN DATE(ue.event_timestamp) 
+          END) as unique_login_days_week_1
+        FROM users u
+        LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+        LEFT JOIN l1_event_facts ue ON ue.tokenized_user_id = ut.tokenized_user_id
+        WHERE u.email != $${paramIndex}
+          ${filterConditions}
+        GROUP BY DATE_TRUNC('week', u.created_at)
+      `;
+      const eventsResult = await pool.query(eventsQuery, filterParams);
         
         eventsResult.rows.forEach((row: any) => {
           const weekKey = `w/c ${new Date(row.signup_week).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;

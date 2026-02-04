@@ -122,26 +122,13 @@ export async function POST(req: NextRequest) {
         frequency: existing.rows[0].frequency + 1,
       });
     } else {
-      // Insert new pattern
-      // Try new schema first, fallback to minimal schema if columns don't exist
-      try {
-        await pool.query(
-          `INSERT INTO categorization_learning 
-           (user_id, description_pattern, original_category, original_label, corrected_category, corrected_label)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [userId, pattern, originalCategory, originalLabel, correctedCategory, correctedLabel]
-        );
-      } catch (insertError: any) {
-        if (insertError.code === '42703') {
-          // Column doesn't exist - try old schema with simple column names
-          console.log('[Learn API] Using old schema (corrected_ prefix missing)');
-          try {
-            await pool.query(
-              `INSERT INTO categorization_learning 
-               (user_id, description_pattern, category, label)
-               VALUES ($1, $2, $3, $4)`,
-              [userId, pattern, correctedCategory, correctedLabel]
-            );
+      // Insert new pattern into l2_user_categorization_learning
+      await pool.query(
+        `INSERT INTO l2_user_categorization_learning 
+         (user_id, description_pattern, original_category, original_label, corrected_category, corrected_label)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [userId, pattern, originalCategory, originalLabel, correctedCategory, correctedLabel]
+      );
           } catch (fallbackError: any) {
             console.error('[Learn API] Fallback insert also failed:', fallbackError.message);
             console.error('[Learn API] Available columns might be different. Checking table schema...');

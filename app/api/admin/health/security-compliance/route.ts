@@ -169,48 +169,40 @@ export async function GET(request: NextRequest) {
 
     // Test 10: Single Source of Truth - Events
     try {
-      // Check if l1_event_facts (new) or l1_events (old) exists (migration-safe)
-      const newTableCheck = await pool.query(`
+      // Check if l1_event_facts exists
+      const tableCheck = await pool.query(`
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'public' 
           AND table_name = 'l1_event_facts'
       `);
-      const oldTableCheck = await pool.query(`
-        SELECT table_name 
-        FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-          AND table_name = 'l1_events'
-      `);
-      const hasNew = newTableCheck.rows.length > 0;
-      const hasOld = oldTableCheck.rows.length > 0;
-      const eventsTableName = hasNew ? 'l1_event_facts' : (hasOld ? 'l1_events' : null);
+      const hasTable = tableCheck.rows.length > 0;
       
       // Check for legacy tables (should not exist after migration)
       const legacyCheck = await pool.query(`
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'public' 
-          AND table_name = 'user_events'
+          AND table_name IN ('user_events', 'l1_events')
       `);
       const hasLegacy = legacyCheck.rows.length > 0;
       
-      // Verify events table has both user_id and tokenized_user_id columns (dual-column approach)
+      // Verify l1_event_facts has both user_id and tokenized_user_id columns (dual-column approach)
       let hasDualColumns = false;
-      if (eventsTableName) {
+      if (hasTable) {
         const columnCheck = await pool.query(`
           SELECT column_name 
           FROM information_schema.columns 
           WHERE table_schema = 'public' 
-            AND table_name = $1
+            AND table_name = 'l1_event_facts'
             AND column_name IN ('user_id', 'tokenized_user_id')
-        `, [eventsTableName]);
+        `);
         hasDualColumns = columnCheck.rows.length === 2;
       }
       
-      const status = eventsTableName && !hasLegacy && hasDualColumns ? 'pass' 
-        : eventsTableName && !hasLegacy ? 'warning' 
-        : eventsTableName ? 'warning' 
+      const status = hasTable && !hasLegacy && hasDualColumns ? 'pass' 
+        : hasTable && !hasLegacy ? 'warning' 
+        : hasTable ? 'warning' 
         : 'fail';
       
       tests.push({
@@ -218,18 +210,18 @@ export async function GET(request: NextRequest) {
         description: 'All user actions and system events are logged in a single, consistent location',
         category: 'data-integrity',
         status,
-        message: eventsTableName && !hasLegacy && hasDualColumns
+        message: hasTable && !hasLegacy && hasDualColumns
           ? 'All events logged in secure, centralized system with dual-column support'
-          : eventsTableName && !hasLegacy
-            ? `${eventsTableName} exists but missing tokenized_user_id column`
-            : eventsTableName
-              ? `${eventsTableName} exists but legacy tables may still exist`
-              : 'Events table (l1_event_facts or l1_events) not found',
-        details: eventsTableName && !hasLegacy && hasDualColumns
-          ? `All events use ${eventsTableName} table with user_id (operational) and tokenized_user_id (analytics)`
-          : eventsTableName
-            ? `${eventsTableName} exists. Legacy tables: ${hasLegacy ? legacyCheck.rows.map((r: any) => r.table_name).join(', ') : 'none'}. Dual columns: ${hasDualColumns ? 'yes' : 'no'}`
-            : 'Events table (l1_event_facts or l1_events) not found',
+          : hasTable && !hasLegacy
+            ? 'l1_event_facts exists but missing tokenized_user_id column'
+            : hasTable
+              ? 'l1_event_facts exists but legacy tables may still exist'
+              : 'l1_event_facts table not found',
+        details: hasTable && !hasLegacy && hasDualColumns
+          ? 'All events use l1_event_facts table with user_id (operational) and tokenized_user_id (analytics)'
+          : hasTable
+            ? `l1_event_facts exists. Legacy tables: ${hasLegacy ? legacyCheck.rows.map((r: any) => r.table_name).join(', ') : 'none'}. Dual columns: ${hasDualColumns ? 'yes' : 'no'}`
+            : 'l1_event_facts table not found',
       });
     } catch (error: any) {
       tests.push({

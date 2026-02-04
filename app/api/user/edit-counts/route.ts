@@ -41,29 +41,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Check if l1_event_facts or l1_events table exists (migration-safe)
-    let eventsTable = 'l1_event_facts';
-    let hasEventsTable = false;
-    try {
-      const newTableCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_event_facts' LIMIT 1
-      `);
-      if (newTableCheck.rows.length > 0) {
-        eventsTable = 'l1_event_facts';
-        hasEventsTable = true;
-      } else {
-        const oldTableCheck = await pool.query(`
-          SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_events' LIMIT 1
-        `);
-        if (oldTableCheck.rows.length > 0) {
-          eventsTable = 'l1_events';
-          hasEventsTable = true;
-        }
-      }
-    } catch (e) {
-      console.log('[Edit Counts API] Could not check for events table');
-    }
-
     // Get tokenized_user_id for querying transactions
     const tokenizedResult = await pool.query(
       'SELECT tokenized_user_id FROM l0_user_tokenization WHERE internal_user_id = $1',
@@ -71,26 +48,10 @@ export async function GET(request: NextRequest) {
     );
     const tokenizedUserId = tokenizedResult.rows[0]?.tokenized_user_id;
 
-    if (!hasEventsTable) {
-      return NextResponse.json({ 
-        totalUploads: 0,
-        monthsWithData: 0,
-        autoCategorisedNumerator: 0,
-        autoCategorisedDenominator: 0,
-        notCategorisedNumerator: 0,
-        notCategorisedDenominator: 0,
-        description: 0,
-        date: 0,
-        amount: 0,
-        label: 0,
-        bulkEdit: 0,
-      }, { status: 200 });
-    }
-
     // Fetch statement upload events for this user (include both statement_upload and statement_linked)
     const statementResult = await pool.query(`
       SELECT COUNT(*) as count
-      FROM ${eventsTable}
+      FROM l1_event_facts
       WHERE user_id = $1
         AND (event_type = 'statement_upload' OR event_type = 'statement_linked')
     `, [userId]);
@@ -98,7 +59,7 @@ export async function GET(request: NextRequest) {
     // Fetch bulk edit events for this user
     const bulkEditResult = await pool.query(`
       SELECT COUNT(*) as count
-      FROM ${eventsTable}
+      FROM l1_event_facts
       WHERE user_id = $1
         AND event_type = 'bulk_edit'
     `, [userId]);
@@ -106,7 +67,7 @@ export async function GET(request: NextRequest) {
     // Fetch transaction editing events for this user
     const editResult = await pool.query(`
       SELECT metadata
-      FROM ${eventsTable}
+      FROM l1_event_facts
       WHERE user_id = $1
         AND event_type = 'transaction_edit'
     `, [userId]);
@@ -114,7 +75,7 @@ export async function GET(request: NextRequest) {
     // Fetch bulk edit events to get transaction IDs that were edited
     const bulkEditDetailsResult = await pool.query(`
       SELECT metadata
-      FROM ${eventsTable}
+      FROM l1_event_facts
       WHERE user_id = $1
         AND event_type = 'bulk_edit'
     `, [userId]);

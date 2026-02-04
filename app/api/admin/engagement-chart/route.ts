@@ -66,23 +66,8 @@ export async function GET(request: NextRequest) {
     const hasMotivation = schemaCheck.rows.some(row => row.column_name === 'motivation');
     const hasEmailValidated = schemaCheck.rows.some(row => row.column_name === 'email_validated');
 
-    // Check if l1_event_facts or l1_events table exists (migration-safe)
-    let hasUserEvents = false;
-    try {
-      const newTableCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_event_facts' LIMIT 1
-      `);
-      if (newTableCheck.rows.length > 0) {
-        hasUserEvents = true;
-      } else {
-        const oldTableCheck = await pool.query(`
-          SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_events' LIMIT 1
-        `);
-        hasUserEvents = oldTableCheck.rows.length > 0;
-      }
-    } catch (e) {
-      // Table doesn't exist
-    }
+    // Use l1_event_facts for engagement tracking
+    const hasUserEvents = true; // Assume table exists after migration
 
     // Check if transactions table has upload_session_id
     let hasUploadSessionId = false;
@@ -223,47 +208,24 @@ export async function GET(request: NextRequest) {
       const signupDate = new Date(user.signup_date);
       const weeks: { week: number; loginDays: number }[] = [];
       
-      // Determine events table name (migration-safe)
-      let eventsTable = 'l1_event_facts';
-      let hasEventsTable = false;
-      try {
-        const newTableCheck = await pool.query(`
-          SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_event_facts' LIMIT 1
-        `);
-        if (newTableCheck.rows.length > 0) {
-          eventsTable = 'l1_event_facts';
-          hasEventsTable = true;
-        } else {
-          const oldTableCheck = await pool.query(`
-            SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_events' LIMIT 1
-          `);
-          if (oldTableCheck.rows.length > 0) {
-            eventsTable = 'l1_events';
-            hasEventsTable = true;
-          }
-        }
-      } catch (e) {
-        // Table check failed
-      }
-
-      if (hasEventsTable) {
-        // Calculate login days per week for 12 weeks
-        for (let weekNum = 0; weekNum < 12; weekNum++) {
-          const weekStart = new Date(signupDate);
-          weekStart.setDate(signupDate.getDate() + (weekNum * 7));
-          weekStart.setHours(0, 0, 0, 0);
-          
-          const weekEnd = new Date(weekStart);
-          weekEnd.setDate(weekStart.getDate() + 6);
-          weekEnd.setHours(23, 59, 59, 999);
-          
-          // Get unique login days in this week
-          // Note: We use user_id (internal ID) since login events are logged with internal user_id
-          // Use DATE_TRUNC('day', ...) instead of DATE() for better PostgreSQL compatibility
-          // Cast user.id to integer to ensure type consistency
+      // Calculate login days per week for 12 weeks from l1_event_facts
+      for (let weekNum = 0; weekNum < 12; weekNum++) {
+        const weekStart = new Date(signupDate);
+        weekStart.setDate(signupDate.getDate() + (weekNum * 7));
+        weekStart.setHours(0, 0, 0, 0);
+        
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+        
+        // Get unique login days in this week from l1_event_facts
+        // Note: We use user_id (internal ID) since login events are logged with internal user_id
+        // Use DATE_TRUNC('day', ...) instead of DATE() for better PostgreSQL compatibility
+        // Cast user.id to integer to ensure type consistency
+        try {
           const loginDaysResult = await pool.query(`
             SELECT COUNT(DISTINCT DATE_TRUNC('day', event_timestamp)) as login_days
-            FROM ${eventsTable}
+            FROM l1_event_facts
             WHERE user_id = $1::integer
               AND event_type = 'login'
               AND event_timestamp >= $2::timestamp
@@ -272,10 +234,8 @@ export async function GET(request: NextRequest) {
           
           const loginDays = parseInt(loginDaysResult.rows[0]?.login_days) || 0;
           weeks.push({ week: weekNum, loginDays });
-        }
-      } else {
-        // No events table - return zeros for now
-        for (let weekNum = 0; weekNum < 12; weekNum++) {
+        } catch (e) {
+          // If query fails, return zero for this week
           weeks.push({ week: weekNum, loginDays: 0 });
         }
       }
@@ -303,50 +263,32 @@ export async function GET(request: NextRequest) {
     }
 
     // Determine events table name for summary queries (migration-safe)
-    let eventsTable = 'l1_event_facts';
-    let hasEventsTable = false;
-    try {
-      const newTableCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_event_facts' LIMIT 1
-      `);
-      if (newTableCheck.rows.length > 0) {
-        eventsTable = 'l1_event_facts';
-        hasEventsTable = true;
-      } else {
-        const oldTableCheck = await pool.query(`
-          SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_events' LIMIT 1
-        `);
-        if (oldTableCheck.rows.length > 0) {
-          eventsTable = 'l1_events';
-          hasEventsTable = true;
-        }
-      }
-    } catch (e) {
-      // Table check failed
-    }
-
-    // Debug: Log summary of what we found
-    const totalLoginEvents = hasEventsTable ? await pool.query(
-      `SELECT COUNT(*) as count FROM ${eventsTable} WHERE event_type = $1`,
+    // Debug: Log summary of what we found from l1_event_facts
+    const totalLoginEvents = await pool.query(
+      `SELECT COUNT(*) as count FROM l1_event_facts WHERE event_type = $1`,
       ['login']
-    ).then((r: any) => parseInt(r.rows[0]?.count || '0')) : 0;
+    ).then((r: any) => parseInt(r.rows[0]?.count || '0')).catch(() => 0);
     
     // Check if login events exist for the filtered users
     let loginEventsForFilteredUsers = 0;
-    if (hasEventsTable && filteredUsers.length > 0) {
+    if (filteredUsers.length > 0) {
       const userIds = filteredUsers.map((u: any) => u.id);
-      const loginCheck = await pool.query(
-        `SELECT COUNT(*) as count FROM ${eventsTable} WHERE event_type = $1 AND user_id = ANY($2::int[])`,
-        ['login', userIds]
-      );
-      loginEventsForFilteredUsers = parseInt(loginCheck.rows[0]?.count || '0');
+      try {
+        const loginCheck = await pool.query(
+          `SELECT COUNT(*) as count FROM l1_event_facts WHERE event_type = $1 AND user_id = ANY($2::int[])`,
+          ['login', userIds]
+        );
+        loginEventsForFilteredUsers = parseInt(loginCheck.rows[0]?.count || '0');
+      } catch (e) {
+        // Query failed
+      }
     }
     
     const usersWithLogins = userLines.filter((ul: any) => 
       ul.weeks.some((w: any) => w.loginDays > 0)
     ).length;
 
-    console.log(`[Engagement Chart] Found ${userLines.length} users, ${usersWithLogins} with login data, ${totalLoginEvents} total login events in l1_events, ${loginEventsForFilteredUsers} login events for filtered users`);
+    console.log(`[Engagement Chart] Found ${userLines.length} users, ${usersWithLogins} with login data, ${totalLoginEvents} total login events in l1_event_facts, ${loginEventsForFilteredUsers} login events for filtered users`);
     console.log(`[Engagement Chart] Filters: cohorts=${filters.cohorts?.length || 0}, dataCoverage=${filters.dataCoverage?.length || 0}, validatedEmails=${filters.validatedEmails}, intentCategories=${filters.intentCategories?.length || 0}`);
 
     return NextResponse.json({

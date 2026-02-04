@@ -262,50 +262,28 @@ export async function GET(request: NextRequest) {
       }
 
       // Weekly Active Users (users who logged in during the week)
-      // Check if l1_event_facts or l1_events table exists (migration-safe)
-      let eventsTable = 'l1_event_facts';
-      let hasEventsTable = false;
-      try {
-        const newTableCheck = await pool.query(`
-          SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_event_facts' LIMIT 1
-        `);
-        if (newTableCheck.rows.length > 0) {
-          eventsTable = 'l1_event_facts';
-          hasEventsTable = true;
-        } else {
-          const oldTableCheck = await pool.query(`
-            SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_events' LIMIT 1
-          `);
-          if (oldTableCheck.rows.length > 0) {
-            eventsTable = 'l1_events';
-            hasEventsTable = true;
-          }
-        }
-      } catch (e) {
-        // Table check failed
-      }
+      // Use l1_event_facts for all event queries
+      const eventsTable = 'l1_event_facts';
       
       let wau = 0;
-      if (hasEventsTable) {
-        try {
-          // Build WAU query with correct parameter order
-          // filterParams come first, then weekStart and weekEnd
-          const wauParamIndex = filterParams.length + 1;
-          const wauQuery = `
-            SELECT COUNT(DISTINCT e.user_id) as count
-            FROM ${eventsTable} e
-            JOIN users u ON u.id = e.user_id
-            WHERE e.event_type = 'login'
-              AND e.event_timestamp >= $${wauParamIndex}::timestamp
-              AND e.event_timestamp <= $${wauParamIndex + 1}::timestamp
-              AND u.email != $${adminEmailParamIndex}
-              ${filterConditions}
-          `;
-          const wauResult = await pool.query(wauQuery, [...filterParams, weekStart, weekEnd]);
-          wau = parseInt(wauResult.rows[0]?.count) || 0;
-        } catch (e) {
-          // Query failed, WAU = 0
-        }
+      try {
+        // Build WAU query with correct parameter order
+        // filterParams come first, then weekStart and weekEnd
+        const wauParamIndex = filterParams.length + 1;
+        const wauQuery = `
+          SELECT COUNT(DISTINCT e.user_id) as count
+          FROM l1_event_facts e
+          JOIN users u ON u.id = e.user_id
+          WHERE e.event_type = 'login'
+            AND e.event_timestamp >= $${wauParamIndex}::timestamp
+            AND e.event_timestamp <= $${wauParamIndex + 1}::timestamp
+            AND u.email != $${adminEmailParamIndex}
+            ${filterConditions}
+        `;
+        const wauResult = await pool.query(wauQuery, [...filterParams, weekStart, weekEnd]);
+        wau = parseInt(wauResult.rows[0]?.count) || 0;
+      } catch (e) {
+        // Query failed, WAU = 0
       }
 
       // New users per week - use DATE_TRUNC to ensure proper date comparison
@@ -479,7 +457,7 @@ export async function GET(request: NextRequest) {
           const mauParamIndex = filterParams.length + 1;
           const mauQuery = `
             SELECT COUNT(DISTINCT e.user_id) as count
-            FROM ${eventsTable} e
+            FROM l1_event_facts e
             JOIN users u ON u.id = e.user_id
             WHERE e.event_type = 'login'
               AND e.event_timestamp >= $${mauParamIndex}::timestamp
@@ -488,10 +466,9 @@ export async function GET(request: NextRequest) {
               ${filterConditions}
           `;
           const mauResult = await pool.query(mauQuery, [...filterParams, monthStart, monthEnd]);
-          mau = parseInt(mauResult.rows[0]?.count) || 0;
-        } catch (e) {
-          // Query failed, MAU = 0
-        }
+        mau = parseInt(mauResult.rows[0]?.count) || 0;
+      } catch (e) {
+        // Query failed, MAU = 0
       }
 
       // New users per month - users who signed up in the month containing this week
@@ -517,13 +494,13 @@ export async function GET(request: NextRequest) {
       // Total transactions recategorised (unique transactions with at least one edit)
       // Count distinct transaction IDs from transaction_edit and bulk_edit events
       let totalTransactionsRecategorised = 0;
-      if (hasEventsTable) {
+      try {
         try {
           // Get all transaction_edit events (single transaction per event)
           const recatParamIndex = filterParams.length + 1;
           const singleEditQuery = `
             SELECT DISTINCT (e.metadata->>'transactionId')::int as transaction_id
-            FROM ${eventsTable} e
+            FROM l1_event_facts e
             JOIN users u ON u.id = e.user_id
             WHERE e.event_type = 'transaction_edit'
               AND e.event_timestamp >= $${recatParamIndex}::timestamp
@@ -538,7 +515,7 @@ export async function GET(request: NextRequest) {
           // Get all bulk_edit events (multiple transactions per event)
           const bulkEditQuery = `
             SELECT e.metadata->'transactionIds' as transaction_ids
-            FROM ${eventsTable} e
+            FROM l1_event_facts e
             JOIN users u ON u.id = e.user_id
             WHERE e.event_type = 'bulk_edit'
               AND e.event_timestamp >= $${recatParamIndex}::timestamp
@@ -564,16 +541,18 @@ export async function GET(request: NextRequest) {
           // Query failed, recategorised = 0
           console.error('[Vanity Metrics] Error counting recategorised transactions:', e);
         }
+      } catch (e) {
+        // Query failed, recategorised = 0
       }
 
       // Total statements uploaded (in the week)
       let totalStatementsUploaded = 0;
-      if (hasEventsTable) {
+      try {
         try {
           const statementsParamIndex = filterParams.length + 1;
           const statementsQuery = `
             SELECT COUNT(*) as count
-            FROM ${eventsTable} e
+            FROM l1_event_facts e
             JOIN users u ON u.id = e.user_id
             WHERE e.event_type = 'statement_upload'
               AND e.event_timestamp >= $${statementsParamIndex}::timestamp
@@ -584,18 +563,20 @@ export async function GET(request: NextRequest) {
           const statementsResult = await pool.query(statementsQuery, [...filterParams, weekStart, weekEnd]);
           totalStatementsUploaded = parseInt(statementsResult.rows[0]?.count) || 0;
         } catch (e) {
-          // l1_events table doesn't exist, statements = 0
+          // Query failed, statements = 0
         }
+      } catch (e) {
+        // Query failed, statements = 0
       }
 
       // Total statements uploaded by unique person (in the week)
       let totalStatementsByUniquePerson = 0;
-      if (hasEventsTable) {
+      try {
         try {
           const uniqueStatementsParamIndex = filterParams.length + 1;
           const uniqueStatementsQuery = `
             SELECT COUNT(DISTINCT e.user_id) as count
-            FROM ${eventsTable} e
+            FROM l1_event_facts e
             JOIN users u ON u.id = e.user_id
             WHERE e.event_type = 'statement_upload'
               AND e.event_timestamp >= $${uniqueStatementsParamIndex}::timestamp
@@ -608,6 +589,8 @@ export async function GET(request: NextRequest) {
         } catch (e) {
           // Query failed, unique statements = 0
         }
+      } catch (e) {
+        // Query failed, unique statements = 0
       }
 
       metrics[weekKey] = {

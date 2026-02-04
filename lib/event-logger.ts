@@ -15,7 +15,7 @@ async function getOrCreateSessionId(pool: any, userId: number): Promise<string> 
   try {
     // Check for recent session (within 30 minutes)
     const recentSessionResult = await pool.query(
-      `SELECT session_id FROM l1_events 
+      `SELECT session_id FROM l1_event_facts 
        WHERE user_id = $1 
          AND session_id IS NOT NULL
          AND event_timestamp > NOW() - INTERVAL '30 minutes'
@@ -86,7 +86,7 @@ export async function logBankStatementEvent(
     const sessionId = await getOrCreateSessionId(pool, numericUserId);
     
     await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+      `INSERT INTO l1_event_facts (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)`,
       [numericUserId, tokenizedUserId, eventType, JSON.stringify(metadata), sessionId]
     );
@@ -184,7 +184,7 @@ export async function logConsentEvent(
     // The unique index on (user_id, event_type, metadata->>'consentType') will prevent duplicates
     // For partial unique indexes, we must reference the columns, not the constraint name
     const result = await pool.query(
-      `INSERT INTO l1_events (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
+      `INSERT INTO l1_event_facts (user_id, tokenized_user_id, event_type, event_timestamp, metadata, is_admin, session_id)
        VALUES ($1, $2, $3, NOW(), $4::jsonb, FALSE, $5)
        ON CONFLICT (user_id, event_type, ((metadata->>'consentType')))
        WHERE event_type = 'consent'
@@ -436,7 +436,7 @@ export async function logAdminEvent(
 
     // Insert the admin event with the valid user_id and is_admin flag
     await pool.query(
-      `INSERT INTO l1_events (user_id, event_type, event_timestamp, metadata, is_admin)
+      `INSERT INTO l1_event_facts (user_id, event_type, event_timestamp, metadata, is_admin)
        VALUES ($1, $2, NOW(), $3::jsonb, TRUE)`,
       [adminUserId, eventType, JSON.stringify({
         adminEmail,

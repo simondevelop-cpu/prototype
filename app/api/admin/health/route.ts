@@ -257,46 +257,14 @@ async function checkConsentEvents(): Promise<HealthCheck> {
       };
     }
 
-    // Check if l1_event_facts or l1_events table exists (migration-safe)
-    let eventsTable = 'l1_event_facts';
-    let hasEventsTable = false;
-    try {
-      const newTableCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_event_facts' LIMIT 1
-      `);
-      if (newTableCheck.rows.length > 0) {
-        eventsTable = 'l1_event_facts';
-        hasEventsTable = true;
-      } else {
-        const oldTableCheck = await pool.query(`
-          SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_events' LIMIT 1
-        `);
-        if (oldTableCheck.rows.length > 0) {
-          eventsTable = 'l1_events';
-          hasEventsTable = true;
-        }
-      }
-    } catch (e) {
-      // Table check failed
-    }
-
-    if (!hasEventsTable) {
-      return {
-        name: 'Consent Events',
-        description: 'Verifies consent events are being logged in events table',
-        status: 'warning',
-        message: 'Events table (l1_event_facts or l1_events) does not exist yet. Consent events will appear after migration and first usage.',
-        responseTimeMs: Date.now() - startTime,
-      };
-    }
-
+    // Query consent events from l1_event_facts
     const result = await pool.query(`
       SELECT 
         COUNT(*) FILTER (WHERE event_type = 'consent') AS total_consent_events,
         COUNT(*) FILTER (WHERE event_type = 'consent' AND metadata->>'consentType' = 'account_creation') AS account_creation_events,
         COUNT(*) FILTER (WHERE event_type = 'consent' AND metadata->>'consentType' = 'cookie_banner') AS cookie_banner_events,
         COUNT(*) FILTER (WHERE event_type = 'consent' AND metadata->>'consentType' = 'first_upload') AS first_upload_events
-      FROM ${eventsTable}
+      FROM l1_event_facts
     `);
 
     const row = result.rows[0] || {};
@@ -756,22 +724,19 @@ async function checkDataFlowVerification(): Promise<HealthCheck> {
       }
     }
 
-    // 2. Check that l1_event_facts or l1_events table exists (for engagement tracking)
+    // 2. Check that l1_event_facts table exists (for engagement tracking)
     try {
-      const newTableCheck = await pool.query(`
+      const tableCheck = await pool.query(`
         SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_event_facts' LIMIT 1
       `);
-      const oldTableCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_events' LIMIT 1
-      `);
-      const hasEventsTable = newTableCheck.rows.length > 0 || oldTableCheck.rows.length > 0;
-      checks['l1_events_exists'] = hasEventsTable;
+      const hasEventsTable = tableCheck.rows.length > 0;
+      checks['l1_event_facts_exists'] = hasEventsTable;
       if (!hasEventsTable) {
-        issues.push('Events table (l1_event_facts or l1_events) does not exist (run /api/admin/init-db to create it)');
+        issues.push('l1_event_facts table does not exist (run /api/admin/init-db to create it)');
       }
     } catch (e) {
-      checks['l1_events_exists'] = false;
-      issues.push(`Could not check events table: ${(e as Error).message}`);
+      checks['l1_event_facts_exists'] = false;
+      issues.push(`Could not check l1_event_facts table: ${(e as Error).message}`);
     }
 
     // 3. Check that analytics endpoints can read from source tables
