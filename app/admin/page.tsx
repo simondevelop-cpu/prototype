@@ -124,6 +124,12 @@ export default function AdminDashboard() {
   const [migrationPhase, setMigrationPhase] = useState<string>('');
   const [migrationResults, setMigrationResults] = useState<any>(null);
   
+  // State for Old Tables Cleanup
+  const [cleanupAnalysis, setCleanupAnalysis] = useState<any>(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupDropping, setCleanupDropping] = useState(false);
+  const [cleanupDropConfirm, setCleanupDropConfirm] = useState('');
+  
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
   const [bookings, setBookings] = useState<any[]>([]);
