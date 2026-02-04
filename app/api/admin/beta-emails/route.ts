@@ -61,14 +61,15 @@ export async function GET(request: NextRequest) {
     // Get all existing user emails that aren't in beta_emails yet
     // Use COALESCE to handle NULL emails
     const existingUsersResult = await pool.query(`
-      SELECT DISTINCT u.email, u.created_at, 'system' as added_by
-      FROM users u
-      WHERE u.email IS NOT NULL
-        AND u.email != ''
-        AND LOWER(TRIM(u.email)) NOT IN (
+      SELECT DISTINCT pii.email, perm.created_at, 'system' as added_by
+      FROM l1_user_permissions perm
+      JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+      WHERE pii.email IS NOT NULL
+        AND pii.email != ''
+        AND LOWER(TRIM(pii.email)) NOT IN (
           SELECT LOWER(TRIM(email)) FROM beta_emails WHERE email IS NOT NULL
         )
-      ORDER BY u.created_at DESC
+      ORDER BY perm.created_at DESC
     `);
 
     // Combine both lists, marking which are explicitly added vs existing users

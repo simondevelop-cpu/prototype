@@ -84,11 +84,13 @@ export async function GET(request: NextRequest) {
       if (hasCompletedAt) {
         const usersDataCheck = await pool.query(`
           SELECT COUNT(*) as count
-          FROM users
-          WHERE (completed_at IS NOT NULL 
-            OR motivation IS NOT NULL 
-            OR emotional_state IS NOT NULL)
-          AND email != $1
+          FROM onboarding_responses o
+          JOIN l1_user_permissions perm ON o.user_id = perm.id
+          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+          WHERE (o.completed_at IS NOT NULL 
+            OR o.motivation IS NOT NULL 
+            OR o.emotional_state IS NOT NULL)
+          AND pii.email != $1
         `, [ADMIN_EMAIL]);
         const usersWithData = parseInt(usersDataCheck.rows[0]?.count || '0', 10);
         useUsersTable = usersWithData > 0;
@@ -212,9 +214,12 @@ export async function GET(request: NextRequest) {
     `;
 
     const fromClause = useL0PII 
-      ? `FROM users u
-         LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL`
-      : `FROM users u`;
+      ? `FROM l1_user_permissions perm
+         JOIN l0_pii_users p ON perm.id = p.internal_user_id AND p.deleted_at IS NULL
+         LEFT JOIN onboarding_responses o ON perm.id = o.user_id`
+      : `FROM l1_user_permissions perm
+         JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+         LEFT JOIN onboarding_responses o ON perm.id = o.user_id`;
 
     console.log('[Customer Data API] Querying users table, useL0PII:', useL0PII, 'hasLastStep:', hasLastStep, 'hasAcquisitionOther:', hasAcquisitionOther, 'hasUploadSessionId:', hasUploadSessionId);
     
