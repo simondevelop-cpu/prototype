@@ -51,6 +51,51 @@ export async function POST(request: NextRequest) {
       tableName = 'chat_bookings'; // Fallback on error
     }
 
+    // Fix foreign key constraint if it references users.id instead of l1_user_permissions.id
+    try {
+      const fkCheck = await pool.query(`
+        SELECT
+          tc.constraint_name,
+          ccu.table_name AS referenced_table
+        FROM information_schema.table_constraints AS tc
+        JOIN information_schema.key_column_usage AS kcu
+          ON tc.constraint_name = kcu.constraint_name
+          AND tc.table_schema = kcu.table_schema
+        JOIN information_schema.constraint_column_usage AS ccu
+          ON ccu.constraint_name = tc.constraint_name
+          AND ccu.table_schema = tc.table_schema
+        WHERE tc.constraint_type = 'FOREIGN KEY'
+          AND tc.table_name = $1
+          AND kcu.column_name = 'user_id'
+      `, [tableName]);
+
+      // If foreign key references users instead of l1_user_permissions, fix it
+      if (fkCheck.rows.length > 0) {
+        const fk = fkCheck.rows[0];
+        if (fk.referenced_table === 'users') {
+          const constraintName = fk.constraint_name;
+          // Drop old constraint
+          await pool.query(`
+            ALTER TABLE ${tableName}
+            DROP CONSTRAINT IF EXISTS ${constraintName}
+          `);
+          // Add new constraint pointing to l1_user_permissions
+          const newConstraintName = `${tableName}_user_id_fkey`;
+          await pool.query(`
+            ALTER TABLE ${tableName}
+            ADD CONSTRAINT ${newConstraintName}
+            FOREIGN KEY (user_id)
+            REFERENCES l1_user_permissions(id)
+            ON DELETE CASCADE
+          `);
+          console.log(`[API] Fixed foreign key constraint on ${tableName} to reference l1_user_permissions`);
+        }
+      }
+    } catch (fkError: any) {
+      // Log but don't fail - constraint might already be correct or table might not exist
+      console.warn('[API] Could not check/fix foreign key constraint:', fkError.message);
+    }
+
     // Check if table exists and has correct constraint
     try {
       const tableExists = await pool.query(`
