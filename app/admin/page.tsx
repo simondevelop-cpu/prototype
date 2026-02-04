@@ -1924,7 +1924,7 @@ export default function AdminDashboard() {
   };
 
   // Render Migration Tab - Simplified: Only cleanup and data migration verification
-  const renderMigrationTab = (): JSX.Element => {
+  const renderMigrationTab = () => {
     return (
       <div className="space-y-6">
         <div className="bg-white rounded-lg shadow p-6">
