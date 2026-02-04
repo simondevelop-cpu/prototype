@@ -29,14 +29,38 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch recategorization logs
-    // First check if the table and columns exist
-    const tableCheck = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'categorization_learning'
-    `);
+    // Check for l2_user_categorization_learning (new) or admin_categorization_learning (old) or categorization_learning (legacy)
+    let learningTable = 'l2_user_categorization_learning';
+    let hasTable = false;
+    try {
+      const newTableCheck = await pool.query(`
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'l2_user_categorization_learning' LIMIT 1
+      `);
+      if (newTableCheck.rows.length > 0) {
+        learningTable = 'l2_user_categorization_learning';
+        hasTable = true;
+      } else {
+        const adminTableCheck = await pool.query(`
+          SELECT 1 FROM information_schema.tables WHERE table_name = 'admin_categorization_learning' LIMIT 1
+        `);
+        if (adminTableCheck.rows.length > 0) {
+          learningTable = 'admin_categorization_learning';
+          hasTable = true;
+        } else {
+          const legacyTableCheck = await pool.query(`
+            SELECT 1 FROM information_schema.tables WHERE table_name = 'categorization_learning' LIMIT 1
+          `);
+          if (legacyTableCheck.rows.length > 0) {
+            learningTable = 'categorization_learning';
+            hasTable = true;
+          }
+        }
+      }
+    } catch (e) {
+      // Table check failed
+    }
     
-    if (tableCheck.rows.length === 0) {
+    if (!hasTable) {
       // Table doesn't exist yet
       return NextResponse.json({
         recategorizations: [],
@@ -44,6 +68,13 @@ export async function GET(request: NextRequest) {
         warning: 'Categorization learning table not initialized yet',
       });
     }
+    
+    // Check columns for the determined table
+    const tableCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = $1
+    `, [learningTable]);
     
     const columns = tableCheck.rows.map(row => row.column_name);
     const hasRequiredColumns = 
@@ -78,7 +109,7 @@ export async function GET(request: NextRequest) {
     
     const result = await pool.query(`
       SELECT ${selectFields.join(', ')}
-      FROM categorization_learning cl
+      FROM ${learningTable} cl
       JOIN users u ON cl.user_id = u.id
       ORDER BY ${columns.includes('last_used') ? 'cl.last_used' : 'cl.created_at'} DESC
     `);
