@@ -29,29 +29,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Ensure chat_bookings table exists
-    try {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS chat_bookings (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          booking_date DATE NOT NULL,
-          booking_time TIME NOT NULL,
-          preferred_method TEXT NOT NULL CHECK (preferred_method IN ('teams', 'google-meet', 'phone')),
-          share_screen BOOLEAN,
-          record_conversation BOOLEAN,
-          notes TEXT,
-          status TEXT DEFAULT 'requested' CHECK (status IN ('pending', 'requested', 'confirmed', 'cancelled', 'completed')),
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(booking_date, booking_time)
-        )
-      `);
-    } catch (createError: any) {
-      console.error('[API] Error ensuring chat_bookings table exists:', createError);
-      // Continue anyway - might already exist
-    }
-
     // Use new table name (l1_admin_chat_bookings) with fallback to old name
     let tableName = 'l1_admin_chat_bookings';
     try {

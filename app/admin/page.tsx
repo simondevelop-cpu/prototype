@@ -2939,39 +2939,9 @@ export default function AdminDashboard() {
                 <button
                   onClick={fetchCohortAnalysis}
                   disabled={cohortLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                  className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
                 >
                   {cohortLoading ? 'Loading...' : 'Refresh Data'}
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      const token = localStorage.getItem('admin_token');
-                      const response = await fetch('/api/admin/export/cohort-vanity', {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                      });
-                      if (!response.ok) {
-                        const error = await response.json();
-                        alert(`Failed to export data: ${error.error || 'Unknown error'}`);
-                        return;
-                      }
-                      const blob = await response.blob();
-                      const url = window.URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `cohort-vanity-metrics-${new Date().toISOString().split('T')[0]}.xlsx`;
-                      document.body.appendChild(a);
-                      a.click();
-                      window.URL.revokeObjectURL(url);
-                      document.body.removeChild(a);
-                    } catch (error: any) {
-                      console.error('Error exporting data:', error);
-                      alert(`Error exporting data: ${error.message || 'Unknown error'}`);
-                    }
-                  }}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
-                >
-                  ⬇️ Download Cohort Data
                 </button>
               </div>
             </div>
@@ -3798,39 +3768,9 @@ export default function AdminDashboard() {
                   <button
                     onClick={fetchVanityMetrics}
                     disabled={vanityLoading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                    className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
                   >
                     {vanityLoading ? 'Loading...' : 'Refresh'}
-                  </button>
-                  <button
-                    onClick={async () => {
-                      try {
-                        const token = localStorage.getItem('admin_token');
-                        const response = await fetch('/api/admin/export/cohort-vanity', {
-                          headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        if (!response.ok) {
-                          const error = await response.json();
-                          alert(`Failed to export data: ${error.error || 'Unknown error'}`);
-                          return;
-                        }
-                        const blob = await response.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `cohort-vanity-metrics-${new Date().toISOString().split('T')[0]}.xlsx`;
-                        document.body.appendChild(a);
-                        a.click();
-                        window.URL.revokeObjectURL(url);
-                        document.body.removeChild(a);
-                      } catch (error: any) {
-                        console.error('Error exporting data:', error);
-                        alert(`Error exporting data: ${error.message || 'Unknown error'}`);
-                      }
-                    }}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
-                  >
-                    ⬇️ Download Vanity Metrics Data
                   </button>
                 </div>
               </div>
@@ -4110,6 +4050,44 @@ export default function AdminDashboard() {
               <p className="text-gray-600 mt-1">Export raw database data or API documentation</p>
             </div>
             <div className="p-6 space-y-6">
+              {/* Export Cohort & Vanity Metrics */}
+              <div className="border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export Cohort Analysis & Vanity Metrics</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Download combined Excel file with Cohort Analysis and Vanity Metrics data details sheets.
+                </p>
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('admin_token');
+                      const response = await fetch('/api/admin/export/cohort-vanity', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      });
+                      if (!response.ok) {
+                        const error = await response.json();
+                        alert(`Failed to export data: ${error.error || 'Unknown error'}`);
+                        return;
+                      }
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `cohort-vanity-metrics-${new Date().toISOString().split('T')[0]}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      document.body.removeChild(a);
+                    } catch (error: any) {
+                      console.error('Error exporting data:', error);
+                      alert(`Error exporting data: ${error.message || 'Unknown error'}`);
+                    }
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  ⬇️ Download Cohort & Vanity Metrics (Excel)
+                </button>
+              </div>
+
               {/* Export All Raw Data */}
               <div className="border border-gray-200 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Export all raw data</h3>
