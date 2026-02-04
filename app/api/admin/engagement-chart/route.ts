@@ -102,9 +102,20 @@ export async function GET(request: NextRequest) {
       paramIndex++;
     }
 
-    if (filters.intentCategories && filters.intentCategories.length > 0) {
+    // Check if onboarding_responses table exists
+    const onboardingTableCheck = await pool.query(`
+      SELECT 1 FROM information_schema.tables 
+      WHERE table_name IN ('onboarding_responses', 'l1_onboarding_responses')
+      LIMIT 1
+    `);
+    const onboardingResponsesExists = onboardingTableCheck.rows.length > 0;
+    const onboardingTableName = onboardingTableCheck.rows.length > 0 
+      ? (await pool.query(`SELECT table_name FROM information_schema.tables WHERE table_name IN ('onboarding_responses', 'l1_onboarding_responses') LIMIT 1`)).rows[0]?.table_name || 'onboarding_responses'
+      : null;
+
+    if (filters.intentCategories && filters.intentCategories.length > 0 && onboardingResponsesExists && onboardingTableName) {
       filterConditions += ` AND EXISTS (
-        SELECT 1 FROM onboarding_responses o 
+        SELECT 1 FROM ${onboardingTableName} o 
         WHERE o.user_id = perm.id 
         AND o.motivation = ANY($${paramIndex}::text[])
       )`;
@@ -179,7 +190,7 @@ export async function GET(request: NextRequest) {
         ) as upload_count
       FROM l1_user_permissions perm
       JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
-      LEFT JOIN onboarding_responses o ON perm.id = o.user_id
+      ${onboardingResponsesExists && onboardingTableName ? `LEFT JOIN ${onboardingTableName} o ON perm.id = o.user_id` : ''}
       WHERE pii.email != $${paramIndex}
         ${filterConditions}
       ORDER BY perm.created_at DESC

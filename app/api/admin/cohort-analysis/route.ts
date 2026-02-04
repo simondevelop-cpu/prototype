@@ -82,13 +82,14 @@ export async function GET(request: NextRequest) {
     `);
     const hasEmailValidated = emailValidatedCheck.rows.length > 0;
     
-    // Check if onboarding_responses table exists
+    // Check if onboarding_responses table exists and get the correct table name
     const onboardingTableCheck = await pool.query(`
-      SELECT 1 FROM information_schema.tables 
+      SELECT table_name FROM information_schema.tables 
       WHERE table_name IN ('onboarding_responses', 'l1_onboarding_responses')
       LIMIT 1
     `);
     const onboardingResponsesExists = onboardingTableCheck.rows.length > 0;
+    const onboardingTableName = onboardingResponsesExists ? onboardingTableCheck.rows[0].table_name : null;
 
     // Build filter conditions
     let filterConditions = '';
@@ -163,7 +164,7 @@ export async function GET(request: NextRequest) {
         AVG(EXTRACT(EPOCH FROM (o.completed_at - perm.created_at)) / 86400) FILTER (WHERE o.completed_at IS NOT NULL) as avg_time_to_onboard_days
       FROM l1_user_permissions perm
       JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
-      LEFT JOIN onboarding_responses o ON perm.id = o.user_id
+      ${onboardingTableName ? `LEFT JOIN ${onboardingTableName} o ON perm.id = o.user_id` : ''}
       WHERE pii.email != $${paramIndex}
         ${filterConditions}
       GROUP BY DATE_TRUNC('week', perm.created_at)
@@ -180,10 +181,10 @@ export async function GET(request: NextRequest) {
         0 as count_drop_off_step_5,
         0 as count_drop_off_step_6,
         0 as count_drop_off_step_7,
-        COUNT(*) FILTER (WHERE EXISTS (
-          SELECT 1 FROM onboarding_responses o 
+        ${onboardingTableName ? `COUNT(*) FILTER (WHERE EXISTS (
+          SELECT 1 FROM ${onboardingTableName} o 
           WHERE o.user_id = perm.id AND o.completed_at IS NOT NULL
-        )) as count_completed_onboarding,
+        ))` : '0'} as count_completed_onboarding,
         NULL as avg_time_to_onboard_days
       FROM l1_user_permissions perm
       JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
@@ -346,7 +347,7 @@ export async function GET(request: NextRequest) {
         COUNT(DISTINCT CASE WHEN transaction_counts.tx_count > 0 THEN perm.id END) as users_with_transactions
       FROM l1_user_permissions perm
       JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
-      LEFT JOIN onboarding_responses o ON perm.id = o.user_id
+      ${onboardingTableName ? `LEFT JOIN ${onboardingTableName} o ON perm.id = o.user_id` : ''}
       LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
       LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
       LEFT JOIN (
@@ -383,10 +384,10 @@ export async function GET(request: NextRequest) {
     ` : `
       SELECT 
         DATE_TRUNC('week', perm.created_at) as signup_week,
-        COUNT(*) FILTER (WHERE EXISTS (
-          SELECT 1 FROM onboarding_responses o 
+        ${onboardingTableName ? `COUNT(*) FILTER (WHERE EXISTS (
+          SELECT 1 FROM ${onboardingTableName} o 
           WHERE o.user_id = perm.id AND o.completed_at IS NOT NULL
-        )) as onboarding_completed,
+        ))` : '0'} as onboarding_completed,
         COUNT(DISTINCT CASE WHEN tf.id IS NOT NULL THEN perm.id END) as uploaded_first_statement,
         0 as uploaded_two_statements,
         0 as uploaded_three_plus_statements,

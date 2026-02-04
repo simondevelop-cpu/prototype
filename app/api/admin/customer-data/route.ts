@@ -168,56 +168,54 @@ export async function GET(request: NextRequest) {
     // Use appropriate table based on where data exists
     let result;
     
-    if (useUsersTable) {
-      // Use users table (post-migration) - Include ALL variables used in dashboard
-      // Add transaction counts, upload counts, and first transaction date for cohort analysis
-      const selectFields = useL0PII ? `
-      u.id as user_id,
-      COALESCE(p.email, u.email) as email,
+    // Always use new table structure (l1_user_permissions + l0_pii_users + onboarding_responses)
+    const selectFields = useL0PII ? `
+      perm.id as user_id,
+      pii.email,
       p.first_name,
       p.last_name,
       p.date_of_birth,
       p.recovery_phone,
       p.province_region,
-      u.emotional_state,
-      u.financial_context,
-      u.motivation,
-      u.motivation_other,
-      u.acquisition_source,
-      ${hasAcquisitionOther ? 'u.acquisition_other,' : ''}
-      u.insight_preferences,
-      u.insight_other,
-      ${hasLastStep ? 'u.last_step,' : ''}
-      ${hasIsActive ? 'u.is_active,' : 'true as is_active,'}
-      ${hasEmailValidated ? 'u.email_validated,' : 'false as email_validated,'}
-      u.completed_at,
-      u.created_at,
-      u.updated_at,
+      o.emotional_state,
+      o.financial_context,
+      o.motivation,
+      o.motivation_other,
+      o.acquisition_source,
+      ${hasAcquisitionOther ? 'o.acquisition_other,' : ''}
+      o.insight_preferences,
+      o.insight_other,
+      ${hasLastStep ? 'o.last_step,' : ''}
+      ${hasIsActive ? 'perm.is_active,' : 'true as is_active,'}
+      ${hasEmailValidated ? 'perm.email_validated,' : 'false as email_validated,'}
+      o.completed_at,
+      perm.created_at,
+      perm.updated_at,
       COALESCE(transaction_stats.transaction_count, 0) as transaction_count,
       COALESCE(transaction_stats.upload_session_count, 0) as upload_session_count,
       transaction_stats.first_transaction_date
     ` : `
-      u.id as user_id,
-      u.email,
+      perm.id as user_id,
+      pii.email,
       NULL as first_name,
       NULL as last_name,
       NULL as date_of_birth,
       NULL as recovery_phone,
       NULL as province_region,
-      u.emotional_state,
-      u.financial_context,
-      u.motivation,
-      u.motivation_other,
-      u.acquisition_source,
-      ${hasAcquisitionOther ? 'u.acquisition_other,' : ''}
-      u.insight_preferences,
-      u.insight_other,
-      ${hasLastStep ? 'u.last_step,' : ''}
-      ${hasIsActive ? 'u.is_active,' : 'true as is_active,'}
-      ${hasEmailValidated ? 'u.email_validated,' : 'false as email_validated,'}
-      u.completed_at,
-      u.created_at,
-      u.updated_at,
+      o.emotional_state,
+      o.financial_context,
+      o.motivation,
+      o.motivation_other,
+      o.acquisition_source,
+      ${hasAcquisitionOther ? 'o.acquisition_other,' : ''}
+      o.insight_preferences,
+      o.insight_other,
+      ${hasLastStep ? 'o.last_step,' : ''}
+      ${hasIsActive ? 'perm.is_active,' : 'true as is_active,'}
+      ${hasEmailValidated ? 'perm.email_validated,' : 'false as email_validated,'}
+      o.completed_at,
+      perm.created_at,
+      perm.updated_at,
       COALESCE(transaction_stats.transaction_count, 0) as transaction_count,
       COALESCE(transaction_stats.upload_session_count, 0) as upload_session_count,
       transaction_stats.first_transaction_date
@@ -225,25 +223,14 @@ export async function GET(request: NextRequest) {
 
     const fromClause = useL0PII 
       ? `FROM l1_user_permissions perm
-         JOIN l0_pii_users p ON perm.id = p.internal_user_id AND p.deleted_at IS NULL
-         LEFT JOIN onboarding_responses o ON perm.id = o.user_id`
+         JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+         LEFT JOIN l0_pii_users p ON perm.id = p.internal_user_id AND p.deleted_at IS NULL
+         LEFT JOIN ${onboardingTableForQuery} o ON perm.id = o.user_id`
       : `FROM l1_user_permissions perm
          JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
-         LEFT JOIN onboarding_responses o ON perm.id = o.user_id`;
+         LEFT JOIN ${onboardingTableForQuery} o ON perm.id = o.user_id`;
 
     console.log('[Customer Data API] Querying users table, useL0PII:', useL0PII, 'hasLastStep:', hasLastStep, 'hasAcquisitionOther:', hasAcquisitionOther, 'hasUploadSessionId:', hasUploadSessionId);
-    
-    // First, test if we can query users at all
-    try {
-      const testQuery = await pool.query(`
-        SELECT COUNT(*) as count
-        FROM users
-        WHERE email != $1
-      `, [ADMIN_EMAIL]);
-      console.log('[Customer Data API] Test query found', testQuery.rows[0]?.count, 'total users');
-    } catch (testError) {
-      console.error('[Customer Data API] Test query failed:', testError);
-    }
     
       // Build transaction stats subquery - Single source of truth (l1_transaction_facts only)
       const transactionStatsQuery = `
@@ -252,8 +239,8 @@ export async function GET(request: NextRequest) {
           COUNT(DISTINCT tf.id) as transaction_count,
           0 as upload_session_count,
           MIN(tf.created_at) as first_transaction_date
-        FROM users u
-        LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+        FROM l1_user_permissions perm2
+        LEFT JOIN l0_user_tokenization ut ON perm2.id = ut.internal_user_id
         LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
         GROUP BY ut.internal_user_id
         HAVING COUNT(DISTINCT tf.id) > 0
@@ -266,9 +253,9 @@ export async function GET(request: NextRequest) {
         ${fromClause}
         LEFT JOIN (
           ${transactionStatsQuery}
-        ) transaction_stats ON transaction_stats.user_id = u.id
-        WHERE u.email != $1
-        ORDER BY u.completed_at DESC NULLS LAST, u.created_at DESC
+        ) transaction_stats ON transaction_stats.user_id = perm.id
+        WHERE pii.email != $1
+        ORDER BY o.completed_at DESC NULLS LAST, perm.created_at DESC
       `;
       console.log('[Customer Data API] Query preview:', fullQuery.substring(0, 500));
       
@@ -329,8 +316,8 @@ export async function GET(request: NextRequest) {
       }
       
       const selectFields = useL0PII ? `
-        u.id as user_id,
-        COALESCE(p.email, u.email) as email,
+        perm.id as user_id,
+        pii.email,
         p.first_name,
         p.last_name,
         p.date_of_birth,
@@ -345,22 +332,22 @@ export async function GET(request: NextRequest) {
         o.insight_preferences,
         o.insight_other,
         ${onboardingHasLastStep ? 'o.last_step,' : ''}
-        false as is_active,
-        false as email_validated,
+        COALESCE(perm.is_active, false) as is_active,
+        COALESCE(perm.email_validated, false) as email_validated,
         o.completed_at,
-        COALESCE(p.created_at, u.created_at) as created_at,
-        COALESCE(p.updated_at, o.updated_at) as updated_at,
+        perm.created_at,
+        COALESCE(p.updated_at, o.updated_at, perm.updated_at) as updated_at,
         COALESCE(transaction_stats.transaction_count, 0) as transaction_count,
         COALESCE(transaction_stats.upload_session_count, 0) as upload_session_count,
         transaction_stats.first_transaction_date
       ` : `
-        u.id as user_id,
-        u.email,
-        p.first_name,
-        p.last_name,
-        p.date_of_birth,
-        p.recovery_phone,
-        p.province_region,
+        perm.id as user_id,
+        pii.email,
+        NULL as first_name,
+        NULL as last_name,
+        NULL as date_of_birth,
+        NULL as recovery_phone,
+        NULL as province_region,
         o.emotional_state,
         o.financial_context,
         o.motivation,
@@ -370,19 +357,24 @@ export async function GET(request: NextRequest) {
         o.insight_preferences,
         o.insight_other,
         ${onboardingHasLastStep ? 'o.last_step,' : ''}
-        false as is_active,
-        false as email_validated,
+        COALESCE(perm.is_active, false) as is_active,
+        COALESCE(perm.email_validated, false) as email_validated,
         o.completed_at,
-        o.created_at,
-        o.updated_at,
+        perm.created_at,
+        COALESCE(o.updated_at, perm.updated_at) as updated_at,
         COALESCE(transaction_stats.transaction_count, 0) as transaction_count,
         COALESCE(transaction_stats.upload_session_count, 0) as upload_session_count,
         transaction_stats.first_transaction_date
       `;
 
-      const fromClause = `FROM users u
-           LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
-           INNER JOIN ${onboardingTable} o ON o.user_id = u.id`;
+      const fromClause = useL0PII
+        ? `FROM l1_user_permissions perm
+           JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+           LEFT JOIN l0_pii_users p ON perm.id = p.internal_user_id AND p.deleted_at IS NULL
+           INNER JOIN ${onboardingTable} o ON o.user_id = perm.id`
+        : `FROM l1_user_permissions perm
+           JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+           INNER JOIN ${onboardingTable} o ON o.user_id = perm.id`;
 
       // Build transaction stats subquery - Single source of truth (l1_transaction_facts only)
       const transactionStatsQuery = `
@@ -391,8 +383,8 @@ export async function GET(request: NextRequest) {
           COUNT(DISTINCT tf.id) as transaction_count,
           0 as upload_session_count,
           MIN(tf.created_at) as first_transaction_date
-        FROM users u
-        LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+        FROM l1_user_permissions perm2
+        LEFT JOIN l0_user_tokenization ut ON perm2.id = ut.internal_user_id
         LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
         GROUP BY ut.internal_user_id
         HAVING COUNT(DISTINCT tf.id) > 0
@@ -403,9 +395,9 @@ export async function GET(request: NextRequest) {
         ${fromClause}
         LEFT JOIN (
           ${transactionStatsQuery}
-        ) transaction_stats ON transaction_stats.user_id = u.id
-        WHERE u.email != $1
-        ORDER BY o.completed_at DESC NULLS LAST, u.created_at DESC
+        ) transaction_stats ON transaction_stats.user_id = perm.id
+        WHERE pii.email != $1
+        ORDER BY o.completed_at DESC NULLS LAST, perm.created_at DESC
       `, [ADMIN_EMAIL]);
       
       console.log(`[Customer Data API] Returning ${result.rows.length} customer records from onboarding_responses table`);
