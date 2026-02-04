@@ -1952,33 +1952,105 @@ export default function AdminDashboard() {
             onClick={() => setAnalyticsSubTab('cohort-analysis')}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
               analyticsSubTab === 'cohort-analysis'
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-red-800 font-medium">Error: {error}</p>
-                </div>
-                <button
-                  onClick={() => setError(null)}
-                  className="text-red-600 hover:text-red-800"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Cohort Analysis
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('customer-data')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'customer-data'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Customer Data
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('events-data')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'events-data'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Events Data
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('editing-events-data')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'editing-events-data'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Editing Events
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('sessions')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'sessions'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Sessions
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('vanity-metrics')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'vanity-metrics'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Vanity Metrics
+          </button>
+          <button
+            onClick={() => setAnalyticsSubTab('download')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              analyticsSubTab === 'download'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Download
+          </button>
+        </div>
 
-          {/* Data Migration Verification Section */}
-          <div className="mb-8 border-b border-gray-200 pb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Data Migration Verification</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Verify that data has been migrated from old tables to new tables for: categorization_learning, chat_bookings, and available_slots.
-                </p>
+        {/* Content based on sub-tab */}
+        {analyticsSubTab === 'cohort-analysis' && (
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Cohort Analysis</h3>
+            {cohortLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-600 mt-4">Loading cohort analysis...</p>
               </div>
-              <button
-                onClick={async () => {
+            ) : cohortData ? (
+              <div className="space-y-4">
+                {/* Cohort data display */}
+                <p className="text-gray-600">Cohort analysis data loaded</p>
+              </div>
+            ) : (
+              <p className="text-gray-600">Click "Generate Cohort Analysis" to load data</p>
+            )}
+          </div>
+        )}
+
+        {analyticsSubTab === 'customer-data' && renderPlaceholder('Customer Data')}
+        {analyticsSubTab === 'events-data' && renderPlaceholder('Events Data')}
+        {analyticsSubTab === 'editing-events-data' && renderPlaceholder('Editing Events Data')}
+        {analyticsSubTab === 'sessions' && renderPlaceholder('Sessions')}
+        {analyticsSubTab === 'vanity-metrics' && renderPlaceholder('Vanity Metrics')}
+        {analyticsSubTab === 'download' && renderPlaceholder('Download')}
+      </div>
+    );
+  };
+
+  // Render Analytics Tab
                   setDataMigrationLoading(true);
                   try {
                     const token = localStorage.getItem('admin_token');
