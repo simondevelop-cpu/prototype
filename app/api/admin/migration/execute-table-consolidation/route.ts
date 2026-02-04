@@ -10,15 +10,8 @@ export const dynamic = 'force-dynamic';
  * Migrates users table to l1_user_permissions and moves PII to l0_pii_users
  */
 export async function POST(request: NextRequest) {
-  const pool = getPool();
-  if (!pool) {
-    return NextResponse.json({ error: 'Database not available' }, { status: 500 });
-  }
-
-  const client = await pool.connect();
-
   try {
-    // Check admin authentication
+    // Check admin authentication first
     const authHeader = request.headers.get('authorization');
     const token = authHeader?.replace('Bearer ', '');
     
@@ -34,6 +27,13 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
+
+    const pool = getPool();
+    if (!pool) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 500 });
+    }
+
+    const client = await pool.connect();
 
     const results: any = {
       success: true,
@@ -139,32 +139,43 @@ export async function POST(request: NextRequest) {
 
       // Make internal_user_id the PRIMARY KEY if it's not already
       try {
-        await client.query(`
-          DO $$
-          BEGIN
-            -- Check if internal_user_id is already the primary key
-            IF NOT EXISTS (
-              SELECT 1 FROM information_schema.table_constraints
-              WHERE table_name = 'l0_pii_users'
-                AND constraint_type = 'PRIMARY KEY'
-                AND constraint_name LIKE '%internal_user_id%'
-            ) THEN
-              -- Drop the old id column if it exists and is the primary key
-              IF EXISTS (
-                SELECT 1 FROM information_schema.columns
-                WHERE table_name = 'l0_pii_users' AND column_name = 'id'
-              ) THEN
-                -- Remove primary key constraint from id if it exists
-                ALTER TABLE l0_pii_users DROP CONSTRAINT IF EXISTS l0_pii_users_pkey;
-                -- Drop id column
-                ALTER TABLE l0_pii_users DROP COLUMN IF EXISTS id;
-              END IF;
-              -- Make internal_user_id the primary key
-              ALTER TABLE l0_pii_users ADD CONSTRAINT l0_pii_users_pkey PRIMARY KEY (internal_user_id);
-            END IF;
-          END $$;
+        // Check if internal_user_id is already the primary key
+        const pkCheck = await client.query(`
+          SELECT constraint_name
+          FROM information_schema.table_constraints
+          WHERE table_name = 'l0_pii_users'
+            AND constraint_type = 'PRIMARY KEY'
         `);
+        
+        const hasInternalUserIdPK = pkCheck.rows.some((row: any) => 
+          row.constraint_name && row.constraint_name.includes('internal_user_id')
+        );
+        
+        if (!hasInternalUserIdPK) {
+          // Check if id column exists
+          const idColumnCheck = await client.query(`
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'l0_pii_users' AND column_name = 'id'
+          `);
+          
+          if (idColumnCheck.rows.length > 0) {
+            // Drop old primary key constraint if it exists
+            await client.query(`
+              ALTER TABLE l0_pii_users DROP CONSTRAINT IF EXISTS l0_pii_users_pkey
+            `);
+            // Drop id column
+            await client.query(`
+              ALTER TABLE l0_pii_users DROP COLUMN IF EXISTS id
+            `);
+          }
+          
+          // Make internal_user_id the primary key
+          await client.query(`
+            ALTER TABLE l0_pii_users ADD CONSTRAINT l0_pii_users_pkey PRIMARY KEY (internal_user_id)
+          `);
+        }
       } catch (e: any) {
+        console.error('[Migration] Error updating l0_pii_users primary key:', e);
         results.warnings.push(`Could not update l0_pii_users primary key: ${e.message}`);
       }
 
@@ -272,22 +283,34 @@ export async function POST(request: NextRequest) {
         try {
           // Drop old foreign key
           await client.query(`
-            ALTER TABLE ${fk.table_name}
-            DROP CONSTRAINT IF EXISTS ${fk.constraint_name}
+            ALTER TABLE "${fk.table_name}"
+            DROP CONSTRAINT IF EXISTS "${fk.constraint_name}"
           `);
           
-          // Add new foreign key pointing to l1_user_permissions
+          // Check if new constraint already exists
           const newConstraintName = `${fk.table_name}_user_id_fkey`;
-          await client.query(`
-            ALTER TABLE ${fk.table_name}
-            ADD CONSTRAINT ${newConstraintName}
-            FOREIGN KEY (${fk.column_name})
-            REFERENCES l1_user_permissions(id)
-            ON DELETE CASCADE
-          `);
+          const existingConstraintCheck = await client.query(`
+            SELECT constraint_name
+            FROM information_schema.table_constraints
+            WHERE table_name = $1
+              AND constraint_name = $2
+              AND constraint_type = 'FOREIGN KEY'
+          `, [fk.table_name, newConstraintName]);
+          
+          if (existingConstraintCheck.rows.length === 0) {
+            // Add new foreign key pointing to l1_user_permissions
+            await client.query(`
+              ALTER TABLE "${fk.table_name}"
+              ADD CONSTRAINT "${newConstraintName}"
+              FOREIGN KEY ("${fk.column_name}")
+              REFERENCES l1_user_permissions(id)
+              ON DELETE CASCADE
+            `);
+          }
           
           results.summary.foreignKeysUpdated++;
         } catch (e: any) {
+          console.error(`[Migration] Error updating foreign key ${fk.constraint_name} on ${fk.table_name}:`, e);
           results.warnings.push(`Could not update foreign key ${fk.constraint_name} on ${fk.table_name}: ${e.message}`);
         }
       }
@@ -331,19 +354,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(results, { status: 200 });
     } catch (error: any) {
       // Rollback on error
-      await client.query('ROLLBACK');
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError: any) {
+        console.error('[Migration] Error during rollback:', rollbackError);
+      }
+      
+      console.error('[Migration] Migration error:', {
+        message: error.message,
+        detail: error.detail,
+        hint: error.hint,
+        code: error.code,
+        stack: error.stack,
+      });
+      
       results.success = false;
-      results.errors.push(error.message);
+      results.errors.push(error.message || 'Unknown error');
+      if (error.detail) results.errors.push(`Detail: ${error.detail}`);
+      if (error.hint) results.errors.push(`Hint: ${error.hint}`);
+      
       results.steps.push({
         step: 'error',
         name: 'Migration failed',
         status: 'error',
-        message: error.message,
+        message: error.message || 'Unknown error occurred',
       });
       return NextResponse.json(results, { status: 500 });
+    } finally {
+      client.release();
     }
-  } finally {
-    client.release();
+  } catch (error: any) {
+    console.error('[Migration] Unexpected error:', error);
+    return NextResponse.json(
+      { 
+        error: 'Failed to execute migration', 
+        details: error.message,
+        success: false,
+        steps: [],
+        errors: [error.message],
+      },
+      { status: 500 }
+    );
   }
 }
 
