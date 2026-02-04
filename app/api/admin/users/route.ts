@@ -73,55 +73,71 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all users with transaction count, onboarding completion, and login attempts
+    // Use l1_user_permissions and l0_pii_users (post-migration)
     const selectFields = hasLoginAttempts 
-      ? 'u.id, u.email, u.created_at, COALESCE(u.login_attempts, 0) as login_attempts'
-      : 'u.id, u.email, u.created_at, 0 as login_attempts';
+      ? 'perm.id, pii.email, perm.created_at, COALESCE(perm.login_attempts, 0) as login_attempts'
+      : 'perm.id, pii.email, perm.created_at, 0 as login_attempts';
     
     const activeFields = hasIsActive && hasEmailValidated
-      ? ', COALESCE(u.is_active, true) as is_active, COALESCE(u.email_validated, false) as email_validated'
+      ? ', COALESCE(perm.is_active, true) as is_active, COALESCE(perm.email_validated, false) as email_validated'
       : hasIsActive
-      ? ', COALESCE(u.is_active, true) as is_active, false as email_validated'
+      ? ', COALESCE(perm.is_active, true) as is_active, false as email_validated'
       : hasEmailValidated
-      ? ', true as is_active, COALESCE(u.email_validated, false) as email_validated'
+      ? ', true as is_active, COALESCE(perm.email_validated, false) as email_validated'
       : ', true as is_active, false as email_validated';
     
     const groupByFields = hasLoginAttempts && hasIsActive && hasEmailValidated
-      ? 'u.id, u.email, u.created_at, u.login_attempts, u.is_active, u.email_validated'
+      ? 'perm.id, pii.email, perm.created_at, perm.login_attempts, perm.is_active, perm.email_validated'
       : hasLoginAttempts
-      ? 'u.id, u.email, u.created_at, u.login_attempts'
-      : 'u.id, u.email, u.created_at';
+      ? 'perm.id, pii.email, perm.created_at, perm.login_attempts'
+      : 'perm.id, pii.email, perm.created_at';
+
+    // Check if onboarding_responses table exists
+    let hasOnboardingTable = false;
+    try {
+      const onboardingCheck = await pool.query(`
+        SELECT COUNT(*) as count FROM information_schema.tables 
+        WHERE table_name IN ('onboarding_responses', 'l1_onboarding_responses')
+      `);
+      hasOnboardingTable = parseInt(onboardingCheck.rows[0]?.count || '0') > 0;
+    } catch (e) {
+      console.log('[Users API] Could not check onboarding table');
+    }
 
     let result;
-    if (useUsersTable) {
-      // Use users table - Single source of truth (l1_transaction_facts only)
+    if (hasOnboardingTable) {
+      // Use l1_user_permissions and l0_pii_users with onboarding_responses
       result = await pool.query(`
         SELECT 
           ${selectFields}${activeFields},
           COUNT(DISTINCT tf.id) as transaction_count,
           MAX(tf.created_at) as last_activity,
-          COUNT(DISTINCT CASE WHEN u.completed_at IS NOT NULL THEN u.id END) as completed_onboarding_count
-        FROM users u
-        LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          COUNT(DISTINCT CASE WHEN o.completed_at IS NOT NULL THEN perm.id END) as completed_onboarding_count
+        FROM l1_user_permissions perm
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
         LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-        WHERE u.email != $1
-        GROUP BY ${groupByFields}${hasIsActive && hasEmailValidated ? ', u.is_active, u.email_validated' : ''}
-        ORDER BY u.created_at DESC
+        LEFT JOIN onboarding_responses o ON perm.id = o.user_id
+        WHERE pii.email != $1
+        GROUP BY ${groupByFields}${hasIsActive && hasEmailValidated ? ', perm.is_active, perm.email_validated' : ''}
+        ORDER BY perm.created_at DESC
       `, [ADMIN_EMAIL]);
     } else {
-      // Fallback to onboarding_responses table (pre-migration) - Single source of truth (l1_transaction_facts only)
+      // No onboarding table - just get users without onboarding data
       result = await pool.query(`
         SELECT 
-          ${selectFields},
+          ${selectFields}${activeFields},
           COUNT(DISTINCT tf.id) as transaction_count,
           MAX(tf.created_at) as last_activity,
-          COUNT(DISTINCT CASE WHEN o.completed_at IS NOT NULL THEN o.id END) as completed_onboarding_count
-        FROM users u
-        LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+          0 as completed_onboarding_count
+        FROM l1_user_permissions perm
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
         LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-        LEFT JOIN onboarding_responses o ON u.id = o.user_id
-        GROUP BY ${groupByFields}
-        ORDER BY u.created_at DESC
-      `);
+        WHERE pii.email != $1
+        GROUP BY ${groupByFields}${hasIsActive && hasEmailValidated ? ', perm.is_active, perm.email_validated' : ''}
+        ORDER BY perm.created_at DESC
+      `, [ADMIN_EMAIL]);
     }
 
     const users = result.rows.map(row => {

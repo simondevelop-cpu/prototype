@@ -94,11 +94,15 @@ export async function GET(request: NextRequest) {
     let paramIndex = 1;
 
     if (filters.validatedEmails && hasEmailValidated) {
-      filterConditions += ` AND u.email_validated = true`;
+      filterConditions += ` AND perm.email_validated = true`;
     }
 
-    if (filters.intentCategories && filters.intentCategories.length > 0 && hasMotivation) {
-      filterConditions += ` AND u.motivation = ANY($${paramIndex}::text[])`;
+    if (filters.intentCategories && filters.intentCategories.length > 0) {
+      filterConditions += ` AND EXISTS (
+        SELECT 1 FROM onboarding_responses o 
+        WHERE o.user_id = perm.id 
+        AND o.motivation = ANY($${paramIndex}::text[])
+      )`;
       filterParams.push(filters.intentCategories);
       paramIndex++;
     }
@@ -126,9 +130,10 @@ export async function GET(request: NextRequest) {
     // Generate all weeks from earliest user to current week (same week calculation as cohort analysis)
     // Find the earliest user creation date
     const earliestUserCheck = await pool.query(`
-      SELECT MIN(created_at) as earliest_date
-      FROM users
-      WHERE email != $1
+      SELECT MIN(perm.created_at) as earliest_date
+      FROM l1_user_permissions perm
+      JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+      WHERE pii.email != $1
     `, [ADMIN_EMAIL]);
     
     const earliestDateStr = earliestUserCheck.rows[0]?.earliest_date;
@@ -231,8 +236,9 @@ export async function GET(request: NextRequest) {
       // Note: Cohort filter does NOT filter users - it only controls which columns are displayed
       const totalUsersQuery = `
         SELECT COUNT(*) as count
-        FROM users u
-        WHERE u.email != $${adminEmailParamIndex}
+        FROM l1_user_permissions perm
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email != $${adminEmailParamIndex}
           AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex}::date)
           ${filterConditions}
       `;
@@ -289,8 +295,9 @@ export async function GET(request: NextRequest) {
       // New users per week - use DATE_TRUNC to ensure proper date comparison
       const newUsersQuery = `
         SELECT COUNT(*) as count
-        FROM users u
-        WHERE u.email != $${adminEmailParamIndex}
+        FROM l1_user_permissions perm
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email != $${adminEmailParamIndex}
           AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
           AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
           ${filterConditions}
@@ -329,8 +336,9 @@ export async function GET(request: NextRequest) {
         SELECT COUNT(*) as count
         FROM l1_transaction_facts tf
         JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
-        JOIN users u ON ut.internal_user_id = u.id
-        WHERE u.email != $${adminEmailParamIndex}
+        JOIN l1_user_permissions perm ON ut.internal_user_id = perm.id
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email != $${adminEmailParamIndex}
           AND tf.created_at >= $${newTransactionsDateParamIndex}::timestamp
           AND tf.created_at <= $${newTransactionsDateParamIndex + 1}::timestamp
           ${filterConditions}
@@ -344,8 +352,9 @@ export async function GET(request: NextRequest) {
         SELECT COUNT(*) as count
         FROM l1_transaction_facts tf
         JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
-        JOIN users u ON ut.internal_user_id = u.id
-        WHERE u.email != $${adminEmailParamIndex}
+        JOIN l1_user_permissions perm ON ut.internal_user_id = perm.id
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email != $${adminEmailParamIndex}
           AND tf.created_at <= $${totalTransactionsDateParamIndex}::timestamp
           ${filterConditions}
       `;
@@ -429,8 +438,9 @@ export async function GET(request: NextRequest) {
         SELECT COUNT(DISTINCT tf.account) as count
         FROM l1_transaction_facts tf
         JOIN l0_user_tokenization ut ON tf.tokenized_user_id = ut.tokenized_user_id
-        JOIN users u ON ut.internal_user_id = u.id
-        WHERE u.email != $${adminEmailParamIndex}
+        JOIN l1_user_permissions perm ON ut.internal_user_id = perm.id
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email != $${adminEmailParamIndex}
           AND tf.created_at >= $${paramIndex}::timestamp
           AND tf.created_at <= $${paramIndex + 1}::timestamp
           AND tf.account IS NOT NULL
@@ -481,8 +491,9 @@ export async function GET(request: NextRequest) {
       
       const newUsersPerMonthQuery = `
         SELECT COUNT(*) as count
-        FROM users u
-        WHERE u.email != $${adminEmailParamIndex}
+        FROM l1_user_permissions perm
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        WHERE pii.email != $${adminEmailParamIndex}
           AND DATE_TRUNC('day', u.created_at) >= DATE_TRUNC('day', $${paramIndex}::date)
           AND DATE_TRUNC('day', u.created_at) <= DATE_TRUNC('day', $${paramIndex + 1}::date)
           ${filterConditions}

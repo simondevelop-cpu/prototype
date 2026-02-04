@@ -51,61 +51,44 @@ export async function GET(request: NextRequest) {
       dataCoverage: url.searchParams.get('dataCoverage')?.split(',').filter(Boolean) || [],
     };
 
-    // Check where data actually exists - be flexible
-    const schemaCheck = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'users' 
-      AND column_name IN ('completed_at', 'motivation', 'is_active', 'email_validated')
-    `);
-    
-    const hasCompletedAt = schemaCheck.rows.some(row => row.column_name === 'completed_at');
-    const hasMotivation = schemaCheck.rows.some(row => row.column_name === 'motivation');
-    const hasEmailValidated = schemaCheck.rows.some(row => row.column_name === 'email_validated');
-    
-    // Check if l1_onboarding_responses exists
-    const onboardingTableCheck = await pool.query(`
+    // Check if l1_user_permissions and l0_pii_users exist (post-migration)
+    const permissionsTableCheck = await pool.query(`
       SELECT 1 FROM information_schema.tables 
-      WHERE table_name = 'l1_onboarding_responses'
+      WHERE table_name = 'l1_user_permissions'
       LIMIT 1
     `);
-    const onboardingResponsesExists = onboardingTableCheck.rows.length > 0;
+    const piiTableCheck = await pool.query(`
+      SELECT 1 FROM information_schema.tables 
+      WHERE table_name = 'l0_pii_users'
+      LIMIT 1
+    `);
     
-    // Determine which table to use
-    let useUsersTable = false;
-    if (hasCompletedAt && hasMotivation) {
-      // Check if users table has data
-      const usersDataCheck = await pool.query(`
-        SELECT COUNT(*) as count
-        FROM users
-        WHERE (completed_at IS NOT NULL OR motivation IS NOT NULL)
-        AND email != $1
-      `, [ADMIN_EMAIL]);
-      const usersWithData = parseInt(usersDataCheck.rows[0]?.count || '0', 10);
-      useUsersTable = usersWithData > 0;
-      
-      // If no data in users, check l1_onboarding_responses
-      if (!useUsersTable && onboardingResponsesExists) {
-        const onboardingDataCheck = await pool.query(`
-          SELECT COUNT(*) as count FROM l1_onboarding_responses
-        `);
-        const onboardingCount = parseInt(onboardingDataCheck.rows[0]?.count || '0', 10);
-        if (onboardingCount > 0) {
-          useUsersTable = false; // Use l1_onboarding_responses
-        }
-      }
-    } else if (onboardingResponsesExists) {
-      useUsersTable = false; // Use l1_onboarding_responses
-    } else {
-      // No data source available
+    if (permissionsTableCheck.rows.length === 0 || piiTableCheck.rows.length === 0) {
       return NextResponse.json({
         success: true,
         activation: {},
         engagement: {},
         weeks: [],
-        message: 'No onboarding data found. Please ensure migration has been run and l1_onboarding_responses table exists.'
+        message: 'Migration not complete. l1_user_permissions and l0_pii_users tables required.'
       }, { status: 200 });
     }
+    
+    // Check if email_validated column exists in l1_user_permissions
+    const emailValidatedCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'l1_user_permissions' 
+      AND column_name = 'email_validated'
+    `);
+    const hasEmailValidated = emailValidatedCheck.rows.length > 0;
+    
+    // Check if onboarding_responses table exists
+    const onboardingTableCheck = await pool.query(`
+      SELECT 1 FROM information_schema.tables 
+      WHERE table_name IN ('onboarding_responses', 'l1_onboarding_responses')
+      LIMIT 1
+    `);
+    const onboardingResponsesExists = onboardingTableCheck.rows.length > 0;
 
     // Build filter conditions
     let filterConditions = '';
@@ -113,11 +96,16 @@ export async function GET(request: NextRequest) {
     let paramIndex = 1;
 
     if (filters.validatedEmails && hasEmailValidated) {
-      filterConditions += ` AND u.email_validated = true`;
+      filterConditions += ` AND perm.email_validated = true`;
     }
 
     if (filters.intentCategories && filters.intentCategories.length > 0) {
-      filterConditions += ` AND u.motivation = ANY($${paramIndex}::text[])`;
+      // Intent categories come from onboarding_responses.motivation
+      filterConditions += ` AND EXISTS (
+        SELECT 1 FROM onboarding_responses o 
+        WHERE o.user_id = perm.id 
+        AND o.motivation = ANY($${paramIndex}::text[])
+      )`;
       filterParams.push(filters.intentCategories);
       paramIndex++;
     }
@@ -145,7 +133,7 @@ export async function GET(request: NextRequest) {
           const weekStart = new Date(date);
           weekStart.setDate(date.getDate() - date.getDay());
           weekStart.setHours(0, 0, 0, 0);
-          return `(DATE_TRUNC('week', u.created_at) = DATE_TRUNC('week', $${paramIndex + idx}::timestamp))`;
+          return `(DATE_TRUNC('week', perm.created_at) = DATE_TRUNC('week', $${paramIndex + idx}::timestamp))`;
         }).join(' OR ');
         filterConditions += ` AND (${dateConditions})`;
         cohortDates.forEach(date => {
@@ -158,30 +146,32 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get activation metrics (onboarding steps) - from appropriate table
+    // Get activation metrics (onboarding steps) - from l1_user_permissions and onboarding_responses
     // Track all steps: 1=Emotional Calibration, 2=Financial Context, 3=Motivation, 4=Acquisition Source, 5=Insight Preferences, 6=Email Verification, 7=Account Profile
-    const activationQuery = useUsersTable ? `
+    const activationQuery = onboardingResponsesExists ? `
       SELECT 
-        DATE_TRUNC('week', u.created_at) as signup_week,
-        COUNT(*) FILTER (WHERE u.created_at IS NOT NULL) as count_starting_onboarding,
-        COUNT(*) FILTER (WHERE u.last_step = 1 AND u.completed_at IS NULL) as count_drop_off_step_1,
-        COUNT(*) FILTER (WHERE u.last_step = 2 AND u.completed_at IS NULL) as count_drop_off_step_2,
-        COUNT(*) FILTER (WHERE u.last_step = 3 AND u.completed_at IS NULL) as count_drop_off_step_3,
-        COUNT(*) FILTER (WHERE u.last_step = 4 AND u.completed_at IS NULL) as count_drop_off_step_4,
-        COUNT(*) FILTER (WHERE u.last_step = 5 AND u.completed_at IS NULL) as count_drop_off_step_5,
-        COUNT(*) FILTER (WHERE u.last_step = 6 AND u.completed_at IS NULL) as count_drop_off_step_6,
-        COUNT(*) FILTER (WHERE u.last_step = 7 AND u.completed_at IS NULL) as count_drop_off_step_7,
-        COUNT(*) FILTER (WHERE u.completed_at IS NOT NULL) as count_completed_onboarding,
-        AVG(EXTRACT(EPOCH FROM (u.completed_at - u.created_at)) / 86400) FILTER (WHERE u.completed_at IS NOT NULL) as avg_time_to_onboard_days
-      FROM users u
-      WHERE u.email != $${paramIndex}
+        DATE_TRUNC('week', perm.created_at) as signup_week,
+        COUNT(*) FILTER (WHERE perm.created_at IS NOT NULL) as count_starting_onboarding,
+        COUNT(*) FILTER (WHERE o.last_step = 1 AND o.completed_at IS NULL) as count_drop_off_step_1,
+        COUNT(*) FILTER (WHERE o.last_step = 2 AND o.completed_at IS NULL) as count_drop_off_step_2,
+        COUNT(*) FILTER (WHERE o.last_step = 3 AND o.completed_at IS NULL) as count_drop_off_step_3,
+        COUNT(*) FILTER (WHERE o.last_step = 4 AND o.completed_at IS NULL) as count_drop_off_step_4,
+        COUNT(*) FILTER (WHERE o.last_step = 5 AND o.completed_at IS NULL) as count_drop_off_step_5,
+        COUNT(*) FILTER (WHERE o.last_step = 6 AND o.completed_at IS NULL) as count_drop_off_step_6,
+        COUNT(*) FILTER (WHERE o.last_step = 7 AND o.completed_at IS NULL) as count_drop_off_step_7,
+        COUNT(*) FILTER (WHERE o.completed_at IS NOT NULL) as count_completed_onboarding,
+        AVG(EXTRACT(EPOCH FROM (o.completed_at - perm.created_at)) / 86400) FILTER (WHERE o.completed_at IS NOT NULL) as avg_time_to_onboard_days
+      FROM l1_user_permissions perm
+      JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+      LEFT JOIN onboarding_responses o ON perm.id = o.user_id
+      WHERE pii.email != $${paramIndex}
         ${filterConditions}
-      GROUP BY DATE_TRUNC('week', u.created_at)
+      GROUP BY DATE_TRUNC('week', perm.created_at)
       ORDER BY signup_week DESC
       LIMIT 12
     ` : `
       SELECT 
-        DATE_TRUNC('week', u.created_at) as signup_week,
+        DATE_TRUNC('week', perm.created_at) as signup_week,
         COUNT(*) as count_starting_onboarding,
         0 as count_drop_off_step_1,
         0 as count_drop_off_step_2,
@@ -191,14 +181,15 @@ export async function GET(request: NextRequest) {
         0 as count_drop_off_step_6,
         0 as count_drop_off_step_7,
         COUNT(*) FILTER (WHERE EXISTS (
-          SELECT 1 FROM l1_onboarding_responses o 
-          WHERE o.user_id = u.id AND o.completed_at IS NOT NULL
+          SELECT 1 FROM onboarding_responses o 
+          WHERE o.user_id = perm.id AND o.completed_at IS NOT NULL
         )) as count_completed_onboarding,
         NULL as avg_time_to_onboard_days
-      FROM users u
-      WHERE u.email != $${paramIndex}
+      FROM l1_user_permissions perm
+      JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+      WHERE pii.email != $${paramIndex}
         ${filterConditions}
-      GROUP BY DATE_TRUNC('week', u.created_at)
+      GROUP BY DATE_TRUNC('week', perm.created_at)
       ORDER BY signup_week DESC
       LIMIT 12
     `;
@@ -296,8 +287,8 @@ export async function GET(request: NextRequest) {
       SELECT 
         ut.internal_user_id as user_id,
         COUNT(DISTINCT tf.id) as upload_count
-      FROM users u
-      LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+      FROM l1_user_permissions perm
+      LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
       LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
       WHERE tf.id IS NOT NULL
       GROUP BY ut.internal_user_id
@@ -323,8 +314,8 @@ export async function GET(request: NextRequest) {
             ELSE NULL
           END
         ) as unique_bank_count
-      FROM users u
-      LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+      FROM l1_user_permissions perm
+      LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
       LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
       WHERE tf.account IS NOT NULL
       GROUP BY ut.internal_user_id
@@ -332,69 +323,69 @@ export async function GET(request: NextRequest) {
     
     const engagementQuery = useUsersTable ? `
       SELECT 
-        DATE_TRUNC('week', u.created_at) as signup_week,
+        DATE_TRUNC('week', perm.created_at) as signup_week,
         -- Onboarding and data coverage
-        COUNT(DISTINCT u.id) FILTER (WHERE u.completed_at IS NOT NULL) as onboarding_completed,
-        COUNT(DISTINCT CASE WHEN tf.id IS NOT NULL THEN u.id END) as uploaded_first_statement,
+        COUNT(DISTINCT perm.id) FILTER (WHERE o.completed_at IS NOT NULL) as onboarding_completed,
+        COUNT(DISTINCT CASE WHEN tf.id IS NOT NULL THEN perm.id END) as uploaded_first_statement,
         COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 2 THEN upload_counts.user_id END) as uploaded_two_statements,
         COUNT(DISTINCT CASE WHEN upload_counts.upload_count >= 3 THEN upload_counts.user_id END) as uploaded_three_plus_statements,
         -- Unique banks metrics
-        COUNT(DISTINCT CASE WHEN bank_counts.unique_bank_count >= 2 THEN u.id END) as uploaded_more_than_one_bank,
-        COUNT(DISTINCT CASE WHEN bank_counts.unique_bank_count >= 3 THEN u.id END) as uploaded_more_than_two_banks,
+        COUNT(DISTINCT CASE WHEN bank_counts.unique_bank_count >= 2 THEN perm.id END) as uploaded_more_than_one_bank,
+        COUNT(DISTINCT CASE WHEN bank_counts.unique_bank_count >= 3 THEN perm.id END) as uploaded_more_than_two_banks,
         -- Time to achieve (in days) - excluding NULLs
-        AVG(EXTRACT(EPOCH FROM (u.completed_at - u.created_at)) / 86400) FILTER (WHERE u.completed_at IS NOT NULL) as avg_time_to_onboard_days,
+        AVG(EXTRACT(EPOCH FROM (o.completed_at - perm.created_at)) / 86400) FILTER (WHERE o.completed_at IS NOT NULL) as avg_time_to_onboard_days,
         -- First upload metrics split by first day vs after first day
         -- "First day" means the same calendar day (DATE() comparison)
-        COUNT(DISTINCT CASE WHEN first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) = DATE(u.created_at) THEN u.id END) as users_uploaded_first_day,
+        COUNT(DISTINCT CASE WHEN first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) = DATE(perm.created_at) THEN perm.id END) as users_uploaded_first_day,
         -- For first day uploads, calculate time in minutes directly (not days) since it's always < 24 hours
-        AVG(EXTRACT(EPOCH FROM (first_upload.first_transaction_date - u.created_at)) / 60) FILTER (WHERE first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) = DATE(u.created_at)) as avg_time_to_first_upload_first_day_minutes,
-        COUNT(DISTINCT CASE WHEN first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) > DATE(u.created_at) THEN u.id END) as users_uploaded_after_first_day,
-        AVG(EXTRACT(EPOCH FROM (first_upload.first_transaction_date - u.created_at)) / 86400) FILTER (WHERE first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) > DATE(u.created_at)) as avg_time_to_first_upload_after_first_day_days,
+        AVG(EXTRACT(EPOCH FROM (first_upload.first_transaction_date - perm.created_at)) / 60) FILTER (WHERE first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) = DATE(perm.created_at)) as avg_time_to_first_upload_first_day_minutes,
+        COUNT(DISTINCT CASE WHEN first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) > DATE(perm.created_at) THEN perm.id END) as users_uploaded_after_first_day,
+        AVG(EXTRACT(EPOCH FROM (first_upload.first_transaction_date - perm.created_at)) / 86400) FILTER (WHERE first_upload.first_transaction_date IS NOT NULL AND DATE(first_upload.first_transaction_date) > DATE(perm.created_at)) as avg_time_to_first_upload_after_first_day_days,
         -- Engagement signals
         AVG(transaction_counts.tx_count) FILTER (WHERE transaction_counts.tx_count > 0) as avg_transactions_per_user,
-        COUNT(DISTINCT CASE WHEN transaction_counts.tx_count > 0 THEN u.id END) as users_with_transactions
-      FROM users u
-      LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+        COUNT(DISTINCT CASE WHEN transaction_counts.tx_count > 0 THEN perm.id END) as users_with_transactions
+      FROM l1_user_permissions perm
+      LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
       LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
       LEFT JOIN (
         ${uploadCountsSubquery}
-      ) upload_counts ON upload_counts.user_id = u.id
+      ) upload_counts ON upload_counts.user_id = perm.id
       LEFT JOIN (
         ${uniqueBanksSubquery}
-      ) bank_counts ON bank_counts.user_id = u.id
+      ) bank_counts ON bank_counts.user_id = perm.id
       LEFT JOIN (
         SELECT 
           ut.internal_user_id as user_id,
           MIN(tf.created_at) as first_transaction_date
-        FROM users u2
-        LEFT JOIN l0_user_tokenization ut ON u2.id = ut.internal_user_id
+        FROM l1_user_permissions perm2
+        LEFT JOIN l0_user_tokenization ut ON perm2.id = ut.internal_user_id
         LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
         WHERE tf.id IS NOT NULL
         GROUP BY ut.internal_user_id
-      ) first_upload ON first_upload.user_id = u.id
+      ) first_upload ON first_upload.user_id = perm.id
       LEFT JOIN (
         SELECT 
           ut.internal_user_id as user_id,
           COUNT(*) as tx_count
-        FROM users u2
-        LEFT JOIN l0_user_tokenization ut ON u2.id = ut.internal_user_id
+        FROM l1_user_permissions perm2
+        LEFT JOIN l0_user_tokenization ut ON perm2.id = ut.internal_user_id
         LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
         WHERE tf.id IS NOT NULL
         GROUP BY ut.internal_user_id
-      ) transaction_counts ON transaction_counts.user_id = u.id
-      WHERE u.email != $${paramIndex}
+      ) transaction_counts ON transaction_counts.user_id = perm.id
+      WHERE pii.email != $${paramIndex}
         ${filterConditions}
-      GROUP BY DATE_TRUNC('week', u.created_at)
+      GROUP BY DATE_TRUNC('week', perm.created_at)
       ORDER BY signup_week DESC
       LIMIT 12
     ` : `
       SELECT 
-        DATE_TRUNC('week', u.created_at) as signup_week,
+        DATE_TRUNC('week', perm.created_at) as signup_week,
         COUNT(*) FILTER (WHERE EXISTS (
-          SELECT 1 FROM l1_onboarding_responses o 
-          WHERE o.user_id = u.id AND o.completed_at IS NOT NULL
+          SELECT 1 FROM onboarding_responses o 
+          WHERE o.user_id = perm.id AND o.completed_at IS NOT NULL
         )) as onboarding_completed,
-        COUNT(DISTINCT CASE WHEN tf.id IS NOT NULL THEN u.id END) as uploaded_first_statement,
+        COUNT(DISTINCT CASE WHEN tf.id IS NOT NULL THEN perm.id END) as uploaded_first_statement,
         0 as uploaded_two_statements,
         0 as uploaded_three_plus_statements,
         0 as uploaded_more_than_one_bank,
@@ -403,12 +394,13 @@ export async function GET(request: NextRequest) {
         NULL as avg_time_to_first_upload_days,
         NULL as avg_transactions_per_user,
         0 as users_with_transactions
-      FROM users u
-      LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+      FROM l1_user_permissions perm
+      JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+      LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
       LEFT JOIN l1_transaction_facts tf ON ut.tokenized_user_id = tf.tokenized_user_id
-      WHERE u.email != $${paramIndex}
+      WHERE pii.email != $${paramIndex}
         ${filterConditions}
-      GROUP BY DATE_TRUNC('week', u.created_at)
+      GROUP BY DATE_TRUNC('week', perm.created_at)
       ORDER BY signup_week DESC
       LIMIT 12
     `;
@@ -438,25 +430,26 @@ export async function GET(request: NextRequest) {
       // Calculate login metrics per week
       const eventsQuery = `
         SELECT 
-          DATE_TRUNC('week', u.created_at) as signup_week,
+          DATE_TRUNC('week', perm.created_at) as signup_week,
           COUNT(DISTINCT CASE 
-            WHEN ue.event_timestamp >= u.created_at 
-            AND ue.event_timestamp < u.created_at + INTERVAL '7 days'
+            WHEN ue.event_timestamp >= perm.created_at 
+            AND ue.event_timestamp < perm.created_at + INTERVAL '7 days'
             AND ue.event_type = 'login' 
             THEN DATE(ue.event_timestamp) 
           END) as unique_login_days_week_0,
           COUNT(DISTINCT CASE 
-            WHEN ue.event_timestamp >= u.created_at + INTERVAL '7 days'
-            AND ue.event_timestamp < u.created_at + INTERVAL '14 days'
+            WHEN ue.event_timestamp >= perm.created_at + INTERVAL '7 days'
+            AND ue.event_timestamp < perm.created_at + INTERVAL '14 days'
             AND ue.event_type = 'login' 
             THEN DATE(ue.event_timestamp) 
           END) as unique_login_days_week_1
-        FROM users u
-        LEFT JOIN l0_user_tokenization ut ON u.id = ut.internal_user_id
+        FROM l1_user_permissions perm
+        JOIN l0_pii_users pii ON perm.id = pii.internal_user_id
+        LEFT JOIN l0_user_tokenization ut ON perm.id = ut.internal_user_id
         LEFT JOIN l1_event_facts ue ON ue.tokenized_user_id = ut.tokenized_user_id
-        WHERE u.email != $${paramIndex}
+        WHERE pii.email != $${paramIndex}
           ${filterConditions}
-        GROUP BY DATE_TRUNC('week', u.created_at)
+        GROUP BY DATE_TRUNC('week', perm.created_at)
       `;
       const eventsResult = await pool.query(eventsQuery, filterParams);
         

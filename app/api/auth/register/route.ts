@@ -141,43 +141,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user exists
-    // Using separate queries to avoid pg-mem limitations with correlated subqueries
-    const userResult = await pool.query(
-      'SELECT id, email FROM users WHERE email = $1',
-      [email.toLowerCase()]
-    );
+    // Check if user exists by email in l0_pii_users
+    const userResult = await pool.query(`
+      SELECT perm.id, pii.email
+      FROM l0_pii_users pii
+      JOIN l1_user_permissions perm ON pii.internal_user_id = perm.id
+      WHERE pii.email = $1
+    `, [email.toLowerCase()]);
 
     if (userResult.rows.length === 0) {
       // User doesn't exist, proceed with registration
       const passwordHash = await hashPassword(password);
       
-      // Check if email_validated column exists, and set it to true by default
-      // Schema-adaptive: handle both cases
-      let hasEmailValidated = false;
-      try {
-        const columnCheck = await pool.query(`
-          SELECT column_name 
-          FROM information_schema.columns 
-          WHERE table_name = 'users' 
-          AND column_name = 'email_validated'
-        `);
-        hasEmailValidated = columnCheck.rows.length > 0;
-      } catch (e) {
-        console.log('[Register] Could not check email_validated column, skipping');
-      }
+      // Insert into l1_user_permissions first (returns id)
+      const permResult = await pool.query(
+        'INSERT INTO l1_user_permissions (password_hash, email_validated, is_active) VALUES ($1, $2, $3) RETURNING id',
+        [passwordHash, true, true]
+      );
       
-      const result = hasEmailValidated
-        ? await pool.query(
-            'INSERT INTO users (email, password_hash, display_name, email_validated) VALUES ($1, $2, $3, $4) RETURNING id, email, display_name',
-            [email.toLowerCase(), passwordHash, name || email, true]
-          )
-        : await pool.query(
-            'INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id, email, display_name',
-            [email.toLowerCase(), passwordHash, name || email]
-          );
+      const userId = permResult.rows[0].id;
+      
+      // Insert into l0_pii_users with email and display_name
+      await pool.query(
+        'INSERT INTO l0_pii_users (internal_user_id, email, display_name) VALUES ($1, $2, $3) ON CONFLICT (internal_user_id) DO UPDATE SET email = EXCLUDED.email, display_name = EXCLUDED.display_name',
+        [userId, email.toLowerCase(), name || email]
+      );
 
-      const user = result.rows[0];
+      const user = { id: userId, email: email.toLowerCase(), display_name: name || email };
       const token = createToken(user.id);
 
       // Log IP address
@@ -260,7 +250,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const user = userResult.rows[0];
     const txCount = parseInt(transactionCount.rows[0]?.count || '0');
     const completedOnboarding = parseInt(onboardingCount.rows[0]?.count || '0');
     const isSpecialAccount = ['test@gmail.com', 'test2@gmail.com', 'demo@canadianinsights.ca'].includes(email.toLowerCase());
@@ -280,11 +269,13 @@ export async function POST(request: NextRequest) {
     // Allow re-registration: delete old incomplete onboarding attempts and keep user
     console.log('[Register] User exists with incomplete onboarding, allowing fresh start:', email);
     
-    // Get full user data
-    const fullUserResult = await pool.query(
-      'SELECT id, email, display_name FROM users WHERE id = $1',
-      [userId]
-    );
+    // Get full user data from l0_pii_users
+    const fullUserResult = await pool.query(`
+      SELECT perm.id, pii.email, pii.display_name
+      FROM l0_pii_users pii
+      JOIN l1_user_permissions perm ON pii.internal_user_id = perm.id
+      WHERE perm.id = $1
+    `, [userId]);
     const fullUser = fullUserResult.rows[0];
     
     // Delete all incomplete onboarding attempts for this user
@@ -293,14 +284,14 @@ export async function POST(request: NextRequest) {
       [userId]
     );
     
-    // Increment login attempts (counts as a login) - schema-adaptive
+    // Increment login attempts (counts as a login)
     try {
       await pool.query(
-        'UPDATE users SET login_attempts = COALESCE(login_attempts, 0) + 1 WHERE id = $1',
+        'UPDATE l1_user_permissions SET login_attempts = COALESCE(login_attempts, 0) + 1 WHERE id = $1',
         [userId]
       );
     } catch (e: any) {
-      // Column doesn't exist yet - skip increment (will be added by migration)
+      // Column doesn't exist yet - skip increment
       console.log('[Register] login_attempts column not found, skipping increment');
     }
     
