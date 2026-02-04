@@ -2264,6 +2264,216 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
+
+            {/* Old Tables Cleanup Section */}
+            <div className="mt-8 border-t border-gray-200 pt-8">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Old Tables Cleanup</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Analyze and drop old table names that have been migrated to new names (e.g., l1_events → l1_event_facts).
+                  </p>
+                </div>
+                <button
+                  onClick={async () => {
+                    setCleanupLoading(true);
+                    try {
+                      const token = localStorage.getItem('adminToken');
+                      const response = await fetch('/api/admin/migration/cleanup', {
+                        headers: {
+                          'Authorization': `Bearer ${token}`,
+                        },
+                      });
+                      const data = await response.json();
+                      if (response.ok) {
+                        setCleanupAnalysis(data);
+                      } else {
+                        setError(data.error || 'Failed to analyze old tables');
+                      }
+                    } catch (error: any) {
+                      setError('Failed to analyze old tables: ' + error.message);
+                    } finally {
+                      setCleanupLoading(false);
+                    }
+                  }}
+                  disabled={cleanupLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {cleanupLoading ? 'Analyzing...' : 'Analyze Old Tables'}
+                </button>
+              </div>
+
+              {cleanupAnalysis && (
+                <div className="space-y-4">
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="grid grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Total Old Tables:</span>
+                        <span className="ml-2 font-semibold text-gray-900">{cleanupAnalysis.summary?.total || 0}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Still Exist:</span>
+                        <span className="ml-2 font-semibold text-gray-900">{cleanupAnalysis.summary?.exists || 0}</span>
+                      </div>
+                      <div>
+                        <span className="text-green-600">Safe to Drop:</span>
+                        <span className="ml-2 font-semibold text-green-700">{cleanupAnalysis.summary?.safeToDrop || 0}</span>
+                      </div>
+                      <div>
+                        <span className="text-red-600">Unsafe:</span>
+                        <span className="ml-2 font-semibold text-red-700">{cleanupAnalysis.summary?.unsafe || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {cleanupAnalysis.safeToDropTables && cleanupAnalysis.safeToDropTables.length > 0 && (
+                    <div className="border border-green-200 rounded-lg p-4 bg-green-50">
+                      <h4 className="font-semibold text-green-900 mb-3">✅ Safe to Drop ({cleanupAnalysis.safeToDropTables.length})</h4>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {cleanupAnalysis.safeToDropTables.map((table: string) => (
+                          <span key={table} className="px-3 py-1 bg-green-100 text-green-800 rounded text-sm font-medium">
+                            {table}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={cleanupDropConfirm}
+                          onChange={(e) => setCleanupDropConfirm(e.target.value)}
+                          placeholder="Type 'DROP_TABLES' to confirm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                        />
+                        <button
+                          onClick={async () => {
+                            if (cleanupDropConfirm !== 'DROP_TABLES') {
+                              setError('Please type DROP_TABLES to confirm');
+                              return;
+                            }
+                            setCleanupDropping(true);
+                            try {
+                              const token = localStorage.getItem('adminToken');
+                              const response = await fetch('/api/admin/migration/cleanup', {
+                                method: 'POST',
+                                headers: {
+                                  'Authorization': `Bearer ${token}`,
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                  tableNames: cleanupAnalysis.safeToDropTables,
+                                  confirm: 'DROP_TABLES',
+                                }),
+                              });
+                              const data = await response.json();
+                              if (response.ok) {
+                                alert(`Successfully dropped ${data.dropped?.length || 0} table(s)`);
+                                setCleanupDropConfirm('');
+                                // Refresh analysis
+                                const refreshResponse = await fetch('/api/admin/migration/cleanup', {
+                                  headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                  },
+                                });
+                                const refreshData = await refreshResponse.json();
+                                if (refreshResponse.ok) {
+                                  setCleanupAnalysis(refreshData);
+                                }
+                              } else {
+                                setError(data.error || 'Failed to drop tables');
+                              }
+                            } catch (error: any) {
+                              setError('Failed to drop tables: ' + error.message);
+                            } finally {
+                              setCleanupDropping(false);
+                            }
+                          }}
+                          disabled={cleanupDropping || cleanupDropConfirm !== 'DROP_TABLES'}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                        >
+                          {cleanupDropping ? 'Dropping...' : `Drop ${cleanupAnalysis.safeToDropTables.length} Table(s)`}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {cleanupAnalysis.unsafeTables && cleanupAnalysis.unsafeTables.length > 0 && (
+                    <div className="border border-red-200 rounded-lg p-4 bg-red-50">
+                      <h4 className="font-semibold text-red-900 mb-3">⚠️ Unsafe to Drop ({cleanupAnalysis.unsafeTables.length})</h4>
+                      <div className="space-y-2">
+                        {cleanupAnalysis.unsafeTables.map((item: any) => (
+                          <div key={item.table} className="p-2 bg-white rounded border border-red-200">
+                            <div className="font-medium text-red-900">{item.table}</div>
+                            <div className="text-sm text-red-700 mt-1">{item.reason}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {cleanupAnalysis.analysis && cleanupAnalysis.analysis.length > 0 && (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="p-4 bg-gray-50 border-b border-gray-200">
+                        <h4 className="font-semibold text-gray-900">Detailed Analysis</h4>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Table</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Exists</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Row Count</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dependencies</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {cleanupAnalysis.analysis.map((item: any, index: number) => (
+                              <tr key={item.tableName || index}>
+                                <td className="px-6 py-4 text-sm font-medium text-gray-900">{item.tableName}</td>
+                                <td className="px-6 py-4 text-sm">
+                                  {item.exists ? (
+                                    <span className="text-green-600">✓ Yes</span>
+                                  ) : (
+                                    <span className="text-gray-400">✗ No (already dropped)</span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{item.rowCount || 0}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">
+                                  {item.hasForeignKeys && (
+                                    <div className="text-xs text-red-600 mb-1">
+                                      Foreign Keys: {item.foreignKeyDetails.length}
+                                    </div>
+                                  )}
+                                  {item.hasDependentViews && (
+                                    <div className="text-xs text-red-600">
+                                      Views: {item.dependentViews.join(', ')}
+                                    </div>
+                                  )}
+                                  {!item.hasForeignKeys && !item.hasDependentViews && (
+                                    <span className="text-green-600 text-xs">None</span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 text-sm">
+                                  {item.safeToDrop ? (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                      ✅ Safe
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                      ⚠️ Unsafe
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
