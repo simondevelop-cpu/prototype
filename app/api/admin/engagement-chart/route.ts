@@ -66,15 +66,20 @@ export async function GET(request: NextRequest) {
     const hasMotivation = schemaCheck.rows.some(row => row.column_name === 'motivation');
     const hasEmailValidated = schemaCheck.rows.some(row => row.column_name === 'email_validated');
 
-    // Check if l1_events table exists
+    // Check if l1_event_facts or l1_events table exists (migration-safe)
     let hasUserEvents = false;
     try {
-      const eventsCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'l1_events'
-        LIMIT 1
+      const newTableCheck = await pool.query(`
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_event_facts' LIMIT 1
       `);
-      hasUserEvents = eventsCheck.rows.length > 0;
+      if (newTableCheck.rows.length > 0) {
+        hasUserEvents = true;
+      } else {
+        const oldTableCheck = await pool.query(`
+          SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_events' LIMIT 1
+        `);
+        hasUserEvents = oldTableCheck.rows.length > 0;
+      }
     } catch (e) {
       // Table doesn't exist
     }

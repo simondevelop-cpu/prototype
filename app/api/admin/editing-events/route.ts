@@ -29,24 +29,34 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
-    // Check if l1_events table exists
+    // Check if l1_event_facts or l1_events table exists (migration-safe)
+    let eventsTable = 'l1_event_facts';
     let hasEventsTable = false;
     try {
-      const tableCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'l1_events'
-        LIMIT 1
+      const newTableCheck = await pool.query(`
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_event_facts' LIMIT 1
       `);
-      hasEventsTable = tableCheck.rows.length > 0;
+      if (newTableCheck.rows.length > 0) {
+        eventsTable = 'l1_event_facts';
+        hasEventsTable = true;
+      } else {
+        const oldTableCheck = await pool.query(`
+          SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_events' LIMIT 1
+        `);
+        if (oldTableCheck.rows.length > 0) {
+          eventsTable = 'l1_events';
+          hasEventsTable = true;
+        }
+      }
     } catch (e) {
-      console.log('[Editing Events API] Could not check for l1_events table');
+      console.log('[Editing Events API] Could not check for events table');
     }
 
     if (!hasEventsTable) {
       return NextResponse.json({ 
         success: true,
         editingEvents: [],
-        message: 'l1_events table does not exist.'
+        message: 'Events table (l1_event_facts or l1_events) does not exist.'
       }, { status: 200 });
     }
 
@@ -60,7 +70,7 @@ export async function GET(request: NextRequest) {
         e.event_type,
         e.metadata,
         e.event_timestamp as created_at
-      FROM l1_events e
+      FROM ${eventsTable} e
       LEFT JOIN users u ON e.user_id = u.id
       LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
       WHERE e.event_type IN ('transaction_edit', 'bulk_edit')

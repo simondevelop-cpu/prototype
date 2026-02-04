@@ -60,15 +60,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if l1_events table exists
-    const tableCheck = await pool.query(`
-      SELECT 1 
-      FROM information_schema.tables 
-      WHERE table_name = 'l1_events'
-      LIMIT 1
-    `);
+    // Check if l1_event_facts or l1_events table exists (migration-safe)
+    let eventsTable = 'l1_event_facts';
+    let hasEventsTable = false;
+    try {
+      const newTableCheck = await pool.query(`
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_event_facts' LIMIT 1
+      `);
+      if (newTableCheck.rows.length > 0) {
+        eventsTable = 'l1_event_facts';
+        hasEventsTable = true;
+      } else {
+        const oldTableCheck = await pool.query(`
+          SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_events' LIMIT 1
+        `);
+        if (oldTableCheck.rows.length > 0) {
+          eventsTable = 'l1_events';
+          hasEventsTable = true;
+        }
+      }
+    } catch (e) {
+      console.log('[Consent Check API] Could not check for events table');
+    }
 
-    if (tableCheck.rows.length === 0) {
+    if (!hasEventsTable) {
       // Table doesn't exist, no consent recorded
       return NextResponse.json({
         hasConsent: false,
@@ -79,7 +94,7 @@ export async function GET(request: NextRequest) {
     // Check for existing consent event
     const result = await pool.query(`
       SELECT event_timestamp, metadata->>'choice' as choice
-      FROM l1_events
+      FROM ${eventsTable}
       WHERE user_id = $1
         AND event_type = 'consent'
         AND metadata->>'consentType' = $2
