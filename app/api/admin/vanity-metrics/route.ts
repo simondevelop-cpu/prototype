@@ -441,31 +441,30 @@ export async function GET(request: NextRequest) {
 
       // Monthly Active Users (MAU) - users who logged in during the month containing this week
       let mau = 0;
-      if (hasEventsTable) {
-        try {
-          // Get the month start and end for this week
-          const monthStart = new Date(weekStart);
-          monthStart.setDate(1);
-          monthStart.setHours(0, 0, 0, 0);
-          const monthEnd = new Date(monthStart);
-          monthEnd.setMonth(monthEnd.getMonth() + 1);
-          monthEnd.setDate(0); // Last day of month
-          monthEnd.setHours(23, 59, 59, 999);
-          
-          // Build MAU query with correct parameter order
-          // filterParams come first, then monthStart and monthEnd
-          const mauParamIndex = filterParams.length + 1;
-          const mauQuery = `
-            SELECT COUNT(DISTINCT e.user_id) as count
-            FROM l1_event_facts e
-            JOIN users u ON u.id = e.user_id
-            WHERE e.event_type = 'login'
-              AND e.event_timestamp >= $${mauParamIndex}::timestamp
-              AND e.event_timestamp <= $${mauParamIndex + 1}::timestamp
-              AND u.email != $${adminEmailParamIndex}
-              ${filterConditions}
-          `;
-          const mauResult = await pool.query(mauQuery, [...filterParams, monthStart, monthEnd]);
+      try {
+        // Get the month start and end for this week
+        const monthStart = new Date(weekStart);
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        const monthEnd = new Date(monthStart);
+        monthEnd.setMonth(monthEnd.getMonth() + 1);
+        monthEnd.setDate(0); // Last day of month
+        monthEnd.setHours(23, 59, 59, 999);
+        
+        // Build MAU query with correct parameter order
+        // filterParams come first, then monthStart and monthEnd
+        const mauParamIndex = filterParams.length + 1;
+        const mauQuery = `
+          SELECT COUNT(DISTINCT e.user_id) as count
+          FROM l1_event_facts e
+          JOIN users u ON u.id = e.user_id
+          WHERE e.event_type = 'login'
+            AND e.event_timestamp >= $${mauParamIndex}::timestamp
+            AND e.event_timestamp <= $${mauParamIndex + 1}::timestamp
+            AND u.email != $${adminEmailParamIndex}
+            ${filterConditions}
+        `;
+        const mauResult = await pool.query(mauQuery, [...filterParams, monthStart, monthEnd]);
         mau = parseInt(mauResult.rows[0]?.count) || 0;
       } catch (e) {
         // Query failed, MAU = 0
