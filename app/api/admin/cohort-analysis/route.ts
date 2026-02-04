@@ -63,10 +63,10 @@ export async function GET(request: NextRequest) {
     const hasMotivation = schemaCheck.rows.some(row => row.column_name === 'motivation');
     const hasEmailValidated = schemaCheck.rows.some(row => row.column_name === 'email_validated');
     
-    // Check if onboarding_responses exists
+    // Check if l1_onboarding_responses exists
     const onboardingTableCheck = await pool.query(`
       SELECT 1 FROM information_schema.tables 
-      WHERE table_name = 'onboarding_responses'
+      WHERE table_name = 'l1_onboarding_responses'
       LIMIT 1
     `);
     const onboardingResponsesExists = onboardingTableCheck.rows.length > 0;
@@ -84,18 +84,18 @@ export async function GET(request: NextRequest) {
       const usersWithData = parseInt(usersDataCheck.rows[0]?.count || '0', 10);
       useUsersTable = usersWithData > 0;
       
-      // If no data in users, check onboarding_responses
+      // If no data in users, check l1_onboarding_responses
       if (!useUsersTable && onboardingResponsesExists) {
         const onboardingDataCheck = await pool.query(`
-          SELECT COUNT(*) as count FROM onboarding_responses
+          SELECT COUNT(*) as count FROM l1_onboarding_responses
         `);
         const onboardingCount = parseInt(onboardingDataCheck.rows[0]?.count || '0', 10);
         if (onboardingCount > 0) {
-          useUsersTable = false; // Use onboarding_responses
+          useUsersTable = false; // Use l1_onboarding_responses
         }
       }
     } else if (onboardingResponsesExists) {
-      useUsersTable = false; // Use onboarding_responses
+      useUsersTable = false; // Use l1_onboarding_responses
     } else {
       // No data source available
       return NextResponse.json({
@@ -402,7 +402,7 @@ export async function GET(request: NextRequest) {
       SELECT 
         DATE_TRUNC('week', u.created_at) as signup_week,
         COUNT(*) FILTER (WHERE EXISTS (
-          SELECT 1 FROM onboarding_responses o 
+          SELECT 1 FROM l1_onboarding_responses o 
           WHERE o.user_id = u.id AND o.completed_at IS NOT NULL
         )) as onboarding_completed,
         COUNT(DISTINCT CASE WHEN tf.id IS NOT NULL THEN u.id END) as uploaded_first_statement,
@@ -547,7 +547,7 @@ export async function GET(request: NextRequest) {
       activation: activationByWeek,
       engagement: engagementByWeek,
       filters,
-      hasUserEventsTable,
+      hasUserEventsTable: true, // l1_event_facts is always used now
     }, { status: 200 });
 
   } catch (error: any) {

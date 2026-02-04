@@ -31,40 +31,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Check if l1_event_facts or l1_events table exists (migration-safe)
-    let eventsTable = 'l1_event_facts';
-    let hasUserEventsTable = false;
-    try {
-      const newTableCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'l1_event_facts'
-        LIMIT 1
-      `);
-      if (newTableCheck.rows.length > 0) {
-        eventsTable = 'l1_event_facts';
-        hasUserEventsTable = true;
-      } else {
-        const oldTableCheck = await pool.query(`
-          SELECT 1 FROM information_schema.tables 
-          WHERE table_name = 'l1_events'
-          LIMIT 1
-        `);
-        if (oldTableCheck.rows.length > 0) {
-          eventsTable = 'l1_events';
-          hasUserEventsTable = true;
-        }
-      }
-    } catch (e) {
-      console.log('[Events Data API] Could not check for events table');
-    }
-
-    if (!hasUserEventsTable) {
-      return NextResponse.json({ 
-        success: true,
-        eventsData: [],
-        message: 'Events table does not exist. Events will appear once the table is created and events are logged.'
-      }, { status: 200 });
-    }
+    // Query l1_event_facts directly (no fallback)
+    const eventsTable = 'l1_event_facts';
 
     // Check how many events exist total
     const countCheck = await pool.query(`SELECT COUNT(*) as count FROM ${eventsTable}`);
@@ -89,7 +57,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build select fields based on what columns exist
-    // Note: l1_events table has event_timestamp (not created_at) and metadata (not event_data)
+    // Note: l1_event_facts table has event_timestamp (not created_at) and metadata (not event_data)
     const eventFields = [
       'e.id',
       'e.user_id',

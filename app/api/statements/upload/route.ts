@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     if (pool) {
       try {
         const consentCheck = await pool.query(
-          `SELECT id FROM l1_events 
+          `SELECT id FROM l1_event_facts 
            WHERE user_id = $1 
              AND event_type = 'consent' 
              AND metadata->>'consentType' = 'first_upload' 

@@ -28,42 +28,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // Check if l1_event_facts or l1_events table exists (migration-safe)
-    let eventsTable = 'l1_event_facts';
-    let hasUserEventsTable = false;
-    try {
-      const newTableCheck = await pool.query(`
-        SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'l1_event_facts'
-        LIMIT 1
-      `);
-      if (newTableCheck.rows.length > 0) {
-        eventsTable = 'l1_event_facts';
-        hasUserEventsTable = true;
-      } else {
-        const oldTableCheck = await pool.query(`
-          SELECT 1 FROM information_schema.tables 
-          WHERE table_name = 'l1_events'
-          LIMIT 1
-        `);
-        if (oldTableCheck.rows.length > 0) {
-          eventsTable = 'l1_events';
-          hasUserEventsTable = true;
-        }
-      }
-    } catch (e) {
-      console.log('[User Feedback API] Could not check for events table');
-    }
-
-    if (!hasUserEventsTable) {
-      return NextResponse.json({ 
-        success: true,
-        feedback: [],
-        message: 'Events table does not exist. Feedback will appear once the table is created and feedback is submitted.'
-      }, { status: 200 });
-    }
-
-    // Fetch all feedback events
+    // Fetch all feedback events from l1_event_facts
     const result = await pool.query(`
       SELECT 
         e.id,
@@ -71,7 +36,7 @@ export async function GET(request: NextRequest) {
         COALESCE(p.first_name, 'Unknown') as first_name,
         e.event_timestamp as submitted_at,
         e.metadata
-      FROM ${eventsTable} e
+      FROM l1_event_facts e
       LEFT JOIN users u ON e.user_id = u.id
       LEFT JOIN l0_pii_users p ON u.id = p.internal_user_id AND p.deleted_at IS NULL
       WHERE e.event_type = 'feedback'

@@ -147,20 +147,12 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Enrich users with consent information from l1_events (schema-adaptive)
+    // Enrich users with consent information from l1_event_facts
     try {
-      // Check if l1_events table exists (or legacy user_events for backward compatibility)
-      const tableCheck = await pool.query(`
-        SELECT 1 
-        FROM information_schema.tables 
-        WHERE table_name IN ('l1_events', 'user_events')
-        LIMIT 1
-      `);
-
-      if (tableCheck.rows.length > 0 && users.length > 0) {
+      if (users.length > 0) {
         const userIds = users.map(u => u.id);
 
-        // Fetch latest consent events per user and consentType
+        // Fetch latest consent events per user and consentType from l1_event_facts
         const consentResult = await pool.query(`
           SELECT DISTINCT ON (user_id, metadata->>'consentType')
             user_id,
@@ -168,7 +160,7 @@ export async function GET(request: NextRequest) {
             metadata->>'choice' AS choice,
             event_timestamp,
             metadata
-          FROM l1_events
+          FROM l1_event_facts
           WHERE event_type = 'consent'
             AND user_id = ANY($1::int[])
           ORDER BY user_id, metadata->>'consentType', event_timestamp DESC
