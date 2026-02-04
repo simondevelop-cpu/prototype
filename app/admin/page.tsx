@@ -2315,7 +2315,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Cohort Analysis
+            👥 Cohort analysis
           </button>
           <button
             onClick={() => setAnalyticsSubTab('customer-data')}
@@ -2325,7 +2325,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Customer Data
+            👥 Customer data
           </button>
           <button
             onClick={() => setAnalyticsSubTab('events-data')}
@@ -2335,7 +2335,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Events Data
+            📊 Events data
           </button>
           <button
             onClick={() => setAnalyticsSubTab('editing-events-data')}
@@ -2345,7 +2345,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Editing Events
+            ✏️ Editing events data
           </button>
           <button
             onClick={() => setAnalyticsSubTab('sessions')}
@@ -2365,7 +2365,7 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Vanity Metrics
+            📈 Vanity metrics
           </button>
           <button
             onClick={() => setAnalyticsSubTab('download')}
@@ -2375,98 +2375,526 @@ export default function AdminDashboard() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Download
+            ⬇️ Download
           </button>
         </div>
 
-        {/* Content based on sub-tab */}
+        {/* Content */}
         {analyticsSubTab === 'cohort-analysis' && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Cohort Analysis</h3>
-            {cohortLoading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-                <p className="text-gray-600 mt-4">Loading cohort analysis...</p>
+          <div className="space-y-6">
+            {/* Filters */}
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Filters</h3>
+              <div className="flex flex-wrap gap-4 items-end">
+                <div className="min-w-[200px]">
+                  <CheckboxDropdown
+                    label="Account Type"
+                    options={['Total Accounts', 'Validated Emails']}
+                    selected={[
+                      ...(cohortFilters.totalAccounts ? ['Total Accounts'] : []),
+                      ...(cohortFilters.validatedEmails ? ['Validated Emails'] : [])
+                    ]}
+                    onChange={(selected) => setCohortFilters({ 
+                      ...cohortFilters, 
+                      totalAccounts: selected.includes('Total Accounts'),
+                      validatedEmails: selected.includes('Validated Emails')
+                    })}
+                    placeholder="Select account type..."
+                  />
+                </div>
+                <div className="min-w-[200px]">
+                  <CheckboxDropdown
+                    label="Intent Categories"
+                    options={intentCategoriesLoading ? [] : intentCategories}
+                    selected={cohortFilters.intentCategories}
+                    onChange={(selected) => setCohortFilters({ ...cohortFilters, intentCategories: selected })}
+                    placeholder={intentCategoriesLoading ? 'Loading...' : 'Select intent categories...'}
+                    disabled={intentCategoriesLoading}
+                  />
+                </div>
+                <div className="min-w-[200px]">
+                  <CheckboxDropdown
+                    label="Cohorts"
+                    options={cohortData?.weeks || []}
+                    selected={cohortFilters.selectedCohorts.length === 0 ? (cohortData?.weeks || []) : cohortFilters.selectedCohorts}
+                    onChange={(selected) => setCohortFilters({ ...cohortFilters, selectedCohorts: selected })}
+                    placeholder="Select cohorts... (default: all)"
+                  />
+                </div>
+                <button
+                  onClick={fetchCohortAnalysis}
+                  disabled={cohortLoading}
+                  className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                >
+                  {cohortLoading ? 'Loading...' : 'Refresh Data'}
+                </button>
               </div>
-            ) : cohortData ? (
-              <div className="space-y-6">
-                {/* Activation Table */}
-                {cohortData.activation && Object.keys(cohortData.activation).length > 0 && (
-                  <div>
-                    <h4 className="text-md font-semibold text-gray-900 mb-3">Activation Metrics by Week</h4>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Week</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Started Onboarding</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dropped Step 1</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dropped Step 2</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Completed</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Time to Onboard (min)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {cohortData.weeks?.map((week: string) => {
-                            const activation = cohortData.activation[week];
-                            if (!activation) return null;
-                            return (
-                              <tr key={week}>
-                                <td className="px-6 py-4 text-sm font-medium text-gray-900">{week}</td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{activation.startedOnboarding || 0}</td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{activation.droppedStep1 || 0}</td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{activation.droppedStep2 || 0}</td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{activation.completedOnboarding || 0}</td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{activation.avgTimeToOnboardMinutes || '-'}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
+            </div>
 
-                {/* Engagement Table */}
-                {cohortData.engagement && Object.keys(cohortData.engagement).length > 0 && (
-                  <div>
-                    <h4 className="text-md font-semibold text-gray-900 mb-3">Engagement Metrics by Week</h4>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Week</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Onboarding Completed</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded 1st Statement</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded 2 Statements</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded 3+ Statements</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Transactions/User</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {cohortData.weeks?.map((week: string) => {
-                            const engagement = cohortData.engagement[week];
-                            if (!engagement) return null;
-                            return (
-                              <tr key={week}>
-                                <td className="px-6 py-4 text-sm font-medium text-gray-900">{week}</td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{engagement.onboardingCompleted || 0}</td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{engagement.uploadedFirstStatement || 0}</td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{engagement.uploadedTwoStatements || 0}</td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{engagement.uploadedThreePlusStatements || 0}</td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{engagement.avgTransactionsPerUser || '-'}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+            {/* Combined Cohort Analysis Table */}
+            {(() => {
+              // Get weeks to display - if selectedCohorts is empty, show all weeks
+              const allWeeks = cohortData?.weeks || [];
+              const displayWeeks = cohortFilters.selectedCohorts.length === 0 
+                ? allWeeks 
+                : cohortFilters.selectedCohorts.filter((w: string) => allWeeks.includes(w));
+              
+              return (
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="p-4 border-b border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-900">Onboarding and engagement KPIs by signup week cohort (each column is a different cohort)</h3>
                   </div>
-                )}
+              {cohortLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                  <p className="text-gray-600 mt-4">Loading cohort analysis...</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
+                        {displayWeeks.map((week: string) => (
+                          <th key={week} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                            {week}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {/* Engagement Signals Section - MOVED TO TOP */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Engagement Signals
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg transactions per user (of those who uploaded)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.avgTransactionsPerUser || '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Users with transactions</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.usersWithTransactions || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2 or more unique days</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.loggedInTwoPlusDays || 0)
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg days logged in per month (of those who logged in 2 or more days)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.avgDaysLoggedInPerMonth || '-')
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Logged in 2 or more unique months</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.loggedInTwoPlusMonths || 0)
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average number of unique months users have logged in, of those who have logged in more than one unique month</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.hasUserEventsTable 
+                              ? (cohortData?.engagement?.[week]?.avgUniqueMonthsLoggedIn || '-')
+                              : <span className="text-gray-400 italic">Requires user_events table</span>}
+                          </td>
+                        ))}
+                      </tr>
+                      {/* Engagement Section */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Number of users by activity completed
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Onboarding completed</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.onboardingCompleted || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded first statement</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.uploadedFirstStatement || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded two statements</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.uploadedTwoStatements || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded three+ statements</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.uploadedThreePlusStatements || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded statements for more than one unique bank</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.uploadedMoreThanOneBank || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Uploaded statements for more than two unique banks</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.uploadedMoreThanTwoBanks || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      {/* Time to Achieve Section */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Time to achieve (of users completing onboarding)
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average time to onboard (minutes)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes !== undefined 
+                              ? cohortData?.engagement?.[week]?.avgTimeToOnboardMinutes 
+                              : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Number of users who uploaded on the first day</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.usersUploadedFirstDay || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average time to first upload, who uploaded on their first day (minutes)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadFirstDayMinutes !== null && cohortData?.engagement?.[week]?.avgTimeToFirstUploadFirstDayMinutes !== undefined 
+                              ? cohortData?.engagement?.[week]?.avgTimeToFirstUploadFirstDayMinutes 
+                              : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Number of users who uploaded after the first day</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.usersUploadedAfterFirstDay || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Average time to first upload, who uploaded after the first day (days)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.engagement?.[week]?.avgTimeToFirstUploadAfterFirstDayDays !== null && cohortData?.engagement?.[week]?.avgTimeToFirstUploadAfterFirstDayDays !== undefined 
+                              ? cohortData?.engagement?.[week]?.avgTimeToFirstUploadAfterFirstDayDays 
+                              : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                      {/* Activation Section - MOVED TO BOTTOM */}
+                      <tr className="bg-gray-50">
+                        <td colSpan={displayWeeks.length + 1} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                          Number of users by onboarding step completed
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Count starting onboarding</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countStartingOnboarding || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop off: emotional calibration</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countDropOffStep1 || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop off: financial context</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countDropOffStep2 || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop off: motivation</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countDropOffStep3 || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop off: acquisition source</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countDropOffStep4 || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop off: insight preferences</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countDropOffStep5 || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Drop off: account profile</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countDropOffStep7 || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Count completed onboarding</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countCompletedOnboarding || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Started but not completed (no drop-off recorded)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.countStartedButNotCompleted || 0}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Avg time to onboard (minutes)</td>
+                        {displayWeeks.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {cohortData?.activation?.[week]?.avgTimeToOnboardMinutes !== null && cohortData?.activation?.[week]?.avgTimeToOnboardMinutes !== undefined 
+                              ? cohortData?.activation?.[week]?.avgTimeToOnboardMinutes 
+                              : '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+                </div>
+              );
+            })()}
+
+
+            {/* Engagement Chart - Number of Days Logged In */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">Unique days logged in per week from first day signed up</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Y-axis: Total unique days logged in per week | X-axis: Week from signup (12 weeks)
+                </p>
               </div>
-            ) : (
-              <p className="text-gray-600">Click "Generate Cohort Analysis" to load data</p>
-            )}
+              
+              {/* Chart Filters */}
+              <div className="p-4 bg-gray-50 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Filters</h3>
+                <div className="flex flex-wrap gap-4 items-end">
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Account Type"
+                      options={['Total Accounts', 'Validated Emails']}
+                      selected={[
+                        ...(chartFilters.totalAccounts ? ['Total Accounts'] : []),
+                        ...(chartFilters.validatedEmails ? ['Validated Emails'] : [])
+                      ]}
+                      onChange={(selected) => setChartFilters({ 
+                        ...chartFilters, 
+                        totalAccounts: selected.includes('Total Accounts'),
+                        validatedEmails: selected.includes('Validated Emails')
+                      })}
+                      placeholder="Select account type..."
+                    />
+                  </div>
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Intent Categories"
+                      options={intentCategoriesLoading ? [] : intentCategories}
+                      selected={chartFilters.intentCategories}
+                      onChange={(selected) => setChartFilters({ ...chartFilters, intentCategories: selected })}
+                      placeholder={intentCategoriesLoading ? 'Loading...' : 'Select intent categories...'}
+                      disabled={intentCategoriesLoading}
+                    />
+                  </div>
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Cohorts"
+                      options={cohortData?.weeks || []}
+                      selected={chartFilters.cohorts.length === 0 ? (cohortData?.weeks || []) : chartFilters.cohorts}
+                      onChange={(selected) => setChartFilters({ ...chartFilters, cohorts: selected })}
+                      placeholder="Select cohorts... (default: all)"
+                    />
+                  </div>
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Data Coverage"
+                      options={['1 upload', '2 uploads', '3+ uploads']}
+                      selected={chartFilters.dataCoverage}
+                      onChange={(selected) => setChartFilters({ ...chartFilters, dataCoverage: selected })}
+                      placeholder="Select data coverage..."
+                    />
+                  </div>
+                  <button
+                    onClick={fetchEngagementChart}
+                    disabled={engagementChartLoading}
+                    className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                  >
+                    {engagementChartLoading ? 'Loading...' : 'Refresh Chart'}
+                  </button>
+                </div>
+              </div>
+
+              {engagementChartLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                  <p className="text-gray-600 mt-4">Loading engagement chart...</p>
+                </div>
+              ) : engagementChartData?.userLines && engagementChartData.userLines.length > 0 ? (
+                <div className="p-6">
+                  {!engagementChartData.hasUserEvents && (
+                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ <strong>Note:</strong> user_events table not found. Chart shows placeholder data (all zeros). 
+                        Login tracking data will appear once user_events table is created and login events are logged.
+                      </p>
+                    </div>
+                  )}
+                  <ResponsiveContainer width="100%" height={500}>
+                    <LineChart 
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      data={(() => {
+                        // Create unified data structure - all lines share same x-axis (weeks 0-11)
+                        const allWeeks = Array.from({ length: 12 }, (_, i) => i);
+                        
+                        // Build a map of week -> user data for each user
+                        const userDataByWeek = new Map<number, Map<number, number>>();
+                        engagementChartData.userLines.forEach((userLine: any) => {
+                          const weekMap = new Map<number, number>();
+                          userLine.weeks.forEach((w: any) => {
+                            weekMap.set(w.week, w.loginDays);
+                          });
+                          userDataByWeek.set(userLine.userId, weekMap);
+                        });
+                        
+                        // Create unified data array where each entry has week and all user values
+                        return allWeeks.map(weekNum => {
+                          const dataPoint: any = { week: weekNum };
+                          engagementChartData.userLines.forEach((userLine: any) => {
+                            const weekMap = userDataByWeek.get(userLine.userId);
+                            dataPoint[`user_${userLine.userId}`] = weekMap?.get(weekNum) || 0;
+                          });
+                          return dataPoint;
+                        });
+                      })()}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="week"
+                        type="number"
+                        domain={[0, 11]}
+                        ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]}
+                      />
+                      <YAxis />
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
+                                <p className="font-semibold">Week {data.week}</p>
+                                <p className="text-sm">User ID: {data.userId}</p>
+                                <p className="text-sm">Cohort: {data.cohortWeek}</p>
+                                <p className="text-sm">Intent: {data.intentType}</p>
+                                <p className="text-sm">Data Coverage: {data.dataCoverage}</p>
+                                <p className="text-sm font-medium">Login Days: {data.loginDays}</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend />
+                      {engagementChartData.userLines.map((userLine: any, idx: number) => {
+                        const color = `hsl(${(idx * 137.5) % 360}, 70%, 50%)`;
+                        return (
+                          <Line
+                            key={userLine.userId}
+                            type="monotone"
+                            dataKey={`user_${userLine.userId}`}
+                            stroke={color}
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            name={`User ${userLine.userId}`}
+                            connectNulls
+                          />
+                        );
+                      })}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  No engagement chart data available. Click "Refresh Chart" to load.
+                  {!engagementChartData?.hasUserEvents && (
+                    <p className="text-sm text-gray-400 mt-2">
+                      Note: Requires user_events table for login tracking data.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
           </div>
         )}
 
@@ -2627,57 +3055,331 @@ export default function AdminDashboard() {
         )}
 
         {analyticsSubTab === 'vanity-metrics' && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Vanity Metrics</h3>
-            {vanityLoading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-                <p className="text-gray-600 mt-4">Loading vanity metrics...</p>
+          <div className="space-y-6">
+            {/* Vanity Metrics Table */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Vanity Metrics</h3>
+                <div className="flex flex-wrap gap-4 items-end">
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Account Type"
+                      options={['Total Accounts', 'Validated Emails']}
+                      selected={[
+                        ...(vanityFilters.totalAccounts ? ['Total Accounts'] : []),
+                        ...(vanityFilters.validatedEmails ? ['Validated Emails'] : [])
+                      ]}
+                      onChange={(selected) => setVanityFilters({ 
+                        ...vanityFilters, 
+                        totalAccounts: selected.includes('Total Accounts'),
+                        validatedEmails: selected.includes('Validated Emails')
+                      })}
+                      placeholder="Select account type..."
+                    />
+                  </div>
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Intent Categories"
+                      options={intentCategoriesLoading ? [] : intentCategories}
+                      selected={vanityFilters.intentCategories}
+                      onChange={(selected) => setVanityFilters({ ...vanityFilters, intentCategories: selected })}
+                      placeholder={intentCategoriesLoading ? 'Loading...' : 'Select intent categories...'}
+                      disabled={intentCategoriesLoading}
+                    />
+                  </div>
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Cohorts"
+                      options={cohortData?.weeks || []}
+                      selected={vanityFilters.cohorts.length === 0 ? (cohortData?.weeks || []) : vanityFilters.cohorts}
+                      onChange={(selected) => setVanityFilters({ ...vanityFilters, cohorts: selected })}
+                      placeholder="Select cohorts... (default: all)"
+                    />
+                  </div>
+                  <div className="min-w-[200px]">
+                    <CheckboxDropdown
+                      label="Data Coverage"
+                      options={['1 upload', '2 uploads', '3+ uploads']}
+                      selected={vanityFilters.dataCoverage}
+                      onChange={(selected) => setVanityFilters({ ...vanityFilters, dataCoverage: selected })}
+                      placeholder="Select data coverage..."
+                    />
+                  </div>
+                  <button
+                    onClick={fetchVanityMetrics}
+                    disabled={vanityLoading}
+                    className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                  >
+                    {vanityLoading ? 'Loading...' : 'Refresh'}
+                  </button>
+                </div>
               </div>
-            ) : vanityData && vanityData.success && vanityData.metrics ? (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Week</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Users</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">WAU</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">MAU</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Users</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Users/Month</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Transactions</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Transactions</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transactions Recategorised</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statements Uploaded</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unique Banks</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {vanityData.weeks?.map((week: string) => {
-                      const weekData = vanityData.metrics[week];
-                      if (!weekData) return null;
-                      return (
-                        <tr key={week}>
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{week}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.totalUsers || 0}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.weeklyActiveUsers || 0}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.monthlyActiveUsers || 0}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.newUsers || 0}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.newUsersPerMonth || 0}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.totalTransactionsUploaded || 0}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.newTransactionsUploaded || 0}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.totalTransactionsRecategorised || 0}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.totalStatementsUploaded || 0}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.totalUniqueBanksUploaded || 0}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="text-gray-600">No vanity metrics data available</p>
-            )}
+              {vanityLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                  <p className="text-gray-600 mt-4">Loading vanity metrics...</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metric</th>
+                        {vanityData?.weeks?.map((week: string) => (
+                          <th key={week} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                            {week}
+                          </th>
+                        )) || (() => {
+                          // Generate weeks from November to now as fallback
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1); // Month 10 = November
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, (_, i) => {
+                            const weekStart = new Date(firstMonday);
+                            weekStart.setDate(firstMonday.getDate() + (i * 7));
+                            return `w/c ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                          }).map((week: string) => (
+                            <th key={week} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                              {week}
+                            </th>
+                          ));
+                        })()}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total users</td>
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.totalUsers || 0}
+                          </td>
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">New users</td>
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.newUsers || 0}
+                          </td>
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Weekly active users</td>
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.weeklyActiveUsers || 0}
+                          </td>
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Monthly active users</td>
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.monthlyActiveUsers || 0}
+                          </td>
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total transactions uploaded</td>
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.totalTransactionsUploaded || 0}
+                          </td>
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">New transactions uploaded</td>
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.newTransactionsUploaded || 0}
+                          </td>
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total transactions recategorised</td>
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.totalTransactionsRecategorised || 0}
+                          </td>
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">Total unique banks uploaded</td>
+                        {vanityData?.weeks?.map((week: string) => (
+                          <td key={week} className="px-4 py-3 text-sm text-gray-600">
+                            {vanityData.metrics?.[week]?.totalUniqueBanksUploaded || 0}
+                          </td>
+                        )) || (() => {
+                          const now = new Date();
+                          const novemberStart = new Date(now.getFullYear(), 10, 1);
+                          const firstMonday = new Date(novemberStart);
+                          const dayOfWeek = novemberStart.getDay();
+                          if (dayOfWeek === 0) {
+                            firstMonday.setDate(novemberStart.getDate() + 1);
+                          } else if (dayOfWeek !== 1) {
+                            firstMonday.setDate(novemberStart.getDate() + (8 - dayOfWeek));
+                          }
+                          firstMonday.setHours(0, 0, 0, 0);
+                          const currentWeekStart = new Date(now);
+                          currentWeekStart.setDate(now.getDate() - now.getDay());
+                          currentWeekStart.setHours(0, 0, 0, 0);
+                          const weeksDiff = Math.ceil((currentWeekStart.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          const numWeeks = Math.max(1, weeksDiff + 1);
+                          return Array.from({ length: numWeeks }, () => (
+                            <td key={Math.random()} className="px-4 py-3 text-sm text-gray-600">0</td>
+                          ));
+                        })()}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
