@@ -495,76 +495,68 @@ export async function GET(request: NextRequest) {
       // Count distinct transaction IDs from transaction_edit and bulk_edit events
       let totalTransactionsRecategorised = 0;
       try {
-        try {
-          // Get all transaction_edit events (single transaction per event)
-          const recatParamIndex = filterParams.length + 1;
-          const singleEditQuery = `
-            SELECT DISTINCT (e.metadata->>'transactionId')::int as transaction_id
-            FROM l1_event_facts e
-            JOIN users u ON u.id = e.user_id
-            WHERE e.event_type = 'transaction_edit'
-              AND e.event_timestamp >= $${recatParamIndex}::timestamp
-              AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
-              AND u.email != $${adminEmailParamIndex}
-              AND e.metadata->>'transactionId' IS NOT NULL
-              ${filterConditions}
-          `;
-          const singleEditResult = await pool.query(singleEditQuery, [...filterParams, weekStart, weekEnd]);
-          const singleEditIds = new Set(singleEditResult.rows.map((r: any) => r.transaction_id).filter((id: any) => id !== null));
-          
-          // Get all bulk_edit events (multiple transactions per event)
-          const bulkEditQuery = `
-            SELECT e.metadata->'transactionIds' as transaction_ids
-            FROM l1_event_facts e
-            JOIN users u ON u.id = e.user_id
-            WHERE e.event_type = 'bulk_edit'
-              AND e.event_timestamp >= $${recatParamIndex}::timestamp
-              AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
-              AND u.email != $${adminEmailParamIndex}
-              AND e.metadata->'transactionIds' IS NOT NULL
-              ${filterConditions}
-          `;
-          const bulkEditResult = await pool.query(bulkEditQuery, [...filterParams, weekStart, weekEnd]);
-          bulkEditResult.rows.forEach((row: any) => {
-            const ids = row.transaction_ids;
-            if (Array.isArray(ids)) {
-              ids.forEach((id: any) => {
-                if (id !== null && id !== undefined) {
-                  singleEditIds.add(parseInt(id));
-                }
-              });
-            }
-          });
-          
-          totalTransactionsRecategorised = singleEditIds.size;
-        } catch (e) {
-          // Query failed, recategorised = 0
-          console.error('[Vanity Metrics] Error counting recategorised transactions:', e);
-        }
+        // Get all transaction_edit events (single transaction per event)
+        const recatParamIndex = filterParams.length + 1;
+        const singleEditQuery = `
+          SELECT DISTINCT (e.metadata->>'transactionId')::int as transaction_id
+          FROM l1_event_facts e
+          JOIN users u ON u.id = e.user_id
+          WHERE e.event_type = 'transaction_edit'
+            AND e.event_timestamp >= $${recatParamIndex}::timestamp
+            AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
+            AND u.email != $${adminEmailParamIndex}
+            AND e.metadata->>'transactionId' IS NOT NULL
+            ${filterConditions}
+        `;
+        const singleEditResult = await pool.query(singleEditQuery, [...filterParams, weekStart, weekEnd]);
+        const singleEditIds = new Set(singleEditResult.rows.map((r: any) => r.transaction_id).filter((id: any) => id !== null));
+        
+        // Get all bulk_edit events (multiple transactions per event)
+        const bulkEditQuery = `
+          SELECT e.metadata->'transactionIds' as transaction_ids
+          FROM l1_event_facts e
+          JOIN users u ON u.id = e.user_id
+          WHERE e.event_type = 'bulk_edit'
+            AND e.event_timestamp >= $${recatParamIndex}::timestamp
+            AND e.event_timestamp <= $${recatParamIndex + 1}::timestamp
+            AND u.email != $${adminEmailParamIndex}
+            AND e.metadata->'transactionIds' IS NOT NULL
+            ${filterConditions}
+        `;
+        const bulkEditResult = await pool.query(bulkEditQuery, [...filterParams, weekStart, weekEnd]);
+        bulkEditResult.rows.forEach((row: any) => {
+          const ids = row.transaction_ids;
+          if (Array.isArray(ids)) {
+            ids.forEach((id: any) => {
+              if (id !== null && id !== undefined) {
+                singleEditIds.add(parseInt(id));
+              }
+            });
+          }
+        });
+        
+        totalTransactionsRecategorised = singleEditIds.size;
       } catch (e) {
         // Query failed, recategorised = 0
+        console.error('[Vanity Metrics] Error counting recategorised transactions:', e);
       }
 
       // Total statements uploaded (in the week)
       let totalStatementsUploaded = 0;
       try {
-        try {
-          const statementsParamIndex = filterParams.length + 1;
-          const statementsQuery = `
-            SELECT COUNT(*) as count
-            FROM l1_event_facts e
-            JOIN users u ON u.id = e.user_id
-            WHERE e.event_type = 'statement_upload'
-              AND e.event_timestamp >= $${statementsParamIndex}::timestamp
-              AND e.event_timestamp <= $${statementsParamIndex + 1}::timestamp
-              AND u.email != $${adminEmailParamIndex}
-              ${filterConditions}
-          `;
-          const statementsResult = await pool.query(statementsQuery, [...filterParams, weekStart, weekEnd]);
-          totalStatementsUploaded = parseInt(statementsResult.rows[0]?.count) || 0;
-        } catch (e) {
-          // Query failed, statements = 0
-        }
+        const statementsParamIndex = filterParams.length + 1;
+        const statementsQuery = `
+          SELECT COUNT(*) as count
+          FROM l1_event_facts e
+          JOIN users u ON u.id = e.user_id
+          WHERE e.event_type = 'statement_upload'
+            AND e.event_timestamp >= $${statementsParamIndex}::timestamp
+            AND e.event_timestamp <= $${statementsParamIndex + 1}::timestamp
+            AND u.email != $${adminEmailParamIndex}
+            ${filterConditions}
+        `;
+        const statementsResult = await pool.query(statementsQuery, [...filterParams, weekStart, weekEnd]);
+        totalStatementsUploaded = parseInt(statementsResult.rows[0]?.count) || 0;
       } catch (e) {
         // Query failed, statements = 0
       }
@@ -572,23 +564,19 @@ export async function GET(request: NextRequest) {
       // Total statements uploaded by unique person (in the week)
       let totalStatementsByUniquePerson = 0;
       try {
-        try {
-          const uniqueStatementsParamIndex = filterParams.length + 1;
-          const uniqueStatementsQuery = `
-            SELECT COUNT(DISTINCT e.user_id) as count
-            FROM l1_event_facts e
-            JOIN users u ON u.id = e.user_id
-            WHERE e.event_type = 'statement_upload'
-              AND e.event_timestamp >= $${uniqueStatementsParamIndex}::timestamp
-              AND e.event_timestamp <= $${uniqueStatementsParamIndex + 1}::timestamp
-              AND u.email != $${adminEmailParamIndex}
-              ${filterConditions}
-          `;
-          const uniqueStatementsResult = await pool.query(uniqueStatementsQuery, [...filterParams, weekStart, weekEnd]);
-          totalStatementsByUniquePerson = parseInt(uniqueStatementsResult.rows[0]?.count) || 0;
-        } catch (e) {
-          // Query failed, unique statements = 0
-        }
+        const uniqueStatementsParamIndex = filterParams.length + 1;
+        const uniqueStatementsQuery = `
+          SELECT COUNT(DISTINCT e.user_id) as count
+          FROM l1_event_facts e
+          JOIN users u ON u.id = e.user_id
+          WHERE e.event_type = 'statement_upload'
+            AND e.event_timestamp >= $${uniqueStatementsParamIndex}::timestamp
+            AND e.event_timestamp <= $${uniqueStatementsParamIndex + 1}::timestamp
+            AND u.email != $${adminEmailParamIndex}
+            ${filterConditions}
+        `;
+        const uniqueStatementsResult = await pool.query(uniqueStatementsQuery, [...filterParams, weekStart, weekEnd]);
+        totalStatementsByUniquePerson = parseInt(uniqueStatementsResult.rows[0]?.count) || 0;
       } catch (e) {
         // Query failed, unique statements = 0
       }

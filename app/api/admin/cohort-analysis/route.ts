@@ -471,15 +471,15 @@ export async function GET(request: NextRequest) {
       `;
       const eventsResult = await pool.query(eventsQuery, filterParams);
         
-        eventsResult.rows.forEach((row: any) => {
-          const weekKey = `w/c ${new Date(row.signup_week).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-          if (!userEventsData[weekKey]) {
-            userEventsData[weekKey] = {};
-          }
-        });
-      } catch (e) {
-        // Could not fetch l1_events data
-      }
+      eventsResult.rows.forEach((row: any) => {
+        const weekKey = `w/c ${new Date(row.signup_week).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        if (!userEventsData[weekKey]) {
+          userEventsData[weekKey] = {};
+        }
+      });
+    } catch (e) {
+      // Could not fetch l1_event_facts data
+      console.error('[Cohort Analysis] Error fetching engagement data:', e);
     }
 
     // Format results by week

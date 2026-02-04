@@ -129,22 +129,6 @@ export async function POST(req: NextRequest) {
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [userId, pattern, originalCategory, originalLabel, correctedCategory, correctedLabel]
       );
-          } catch (fallbackError: any) {
-            console.error('[Learn API] Fallback insert also failed:', fallbackError.message);
-            console.error('[Learn API] Available columns might be different. Checking table schema...');
-            // Try to get table structure for debugging
-            const schemaCheck = await pool.query(`
-              SELECT column_name, data_type 
-              FROM information_schema.columns 
-              WHERE table_name = 'categorization_learning'
-            `);
-            console.log('[Learn API] Table columns:', schemaCheck.rows);
-            throw fallbackError;
-          }
-        } else {
-          throw insertError;
-        }
-      }
 
       return NextResponse.json({
         success: true,
