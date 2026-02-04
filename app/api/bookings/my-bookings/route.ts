@@ -28,6 +28,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 });
     }
 
+    // Use new table name (l1_admin_chat_bookings) with fallback to old name
+    let tableName = 'l1_admin_chat_bookings';
+    try {
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'chat_bookings'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'chat_bookings'; // Fallback on error
+    }
+
     // Get user's bookings
     const result = await pool.query(
       `SELECT 
@@ -40,7 +54,7 @@ export async function GET(request: NextRequest) {
         notes,
         status,
         created_at
-       FROM chat_bookings
+       FROM ${tableName}
        WHERE user_id = $1
        ORDER BY booking_date DESC, booking_time DESC`,
       [userId]

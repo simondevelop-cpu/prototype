@@ -2904,9 +2904,7 @@ export default function AdminDashboard() {
                   <div className="mt-4 text-sm text-gray-600">
                     <p className="font-medium mb-2">Chart showing: {chartMetric === 'loginDays' ? 'Unique Days Logged In' : 'Number of Uploads Per Week'}</p>
                     <p className="text-xs text-gray-500">
-                      {chartMetric === 'loginDays' 
-                        ? 'Tracks unique days each user logged in per week from Day 1 of signup'
-                        : 'Tracks number of statement uploads per week from Day 1 of signup'}
+                      Unique events per week from first day of sign up
                     </p>
                   </div>
                 </div>
@@ -3535,7 +3533,53 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {analyticsSubTab === 'download' && renderPlaceholder('Download')}
+        {analyticsSubTab === 'download' && (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Download</h2>
+              <p className="text-gray-600 mt-1">Export raw database data or API documentation</p>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Export All Raw Data */}
+              <div className="border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Export all raw data</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Download all data from every table in the database. Includes API documentation and table of contents as the first sheets. Each table will be a separate sheet in the Excel file.
+                </p>
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('admin_token');
+                      const response = await fetch('/api/admin/export/all-data', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      });
+                      if (!response.ok) {
+                        const error = await response.json();
+                        alert(`Failed to export data: ${error.error || 'Unknown error'}`);
+                        return;
+                      }
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `database-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      document.body.removeChild(a);
+                    } catch (error: any) {
+                      console.error('Error exporting data:', error);
+                      alert(`Error exporting data: ${error.message || 'Unknown error'}`);
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  ⬇️ Download All Data (Excel)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };

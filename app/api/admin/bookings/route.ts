@@ -52,6 +52,20 @@ export async function GET(request: NextRequest) {
       // Continue anyway - might already exist
     }
 
+    // Use new table name (l1_admin_chat_bookings) with fallback to old name
+    let tableName = 'l1_admin_chat_bookings';
+    try {
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'chat_bookings'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'chat_bookings'; // Fallback on error
+    }
+
     // Get all bookings with user information
     let result;
     try {
@@ -69,7 +83,7 @@ export async function GET(request: NextRequest) {
           cb.notes,
           cb.status,
           cb.created_at
-         FROM chat_bookings cb
+         FROM ${tableName} cb
          JOIN users u ON cb.user_id = u.id
          ORDER BY cb.booking_date DESC, cb.booking_time DESC
          LIMIT 500`

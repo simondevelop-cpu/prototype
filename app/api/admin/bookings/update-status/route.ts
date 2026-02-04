@@ -45,9 +45,23 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // Use new table name (l1_admin_chat_bookings) with fallback to old name
+    let tableName = 'l1_admin_chat_bookings';
+    try {
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [tableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        tableName = 'chat_bookings'; // Fallback to old name
+      }
+    } catch (e) {
+      tableName = 'chat_bookings'; // Fallback on error
+    }
+
     // Update booking status
     const result = await pool.query(
-      `UPDATE chat_bookings 
+      `UPDATE ${tableName} 
        SET status = $1, updated_at = NOW()
        WHERE id = $2
        RETURNING id, status`,

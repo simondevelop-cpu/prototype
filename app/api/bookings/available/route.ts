@@ -92,12 +92,26 @@ export async function GET(request: NextRequest) {
       // Continue anyway - might already exist
     }
 
+    // Use new table name (l1_admin_chat_bookings) with fallback to old name
+    let bookingsTableName = 'l1_admin_chat_bookings';
+    try {
+      const tableCheck = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = $1`,
+        [bookingsTableName]
+      );
+      if (tableCheck.rows.length === 0) {
+        bookingsTableName = 'chat_bookings'; // Fallback to old name
+      }
+    } catch (e) {
+      bookingsTableName = 'chat_bookings'; // Fallback on error
+    }
+
     // Get all bookings
     let bookingsResult;
     try {
       bookingsResult = await pool.query(
         `SELECT booking_date, booking_time 
-         FROM chat_bookings 
+         FROM ${bookingsTableName} 
          WHERE status IN ('pending', 'requested', 'confirmed')`
       );
     } catch (error: any) {
