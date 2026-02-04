@@ -130,6 +130,8 @@ export default function AdminDashboard() {
   // State for Post-Migration Verification
   const [verificationTests, setVerificationTests] = useState<any>(null);
   const [verificationTestsLoading, setVerificationTestsLoading] = useState(false);
+  const [codeReferences, setCodeReferences] = useState<any>(null);
+  const [codeReferencesLoading, setCodeReferencesLoading] = useState(false);
   
   // State for Chat Scheduler
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
@@ -2261,6 +2263,258 @@ export default function AdminDashboard() {
           {!verificationTests && !verificationTestsLoading && (
             <div className="p-6 text-center text-gray-500">
               <p>Click "Run Verification Tests" to check system functionality</p>
+            </div>
+          )}
+        </div>
+
+        {/* Code References Check Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Code References Check</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Check which code files still reference the old users table
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Identifies what needs to be updated before dropping old fields
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  setCodeReferencesLoading(true);
+                  try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch('/api/admin/migration/check-code-references', {
+                      headers: {
+                        'Authorization': `Bearer ${token}`,
+                      },
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                      setCodeReferences(data);
+                    } else {
+                      setError(data.error || 'Failed to check code references');
+                    }
+                  } catch (error: any) {
+                    setError('Failed to check code references: ' + error.message);
+                  } finally {
+                    setCodeReferencesLoading(false);
+                  }
+                }}
+                disabled={codeReferencesLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {codeReferencesLoading ? 'Checking...' : 'Check Code References'}
+              </button>
+            </div>
+          </div>
+
+          {codeReferences && (
+            <div className="p-6 space-y-6">
+              {/* Database Status */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <h4 className="font-semibold text-gray-900 mb-3">Database Status</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Users table exists:</span>
+                    <span className={`ml-2 font-semibold ${codeReferences.databaseStatus.usersTableExists ? 'text-yellow-700' : 'text-green-700'}`}>
+                      {codeReferences.databaseStatus.usersTableExists ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  {codeReferences.databaseStatus.usersTableExists && (
+                    <>
+                      <div>
+                        <span className="text-gray-600">Users table rows:</span>
+                        <span className="ml-2 font-semibold">{codeReferences.databaseStatus.usersTableRowCount || 0}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Has email column:</span>
+                        <span className={`ml-2 font-semibold ${codeReferences.databaseStatus.usersHasEmail ? 'text-yellow-700' : 'text-green-700'}`}>
+                          {codeReferences.databaseStatus.usersHasEmail ? 'Yes (should be removed)' : 'No'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Has display_name column:</span>
+                        <span className={`ml-2 font-semibold ${codeReferences.databaseStatus.usersHasDisplayName ? 'text-yellow-700' : 'text-green-700'}`}>
+                          {codeReferences.databaseStatus.usersHasDisplayName ? 'Yes (should be removed)' : 'No'}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <span className="text-gray-600">l1_user_permissions exists:</span>
+                    <span className={`ml-2 font-semibold ${codeReferences.databaseStatus.l1UserPermissionsExists ? 'text-green-700' : 'text-red-700'}`}>
+                      {codeReferences.databaseStatus.l1UserPermissionsExists ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  {codeReferences.databaseStatus.l1UserPermissionsExists && (
+                    <div>
+                      <span className="text-gray-600">l1_user_permissions rows:</span>
+                      <span className="ml-2 font-semibold">{codeReferences.databaseStatus.l1UserPermissionsRowCount || 0}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className={`p-4 rounded-lg border-2 ${
+                codeReferences.summary.criticalUpdates === 0 && codeReferences.summary.needsCodeUpdates === 0 
+                  ? 'bg-green-50 border-green-300' 
+                  : codeReferences.summary.criticalUpdates > 0 
+                    ? 'bg-red-50 border-red-300' 
+                    : 'bg-yellow-50 border-yellow-300'
+              }`}>
+                <h4 className="font-semibold text-gray-900 mb-3">Summary</h4>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Files with users references:</span>
+                    <span className="ml-2 font-semibold">{codeReferences.summary.needsCodeUpdates || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Critical endpoints:</span>
+                    <span className={`ml-2 font-semibold ${codeReferences.summary.criticalUpdates > 0 ? 'text-red-700' : 'text-green-700'}`}>
+                      {codeReferences.summary.criticalUpdates || 0}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Safe to drop:</span>
+                    <span className={`ml-2 font-semibold ${
+                      codeReferences.summary.criticalUpdates === 0 && codeReferences.summary.needsCodeUpdates === 0 
+                        ? 'text-green-700' 
+                        : 'text-red-700'
+                    }`}>
+                      {codeReferences.summary.criticalUpdates === 0 && codeReferences.summary.needsCodeUpdates === 0 ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recommendations */}
+              {codeReferences.recommendations && codeReferences.recommendations.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-gray-900">Recommendations</h4>
+                  {codeReferences.recommendations.map((rec: any, idx: number) => (
+                    <div key={idx} className={`p-4 rounded-lg border ${
+                      rec.priority === 'HIGH' ? 'bg-red-50 border-red-200' :
+                      rec.priority === 'MEDIUM' ? 'bg-yellow-50 border-yellow-200' :
+                      'bg-blue-50 border-blue-200'
+                    }`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                              rec.priority === 'HIGH' ? 'bg-red-200 text-red-800' :
+                              rec.priority === 'MEDIUM' ? 'bg-yellow-200 text-yellow-800' :
+                              'bg-blue-200 text-blue-800'
+                            }`}>
+                              {rec.priority}
+                            </span>
+                            <span className="font-semibold text-gray-900">{rec.action}</span>
+                          </div>
+                          <p className="text-sm text-gray-700">{rec.reason}</p>
+                          {rec.endpoints && rec.endpoints.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-xs font-medium text-gray-600 mb-1">Affected endpoints:</p>
+                              <ul className="list-disc list-inside text-xs text-gray-700">
+                                {rec.endpoints.map((ep: string, epIdx: number) => (
+                                  <li key={epIdx}>{ep}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Critical Endpoints */}
+              {codeReferences.criticalEndpoints && codeReferences.criticalEndpoints.length > 0 && (
+                <div className="border border-red-200 rounded-lg overflow-hidden">
+                  <div className="bg-red-50 px-6 py-3 border-b border-red-200">
+                    <h5 className="font-semibold text-red-900">Critical Endpoints Needing Updates</h5>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">File</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">References</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {codeReferences.criticalEndpoints.map((endpoint: any, index: number) => (
+                          <tr key={index} className="bg-red-50">
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{endpoint.file}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              <div className="space-y-1">
+                                {endpoint.references.slice(0, 5).map((ref: any, refIdx: number) => (
+                                  <div key={refIdx} className="text-xs">
+                                    <span className="font-medium">{ref.type}</span> (line {ref.line})
+                                  </div>
+                                ))}
+                                {endpoint.references.length > 5 && (
+                                  <div className="text-xs text-gray-500">
+                                    +{endpoint.references.length - 5} more...
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* All Code References */}
+              {codeReferences.codeReferences && codeReferences.codeReferences.length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+                    <h5 className="font-semibold text-gray-900">All Code References</h5>
+                  </div>
+                  <div className="overflow-x-auto max-h-96">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">File</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">References</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {codeReferences.codeReferences.map((ref: any, index: number) => (
+                          <tr key={index} className={ref.isCritical ? 'bg-yellow-50' : ''}>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{ref.file}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              <div className="space-y-1">
+                                {ref.references.slice(0, 3).map((r: any, rIdx: number) => (
+                                  <div key={rIdx} className="text-xs">
+                                    <span className="font-medium">{r.type}</span> (line {r.line})
+                                  </div>
+                                ))}
+                                {ref.references.length > 3 && (
+                                  <div className="text-xs text-gray-500">
+                                    +{ref.references.length - 3} more...
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!codeReferences && !codeReferencesLoading && (
+            <div className="p-6 text-center text-gray-500">
+              <p>Click "Check Code References" to see which files still reference the users table</p>
             </div>
           )}
         </div>
