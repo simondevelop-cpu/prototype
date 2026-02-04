@@ -1924,7 +1924,7 @@ export default function AdminDashboard() {
   };
 
   // Render Migration Tab
-  const renderMigrationTab = () => {
+  const renderMigrationTab = function() {
     return (
       <div className="space-y-6">
         <div className="bg-white rounded-lg shadow p-6">
