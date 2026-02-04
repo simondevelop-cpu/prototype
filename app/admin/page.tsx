@@ -1923,7 +1923,7 @@ export default function AdminDashboard() {
     );
   };
 
-  const renderMigrationTab = () => {
+  const renderMigrationTab = (): JSX.Element => {
     return (
       <div className="space-y-6">
         <div className="bg-white rounded-lg shadow p-6">
