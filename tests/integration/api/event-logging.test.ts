@@ -193,7 +193,7 @@ describe('Event Logging', () => {
       expect(response.status).toBe(200);
 
       const events = await testClient.query(
-        `SELECT event_type, user_id, metadata FROM l1_events WHERE event_type = 'transaction_edit'`
+        `SELECT event_type, user_id, metadata FROM l1_event_facts WHERE event_type = 'transaction_edit'`
       );
 
       expect(events.rows.length).toBe(1);
@@ -263,7 +263,7 @@ describe('Event Logging', () => {
       expect(responseData.updatedCount).toBeGreaterThan(0);
 
       const events = await testClient.query(
-        `SELECT event_type, user_id, metadata FROM l1_events WHERE event_type = 'bulk_edit'`
+        `SELECT event_type, user_id, metadata FROM l1_event_facts WHERE event_type = 'bulk_edit'`
       );
 
       expect(events.rows.length).toBe(1);

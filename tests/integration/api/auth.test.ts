@@ -65,6 +65,17 @@ describe('Authentication API', () => {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS l1_event_facts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES l1_user_permissions(id),
+        tokenized_user_id TEXT REFERENCES l0_user_tokenization(tokenized_user_id),
+        event_type TEXT NOT NULL,
+        event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        metadata JSONB,
+        is_admin BOOLEAN DEFAULT FALSE,
+        session_id TEXT
+      );
+
       CREATE TABLE IF NOT EXISTS l0_user_tokenization (
         internal_user_id INTEGER PRIMARY KEY REFERENCES l1_user_permissions(id),
         tokenized_user_id TEXT NOT NULL UNIQUE,
