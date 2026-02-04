@@ -2389,9 +2389,80 @@ export default function AdminDashboard() {
                 <p className="text-gray-600 mt-4">Loading cohort analysis...</p>
               </div>
             ) : cohortData ? (
-              <div className="space-y-4">
-                {/* Cohort data display */}
-                <p className="text-gray-600">Cohort analysis data loaded</p>
+              <div className="space-y-6">
+                {/* Activation Table */}
+                {cohortData.activation && Object.keys(cohortData.activation).length > 0 && (
+                  <div>
+                    <h4 className="text-md font-semibold text-gray-900 mb-3">Activation Metrics by Week</h4>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Week</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Started Onboarding</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dropped Step 1</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dropped Step 2</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Completed</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Time to Onboard (min)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {cohortData.weeks?.map((week: string) => {
+                            const activation = cohortData.activation[week];
+                            if (!activation) return null;
+                            return (
+                              <tr key={week}>
+                                <td className="px-6 py-4 text-sm font-medium text-gray-900">{week}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{activation.startedOnboarding || 0}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{activation.droppedStep1 || 0}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{activation.droppedStep2 || 0}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{activation.completedOnboarding || 0}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{activation.avgTimeToOnboardMinutes || '-'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Engagement Table */}
+                {cohortData.engagement && Object.keys(cohortData.engagement).length > 0 && (
+                  <div>
+                    <h4 className="text-md font-semibold text-gray-900 mb-3">Engagement Metrics by Week</h4>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Week</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Onboarding Completed</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded 1st Statement</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded 2 Statements</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded 3+ Statements</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Transactions/User</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {cohortData.weeks?.map((week: string) => {
+                            const engagement = cohortData.engagement[week];
+                            if (!engagement) return null;
+                            return (
+                              <tr key={week}>
+                                <td className="px-6 py-4 text-sm font-medium text-gray-900">{week}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{engagement.onboardingCompleted || 0}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{engagement.uploadedFirstStatement || 0}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{engagement.uploadedTwoStatements || 0}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{engagement.uploadedThreePlusStatements || 0}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{engagement.avgTransactionsPerUser || '-'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-gray-600">Click "Generate Cohort Analysis" to load data</p>
@@ -2563,39 +2634,46 @@ export default function AdminDashboard() {
                 <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
                 <p className="text-gray-600 mt-4">Loading vanity metrics...</p>
               </div>
-            ) : vanityData ? (
-              <div className="space-y-4">
-                {vanityData.monthlyMetrics && (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Month</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Users</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">MAU</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Users</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transactions</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unique Banks</th>
+            ) : vanityData && vanityData.success && vanityData.metrics ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Week</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Users</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">WAU</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">MAU</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Users</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Users/Month</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Transactions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Transactions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transactions Recategorised</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statements Uploaded</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unique Banks</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {vanityData.weeks?.map((week: string) => {
+                      const weekData = vanityData.metrics[week];
+                      if (!weekData) return null;
+                      return (
+                        <tr key={week}>
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{week}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.totalUsers || 0}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.weeklyActiveUsers || 0}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.monthlyActiveUsers || 0}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.newUsers || 0}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.newUsersPerMonth || 0}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.totalTransactionsUploaded || 0}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.newTransactionsUploaded || 0}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.totalTransactionsRecategorised || 0}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.totalStatementsUploaded || 0}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{weekData.totalUniqueBanksUploaded || 0}</td>
                         </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {vanityData.monthlyMetrics.map((month: any, idx: number) => (
-                          <tr key={idx}>
-                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{month.month}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{month.totalUsers || 0}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{month.mau || 0}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{month.newUsers || 0}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{month.transactions || 0}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{month.uniqueBanks || 0}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                {!vanityData.monthlyMetrics && (
-                  <p className="text-gray-600">No vanity metrics data available</p>
-                )}
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <p className="text-gray-600">No vanity metrics data available</p>
