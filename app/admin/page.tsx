@@ -2488,6 +2488,7 @@ export default function AdminDashboard() {
         </div>
       </div>
     );
+    */
   };
 
   // Render Analytics Tab
