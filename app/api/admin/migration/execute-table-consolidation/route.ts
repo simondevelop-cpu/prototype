@@ -139,31 +139,40 @@ export async function POST(request: NextRequest) {
 
       // Make internal_user_id the PRIMARY KEY if it's not already
       try {
-        // Check if internal_user_id is already the primary key
+        // Check which column(s) the primary key is currently on
         const pkCheck = await client.query(`
-          SELECT constraint_name
-          FROM information_schema.table_constraints
-          WHERE table_name = 'l0_pii_users'
-            AND constraint_type = 'PRIMARY KEY'
+          SELECT 
+            tc.constraint_name,
+            kcu.column_name
+          FROM information_schema.table_constraints tc
+          JOIN information_schema.key_column_usage kcu
+            ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_schema = kcu.table_schema
+          WHERE tc.table_name = 'l0_pii_users'
+            AND tc.constraint_type = 'PRIMARY KEY'
         `);
         
-        const hasInternalUserIdPK = pkCheck.rows.some((row: any) => 
-          row.constraint_name && row.constraint_name.includes('internal_user_id')
-        );
+        const pkColumns = pkCheck.rows.map((row: any) => row.column_name);
+        const hasInternalUserIdPK = pkColumns.includes('internal_user_id');
+        const hasIdPK = pkColumns.includes('id');
         
         if (!hasInternalUserIdPK) {
-          // Check if id column exists
+          // If there's a primary key on 'id' or any other column, drop it first
+          if (pkCheck.rows.length > 0) {
+            const constraintName = pkCheck.rows[0].constraint_name;
+            await client.query(`
+              ALTER TABLE l0_pii_users DROP CONSTRAINT IF EXISTS "${constraintName}"
+            `);
+          }
+          
+          // Check if id column exists and drop it if it does
           const idColumnCheck = await client.query(`
             SELECT 1 FROM information_schema.columns
             WHERE table_name = 'l0_pii_users' AND column_name = 'id'
           `);
           
           if (idColumnCheck.rows.length > 0) {
-            // Drop old primary key constraint if it exists
-            await client.query(`
-              ALTER TABLE l0_pii_users DROP CONSTRAINT IF EXISTS l0_pii_users_pkey
-            `);
-            // Drop id column
+            // Drop id column (constraint already dropped above)
             await client.query(`
               ALTER TABLE l0_pii_users DROP COLUMN IF EXISTS id
             `);
@@ -173,6 +182,19 @@ export async function POST(request: NextRequest) {
           await client.query(`
             ALTER TABLE l0_pii_users ADD CONSTRAINT l0_pii_users_pkey PRIMARY KEY (internal_user_id)
           `);
+        } else {
+          // internal_user_id is already the primary key, but we might still need to drop the id column
+          const idColumnCheck = await client.query(`
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'l0_pii_users' AND column_name = 'id'
+          `);
+          
+          if (idColumnCheck.rows.length > 0) {
+            // Drop id column if it exists (but keep the PK on internal_user_id)
+            await client.query(`
+              ALTER TABLE l0_pii_users DROP COLUMN IF EXISTS id
+            `);
+          }
         }
       } catch (e: any) {
         console.error('[Migration] Error updating l0_pii_users primary key:', e);
