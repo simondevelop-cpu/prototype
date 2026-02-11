@@ -131,6 +131,35 @@ export async function GET(request: NextRequest) {
       results.allPassed = false;
     }
 
+    // Test 1.4: l1_customer_facts has no PII columns (migration complete)
+    try {
+      const check = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'l1_customer_facts'
+          AND column_name IN ('age_range', 'province_region', 'migration_flag')
+      `);
+      const piiColumnsPresent = check.rows.map((r: any) => r.column_name);
+      const allRemoved = piiColumnsPresent.length === 0;
+      results.tests.push({
+        category: 'Database Structure',
+        name: 'l1_customer_facts PII columns removed',
+        status: allRemoved ? 'pass' : 'fail',
+        message: allRemoved
+          ? 'age_range, province_region, migration_flag successfully removed'
+          : `Run schema-change migration to drop: ${piiColumnsPresent.join(', ')}`,
+      });
+      if (allRemoved) results.summary.passed++;
+      else { results.summary.failed++; results.allPassed = false; }
+    } catch (e: any) {
+      results.tests.push({
+        category: 'Database Structure',
+        name: 'l1_customer_facts PII columns removed',
+        status: 'warn',
+        message: `Could not check: ${e.message}`,
+      });
+      results.summary.warnings++;
+    }
+
     // ============================================
     // 2. DATA INTEGRITY TESTS
     // ============================================

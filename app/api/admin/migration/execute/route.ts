@@ -291,6 +291,62 @@ async function executeSchemaChanges(pool: any, dryRun: boolean): Promise<Migrati
     });
   }
 
+  // Step 4: Remove PII/migration columns from l1_customer_facts (per consolidation migration)
+  try {
+    const tableCheck = await pool.query(`
+      SELECT 1 FROM information_schema.tables WHERE table_name = 'l1_customer_facts'
+    `);
+    if (tableCheck.rows.length > 0) {
+      const columnsToDrop = ['age_range', 'province_region', 'migration_flag'];
+      const existingCols = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'l1_customer_facts' AND column_name = ANY($1::text[])
+      `, [columnsToDrop]);
+      const existingNames = existingCols.rows.map((r: any) => r.column_name);
+
+      if (existingNames.length === 0) {
+        steps.push({
+          id: 'drop-customer-facts-pii-columns',
+          name: 'Remove PII columns from l1_customer_facts',
+          description: 'Drop age_range, province_region, migration_flag (already removed)',
+          phase: 'schema-change',
+          status: 'completed',
+          details: { note: 'Columns already dropped - no change needed' },
+        });
+      } else if (dryRun) {
+        steps.push({
+          id: 'drop-customer-facts-pii-columns',
+          name: 'Remove PII columns from l1_customer_facts',
+          description: `Would drop: ${existingNames.join(', ')}`,
+          phase: 'schema-change',
+          status: 'completed',
+          details: { wouldExecute: true, columns: existingNames },
+        });
+      } else {
+        for (const col of columnsToDrop) {
+          await pool.query(`ALTER TABLE l1_customer_facts DROP COLUMN IF EXISTS ${col}`);
+        }
+        steps.push({
+          id: 'drop-customer-facts-pii-columns',
+          name: 'Remove PII columns from l1_customer_facts',
+          description: `Dropped age_range, province_region, migration_flag`,
+          phase: 'schema-change',
+          status: 'completed',
+          details: { dropped: existingNames },
+        });
+      }
+    }
+  } catch (error: any) {
+    steps.push({
+      id: 'drop-customer-facts-pii-columns',
+      name: 'Remove PII columns from l1_customer_facts',
+      description: 'Drop age_range, province_region, migration_flag',
+      phase: 'schema-change',
+      status: 'failed',
+      error: error.message,
+    });
+  }
+
   return steps;
 }
 
